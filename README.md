@@ -2,7 +2,7 @@
 
 A Wear OS watch app and Android phone companion for talking to your own Hermes agent, approving prompts, and seeing your profile's pet on your wrist.
 
-**Status:** repository bootstrap. Application code and the M0–M8 milestones are not implemented yet.
+**Status:** M0 foundation and M1 protocol are implemented and verified locally. Both starter apps build; pairing, UTF-8 text replies, PCM loopback, and HMAC reconnect pass against the unmodified SDK devserver. The watch conversation UI and phone relay are next; these starter apps cannot yet talk to a configured Hermes server.
 
 The initial target is the Samsung Galaxy Watch Ultra, with support planned for Wear OS 4+ devices. The app will connect to user-configured Hermes servers, using a phone relay by default or a direct WebSocket connection when configured. There is no hosted backend or analytics service planned.
 
@@ -10,19 +10,36 @@ The initial target is the Samsung Galaxy Watch Ultra, with support planned for W
 
 The [project brief](docs/hermes-gadget-wear-prompt.md) defines the requirements, upstream sources, acceptance criteria, and milestones. [Progress](docs/progress.md) records what has actually been delivered.
 
-Before implementation, verify the Hermes Gadget SDK at `v0.2.0` and the referenced Hermes pet code, then write `docs/PRD.md`, `docs/architecture.md`, and `docs/pets.md`. Decisions marked **DECISION** in the brief require maintainer input.
+Design and verified upstream corrections are in the [PRD](docs/PRD.md), [architecture](docs/architecture.md), and [pet analysis](docs/pets.md). Server extensions are tracked in [upstream proposals](docs/upstream.md). The [self-host guide](docs/self-host.md) covers private TLS access. Decisions marked **DECISION** in the brief require maintainer input.
 
-## Planned modules
+## Modules
 
 | Directory | Purpose |
 | --- | --- |
-| `protocol/` | Pure Kotlin/JVM protocol, framing, authentication, and negotiation |
-| `wear/` | Wear OS UI, audio, actions, pets, Tile, and complication |
-| `mobile/` | Android onboarding, server management, relay, and optional client TTS |
-| `server/` | Upstream-bound Hermes Gadget SDK patch series |
-| `tools/` | Pet tooling, development server helpers, and CI utilities |
+| `protocol/` | Pure Kotlin/JVM envelopes, framing, identity, handshake, heartbeat, and PCM negotiation |
+| `wear/` | Compose for Wear OS starter; conversation features follow in M2 |
+| `mobile/` | Android Compose starter; onboarding and relay follow in M3 |
+| `server/` | Index of proposed upstream changes; no server fork or patches yet |
+| `tools/` | Pinned SDK installation and actual devserver integration launcher |
 
-These directories will be introduced during implementation.
+## Build and verify
+
+Install JDK 17, Python 3.10+, Git, and the Android SDK packages `platforms;android-37.0`, `build-tools;36.0.0`, and `ndk;27.1.12297006`. Set `JAVA_HOME` and `ANDROID_HOME`, or configure the SDK location in an ignored `local.properties`. The checked-in Gradle 9.4.1 wrapper verifies the distribution checksum. Both apps compile/target API 37; watch minimum API is 33, phone minimum API is 29.
+
+```bash
+python3 tools/setup-devserver.py
+HERMES_GADGET_PYTHON="$PWD/.local/venv/bin/python" ./gradlew check :wear:assembleDebug :mobile:assembleDebug --warning-mode=fail
+```
+
+The setup script pins SDK `v0.2.0` to commit `323e3303ab68981f810fc3208119cd8a22e64af0`, rejects a modified checkout, and installs test dependencies into ignored `.local/` state. On Windows, use `.local/venv/Scripts/python.exe` and `gradlew.bat` with the same environment variable.
+
+`check` runs protocol tests, Android host unit-test tasks, Android lint, and ktlint. Kotlin, lint, and Gradle warnings fail verification. The live integration test is skipped when `HERMES_GADGET_PYTHON` is absent; CI sets it, and the recorded local run has zero skipped tests. Android host unit-test tasks currently have no tests because these screens are only starters.
+
+Debug APKs are written to `wear/build/outputs/apk/debug/` and `mobile/build/outputs/apk/debug/`. [CI](.github/workflows/ci.yml) runs the same gate, scans secrets, and publishes both debug APKs. Format Kotlin with `./gradlew ktlintFormat`.
+
+## Next gates
+
+M2 adds direct pairing, text, PCM capture/playback, prompts, cards, images, and actions, followed by a physical-watch demo against real Hermes. Before connection work, resolve TLS-only versus explicitly permitted cleartext endpoints. Before M3, resolve watch-owned TLS through an opaque phone relay versus a trusted-phone relay. The current starter policy denies cleartext traffic. Hardware, battery, and release acceptance remain open.
 
 ## Public repository hygiene
 

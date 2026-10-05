@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Hermes Gadget</string>
+    <string name="gadget_title">Hermes</string>
+    <string name="setup_title">Your agent.\nOn your wrist.</string>
+    <string name="setup_hint">Connect your own Hermes\nwith the phone companion.</string>
+    <string name="connection_status">Not connected</string>
+</resources>
