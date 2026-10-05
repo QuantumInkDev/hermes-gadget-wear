@@ -2,7 +2,7 @@
 
 A Wear OS watch app and Android phone companion for talking to your own Hermes agent, approving prompts, and seeing your profile's pet on your wrist.
 
-**Status:** M0 foundation and M1 protocol are implemented and verified locally. Both starter apps build; pairing, UTF-8 text replies, PCM loopback, and HMAC reconnect pass against the unmodified SDK devserver. The watch conversation UI and phone relay are next; these starter apps cannot yet talk to a configured Hermes server.
+**Status:** M0 foundation and M1 protocol are complete, with local and GitHub CI checks passing. Both starter apps build; pairing, UTF-8 text replies, PCM loopback, and HMAC reconnect pass against the unmodified SDK devserver. The watch conversation UI and phone relay are next; these starter apps cannot yet talk to a configured Hermes server.
 
 The initial target is the Samsung Galaxy Watch Ultra, with support planned for Wear OS 4+ devices. The app will connect to user-configured Hermes servers, using a phone relay by default or a direct WebSocket connection when configured. There is no hosted backend or analytics service planned.
 

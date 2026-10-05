@@ -20,6 +20,8 @@ Local validation: `./gradlew ktlintFormat check :wear:assembleDebug :mobile:asse
 
 Public-tree validation: gitleaks 8.30.1 found no leaks in the staged export; private-address/tailnet checks and local documentation-link checks passed. Maintainer notes, SDK location, and both APK outputs remain ignored. Git attributes normalize source line endings while preserving Windows wrapper checkout compatibility.
 
+[GitHub CI run](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37379033226) passed the Android build/check job and secret-scan job for commit `9e9b696`, with both debug APKs uploaded. M0 is complete; emulator and physical-device evidence remain later gates.
+
 ## M1 stock protocol — 2026-10-05
 
 Implemented defensive device identities, SHA-256 IDs, enrollment Base64, authentication/OTA HMAC, little-endian binary framing, bounded JSON envelopes, PCM negotiation, ordered handshake/pairing state, handshake timeout, heartbeat echo, and liveness. Tests cover upstream vectors, malformed and out-of-order input, unknown messages/channels, size/nesting limits, key redaction, and pairing revocation.
@@ -28,14 +30,16 @@ Demo note: a JVM client starts the actual unmodified SDK devserver with isolated
 
 Local validation: 13 protocol tests plus one live SDK integration test passed, zero failures/errors/skips. `.local/venv/bin/python -m pytest .local/upstream/hermes-gadget-sdk/tests/test_protocol.py -q` passed all four upstream Python tests. SDK commit: `323e3303ab68981f810fc3208119cd8a22e64af0`.
 
-The integration test requires `HERMES_GADGET_PYTHON`; without it, that test is explicitly skipped. CI installs the pinned server and sets the variable. No full Hermes gateway, physical microphone/playback, or phone Data Layer evidence is claimed by M1.
+The integration test requires `HERMES_GADGET_PYTHON`; without it, that test is explicitly skipped. Its enabled state is a Gradle test input: changing from an absent variable to a configured devserver was verified to rerun the test and pass with zero skips. CI installs the pinned server and sets the variable. No full Hermes gateway, physical microphone/playback, or phone Data Layer evidence is claimed by M1.
+
+M1's protocol and live devserver checks also passed in the CI run linked above. M1 is complete; M2 is the first real-Hermes and watch-hardware conversation gate.
 
 ## Milestones
 
 | Milestone | Status |
 | --- | --- |
-| M0: Gradle skeleton, CI, PRD, architecture, pet analysis | Implemented; local checks passed |
-| M1: Protocol vectors and devserver integration | Implemented; local checks passed, zero skips |
+| M0: Gradle skeleton, CI, PRD, architecture, pet analysis | Complete; local and CI checks passed |
+| M1: Protocol vectors and devserver integration | Complete; local and CI checks passed |
 | M2: Watch direct mode and real Hermes demo | Not started |
 | M3: Phone relay and transport selection | Not started |
 | M4: Opus and measurements | Not started |

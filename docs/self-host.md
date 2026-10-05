@@ -6,7 +6,7 @@ Install the stock Hermes Gadget SDK plugin and run `hermes gadget info` on the h
 
 ## Private TLS through Tailscale Serve
 
-For the planned phone relay, both the Hermes host and Android phone join the user's tailnet. The phone uses the Tailscale system VPN. Tailscale Serve can terminate TLS on the Hermes host and proxy to its local cleartext gadget listener; watch-owned TLS through the opaque relay ends at that trusted host.
+For the planned phone relay, install Tailscale on the Hermes host and Android phone and join both to the same tailnet. The phone uses the Tailscale system VPN. Tailscale Serve can terminate TLS on the Hermes host and proxy to its local cleartext gadget listener; watch-owned TLS through the opaque relay ends at that trusted host.
 
 On the Hermes host, inspect existing Serve configuration before changing it:
 
@@ -26,6 +26,13 @@ Serve access remains within the tailnet and is subject to its access rules. Do n
 
 ## Native plugin TLS or public direct access
 
-Alternatively, the SDK supports `platforms.gadget.extra.tls_cert` and `tls_key`. This needs a certificate valid for the configured DNS name, its private key, a renewal process, and a gateway restart. A self-signed certificate is not automatically trusted by Android; never disable certificate/hostname verification to make it connect. See the pinned [SDK integration guide](https://github.com/Adolanium/hermes-gadget-sdk/blob/323e3303ab68981f810fc3208119cd8a22e64af0/docs/hermes-integration.md).
+For a direct LAN watch connection, use a DNS name and TLS listener reachable by the watch without the phone's tailnet VPN. Native plugin TLS is one option. Merge these fields into the existing Hermes configuration's `platforms.gadget.extra` block:
+
+```yaml
+tls_cert: /path/to/fullchain.pem
+tls_key: /path/to/private-key.pem
+```
+
+The SDK loads these fields on startup. Obtain a certificate valid for the endpoint DNS name, protect its private key, arrange renewal, and restart the gateway after configuration or certificate changes. The configured listener then uses `wss` on its existing port and path. A self-signed certificate is not automatically trusted by Android; never disable certificate/hostname verification to make it connect. See the pinned [SDK integration guide](https://github.com/Adolanium/hermes-gadget-sdk/blob/323e3303ab68981f810fc3208119cd8a22e64af0/docs/hermes-integration.md).
 
 Tailscale Funnel is a separate opt-in choice for public direct `wss` access, including an LTE watch without the phone. It publishes the endpoint to the internet; pairing and optional access-token controls still matter. It is unnecessary for private phone-relayed tailnet access. Follow the pinned [Funnel guide](https://github.com/Adolanium/hermes-gadget-sdk/blob/323e3303ab68981f810fc3208119cd8a22e64af0/docs/tailscale-funnel.md) and preserve existing services.
