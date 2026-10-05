@@ -1,0 +1,36 @@
+# Maintainer-only setup, credentials, captures, and personal assets
+.local/
+secrets/
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+
+# Android / Gradle local state and build outputs
+local.properties
+.gradle/
+.kotlin/
+**/build/
+.cxx/
+.externalNativeBuild/
+*.apk
+*.aab
+*.apks
+
+# IDE / OS state
+.idea/
+*.iml
+.DS_Store
+
+# Python development state
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
