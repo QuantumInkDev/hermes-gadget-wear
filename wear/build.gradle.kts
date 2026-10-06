@@ -18,6 +18,7 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
@@ -42,5 +43,12 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.wear.material3)
     implementation(libs.activity.compose)
+    implementation(libs.wear.foundation)
+    implementation(libs.coroutines.android)
+    implementation(libs.lifecycle.runtime.compose)
+    implementation(libs.okhttp)
+    implementation(libs.serialization.json)
     testImplementation(libs.junit)
+    androidTestImplementation(libs.android.test.runner)
+    androidTestImplementation(libs.android.test.junit)
 }

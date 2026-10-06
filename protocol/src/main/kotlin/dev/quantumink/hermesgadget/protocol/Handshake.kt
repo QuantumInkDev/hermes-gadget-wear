@@ -1,6 +1,7 @@
 package dev.quantumink.hermesgadget.protocol
 
 import java.util.Base64
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -12,7 +13,9 @@ class Handshake(
     private val name: String = "Wear Gadget",
     private val board: String = "wear-os",
     private val firmware: String = "0.1.0",
-    private val accessToken: String? = null
+    private val accessToken: String? = null,
+    private val actions: JsonArray = JsonArray(emptyList()),
+    private val sensors: JsonObject = JsonObject(emptyMap())
 ) {
     enum class State { CLOSED, HELLO_SENT, AUTH_SENT, UNPAIRED, PAIRED, FAILED }
 
@@ -33,7 +36,16 @@ class Handshake(
         heartbeatSeconds = 20
         openedAt = now
         lastInboundAt = now
-        return Protocol.hello(identity, name, board, firmware, capabilities, accessToken)
+        return Protocol.hello(
+            identity,
+            name,
+            board,
+            firmware,
+            capabilities,
+            accessToken,
+            actions,
+            sensors
+        )
     }
 
     fun receive(message: Message, now: Long): List<Message> {

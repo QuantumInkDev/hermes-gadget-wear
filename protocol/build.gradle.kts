@@ -8,8 +8,9 @@ kotlin {
 
 dependencies {
     implementation(libs.serialization.json)
+    implementation(libs.okhttp)
     testImplementation(libs.junit)
-    testImplementation(libs.okhttp)
+    testImplementation(libs.okhttp.tls)
 }
 
 tasks.test {

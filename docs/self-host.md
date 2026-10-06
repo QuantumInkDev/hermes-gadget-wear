@@ -1,6 +1,6 @@
 # Self-host connection guide
 
-Status: TLS setup reference. Application onboarding and physical watch validation are still under development.
+Status: M2 direct onboarding works against the stock SDK on an emulator. Physical Watch Ultra / real-Hermes acceptance is still pending.
 
 Install the stock Hermes Gadget SDK plugin and run `hermes gadget info` on the host to obtain its actual endpoint. Pairing is approved on that host using `hermes gadget pair` or the approve command displayed by the server. Keep all actual addresses and credentials in local configuration, never this repository.
 
@@ -36,3 +36,15 @@ tls_key: /path/to/private-key.pem
 The SDK loads these fields on startup. Obtain a certificate valid for the endpoint DNS name, protect its private key, arrange renewal, and restart the gateway after configuration or certificate changes. The configured listener then uses `wss` on its existing port and path. A self-signed certificate is not automatically trusted by Android; never disable certificate/hostname verification to make it connect. See the pinned [SDK integration guide](https://github.com/Adolanium/hermes-gadget-sdk/blob/323e3303ab68981f810fc3208119cd8a22e64af0/docs/hermes-integration.md).
 
 Tailscale Funnel is a separate opt-in choice for public direct `wss` access, including an LTE watch without the phone. It publishes the endpoint to the internet; pairing and optional access-token controls still matter. It is unnecessary for private phone-relayed tailnet access. Follow the pinned [Funnel guide](https://github.com/Adolanium/hermes-gadget-sdk/blob/323e3303ab68981f810fc3208119cd8a22e64af0/docs/tailscale-funnel.md) and preserve existing services.
+
+## Configure the direct watch app
+
+Install the watch debug APK, open Hermes Gadget, and enter a short server name plus the actual Gadget WebSocket URL. Access tokens are optional separate masked fields. Prefer a valid `wss` URL. For a private endpoint, mark it as LAN/tailnet so Android 17 can request local-network permission. Public cleartext endpoints are rejected.
+
+For an approved private `ws` endpoint, both the LAN/tailnet declaration and the endpoint-specific cleartext warning must be accepted before Save & connect is enabled. Changing the URL clears warning acceptance. The app also checks every cleartext DNS result against private ranges; the choice cannot be used to reach public destinations or silently downgrade TLS. Settings and the separate endpoint identity are encrypted with Android Keystore.
+
+Approve the displayed code on your own Hermes host. Conversations are disabled until the server marks the watch paired. Type a message or hold the screen to speak; release sends, and moving down while holding discards. After the first microphone grant, hold again to begin capture. Hold Cancel for two seconds to request a new session. A server approval blocks unrelated conversation controls and ignores answers for the first 600 ms.
+
+Vibration, notifications, app-window brightness, and a system-clock timer are advertised only when supported/permitted. Notification denial leaves typed/voice conversations available. Timer execution requires an installed clock activity handling the Android timer intent. Screen brightness resets when leaving or disconnecting.
+
+The app disconnects after 90 seconds of ordinary inactivity; a stalled active turn/prompt has a 120-second inactivity cap. Server pushes sent while disconnected are lost with the stock SDK, except pending prompts re-sent by the adapter. There is no phone relay yet, and a direct watch connection cannot use the phone VPN automatically. Validate reachability from the watch itself.

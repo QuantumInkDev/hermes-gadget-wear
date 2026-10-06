@@ -38,7 +38,7 @@ A two-second cancel hold requests a new session. The stock adapter may auto-conf
 ## Boundaries and unresolved choices
 
 - Relay confidentiality: first enrollment includes the device key. A phone-terminated WebSocket sees it, and later HMAC authenticates the handshake only. Watch-owned end-to-end TLS through a byte-forwarding relay is the recommended design; user choice is pending. Do not implement M3 as though the phone were incapable of impersonation.
-- Dynamic cleartext: Android's XML domain policy is static. Release initially denies cleartext. Before enabling arbitrary user-entered LAN/tailnet `ws` endpoints, obtain the brief's required decision on app-wide cleartext allowance with a strict per-endpoint application gate versus requiring TLS.
+- Dynamic cleartext: the maintainer approved explicit LAN/tailnet `ws` on 2026-10-05, with a per-endpoint warning. The watch platform policy allows cleartext; the direct connector requires declaration and acceptance, rejects public destinations, and disables redirects/proxies. The phone's relay policy remains an independent M3 decision.
 - Multiplexed gateway v2 stays a documented proposal until user approval and upstream maintainer feedback.
 - No firmware OTA installation on Android: test the shared MAC vector, but omit `caps.ota`; distribution uses Android installation/update mechanisms.
 - Do not claim that every Hermes installation has working ffmpeg or that every Ultra has a usable Opus encoder before checking them at M4.

@@ -34,13 +34,27 @@ The integration test requires `HERMES_GADGET_PYTHON`; without it, that test is e
 
 M1's protocol and live devserver checks also passed in the CI run linked above. M1 is complete; M2 is the first real-Hermes and watch-hardware conversation gate.
 
+## M2 direct mode — 2026-10-05 — software verified, hardware gate open
+
+The maintainer approved explicit LAN/tailnet cleartext with a per-endpoint warning. Implemented direct OkHttp WebSockets with normal TLS validation, private-address checks on every cleartext DNS resolution, no redirects/proxies/downgrade, generation-guarded callbacks, bounded work/audio queues, jittered reconnect, and no input replay. TLS, token, enrollment, and protocol errors require explicit correction. Ordinary inactivity disconnects after 90 seconds; a stalled turn/prompt has a 120-second inactivity cap.
+
+Added a pure JVM conversation reducer for cumulative replies, turn matching, guarded exactly-once prompt answers, cards and RGB565 transfers, 16 kHz PCM upload/playback ordering, capture cancellation, and bounded action execution. The watch now has encrypted atomic endpoint/key storage under Android Keystore, memory-only media, bound-service lifecycle, runtime permissions, typed input, hold/release/swipe gestures, a live meter, two-second Cancel hold, and platform actions. Wear keyboard draft loss was found on the emulator and fixed by retaining the binding until activity destruction. Typed entry starts a bounded conversation service before opening the full-screen keyboard. Standalone metadata is now true following the direct emulator demo.
+
+Local build gate: `./gradlew ktlintFormat check :wear:assembleDebug :wear:assembleDebugAndroidTest :mobile:assembleDebug --warning-mode=fail --max-workers=4` passed with the pinned devserver environment configured. All 29 JVM tests passed with zero failures/errors/skips: 13 original protocol tests, 10 conversation/action/media tests, four endpoint-policy tests, and two actual SDK integration tests. The new live test uses the stock hub's native TLS hook with its unmodified echo delegate, rejects an untrusted certificate, and validates pairing, typed replies, exact PCM loopback, prompt answer, card, image, server receipt of an action result, cancellation, HMAC reconnect, idle closure, and a new user connection after idle. Production trust settings are unchanged.
+
+Three Android Keystore instrumentation tests and one opt-in setup UI instrumentation test passed on a 480×480 round Wear OS 7 / API 37 ARM64 emulator. CI compiles the instrumentation APK; emulator execution remains a separately recorded local check. The approved dynamic cleartext platform policy has one targeted `InsecureBaseConfiguration` XML suppression, justified by the per-endpoint connector gate. No other lint, Kotlin, or Gradle warnings remained.
+
+Demo note: see [synthetic emulator screenshots and reproduction](demo/m2/README.md). The app paired to the real stock devserver, typed `Hi` through Wear's keyboard, received `You said: Hi`, captured and looped back emulator PCM, required a fresh gesture after mic permission, displayed prompts/cards/images, discarded a recording by downward swipe, and started a new session with a two-second Cancel hold. SDK output confirmed successful vibration, brightness, and notification results. Notification denial omitted its action; grant on reconnect added it. No timer-handler app exists on this emulator, so timer advertisement was correctly omitted. The emulator also reached Offline with zero foreground services after inactivity. Host microphone/audio were disabled; these checks do not measure physical microphone, speaker, STT, or vibration quality.
+
+M2 is **not complete**: no physical Watch Ultra / real-Hermes pairing and conversation has been approved or demonstrated. Android 13–16 / Wear OS 4–6 compatibility, real clock timer execution, permission-denied and background behavior on the Ultra, and physical audio remain hardware checks. Personal endpoint details were not written to tracked files. M3 is not started.
+
 ## Milestones
 
 | Milestone | Status |
 | --- | --- |
 | M0: Gradle skeleton, CI, PRD, architecture, pet analysis | Complete; local and CI checks passed |
 | M1: Protocol vectors and devserver integration | Complete; local and CI checks passed |
-| M2: Watch direct mode and real Hermes demo | Not started |
+| M2: Watch direct mode and real Hermes demo | Software and emulator verified; physical Ultra / real-Hermes gate open |
 | M3: Phone relay and transport selection | Not started |
 | M4: Opus and measurements | Not started |
 | M5: Pets and companion-sheet tooling | Not started |
@@ -48,4 +62,4 @@ M1's protocol and live devserver checks also passed in the CI run linked above. 
 | M7: Multi-endpoint profiles and v2 proposal | Not started |
 | M8: Tile, complication, ambient, battery, internal testing | Not started |
 
-Next: resolve the TLS/cleartext policy and implement M2. The supplied maintainer endpoint is kept out of public files. For M3, resolve whether the relay must preserve watch-owned TLS or the phone is explicitly trusted. Multiplexed gateway v2 remains a later decision. No upstream patches or PRs have been submitted.
+Next: finish M2 on the physical watch after availability and pairing approval. The cleartext policy is resolved. The supplied maintainer endpoint is kept out of public files. For M3, resolve whether the relay must preserve watch-owned TLS or the phone is explicitly trusted. Multiplexed gateway v2 remains a later decision. No upstream patches or PRs have been submitted.

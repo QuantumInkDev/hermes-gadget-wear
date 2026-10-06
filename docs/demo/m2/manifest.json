@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-05",
+  "surface": "480x480 round Wear OS 7 API 37 emulator",
+  "hostMicrophone": "disabled",
+  "captures": [
+    {
+      "file": "setup.png",
+      "sha256": "b6154a824fd31bbb69c2049444360a6e5815eed1e57e9786cdf21ac2a59995dc",
+      "data": "synthetic"
+    },
+    {
+      "file": "pairing.png",
+      "sha256": "4e4d7da5a183e34c76fed3ddd4d91adb5d527d7e0c3d9abb2d4c9120b0f3a563",
+      "data": "synthetic"
+    },
+    {
+      "file": "ready.png",
+      "sha256": "5c1310595e14759f3d6652932d9965ef2533682ed064e2f3f7f20eb01a7181a9",
+      "data": "synthetic"
+    },
+    {
+      "file": "listening.png",
+      "sha256": "db4f21f9f73652716f02936586edbd563ec09f60f6946c3ce71034a59d4f1be9",
+      "data": "synthetic"
+    },
+    {
+      "file": "reply.png",
+      "sha256": "5f13be2bb5c73456fe456087bd40cb719707e046d2391767761dc8a09fef5b6b",
+      "data": "synthetic"
+    },
+    {
+      "file": "approval.png",
+      "sha256": "1f91ad296af620a70257e1f59c19cf20fe320ce2dcb1369f33cb600a06db834f",
+      "data": "synthetic"
+    },
+    {
+      "file": "card.png",
+      "sha256": "61f1434d9201e2699aa2ec36574fab006c77b79087b16f4af56bb6ddc8dff220",
+      "data": "synthetic"
+    },
+    {
+      "file": "image.png",
+      "sha256": "3b7abd3c63bb037dcf354486543c912ca78b09c4580613223cd8f287370efdad",
+      "data": "synthetic"
+    }
+  ]
+}

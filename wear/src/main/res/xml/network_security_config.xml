@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<network-security-config>
-    <base-config cleartextTrafficPermitted="false" />
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <!-- DirectConnection enforces the maintainer-approved per-endpoint LAN/tailnet gate. -->
+    <!-- Approved dynamic-host exception, enforced by Endpoint + EndpointDns; see architecture.md. -->
+    <base-config cleartextTrafficPermitted="true" tools:ignore="InsecureBaseConfiguration" />
 </network-security-config>

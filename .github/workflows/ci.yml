@@ -24,7 +24,7 @@ jobs:
       - name: Install pinned SDK development server
         run: python3 tools/setup-devserver.py
       - name: Build, test, lint, and format check
-        run: HERMES_GADGET_PYTHON="$PWD/.local/venv/bin/python" ./gradlew check :wear:assembleDebug :mobile:assembleDebug --warning-mode=fail
+        run: HERMES_GADGET_PYTHON="$PWD/.local/venv/bin/python" ./gradlew check :wear:assembleDebug :wear:assembleDebugAndroidTest :mobile:assembleDebug --warning-mode=fail
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: debug-apps

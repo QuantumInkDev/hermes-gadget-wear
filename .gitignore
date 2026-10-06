@@ -23,6 +23,7 @@ local.properties
 
 # IDE / OS state
 .idea/
+.serena/
 *.iml
 .DS_Store
 

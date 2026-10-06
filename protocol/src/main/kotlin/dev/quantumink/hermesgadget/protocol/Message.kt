@@ -2,6 +2,7 @@ package dev.quantumink.hermesgadget.protocol
 
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -91,7 +92,9 @@ object Protocol {
         board: String,
         firmware: String,
         capabilities: JsonObject = JsonObject(emptyMap()),
-        accessToken: String? = null
+        accessToken: String? = null,
+        actions: JsonArray = JsonArray(emptyList()),
+        sensors: JsonObject = JsonObject(emptyMap())
     ): Message = Message.create(
         "hello",
         buildJsonObject {
@@ -101,6 +104,8 @@ object Protocol {
             put("board", board)
             put("firmware", firmware)
             put("caps", capabilities)
+            if (actions.isNotEmpty()) put("actions", actions)
+            if (sensors.isNotEmpty()) put("sensors", sensors)
             accessToken?.takeIf(String::isNotEmpty)?.let { put("token", it) }
         }
     )
