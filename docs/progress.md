@@ -76,6 +76,16 @@ Validation: strict build/check passed with 42 JVM tests and zero failures/errors
 
 Demo note: [measured synthetic payload table](audio-measurements.md) records PCM 256 kbit/s versus Android Opus 23.584 kbit/s uplink and host ffmpeg 36.264 kbit/s downlink for one original three-second tone. This is not Bluetooth throughput, end-to-end latency, actual speech/STT accuracy, or Ultra battery evidence. M4 acceptance remains open for the required actual-device comparison. Continue M5 in order under the maintainer's advance authorization.
 
+## M5 pets — 2026-10-06 — software verified, Ultra gate open
+
+Implemented authenticated optional pet manifests/channel-4 PNG transfers with exact sequence/length/hash, dimension/compression/alpha limits and expiry. SDK patch 2 (`2bcdfc7`) resolves the current profile's active pet with confined paths, preserves base/legacy taxonomy, converts WebP to alpha PNG, trims blank tails and paces chunks. Missing pets/extensions do not block conversations. No running Hermes was changed.
+
+The watch prepares pixel-scaled frames on a bounded worker, caches per endpoint/hash with an 8 MiB/64-file quota, maps state/legacy fallbacks, emits once-only turn cues and uses playback amplitude/hysteresis for talking or idle bob. An original procedural robot is the fallback. `tools/extend-pet.py` matches later rows to median idle height/center/baseline using shared row registration, rejects empty/clipped/drifting/extreme poses, and leaves the base and inputs unchanged. Same-hatch generation remains an upstream proposal.
+
+Validation: the strict full build/check command passed; 46 JVM tests, zero failures/errors/skips. A fresh pinned checkout accepted the exported two-patch series and passed 29 Python SDK/tool tests. API 37 actual SDK→GadgetService pet transfer/cache/endpoint isolation and PNG corruption/bounds/alpha/blank-tail instrumentation passed. The stock SDK offline-draft/resend regression passed after the renderer changes. Personal-watch state remains untouched. Scope the patch whitespace attribute to preserve required unified-diff context prefixes; the inner SDK diff is whitespace-clean.
+
+Demo note: [original sample on the round emulator](demo/m5/README.md), including cached rendering after fixture loss. Software checks do not establish personal-profile delivery, small-watch legibility, physical lip sync, or ambient/battery acceptance. Staged-export gitleaks, private-value and local-document-link checks passed. M5 hardware acceptance remains open. M4 commit `82a206b` [CI](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37468005261) passed all three jobs.
+
 ## Milestones
 
 Maintainer voice demo — 2026-10-06: the maintainer reports that the physical watch successfully asked about the weather, received an answer, and played the profile's ElevenLabs voice. This verifies a real hold-to-talk/STT/reply/playback path by maintainer report; no bitrate, STT comparison, battery, or audio-quality measurement is inferred. They described the flow as clunky and authorized advancing the remaining phases while away from the home network. The core M2 conversation demo has passed; the remaining physical media/action, permission, lifecycle, and quality matrix stays open. Phase implementation may advance in sequence under that authorization, with unverified milestone acceptance kept explicit.
@@ -87,9 +97,9 @@ Maintainer voice demo — 2026-10-06: the maintainer reports that the physical w
 | M2: Watch direct mode and real Hermes demo | Core physical typed/voice demo passed; remaining Ultra matrix open |
 | M3: Phone relay and transport selection | Software verified; actual Data Layer/off-network gate open |
 | M4: Opus and measurements | Software/cross-codec verified; Ultra speech/bitrate/battery gate open |
-| M5: Pets and companion-sheet tooling | Not started |
+| M5: Pets and companion-sheet tooling | Software/emulator verified; real profile/Ultra gate open |
 | M6: Client BYOK TTS | Not started |
 | M7: Multi-endpoint profiles and v2 proposal | Not started |
 | M8: Tile, complication, ambient, battery, internal testing | Not started |
 
-Next: M4 optional Opus implementation and software measurement, then M5–M8 in order. Keep M2/M3 hardware gates open while the maintainer is away. Relay TLS and direct cleartext decisions are resolved. Multiplexed gateway v2 remains proposal-only pending decision and upstream feedback.
+Next: M6 BYOK client TTS, then M7–M8 in order. Keep M2/M3 hardware gates open while the maintainer is away. Relay TLS and direct cleartext decisions are resolved. Multiplexed gateway v2 remains proposal-only pending decision and upstream feedback.

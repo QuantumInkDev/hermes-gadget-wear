@@ -363,6 +363,7 @@ private fun ConversationPage(
         service::cancelRecording
     )
     RoundPage(gesture) {
+        item { PetView(watch) }
         if (prompt != null) {
             item { Heading(stringResource(R.string.approval)) }
             item { Body(prompt.title) }

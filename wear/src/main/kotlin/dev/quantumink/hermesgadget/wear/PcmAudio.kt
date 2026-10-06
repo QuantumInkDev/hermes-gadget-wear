@@ -116,7 +116,12 @@ class PcmCapture(private val context: Context) {
     }
 }
 
-class PcmPlayback(context: Context, private val onInterrupted: () -> Unit) {
+class PcmPlayback(
+    context: Context,
+    private val onInterrupted: () -> Unit,
+    private val onLevel: (Float) -> Unit = {},
+    private val onFinished: () -> Unit = {}
+) {
     private val manager = context.getSystemService(AudioManager::class.java)
     private sealed interface Packet {
         class Data(val bytes: ByteArray) : Packet
@@ -130,7 +135,8 @@ class PcmPlayback(context: Context, private val onInterrupted: () -> Unit) {
         @Volatile var track: AudioTrack? = null
         var focus: AudioFocusRequest? = null
     }
-    private var active: Playback? = null
+
+    @Volatile private var active: Playback? = null
 
     @Synchronized
     fun start(rate: Int, opusHeader: ByteArray? = null) {
@@ -181,7 +187,28 @@ class PcmPlayback(context: Context, private val onInterrupted: () -> Unit) {
                 if (playback.stopped.get()) return@Thread
                 track.play()
                 var samples = 0L
+                var levelAt = 0L
                 fun writePcm(bytes: ByteArray) {
+                    val now = System.nanoTime()
+                    if (active === playback &&
+                        now - levelAt >= TimeUnit.MILLISECONDS.toNanos(100)
+                    ) {
+                        var sum = 0.0
+                        for (index in 0 until bytes.size - 1 step 2) {
+                            val value =
+                                (
+                                    (bytes[index].toInt() and 255) or
+                                        (bytes[index + 1].toInt() shl 8)
+                                    ).toShort().toDouble() / 32768.0
+                            sum += value * value
+                        }
+                        onLevel(
+                            kotlin.math.sqrt(
+                                sum / (bytes.size / 2).coerceAtLeast(1)
+                            ).toFloat().coerceIn(0f, 1f)
+                        )
+                        levelAt = now
+                    }
                     var offset = 0
                     while (offset < bytes.size && !playback.stopped.get()) {
                         val count = track.write(
@@ -232,6 +259,10 @@ class PcmPlayback(context: Context, private val onInterrupted: () -> Unit) {
                 playback.track = null
                 playback.focus?.let(manager::abandonAudioFocusRequest)
                 playback.queue.clear()
+                if (active === playback) {
+                    onLevel(0f)
+                    onFinished()
+                }
             }
         }, "watch-speaker").apply { isDaemon = true }.start()
     }
@@ -261,6 +292,8 @@ class PcmPlayback(context: Context, private val onInterrupted: () -> Unit) {
     fun stop() {
         active?.let(::stop)
         active = null
+        onLevel(0f)
+        onFinished()
     }
 
     private fun stop(playback: Playback) {

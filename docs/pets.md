@@ -66,4 +66,41 @@ The better upstream path generates optional extra rows in the same hatch normali
 
 ## Delivery and renderer gates
 
-`pet.request`, `pet.manifest`, and binary asset channel 4 remain proposed extensions. Stock servers ignore the request and the watch uses its original placeholder; never wait indefinitely. Authenticate delivery, enforce compressed/decoded byte and dimension limits, reject malformed rows, validate SHA-256 before cache promotion, and cache per endpoint/hash with a quota. Never use the slug as an unchecked local path. Support absent sheets, missing states, legacy aliases, opaque/invalid assets, interrupted transfer, and expired profile selection. Hardware checks must assess small round-screen legibility and ambient power before M5/M8 completion.
+`pet.request`, `pet.manifest`, and binary asset channel 4 are implemented in opt-in SDK patch 2; upstream adoption remains proposed. Stock servers ignore the request and the watch uses its original placeholder; never wait indefinitely. Authenticate delivery, enforce compressed/decoded byte and dimension limits, reject malformed rows, validate SHA-256 before cache promotion, and cache per endpoint/hash with a quota. Never use the slug as an unchecked local path. Support absent sheets, missing states, legacy aliases, opaque/invalid assets, interrupted transfer, and expired profile selection. Hardware checks must assess small round-screen legibility and ambient power before M5/M8 completion.
+
+## M5 implementation and reproduction
+
+SDK patch 2 (`2bcdfc7`, local branch `wear/optional-extensions`) adds disabled-by-default
+`enable_pets`, current-profile selection, path/symlink confinement, alpha-preserving
+PNG conversion, occupied frame counts, bounded paced channel-4 delivery, and protocol
+documentation/tests. The watch requests after pairing, validates metadata, sequence,
+length and hash, and checks PNG bounds before decoding on a bounded worker. Its private
+cache uses endpoint/hash directories, an 8 MiB global quota and 64-file limit. Prepared
+96×104 frames use nearest-neighbour scaling; no image decoding occurs on the UI thread.
+
+The renderer uses base/legacy aliases and companion fallbacks above. Completed turns
+emit one jump/failure cue; pairing and the new-session gesture emit a short wave.
+Talking selects three poses with amplitude hysteresis (PCM buffered for AudioTrack,
+not microphone amplitude). Missing talking uses idle plus amplitude bob. A procedural
+amber robot is the original stock-server placeholder. Offline stays static.
+
+Extend existing art with Pillow installed:
+
+```sh
+python3 tools/extend-pet.py --base /path/to/base.webp \
+  --companion /path/to/generated-companion.png --output /path/to/gadget-sheet.png
+```
+
+Input companion: 1152×624 RGBA, three rows listening/talking/sleeping, left-packed
+6/3/6 occupied frames. The tool prints a proposed `gadgetSheet` metadata fragment for
+review; it never edits pet.json or the base/input sheet. One scale/registration per row
+matches median idle height, body center and baseline while preserving aspect ratio and
+relative pose movement. Empty/clipped/drifting/extreme poses fail. Human review remains
+necessary for accessories and unusual sleeping poses; no generation provider is wired.
+
+Validation: 46 JVM tests pass (zero failures/errors/skips). The clean exported patch
+series passes 29 Python tests including pet delivery, stock/Opus compatibility and two
+tool tests. API 37 pet delivery/cache and cache-corruption instrumentation passed; the
+stock SDK draft regression still passed. Strict build/lint/format/warnings checks pass.
+[Synthetic round-screen capture](demo/m5/README.md). Personal pet transfer, Ultra
+legibility, physical lip sync and ambient power remain unverified.

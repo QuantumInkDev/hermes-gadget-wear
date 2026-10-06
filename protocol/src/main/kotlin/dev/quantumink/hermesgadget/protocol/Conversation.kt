@@ -70,6 +70,7 @@ sealed interface ConversationEffect {
         val bytes = bytes.copyOf()
         override fun toString(): String = "PlaybackData(redacted)"
     }
+    data class PetCue(val mode: String) : ConversationEffect
     data object PlaybackFinish : ConversationEffect
     data object PlaybackStop : ConversationEffect
     data class Action(val id: String, val action: WatchAction) : ConversationEffect
@@ -208,8 +209,9 @@ class Conversation(
                             status = ""
                         )
                     }
-                    if (message.string("outcome") == "failure") notice("The turn failed.", now)
-                    emptyList()
+                    val failed = message.string("outcome") == "failure"
+                    if (failed) notice("The turn failed.", now)
+                    listOf(ConversationEffect.PetCue(if (failed) "failed" else "jumping"))
                 }
                 "transcript", "status" -> {
                     if (upload == null) {
@@ -524,7 +526,7 @@ class Conversation(
             listOf(
                 ConversationEffect.PlaybackStop,
                 send(if (newSession) "session.new" else "cancel")
-            )
+            ) + if (newSession) listOf(ConversationEffect.PetCue("waving")) else emptyList()
     }
 
     fun answer(id: String, yes: Boolean, now: Long): List<ConversationEffect> {

@@ -1,0 +1,428 @@
+From 2bcdfc7e0cf990203aa64a83f0b77b79e49880a6 Mon Sep 17 00:00:00 2001
+From: Justin Garcia <dev@quantumink.dev>
+Date: Tue, 6 Oct 2026 09:24:56 -0400
+Subject: [PATCH] feat: deliver optional profile pets as bounded PNG assets
+
+---
+ docs/connect-hermes.md |   6 +++
+ docs/protocol.md       |  29 +++++++++++
+ plugin/adapter.py      |   7 ++-
+ plugin/hub.py          |  28 ++++++++++
+ plugin/pets.py         | 113 +++++++++++++++++++++++++++++++++++++++++
+ plugin/protocol.py     |   5 +-
+ tests/test_pets.py     | 110 +++++++++++++++++++++++++++++++++++++++
+ 7 files changed, 295 insertions(+), 3 deletions(-)
+ create mode 100644 plugin/pets.py
+ create mode 100644 tests/test_pets.py
+
+diff --git a/docs/connect-hermes.md b/docs/connect-hermes.md
+index 42f5d0a..ba3e424 100644
+--- a/docs/connect-hermes.md
++++ b/docs/connect-hermes.md
+@@ -48,3 +48,9 @@ For the desktop simulator, install its [audio extra](desktop.md#4-try-audio) and
+ **You know it worked when:** holding TALK captures your speech, releasing it sends the message, and the reply is both displayed and spoken.
+ 
+ Next: [Talk, type, and interrupt](using-gadget.md). For configuration details and plugin development, read [Hermes integration](hermes-integration.md).
++
++Optional Wear pet delivery: set `platforms.gadget.extra.enable_pets: true` and use
++an approved client advertising `caps.pet.asset_channel: 4`. The current profile's
++active pet is converted to PNG with alpha. Pillow is optional; unavailable or invalid
++pet art leaves conversations working. See the [pet wire contract](protocol.md#optional-pet-assets-wear-extension).
++This is an opt-in extension; no personal art is bundled with the plugin.
+diff --git a/docs/protocol.md b/docs/protocol.md
+index 886197e..47c1390 100644
+--- a/docs/protocol.md
++++ b/docs/protocol.md
+@@ -230,3 +230,32 @@ mac = HMAC-SHA256(key, "hermes-gadget/v1|ota|" + device_id + "|" + nonce + "|" +
+ - `proto` is a single integer, and a server rejects versions it does not speak.
+ - Adding optional fields or new message types does not change the version. Receivers ignore unknown types and fields.
+ - Changing the meaning of an existing field does.
++
++### Optional pet assets (Wear extension)
++
++Disabled by default (`platforms.gadget.extra.enable_pets: true` opts in). An
++approved device advertises `caps.pet.asset_channel: 4` and sends `pet.request`
++after pairing. Unknown requests remain ignorable. No conversation waits for pets.
++The adapter resolves the active pet in its current Hermes profile home, respecting
++`display.pet.enabled` and `display.pet.slug`. Missing Pillow/pet configuration or
++invalid art returns `pet.unavailable`, without paths or error details.
++
++`pet.manifest` contains `slug`, `name`, `cell_width:192`, `cell_height:208`,
++`loop_ms:1100`, and one or two `sheets`. Each sheet has `kind` (`base` or
++`companion`), lowercase SHA-256, compressed `bytes`, `width`, `height`, and `rows`
++with `name`, zero-based `index`, and occupied `frames`. Use at most six base
++frames, trimming transparent tails. Base row taxonomy follows the current/legacy
++Hermes grid; the base atlas is never extended. Optional `gadgetSheet` in pet.json
++references a separate asset and explicit listening/talking/sleeping rows. Talking
++requires three occupied mouth poses. This metadata remains a Hermes-side proposal.
++
++For each PNG: `asset.start {stream,sha256,bytes,format:"png"}`, ordered binary
++channel `0x04` packets (normal four-byte header; seq starts at zero, chunks at most
++4096 bytes), then `asset.end {stream}`. `asset.abort {stream}` discards a partial
++transfer; disappearance, revocation or error also invalidates it. Verify exact
++length/hash before promotion, never use slug or supplied paths as cache filenames.
++Limit two assets, 2 MiB compressed each, 3.2 million pixels per asset, grid dimensions
++192..1728 by 208..2496 divisible by cell size, and 15 seconds of transfer inactivity.
++The reference server paces chunks at 20 ms and caps the entire delivery at 30 seconds.
++Metadata paths and symlinks must stay within the profile pet directory. RGB565 image
++channel 2 is unchanged. PNG preserves alpha; no new native Python dependency is needed.
+diff --git a/plugin/adapter.py b/plugin/adapter.py
+index 9e47734..3f7d030 100644
+--- a/plugin/adapter.py
++++ b/plugin/adapter.py
+@@ -146,6 +146,7 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
+         self._heartbeat_s = int(extra.get("heartbeat_s") or 20)
+         self._max_utterance_s = float(extra.get("max_utterance_s") or 60)
+         self._enable_opus = extra.get("enable_opus") is True
++        self._enable_pets = extra.get("enable_pets") is True
+         self._speak_replies = _flag(extra.get("speak_replies"), True)
+         self._auto_home = _flag(extra.get("auto_home"), True)
+         self._tls_cert = extra.get("tls_cert")
+@@ -183,7 +184,7 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
+         self._hub = DeviceHub(
+             self._store, self, host=self._host, port=self._port, path=self._path,
+             access_token=self._access_token, heartbeat_s=self._heartbeat_s, ssl_context=ssl_ctx,
+-            max_utterance_s=self._max_utterance_s, enable_opus=self._enable_opus)
++            max_utterance_s=self._max_utterance_s, enable_opus=self._enable_opus, enable_pets=self._enable_pets)
+         try:
+             await self._hub.start()
+         except OSError as exc:
+@@ -233,6 +234,10 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
+         # None means no runner check is installed (unit harness): nothing to gate on.
+         return self._authorized(session.device_id) is not False
+ 
++    async def pet_package(self, session: DeviceSession):
++        from .pets import active_package
++        return await asyncio.to_thread(active_package)
++
+     async def on_ready(self, session: DeviceSession) -> None:
+         if session.paired:
+             self._store.clear_pairing(session.device_id)
+diff --git a/plugin/hub.py b/plugin/hub.py
+index 5b62ae5..99c6ff3 100644
+--- a/plugin/hub.py
++++ b/plugin/hub.py
+@@ -62,6 +62,9 @@ class HubDelegate:
+     async def on_state(self, session: "DeviceSession", sensors: dict) -> None:
+         pass
+ 
++    async def pet_package(self, session: "DeviceSession"):
++        return None
++
+     async def on_disconnect(self, session: "DeviceSession") -> None:
+         pass
+ 
+@@ -471,6 +474,7 @@ class DeviceHub:
+         ssl_context=None,
+         max_utterance_s: float = 60.0,
+         enable_opus: bool = False,
++        enable_pets: bool = False,
+     ):
+         self.store = store
+         self.delegate = delegate
+@@ -480,6 +484,7 @@ class DeviceHub:
+         self.ssl_context = ssl_context
+         self.max_utterance_s = max_utterance_s
+         self.enable_opus = bool(enable_opus and opus.available())
++        self.enable_pets = bool(enable_pets)
+         self.sessions: dict[str, DeviceSession] = {}
+         self.loop: asyncio.AbstractEventLoop | None = None
+         self._server = None
+@@ -674,6 +679,28 @@ class DeviceHub:
+             return
+         await handler(self, session, msg)
+ 
++    async def _h_pet_request(self, session: DeviceSession, msg: dict) -> None:
++        cap = session.caps.get("pet")
++        if not self.enable_pets or not session.paired or not isinstance(cap, dict) or cap.get("asset_channel") != 4:
++            return
++        previous = getattr(session, "_pet_task", None)
++        if previous and not previous.done():
++            return
++        async def deliver():
++            from . import pets
++            try:
++                value = await asyncio.wait_for(self.delegate.pet_package(session), 10)
++                if value and session.paired:
++                    await asyncio.wait_for(pets.send_package(session, value), 30)
++                elif not session.closed:
++                    await session.send_json({"type": "pet.unavailable"})
++            except asyncio.CancelledError:
++                raise
++            except Exception:
++                if not session.closed:
++                    await session.send_json({"type": "pet.unavailable"})
++        session._pet_task = session.spawn(deliver())
++
+     async def _h_text(self, session: DeviceSession, msg: dict) -> None:
+         text = str(msg.get("text") or "").strip()
+         if text:
+@@ -809,6 +836,7 @@ class DeviceHub:
+         "audio.start": _h_audio_start,
+         "audio.end": _h_audio_end,
+         "audio.codec": _h_audio_codec,
++        "pet.request": _h_pet_request,
+         "audio.cancel": _h_audio_cancel,
+         "cancel": _h_cancel,
+         "session.new": _h_session_new,
+diff --git a/plugin/pets.py b/plugin/pets.py
+new file mode 100644
+index 0000000..940a139
+--- /dev/null
++++ b/plugin/pets.py
+@@ -0,0 +1,113 @@
++"""Optional alpha-preserving pet assets. No metadata path escapes its profile pet directory."""
++from __future__ import annotations
++
++import asyncio
++import hashlib
++import io
++import json
++from pathlib import Path
++
++CURRENT = ['idle', 'running-right', 'running-left', 'waving', 'jumping', 'failed', 'waiting', 'running', 'review']
++LEGACY = ['idle', 'wave', 'run', 'failed', 'review', 'jump']
++MAX_PNG = 2 * 1024 * 1024
++MAX_PIXELS = 3200000
++
++
++def confined(directory: Path, path: str) -> Path:
++    result = (directory / path).resolve()
++    result.relative_to(directory.resolve())
++    if not result.is_file() or result.stat().st_size > 8 * 1024 * 1024:
++        raise ValueError('Invalid pet asset')
++    return result
++
++
++def _sheet(path: Path, kind: str, rows=None):
++    from PIL import Image
++    with Image.open(path) as source:
++        width, height = source.size
++        if not (192 <= width <= 1728 and 208 <= height <= 2496 and width % 192 == 0 and height % 208 == 0 and width * height <= MAX_PIXELS):
++            raise ValueError('Invalid pet geometry')
++        if source.mode not in ('RGBA', 'LA', 'P') or (source.mode == 'P' and 'transparency' not in source.info):
++            raise ValueError('Pet requires alpha')
++        image = source.convert('RGBA')
++    if kind == 'base':
++        names = CURRENT if height // 208 >= 9 else LEGACY
++        rows = [{'name': name, 'index': index, 'frames': min(6, width // 192)} for index, name in enumerate(names) if index < height // 208]
++    if not isinstance(rows, list) or not 1 <= len(rows) <= 12:
++        raise ValueError('Invalid pet rows')
++    occupied, labels, indices = [], set(), set()
++    for row in rows:
++        name, index, count = row['name'], row['index'], row['frames']
++        if name in labels or index in indices or type(index) is not int or type(count) is not int or not (0 <= index < height // 208 and 1 <= count <= min(6, width // 192)):
++            raise ValueError('Invalid pet row')
++        if kind == 'companion' and (name not in ('listening', 'talking', 'sleeping') or (name == 'talking' and count != 3)):
++            raise ValueError('Invalid companion row')
++        labels.add(name); indices.add(index)
++        frames = 0
++        for column in range(count):
++            alpha = image.getchannel('A').crop((column * 192, index * 208, (column + 1) * 192, (index + 1) * 208))
++            if not alpha.point(lambda value: 255 if value > 16 else 0).getbbox():
++                break
++            if alpha.getextrema()[0] == 255:
++                raise ValueError("Opaque pet frame")
++            frames += 1
++        if frames:
++            if name == 'talking' and frames != 3:
++                raise ValueError('Talking needs three occupied poses')
++            occupied.append({'name': name, 'index': index, 'frames': frames})
++    if not occupied or (kind == 'base' and 'idle' not in [row['name'] for row in occupied]):
++        raise ValueError('Empty pet')
++    output = io.BytesIO()
++    image.save(output, 'PNG')
++    data = output.getvalue()
++    if len(data) > MAX_PNG:
++        raise ValueError('Pet PNG exceeds limit')
++    return {'kind': kind, 'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data), 'width': width, 'height': height, 'rows': occupied}, data
++
++
++def package(directory: Path, spritesheet: Path, name: str, slug: str):
++    # Both base path and companion metadata are confined, including symlinks.
++    base = confined(directory, str(spritesheet.resolve().relative_to(directory.resolve())))
++    metadata_path = directory / 'pet.json'
++    metadata = {}
++    if metadata_path.exists():
++        metadata_path = confined(directory, 'pet.json')
++        if metadata_path.stat().st_size > 65536:
++            raise ValueError('Pet metadata exceeds limit')
++        metadata = json.loads(metadata_path.read_text())
++    assets = [_sheet(base, 'base')]
++    companion = metadata.get('gadgetSheet')
++    if companion is not None:
++        if not isinstance(companion, dict):
++            raise ValueError('Invalid companion metadata')
++        assets.append(_sheet(confined(directory, companion['spritesheetPath']), 'companion', companion['rows']))
++    manifest = {'type': 'pet.manifest', 'slug': str(slug)[:64], 'name': str(name).strip()[:64] or 'Pet', 'cell_width': 192, 'cell_height': 208, 'loop_ms': 1100, 'sheets': [sheet for sheet, _ in assets]}
++    return manifest, assets
++
++
++def active_package():
++    from agent.pet.store import resolve_active_pet
++    from hermes_cli.config import load_config_readonly
++    config = load_config_readonly()
++    display = config.get('display') or {}
++    settings = display.get('pet') or {}
++    if settings.get('enabled') is False:
++        return None
++    pet = resolve_active_pet(settings.get('slug'))
++    return package(pet.directory, pet.spritesheet, pet.display_name, pet.slug) if pet else None
++
++
++async def send_package(session, value):
++    from .protocol import binary
++    manifest, assets = value
++    await session.send_json(manifest)
++    for stream, (sheet, data) in enumerate(assets, 1):
++        if not session.paired or session.closed:
++            return
++        await session.send_json({'type': 'asset.start', 'stream': stream, 'sha256': sheet['sha256'], 'bytes': len(data), 'format': 'png'})
++        for seq, offset in enumerate(range(0, len(data), 4096)):
++            if not session.paired or session.closed:
++                return
++            await session.send_binary(binary(4, stream, seq, data[offset:offset + 4096]))
++            await asyncio.sleep(0.02)
++        await session.send_json({'type': 'asset.end', 'stream': stream})
+diff --git a/plugin/protocol.py b/plugin/protocol.py
+index e80db07..2981500 100644
+--- a/plugin/protocol.py
++++ b/plugin/protocol.py
+@@ -27,6 +27,7 @@ BINARY_HEADER = 4
+ CHANNEL_AUDIO = 0x01
+ CHANNEL_IMAGE = 0x02
+ CHANNEL_FIRMWARE = 0x03
++CHANNEL_ASSET = 0x04
+ 
+ 
+ @dataclass(frozen=True)
+@@ -37,8 +38,8 @@ class BinaryFrame:
+     payload: bytes
+ 
+ 
+-def parse_binary(data: bytes) -> BinaryFrame | None:
+-    if len(data) < BINARY_HEADER or data[0] not in (CHANNEL_AUDIO, CHANNEL_IMAGE, CHANNEL_FIRMWARE):
++def parse_binary(data: bytes, *, additional_channels=()) -> BinaryFrame | None:
++    if len(data) < BINARY_HEADER or data[0] not in (CHANNEL_AUDIO, CHANNEL_IMAGE, CHANNEL_FIRMWARE, *additional_channels):
+         return None
+     channel, stream, seq = struct.unpack_from("<BBH", data)
+     return BinaryFrame(channel, stream, seq, bytes(data[BINARY_HEADER:]))
+diff --git a/tests/test_pets.py b/tests/test_pets.py
+new file mode 100644
+index 0000000..f622aac
+--- /dev/null
++++ b/tests/test_pets.py
+@@ -0,0 +1,110 @@
++"""Original synthetic sprites only: alpha, taxonomy, paths, and authenticated delivery."""
++import asyncio
++import hashlib
++import json
++from pathlib import Path
++
++import pytest
++from PIL import Image, ImageDraw
++from hermes_gadget_plugin import pets, protocol
++from hermes_gadget_plugin.hub import DeviceHub, DeviceSession, HubDelegate
++from hermes_gadget_plugin.store import DeviceStore
++
++
++def sheet(path, legacy=False):
++    image = Image.new('RGBA', (1728, 1664) if legacy else (1536, 1872))
++    draw = ImageDraw.Draw(image)
++    for row in range(image.height // 208):
++        for col in range(4 if row == 3 else 6):
++            x, y = col * 192 + 72, row * 208 + 80
++            draw.rectangle((x, y, x + 47, y + 99), fill=(255, 190, 90, 255))
++    image.save(path, 'WEBP', lossless=True)
++
++
++@pytest.mark.parametrize('legacy', [False, True])
++def test_alpha_transcode_geometry_taxonomy_and_trim(tmp_path, legacy):
++    path = tmp_path / 'sheet.webp'; sheet(path, legacy)
++    manifest, assets = pets.package(tmp_path, path, 'Original sample', 'sample')
++    meta, data = assets[0]
++    assert data.startswith(b'\x89PNG\r\n\x1a\n')
++    assert meta['sha256'] == hashlib.sha256(data).hexdigest()
++    assert meta['rows'][3]['frames'] == 4
++    assert meta['rows'][1]['name'] == ('wave' if legacy else 'running-right')
++    assert manifest['cell_width'] == 192
++
++
++def test_companion_is_separate_and_untrusted_paths_are_rejected(tmp_path):
++    path = tmp_path / 'sheet.webp'; sheet(path)
++    before = path.read_bytes()
++    image = Image.new('RGBA', (1152, 624)); draw = ImageDraw.Draw(image)
++    for col in range(3): draw.rectangle((col * 192 + 72, 80, col * 192 + 119, 179), fill=(255, 190, 90, 255))
++    image.save(tmp_path / 'gadget-sheet.png')
++    metadata = {'gadgetSheet': {'spritesheetPath': 'gadget-sheet.png', 'rows': [{'name': 'talking', 'index': 0, 'frames': 3}]}}
++    (tmp_path / 'pet.json').write_text(json.dumps(metadata))
++    assert len(pets.package(tmp_path, path, 'Sample', 'sample')[1]) == 2
++    assert path.read_bytes() == before
++    metadata['gadgetSheet']['spritesheetPath'] = '../outside.png'
++    (tmp_path / 'pet.json').write_text(json.dumps(metadata))
++    with pytest.raises(ValueError): pets.package(tmp_path, path, 'Sample', 'sample')
++    (tmp_path / 'link.png').symlink_to(tmp_path.parent / 'outside.png')
++    with pytest.raises(ValueError): pets.confined(tmp_path, 'link.png')
++
++
++def test_opaque_bad_geometry_and_empty_idle_are_rejected(tmp_path):
++    path = tmp_path / 'sheet.png'
++    for image in [Image.new('RGB', (1536, 1872)), Image.new('RGBA', (100, 100)), Image.new('RGBA', (1536, 1872))]:
++        image.save(path)
++        with pytest.raises(ValueError): pets.package(tmp_path, path, 'Sample', 'sample')
++
++
++def test_authenticated_opt_in_delivery_bounds_and_duplicate_request(tmp_path):
++    path = tmp_path / 'sheet.webp'; sheet(path)
++    value = pets.package(tmp_path, path, 'Sample', 'sample')
++    class WS:
++        def __init__(self): self.sent = []
++        async def send(self, data): self.sent.append(data)
++    class Delegate(HubDelegate):
++        def __init__(self): self.calls = 0
++        async def pet_package(self, session):
++            self.calls += 1
++            return value
++    async def run():
++        delegate, ws = Delegate(), WS()
++        hub = DeviceHub(DeviceStore(tmp_path / 'store'), delegate, enable_pets=True)
++        session = DeviceSession(hub, ws, {'device_id': 'hg-0123456789abcdef', 'caps': {'pet': {'asset_channel': 4}}})
++        await hub._h_pet_request(session, {})
++        assert not ws.sent and delegate.calls == 0
++        session.paired = True
++        hub.enable_pets = False
++        await hub._h_pet_request(session, {})
++        assert not ws.sent and delegate.calls == 0
++        hub.enable_pets = True
++        await hub._h_pet_request(session, {})
++        await hub._h_pet_request(session, {})
++        await asyncio.gather(*session._tasks)
++        assert delegate.calls == 1
++        texts = [json.loads(item) for item in ws.sent if isinstance(item, str)]
++        assert [item['type'] for item in texts] == ['pet.manifest', 'asset.start', 'asset.end']
++        frames = [protocol.parse_binary(item, additional_channels=(4,)) for item in ws.sent if isinstance(item, bytes)]
++        assert all(item.channel == 4 and len(item.payload) <= 4096 for item in frames)
++        assert [item.seq for item in frames] == list(range(len(frames)))
++        assert b''.join(item.payload for item in frames) == value[1][0][1]
++    asyncio.run(run())
++
++
++def test_profile_selection_and_disabled_setting_are_respected(tmp_path, monkeypatch):
++    import sys
++    import types
++    path = tmp_path / 'sheet.webp'; sheet(path)
++    selected = []
++    config = {'display': {'pet': {'enabled': True, 'slug': 'selected-profile-pet'}}}
++    def resolve(slug):
++        selected.append(slug)
++        return types.SimpleNamespace(directory=tmp_path, spritesheet=path, display_name='Original sample', slug='sample')
++    monkeypatch.setitem(sys.modules, 'agent.pet.store', types.SimpleNamespace(resolve_active_pet=resolve))
++    monkeypatch.setitem(sys.modules, 'hermes_cli.config', types.SimpleNamespace(load_config_readonly=lambda: config))
++    assert pets.active_package()[0]['name'] == 'Original sample'
++    assert selected == ['selected-profile-pet']
++    config['display']['pet']['enabled'] = False
++    assert pets.active_package() is None
++    assert len(selected) == 1
+-- 
+2.54.0 (Apple Git-157)
+

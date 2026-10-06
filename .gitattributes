@@ -1,3 +1,5 @@
 * text=auto eol=lf
 *.bat text eol=crlf
 *.jar binary
+# Format-patch preserves blank context prefixes and its mail footer.
+*.patch whitespace=-blank-at-eol,-blank-at-eof

@@ -38,6 +38,7 @@ data class ConnectionState(
 
 interface ConnectionObserver {
     fun stateChanged(state: ConnectionState)
+    fun pet(effect: PetEffect) {}
     fun effect(effect: ConversationEffect, generation: Long)
 }
 
@@ -97,6 +98,10 @@ class DirectConnection(
         microphoneFormats = offeredFormats("mic"),
         speakerFormats = offeredFormats("speaker")
     )
+    private val pets = PetTransfers()
+    private val petEnabled =
+        (capabilities["pet"] as? JsonObject)?.get("asset_channel") == JsonPrimitive(4)
+    private var petRequested = false
     private val stopped = AtomicBoolean(false)
     private val overloaded = AtomicBoolean(false)
     private val executor = ThreadPoolExecutor(
@@ -237,6 +242,8 @@ class DirectConnection(
         generation++
         val epoch = generation
         handshake = newHandshake()
+        pets.clear()
+        petRequested = false
         reconnectAt = null
         healthySince = null
         state =
@@ -287,7 +294,18 @@ class DirectConnection(
                     dispatch {
                         if (epoch != generation) return@dispatch
                         handshake.recordInbound(now())
-                        BinaryFrame.parse(copy)?.let { effects(conversation.binary(it, now())) }
+                        BinaryFrame.parse(copy, if (petEnabled) setOf(4) else emptySet())?.let {
+                            if (it.channel == 4) {
+                                if (handshake.canSendConversation) {
+                                    pets.binary(
+                                        it,
+                                        now()
+                                    ).forEach(observer::pet)
+                                }
+                            } else {
+                                effects(conversation.binary(it, now()))
+                            }
+                        }
                         activityAt = now()
                         publish()
                     }
@@ -367,7 +385,19 @@ class DirectConnection(
                         )
                 }
             }
-            else -> if (handshake.canSendConversation) effects(conversation.receive(message, now()))
+            else -> if (handshake.canSendConversation) {
+                if (petEnabled &&
+                    message.type in setOf("pet.manifest", "asset.start", "asset.end", "asset.abort")
+                ) {
+                    pets.message(message, now()).forEach(observer::pet)
+                } else {
+                    effects(conversation.receive(message, now()))
+                }
+            }
+        }
+        if (petEnabled && handshake.canSendConversation && !petRequested) {
+            petRequested = true
+            send(Message.create("pet.request"))
         }
         if (message.type !in setOf("ping", "pong", "status")) activityAt = now()
     }
@@ -379,6 +409,7 @@ class DirectConnection(
             if (handshake.state == Handshake.State.FAILED) fail("Connection timed out.", true)
             if (healthySince?.let { now() - it >= 20000 } == true) retryCount = 0
         }
+        pets.tick(now())
         effects(conversation.tick(now()))
         val inactivityLimit = if (conversation.busy) {
             idleMillis.coerceAtLeast(
@@ -398,6 +429,7 @@ class DirectConnection(
         socket?.cancel()
         socket = null
         handshake.close()
+        pets.clear()
         effects(conversation.disconnected())
         healthySince = null
         if (desired && retry) {
@@ -438,6 +470,7 @@ class DirectConnection(
         socket?.cancel()
         socket = null
         handshake.close()
+        pets.clear()
         effects(conversation.disconnected())
         state =
             state.copy(

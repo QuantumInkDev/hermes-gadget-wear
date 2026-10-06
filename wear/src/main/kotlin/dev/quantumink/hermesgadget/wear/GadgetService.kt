@@ -26,6 +26,8 @@ import dev.quantumink.hermesgadget.protocol.ConversationState
 import dev.quantumink.hermesgadget.protocol.DeviceIdentity
 import dev.quantumink.hermesgadget.protocol.DirectConnection
 import dev.quantumink.hermesgadget.protocol.Endpoint
+import dev.quantumink.hermesgadget.protocol.PetEffect
+import dev.quantumink.hermesgadget.protocol.PetManifest
 import dev.quantumink.hermesgadget.protocol.TransportPath
 import dev.quantumink.hermesgadget.protocol.TransportPolicy
 import dev.quantumink.hermesgadget.protocol.TransportPreference
@@ -53,6 +55,10 @@ data class WatchState(
     val path: TransportPath = TransportPath.DIRECT,
     val selecting: Boolean = false,
     val transportNotice: String = "",
+    val pet: PetAtlas? = null,
+    val petCue: String = "",
+    val speaking: Boolean = false,
+    val playbackLevel: Float = 0f,
     val haptic: Long = 0
 ) {
     override fun toString(): String = "WatchState(content=redacted)"
@@ -70,6 +76,17 @@ class GadgetService : Service() {
     private val transportWorker = Executors.newSingleThreadExecutor()
     private val selectionEpoch = AtomicLong()
     private val epoch = AtomicLong()
+    private val petWorker = java.util.concurrent.ThreadPoolExecutor(
+        1,
+        1,
+        0,
+        java.util.concurrent.TimeUnit.MILLISECONDS,
+        java.util.concurrent.ArrayBlockingQueue(3),
+        { task -> Thread(task, "pet-storage").apply { isDaemon = true } }
+    )
+    private lateinit var petCache: PetCache
+
+    @Volatile private var petManifest: PetManifest? = null
     private lateinit var vault: IdentityVault
     private lateinit var capture: PcmCapture
     private lateinit var playback: PcmPlayback
@@ -91,7 +108,13 @@ class GadgetService : Service() {
     override fun onCreate() {
         super.onCreate()
         capture = PcmCapture(this)
-        playback = PcmPlayback(this) { connection?.report("Playback interrupted.") }
+        petCache = PetCache(this)
+        playback = PcmPlayback(
+            this,
+            onInterrupted = { connection?.report("Playback interrupted.") },
+            onLevel = { level -> mutableState.update { it.copy(playbackLevel = level) } },
+            onFinished = { mutableState.update { it.copy(speaking = false, playbackLevel = 0f) } }
+        )
         val notifications = getSystemService(NotificationManager::class.java)
         notifications.createNotificationChannel(
             NotificationChannel(
@@ -386,6 +409,22 @@ class GadgetService : Service() {
         }
     }
 
+    private var cueSerial = 0L
+    private fun petCue(mode: String, version: Long) {
+        main.post {
+            if (version != epoch.get()) return@post
+            val serial = ++cueSerial
+            mutableState.update { it.copy(petCue = mode) }
+            main.postDelayed({
+                if (version == epoch.get() &&
+                    mutableState.value.petCue == mode && serial == cueSerial
+                ) {
+                    mutableState.update { it.copy(petCue = "") }
+                }
+            }, 1100)
+        }
+    }
+
     private fun configure(
         profile: EndpointProfile,
         identity: DeviceIdentity,
@@ -400,7 +439,19 @@ class GadgetService : Service() {
         val version = epoch.incrementAndGet()
         val actions = availableActions()
         advertisedActions = actions
+        val sameEndpoint = mutableState.value.profile?.endpoint?.url == profile.endpoint.url
+        petManifest = null
+        if (!sameEndpoint) mutableState.update { it.copy(pet = null, petCue = "") }
+        storage.execute {
+            val cached = petCache.load(profile.endpoint.url)
+            if (cached != null && version == epoch.get()) {
+                mutableState.update {
+                    if (version == epoch.get()) it.copy(pet = cached) else it
+                }
+            }
+        }
         val caps = WatchActions.capabilities().toMutableMap()
+        caps["pet"] = buildJsonObject { put("asset_channel", 4) }
         if (opusReady) {
             val formats = JsonArray(listOf(JsonPrimitive("opus"), JsonPrimitive("pcm16")))
             listOf("mic", "speaker").forEach { name ->
@@ -421,8 +472,50 @@ class GadgetService : Service() {
             profile.endpoint,
             identity,
             object : ConnectionObserver {
+                override fun pet(effect: PetEffect) {
+                    if (version != epoch.get()) return
+                    if (effect is PetEffect.Manifest) petManifest = effect.value
+                    val manifest = petManifest ?: return
+                    runCatching {
+                        petWorker.execute {
+                            if (version != epoch.get() || petManifest !== manifest) return@execute
+                            val atlas = runCatching {
+                                when (effect) {
+                                    is PetEffect.Manifest -> petCache.saveManifest(
+                                        profile.endpoint.url,
+                                        manifest
+                                    )
+                                    is PetEffect.Asset -> petCache.saveAsset(
+                                        profile.endpoint.url,
+                                        manifest,
+                                        effect.sheet,
+                                        effect.bytes
+                                    )
+                                }
+                            }.getOrNull()
+                            if (atlas != null && version == epoch.get() &&
+                                petManifest === manifest
+                            ) {
+                                mutableState.update {
+                                    if (version == epoch.get() &&
+                                        petManifest === manifest
+                                    ) {
+                                        it.copy(pet = atlas)
+                                    } else {
+                                        it
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 override fun stateChanged(state: ConnectionState) {
                     if (version != epoch.get()) return
+                    if (state.status == ConnectionStatus.PAIRED &&
+                        mutableState.value.connection.status != ConnectionStatus.PAIRED
+                    ) {
+                        petCue("waving", version)
+                    }
                     mutableState.update {
                         if (version == epoch.get()) it.copy(connection = state) else it
                     }
@@ -493,10 +586,12 @@ class GadgetService : Service() {
                             foreground
                         ) {
                             playback.start(effect.rate, effect.opusHeader)
+                            mutableState.update { it.copy(speaking = true) }
                         }
                         is ConversationEffect.PlaybackData -> playback.offer(effect.bytes)
                         ConversationEffect.PlaybackFinish -> playback.finish()
                         ConversationEffect.PlaybackStop -> playback.stop()
+                        is ConversationEffect.PetCue -> petCue(effect.mode, version)
                         is ConversationEffect.Action -> main.post {
                             if (version == epoch.get()) executeAction(effect, generation)
                         }
@@ -689,6 +784,7 @@ class GadgetService : Service() {
         closeConnection()
         main.removeCallbacksAndMessages(null)
         storage.shutdownNow()
+        petWorker.shutdownNow()
         transportWorker.shutdownNow()
         super.onDestroy()
     }
