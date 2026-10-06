@@ -328,8 +328,10 @@ class GadgetService : Service() {
                                 capture.start(
                                     { bytes -> current.captured(effect.token, bytes) },
                                     {
-                                        current.cancelRecording()
-                                        current.report(getString(R.string.capture_failed))
+                                        current.captureFailed(
+                                            effect.token,
+                                            getString(R.string.capture_failed)
+                                        )
                                     }
                                 )
                             }

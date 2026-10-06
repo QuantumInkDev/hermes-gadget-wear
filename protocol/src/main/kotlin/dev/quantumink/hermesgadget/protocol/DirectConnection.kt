@@ -144,6 +144,11 @@ class DirectConnection(
         }
     }
 
+    fun captureFailed(token: String, reason: String) = dispatch {
+        effects(conversation.captureFailed(token, now(), reason))
+        publish()
+    }
+
     fun actionResult(epoch: Long, id: String, result: JsonObject?, error: String? = null) =
         dispatch {
             if (epoch == generation) effects(conversation.actionResult(id, result, error))

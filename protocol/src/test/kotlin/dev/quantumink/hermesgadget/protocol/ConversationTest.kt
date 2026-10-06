@@ -88,6 +88,8 @@ class ConversationTest {
         val second = c.startRecording(200)
             .filterIsInstance<ConversationEffect.CaptureStart>().single()
         assertTrue(c.capture(first.token, ByteArray(640), 220).isEmpty())
+        assertTrue(c.captureFailed(first.token, 220, "Stale capture failure").isEmpty())
+        assertEquals(ConversationMode.LISTENING, c.state.mode)
         repeat(20) { c.capture(second.token, ByteArray(640), 220L + it * 20) }
         val end = sends(c.finishRecording(650)).single()
         assertEquals("audio.end", end.type)

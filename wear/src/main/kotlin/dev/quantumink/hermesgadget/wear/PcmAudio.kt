@@ -34,7 +34,7 @@ class PcmCapture(private val context: Context) {
                 if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) !=
                     PackageManager.PERMISSION_GRANTED
                 ) {
-                    onFailure()
+                    if (!capture.stopped.get()) onFailure()
                     return@Thread
                 }
                 val minimum = AudioRecord.getMinBufferSize(

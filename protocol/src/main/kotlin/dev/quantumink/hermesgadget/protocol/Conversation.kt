@@ -416,6 +416,9 @@ class Conversation(private val availableActions: Set<String> = WatchActions.name
         return effects + ConversationEffect.Haptic.LISTEN_END
     }
 
+    fun captureFailed(token: String, now: Long, reason: String): List<ConversationEffect> =
+        if (upload?.token == token) cancelRecording(now, reason) else emptyList()
+
     fun cancel(now: Long, newSession: Boolean = false): List<ConversationEffect> {
         if (!canInput()) return emptyList()
         val effects = cancelRecording(now)
