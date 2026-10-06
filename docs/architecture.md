@@ -74,3 +74,5 @@ CI builds both debug apps, runs JVM and Android host unit tests, Android lint wi
 Hardware checks remain separate: Ultra mic/playback, round clipping, prompt accidental-press prevention, Bluetooth relay loss/backpressure, VPN reachability from the phone, Opus bitrate/STT, standby battery, ambient burn-in, and signed Play internal-track installation.
 
 M2 idle policy: ordinary inactivity disconnects after 90 seconds. A stalled active turn or unanswered prompt has a 120-second inactivity cap, including during retries, so heartbeats cannot keep a foreground service alive indefinitely. Offline state preserves the last reply.
+
+Typed drafts stay in memory when idle or network loss closes the connection. The editor shows connection status and an explicit Connect control, then requires a fresh Send after reconnecting. It clears a draft only after the connection event queue confirms that the text frame was accepted by the active WebSocket. Rejected, stopped, or overloaded submissions leave the draft available. This local acceptance result does not claim delivery acknowledgement from the stock server, and input is never replayed automatically.

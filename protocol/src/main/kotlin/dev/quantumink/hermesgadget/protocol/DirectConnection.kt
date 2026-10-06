@@ -4,6 +4,7 @@ import java.net.InetAddress
 import java.net.Proxy
 import java.net.UnknownHostException
 import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.ThreadPoolExecutor
@@ -67,6 +68,9 @@ class DirectConnection(
     private val now: () -> Long = { TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) },
     private val idleMillis: Long = 90000
 ) : AutoCloseable {
+    private class Work(val block: () -> Unit, val rejected: () -> Unit) : Runnable {
+        override fun run() = block()
+    }
     private val ownsClient = httpClient == null
     private val client = (httpClient ?: OkHttpClient()).newBuilder()
         .dns(EndpointDns(endpoint))
@@ -88,9 +92,10 @@ class DirectConnection(
         TimeUnit.MILLISECONDS,
         ArrayBlockingQueue(32),
         { runnable -> Thread(runnable, "gadget-events").apply { isDaemon = true } },
-        { _, _ ->
+        { work, _ ->
             overloaded.set(true)
             socket?.cancel()
+            (work as? Work)?.rejected?.invoke()
         }
     )
     private val timer = Executors.newSingleThreadScheduledExecutor { runnable ->
@@ -121,7 +126,23 @@ class DirectConnection(
     }
 
     fun disconnect() = dispatch { disconnectInternal() }
-    fun text(value: String) = user { conversation.sendText(value, now()) }
+    fun text(value: String): CompletableFuture<Boolean> {
+        val result = CompletableFuture<Boolean>()
+        submit(
+            {
+                activityAt = now()
+                val values = conversation.sendText(value, now())
+                val hasText = values.any {
+                    it is ConversationEffect.Send && it.message.type == "text"
+                }
+                val accepted = effects(values)
+                publish()
+                result.complete(hasText && accepted)
+            },
+            { result.complete(false) }
+        )
+        return result
+    }
     fun startRecording() = user { conversation.startRecording(now()) }
     fun finishRecording() = user { conversation.finishRecording(now()) }
     fun cancelRecording() = user { conversation.cancelRecording(now()) }
@@ -385,15 +406,17 @@ class DirectConnection(
         publish()
     }
 
-    private fun effects(values: List<ConversationEffect>) {
+    private fun effects(values: List<ConversationEffect>): Boolean {
         val epoch = generation
+        var accepted = true
         for (effect in values) {
-            if (stopped.get() || epoch != generation) break
+            if (stopped.get() || epoch != generation) {
+                accepted = false
+                break
+            }
             when (effect) {
-                is ConversationEffect.Send -> if (handshake.canSendConversation) {
-                    send(
-                        effect.message
-                    )
+                is ConversationEffect.Send -> {
+                    if (!handshake.canSendConversation || !send(effect.message)) accepted = false
                 }
                 is ConversationEffect.SendBinary -> if (handshake.canSendConversation) {
                     val active = socket
@@ -401,16 +424,20 @@ class DirectConnection(
                         !active.send(effect.frame.encode().toByteString())
                     ) {
                         fail("Audio uplink could not keep up.", true)
+                        accepted = false
                         break
                     }
                 }
                 else -> observer.effect(effect, generation)
             }
         }
+        return accepted
     }
 
-    private fun send(message: Message) {
-        if (socket?.send(message.encode()) != true) fail("Connection cannot send.", true)
+    private fun send(message: Message): Boolean {
+        if (socket?.send(message.encode()) == true) return true
+        fail("Connection cannot send.", true)
+        return false
     }
 
     private fun publish() {
@@ -422,17 +449,29 @@ class DirectConnection(
         }
     }
 
-    private fun dispatch(block: () -> Unit) {
-        if (stopped.get()) return
-        executor.execute {
-            if (stopped.get()) return@execute
-            if (overloaded.getAndSet(false)) {
-                fail("Connection exceeded its work limit.", false)
-                publish()
-                return@execute
-            }
-            block()
+    private fun dispatch(block: () -> Unit) = submit(block) {}
+
+    private fun submit(block: () -> Unit, rejected: () -> Unit) {
+        if (stopped.get()) {
+            rejected()
+            return
         }
+        executor.execute(
+            Work(
+                {
+                    if (stopped.get()) {
+                        rejected()
+                    } else if (overloaded.getAndSet(false)) {
+                        fail("Connection exceeded its work limit.", false)
+                        publish()
+                        rejected()
+                    } else {
+                        block()
+                    }
+                },
+                rejected
+            )
+        )
     }
 
     private fun newHandshake() = Handshake(
@@ -447,7 +486,7 @@ class DirectConnection(
         if (!stopped.compareAndSet(false, true)) return
         socket?.cancel()
         timer.shutdownNow()
-        executor.shutdownNow()
+        executor.shutdownNow().forEach { (it as? Work)?.rejected?.invoke() }
         observer.effect(ConversationEffect.CaptureStop, generation)
         observer.effect(ConversationEffect.PlaybackStop, generation)
         observer.stateChanged(

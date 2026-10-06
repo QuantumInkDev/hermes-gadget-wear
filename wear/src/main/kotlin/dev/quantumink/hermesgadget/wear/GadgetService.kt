@@ -219,11 +219,17 @@ class GadgetService : Service() {
         brightness?.invoke(null)
     }
 
-    fun text(value: String) {
+    fun text(value: String, completed: (Boolean) -> Unit) {
+        val active = connection
         if (visible && mutableState.value.connection.status == ConnectionStatus.PAIRED &&
-            mutableState.value.connection.conversation.prompt == null && beginForeground(false)
+            mutableState.value.connection.conversation.prompt == null && active != null &&
+            beginForeground(false)
         ) {
-            connection?.text(value)
+            active.text(value).whenComplete { accepted, failure ->
+                main.post { completed(failure == null && accepted == true) }
+            }
+        } else {
+            completed(false)
         }
     }
 

@@ -26,6 +26,10 @@
     <string name="type_message">Type a message</string>
     <string name="message">Message</string>
     <string name="send">Send</string>
+    <string name="sending">Sending</string>
+    <string name="message_reconnect">Reconnect to send your message. Your draft is still here.</string>
+    <string name="message_not_sent">Message was not sent. Your draft is still here.</string>
+    <string name="message_approval">Review the pending approval, then return to your draft.</string>
     <string name="cancel">Cancel</string>
     <string name="new_session_hint">Hold Cancel 2 seconds for a new conversation.</string>
     <string name="new_session">Start a new conversation</string>

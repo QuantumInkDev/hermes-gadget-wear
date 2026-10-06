@@ -90,6 +90,7 @@ fun WatchScreen(
 ) {
     val watch by service.state.collectAsStateWithLifecycle()
     var route by remember { mutableStateOf("home") }
+    var textDraft by remember(watch.profile?.endpoint?.url) { mutableStateOf("") }
     val feedback = LocalHapticFeedback.current
     var haptic by remember { mutableLongStateOf(watch.haptic) }
     LaunchedEffect(watch.haptic) {
@@ -123,9 +124,18 @@ fun WatchScreen(
             permissions = permissions
         )
         route == "text" -> TextPage(
-            send = {
-                service.text(it)
-                route = "home"
+            text = textDraft,
+            changed = { textDraft = it.take(4096) },
+            connection = watch.connection,
+            connect = connect,
+            send = { value, completed ->
+                service.text(value) { accepted ->
+                    if (accepted) {
+                        if (textDraft == value) textDraft = ""
+                        route = "home"
+                    }
+                    completed(accepted)
+                }
             },
             back = { route = "home" }
         )
@@ -216,13 +226,71 @@ private fun SetupPage(
 }
 
 @Composable
-private fun TextPage(send: (String) -> Unit, back: () -> Unit) {
-    var text by remember { mutableStateOf("") }
+private fun TextPage(
+    text: String,
+    changed: (String) -> Unit,
+    connection: dev.quantumink.hermesgadget.protocol.ConnectionState,
+    connect: () -> Unit,
+    send: (String, (Boolean) -> Unit) -> Unit,
+    back: () -> Unit
+) {
+    var pending by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf(false) }
+    val ready = connection.status == ConnectionStatus.PAIRED &&
+        connection.conversation.prompt == null
     RoundPage {
         item { Heading(stringResource(R.string.type_message)) }
-        item { Input(stringResource(R.string.message), text, { text = it.take(4096) }) }
-        item { Primary(stringResource(R.string.send), enabled = text.isNotBlank()) { send(text) } }
-        item { Secondary(stringResource(R.string.back), back) }
+        item { Input(stringResource(R.string.message), text, changed, enabled = !pending) }
+        if (!ready) {
+            item {
+                Body(
+                    if (connection.error.isNotBlank()) {
+                        connection.error
+                    } else {
+                        stringResource(
+                            when {
+                                connection.conversation.prompt != null -> R.string.message_approval
+                                connection.status == ConnectionStatus.PAIRING -> R.string.pairing
+                                connection.status == ConnectionStatus.CONNECTING -> {
+                                    R.string.connecting
+                                }
+                                connection.status == ConnectionStatus.RETRYING -> {
+                                    R.string.reconnecting
+                                }
+                                else -> R.string.message_reconnect
+                            }
+                        )
+                    }
+                )
+            }
+        } else if (failed) {
+            item {
+                Body(
+                    connection.conversation.notice.ifBlank {
+                        stringResource(R.string.message_not_sent)
+                    }
+                )
+            }
+        }
+        if (connection.status in setOf(ConnectionStatus.OFFLINE, ConnectionStatus.ERROR)) {
+            item {
+                Primary(stringResource(R.string.connect), enabled = !pending, onClick = connect)
+            }
+        }
+        item {
+            Primary(
+                stringResource(if (pending) R.string.sending else R.string.send),
+                enabled = ready && !pending && text.isNotBlank()
+            ) {
+                pending = true
+                failed = false
+                send(text) { accepted ->
+                    pending = false
+                    failed = !accepted
+                }
+            }
+        }
+        item { Secondary(stringResource(R.string.back), back, enabled = !pending) }
     }
 }
 
@@ -476,7 +544,8 @@ private fun Input(
     label: String,
     value: String,
     changed: (String) -> Unit,
-    keyboard: KeyboardType = KeyboardType.Text
+    keyboard: KeyboardType = KeyboardType.Text,
+    enabled: Boolean = true
 ) {
     val focus = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -485,6 +554,7 @@ private fun Input(
         Text(label, color = Muted, style = MaterialTheme.typography.labelMedium)
         BasicTextField(
             value, changed,
+            enabled = enabled,
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                 .clip(RoundedCornerShape(16.dp)).background(Color(0xFF20251F)).padding(12.dp)
                 .semantics { contentDescription = label },

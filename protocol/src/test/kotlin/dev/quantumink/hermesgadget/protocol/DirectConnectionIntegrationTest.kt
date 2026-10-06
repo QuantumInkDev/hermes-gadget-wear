@@ -19,6 +19,7 @@ import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -91,7 +92,7 @@ class DirectConnectionIntegrationTest {
                 val pairing = probe.await { it.pairingCode.isNotBlank() }
                 command(process, "approve " + pairing.pairingCode)
                 probe.await { it.status == ConnectionStatus.PAIRED }
-                connection.text("synthetic café")
+                assertTrue(connection.text("synthetic café").get(5, TimeUnit.SECONDS))
                 probe.await { it.conversation.reply == "You said: synthetic café" }
                 probe.playback.clear()
                 connection.startRecording()
@@ -141,9 +142,10 @@ class DirectConnectionIntegrationTest {
                 probe.await { it.conversation.notice == "Recording discarded." }
                 connection.disconnect()
                 probe.await { it.status == ConnectionStatus.OFFLINE }
+                assertFalse(connection.text("unsent draft").get(5, TimeUnit.SECONDS))
                 connection.connect()
                 probe.await { it.status == ConnectionStatus.PAIRED }
-                connection.text("reconnected")
+                assertTrue(connection.text("reconnected").get(5, TimeUnit.SECONDS))
                 probe.await {
                     it.conversation.reply == "You said: reconnected" &&
                         it.conversation.status.isEmpty()
@@ -151,8 +153,13 @@ class DirectConnectionIntegrationTest {
                 clockOffset.addAndGet(200000)
                 val idle = probe.await { it.status == ConnectionStatus.OFFLINE }
                 assertEquals("You said: reconnected", idle.conversation.reply)
+                assertFalse(connection.text("idle draft").get(5, TimeUnit.SECONDS))
                 connection.connect()
                 probe.await { it.status == ConnectionStatus.PAIRED }
+                assertTrue(connection.text("fresh send").get(5, TimeUnit.SECONDS))
+                probe.await { it.conversation.reply == "You said: fresh send" }
+                connection.close()
+                assertFalse(connection.text("closed draft").get(5, TimeUnit.SECONDS))
             }
         } finally {
             runCatching { command(process, "quit") }
