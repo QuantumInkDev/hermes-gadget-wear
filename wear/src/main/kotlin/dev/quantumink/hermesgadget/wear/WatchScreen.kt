@@ -411,6 +411,18 @@ private fun ConversationPage(
                     }
                 }
             } else if (paired) {
+                item {
+                    Body(
+                        stringResource(
+                            if (connection.clientSpeech) {
+                                R.string.phone_speech
+                            } else {
+                                R.string.server_speech
+                            }
+                        ),
+                        muted = true
+                    )
+                }
                 if (conversation.mode in
                     setOf(ConversationMode.READY, ConversationMode.LISTENING)
                 ) {

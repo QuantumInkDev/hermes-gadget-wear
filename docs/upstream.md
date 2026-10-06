@@ -5,7 +5,7 @@ Baseline: Hermes Gadget SDK `v0.2.0`, commit `323e3303ab68981f810fc3208119cd8a22
 | Proposal | Target | Status / gate |
 | --- | --- | --- |
 | Optional mic/speaker Opus negotiation, packet framing and paced codec pipeline | Gadget SDK | Patch 1 implemented/tested with real ffmpeg and SDK; Android cross-codec tests pass; Ultra measurements open |
-| Optional client TTS and profile voice hint | Gadget SDK | Proposed for M6; stock server TTS remains default |
+| Optional client TTS and profile voice hint | Gadget SDK | Patch 3 implemented/tested; opt-in negotiation and final text; physical/provider gate open |
 | Pet manifest and bounded PNG asset transfer on channel 4 | Gadget SDK | Patch 2 implemented/tested; Android delivery/cache checks pass; real-profile/Ultra gate open |
 | Optional companion metadata and extra rows in one hatch normalization pass | Hermes Agent | Later-row registration tool implemented/tested; same-hatch generator change remains proposed |
 | Pending outbox on reconnect | Gadget SDK | Proposed; define expiry, order, bounded retention and deduplication |
@@ -16,3 +16,5 @@ Each SDK implementation must be a clean branch/PR series against the pinned base
 M4 local branch `wear/optional-extensions`, first patch `feat: negotiate optional packet Opus using ffmpeg`, includes SDK protocol documentation and tests. Reproduce from [server patch series](../server/README.md). The opt-in path uses a correctly rebased lead-pacing clock; elapsed-time testing caught the copied sign error that otherwise let packets burst. Stock PCM behavior remains unchanged in this patch. No provider-direct Opus optimization, hardware STT nonregression, gateway installation, or upstream review is claimed.
 
 M5 local SDK patch 2 `2bcdfc7` implements authenticated, opt-in profile pet delivery. [Pet documentation](pets.md) records the companion metadata proposal, original-fixture evidence, renderer fallback and registration-tool limits. No Hermes Agent generator change, real-profile delivery, upstream review, or live installation is claimed.
+
+M6 local SDK patch 3 `8a1d854` acknowledges optional client speech, sends bounded final reply text and a profile voice hint, deduplicates finals, respects voice-off, and suppresses automatic server synthesis for acknowledged client sessions. Default `enable_client_tts` is false. Stock clients and extension-off servers retain their speech behavior. Explicit voice attachments retain their existing server path. Actual Hermes adapter/profile integration, real provider output and phone/watch transport remain unverified. No upstream review or live installation is claimed.

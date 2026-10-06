@@ -86,6 +86,16 @@ Validation: the strict full build/check command passed; 46 JVM tests, zero failu
 
 Demo note: [original sample on the round emulator](demo/m5/README.md), including cached rendering after fixture loss. Software checks do not establish personal-profile delivery, small-watch legibility, physical lip sync, or ambient/battery acceptance. Staged-export gitleaks, private-value and local-document-link checks passed. M5 hardware acceptance remains open. M4 commit `82a206b` [CI](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37468005261) passed all three jobs.
 
+## M6 client speech — 2026-10-06 — software verified, provider/hardware gate open
+
+Implemented opt-in phone-only shared/per-endpoint AES-GCM Keystore keys, voice overrides, read-only quota checks, readiness synchronization and a separate bounded ChannelClient speech stream. Watch relay readiness plus server acknowledgment is required; direct/stock paths use server voice. Native Ogg Opus is validated/demuxed without transcoding, or PCM16 is selected when the watch codec is unavailable. Cancellation closes the request/channel; synthesis is never automatically retried. The UI discloses reply-text/provider/billing access and blocks phone screenshots.
+
+SDK patch 3 `8a1d854` adds optional acknowledgment, profile voice hint and bounded final `tts.speak`, suppresses automatic server TTS for those sessions and respects voice-off. A fresh pinned checkout accepted all three exported patches and passed 31 Python tests. Live Hermes remains unchanged.
+
+Validation: strict full build/check, format/lint/warnings-as-errors, both app and instrumentation APKs passed; 53 JVM tests with zero failures/errors/skips. The live unmodified SDK and isolated extension negotiation test exposed a missing `tts.speak` dispatch; the fixed path now verifies stock-readable replies versus acknowledged client speech. TLS provider fixtures check quota/header, native Opus and PCM bytes/pacing, voice precedence, errors, redirects, cancellation and no paid retry. Phone API 37 Keystore tamper/missing-key/independent-selection instrumentation and watch API 37 native Opus decode passed on owned emulators.
+
+Demo note: original 0.6-second tone and synthetic keys/provider responses only; no existing personal ElevenLabs key, paid synthesis, personal watch operation or real Data Layer exchange was used. Actual provider output, background delivery, billing and voice quality remain open. See [client speech evidence](client-speech.md) and [setup/disclosure](self-host.md). M5 `4f1d588` [CI](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37471127954) passed all jobs.
+
 ## Milestones
 
 Maintainer voice demo — 2026-10-06: the maintainer reports that the physical watch successfully asked about the weather, received an answer, and played the profile's ElevenLabs voice. This verifies a real hold-to-talk/STT/reply/playback path by maintainer report; no bitrate, STT comparison, battery, or audio-quality measurement is inferred. They described the flow as clunky and authorized advancing the remaining phases while away from the home network. The core M2 conversation demo has passed; the remaining physical media/action, permission, lifecycle, and quality matrix stays open. Phase implementation may advance in sequence under that authorization, with unverified milestone acceptance kept explicit.
@@ -98,8 +108,8 @@ Maintainer voice demo — 2026-10-06: the maintainer reports that the physical w
 | M3: Phone relay and transport selection | Software verified; actual Data Layer/off-network gate open |
 | M4: Opus and measurements | Software/cross-codec verified; Ultra speech/bitrate/battery gate open |
 | M5: Pets and companion-sheet tooling | Software/emulator verified; real profile/Ultra gate open |
-| M6: Client BYOK TTS | Not started |
+| M6: Client BYOK TTS | Software/emulator verified; provider/Data Layer gate open |
 | M7: Multi-endpoint profiles and v2 proposal | Not started |
 | M8: Tile, complication, ambient, battery, internal testing | Not started |
 
-Next: M6 BYOK client TTS, then M7–M8 in order. Keep M2/M3 hardware gates open while the maintainer is away. Relay TLS and direct cleartext decisions are resolved. Multiplexed gateway v2 remains proposal-only pending decision and upstream feedback.
+Next: M7 endpoint management, then M8 in order. Keep M2/M3 hardware gates open while the maintainer is away. Relay TLS and direct cleartext decisions are resolved. Multiplexed gateway v2 remains proposal-only pending decision and upstream feedback.

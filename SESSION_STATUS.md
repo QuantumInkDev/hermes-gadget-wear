@@ -16,6 +16,8 @@ M4 commit `82a206b` was pushed; [CI](https://github.com/QuantumInkDev/hermes-gad
 
 M5 staged-export gitleaks, personal-value and local-document-link checks passed.
 
-CONTINUE HERE: implement M6 BYOK, M7 independent endpoint management, and M8 surfaces/release prep in order. The maintainer authorizes advancement with open hardware gates. Do not mark Ultra throughput/STT/quality/battery or actual Data Layer complete. Multiplexed gateway v2 remains proposal-only pending explicit DECISION and upstream-maintainer feedback; no maintainer messages have been authorized.
+M6 phone BYOK shared/per-endpoint vault, quota checks, native Opus/PCM streaming, cancellation and server negotiation are implemented. Strict full checks passed: 53 JVM tests, zero failures/errors/skips, 31 Python tests from a fresh three-patch export, actual owned-phone Keystore and owned-watch native Opus decode instrumentation. Stock-readable replies and optional client speech are checked against actual SDK processes. No paid provider call, personal key or live gateway extension was used. Provider output/billing/voice quality and Data Layer remain open.
+
+CONTINUE HERE: implement M7 independent endpoint management and M8 surfaces/release prep in order. The maintainer authorizes advancement with open hardware gates. Do not mark Ultra throughput/STT/quality/battery or actual Data Layer complete. Multiplexed gateway v2 remains proposal-only pending explicit DECISION and upstream-maintainer feedback; no maintainer messages have been authorized.
 
 Physical pairing approval was already fulfilled. Private ADB/settings/captures remain ignored; screen timeout was restored. Use only the owned Hermes test AVD for local checks and exact serials. Existing unrelated AVDs remain untouched. The public demo uses synthetic data and original procedural artwork. No PR has been created.

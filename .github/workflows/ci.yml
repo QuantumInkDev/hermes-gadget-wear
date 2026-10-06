@@ -23,8 +23,10 @@ jobs:
           accept-android-sdk-licenses: false
       - name: Install pinned SDK development server
         run: python3 tools/setup-devserver.py
+      - name: Prepare optional extension integration server
+        run: python3 tools/setup-extensions.py
       - name: Build, test, lint, and format check
-        run: HERMES_GADGET_PYTHON="$PWD/.local/venv/bin/python" ./gradlew check :wear:assembleDebug :wear:assembleDebugAndroidTest :mobile:assembleDebug --warning-mode=fail
+        run: HERMES_GADGET_PYTHON="$PWD/.local/venv/bin/python" HERMES_GADGET_EXTENSION_PYTHON="$PWD/.local/extension-venv/bin/python" ./gradlew check :wear:assembleDebug :wear:assembleDebugAndroidTest :mobile:assembleDebug :mobile:assembleDebugAndroidTest --warning-mode=fail
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: debug-apps
@@ -42,7 +44,7 @@ jobs:
       - name: Prepare isolated pinned SDK patch series
         run: python3 tools/setup-extensions.py
       - name: Test optional codecs, pets, tools, and stock compatibility
-        run: HERMES_AGENT_DIR="$PWD/.local/unavailable" .local/extension-venv/bin/python -m pytest .local/upstream/hermes-gadget-sdk-patched/tests/test_opus.py .local/upstream/hermes-gadget-sdk-patched/tests/test_pets.py tools/tests/test_extend_pet.py .local/upstream/hermes-gadget-sdk-patched/tests/test_protocol.py .local/upstream/hermes-gadget-sdk-patched/tests/test_plugin_units.py -q
+        run: HERMES_AGENT_DIR="$PWD/.local/unavailable" .local/extension-venv/bin/python -m pytest .local/upstream/hermes-gadget-sdk-patched/tests/test_opus.py .local/upstream/hermes-gadget-sdk-patched/tests/test_pets.py .local/upstream/hermes-gadget-sdk-patched/tests/test_client_tts.py tools/tests/test_extend_pet.py .local/upstream/hermes-gadget-sdk-patched/tests/test_protocol.py .local/upstream/hermes-gadget-sdk-patched/tests/test_plugin_units.py -q
 
   secrets:
     runs-on: ubuntu-latest

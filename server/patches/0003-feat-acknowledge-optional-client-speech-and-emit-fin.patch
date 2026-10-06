@@ -1,0 +1,296 @@
+From 8a1d8541661a218acb70b8e4dec46fbb30a9eff2 Mon Sep 17 00:00:00 2001
+From: Justin Garcia <dev@quantumink.dev>
+Date: Tue, 6 Oct 2026 10:02:33 -0400
+Subject: [PATCH] feat: acknowledge optional client speech and emit final
+ events
+
+---
+ docs/connect-hermes.md   |  7 ++++
+ docs/protocol.md         | 26 ++++++++++++++
+ plugin/adapter.py        | 17 +++++++--
+ plugin/hub.py            | 32 +++++++++++++++++
+ tests/test_client_tts.py | 76 ++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 156 insertions(+), 2 deletions(-)
+ create mode 100644 tests/test_client_tts.py
+
+diff --git a/docs/connect-hermes.md b/docs/connect-hermes.md
+index ba3e424..4c1f904 100644
+--- a/docs/connect-hermes.md
++++ b/docs/connect-hermes.md
+@@ -54,3 +54,10 @@ an approved client advertising `caps.pet.asset_channel: 4`. The current profile'
+ active pet is converted to PNG with alpha. Pillow is optional; unavailable or invalid
+ pet art leaves conversations working. See the [pet wire contract](protocol.md#optional-pet-assets-wear-extension).
+ This is an opt-in extension; no personal art is bundled with the plugin.
++
++Optional phone BYOK speech: set `platforms.gadget.extra.enable_client_tts: true`.
++The watch must offer client speech and receive its acknowledgement. These sessions
++keep readable replies and receive one final speech event, with an optional configured
++profile voice ID. Automatic server TTS is suppressed for them; /voice off still wins.
++The phone's own key stays on the phone. Default/stock/no-phone sessions use server TTS.
++See the [wire contract](protocol.md#optional-client-side-speech-wear-extension).
+diff --git a/docs/protocol.md b/docs/protocol.md
+index 47c1390..b05124a 100644
+--- a/docs/protocol.md
++++ b/docs/protocol.md
+@@ -259,3 +259,29 @@ Limit two assets, 2 MiB compressed each, 3.2 million pixels per asset, grid dime
+ The reference server paces chunks at 20 ms and caps the entire delivery at 30 seconds.
+ Metadata paths and symlinks must stay within the profile pet directory. RGB565 image
+ channel 2 is unchanged. PNG preserves alpha; no new native Python dependency is needed.
++
++### Optional client-side speech (Wear extension)
++
++Disabled by default (`platforms.gadget.extra.enable_client_tts: true` opts in).
++A device offers `caps.tts:"client"` only while its configured phone speech service
++is reachable/ready. A supporting hub replies `welcome.tts:"client"`, optionally
++with `voice` (profile ElevenLabs voice ID, never an API key). An absent acknowledgement
++means stock server speech. Direct/no-phone reconnections must omit this capability.
++
++An approved acknowledged session receives normal readable reply/delta frames plus
++`tts.speak {id,text,turn?,voice?}` for final, non-interim replies. Text is capped at
++4096 characters. IDs suppress duplicate identical final replies within a turn,
++with a 64-event in-memory bound; a distinct turn can repeat the same words. Outside
++turns, each final message is a separate event. Never synthesize transcripts/deltas,
++replay interrupted inputs, or replay a cancelled speech event on reconnect. Late
++turn-tagged speech must be ignored after cancellation or turn replacement. The
++adapter respects speak_replies and chat /voice off, suppresses automatic server TTS
++for client sessions, and disables its server streaming TTS seam for them.
++
++The phone speech channel is separate from the Hermes connection: opting in discloses
++final reply text to the phone and the user's provider, while device enrollment/HMAC
++remain protected inside watch-owned TLS. Keys stay in the phone vault and never enter
++Hermes messages. Provider/API failure leaves text readable and prompts correction or
++server mode on reconnect; do not silently make a second paid synthesis request.
++Stock devices/servers need no change, and existing explicit voice attachments are not
++reclassified as automatic client speech.
+diff --git a/plugin/adapter.py b/plugin/adapter.py
+index 3f7d030..700577a 100644
+--- a/plugin/adapter.py
++++ b/plugin/adapter.py
+@@ -147,6 +147,7 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
+         self._max_utterance_s = float(extra.get("max_utterance_s") or 60)
+         self._enable_opus = extra.get("enable_opus") is True
+         self._enable_pets = extra.get("enable_pets") is True
++        self._enable_client_tts = extra.get("enable_client_tts") is True
+         self._speak_replies = _flag(extra.get("speak_replies"), True)
+         self._auto_home = _flag(extra.get("auto_home"), True)
+         self._tls_cert = extra.get("tls_cert")
+@@ -184,7 +185,7 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
+         self._hub = DeviceHub(
+             self._store, self, host=self._host, port=self._port, path=self._path,
+             access_token=self._access_token, heartbeat_s=self._heartbeat_s, ssl_context=ssl_ctx,
+-            max_utterance_s=self._max_utterance_s, enable_opus=self._enable_opus, enable_pets=self._enable_pets)
++            max_utterance_s=self._max_utterance_s, enable_opus=self._enable_opus, enable_pets=self._enable_pets, enable_client_tts=self._enable_client_tts)
+         try:
+             await self._hub.start()
+         except OSError as exc:
+@@ -234,6 +235,16 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
+         # None means no runner check is installed (unit harness): nothing to gate on.
+         return self._authorized(session.device_id) is not False
+ 
++    def client_speech_allowed(self, session: DeviceSession) -> bool:
++        return bool(self._speak_replies and session.device_id not in self._auto_tts_disabled_chats)
++
++    async def voice_hint(self, session: DeviceSession) -> str:
++        def read():
++            from hermes_cli.config import load_config_readonly
++            config = load_config_readonly()
++            return str((config.get("tts") or {}).get("elevenlabs", {}).get("voice_id") or "")
++        return await asyncio.to_thread(read)
++
+     async def pet_package(self, session: DeviceSession):
+         from .pets import active_package
+         return await asyncio.to_thread(active_package)
+@@ -591,6 +602,8 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
+         if chat_id in self._auto_tts_disabled_chats:
+             return False
+         session = self._session(chat_id)
++        if session is not None and session.client_tts:
++            return False
+         if session is not None and session.has_speaker and self._speak_replies:
+             return True
+         return super()._should_auto_tts_for_chat(chat_id)
+@@ -622,7 +635,7 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
+ 
+     def supports_streaming_tts(self, chat_id: str, audio_format: AudioFormat) -> bool:
+         session = self._session(chat_id)
+-        return bool(session and session.paired and session.has_speaker
++        return bool(session and session.paired and session.has_speaker and not session.client_tts
+                     and audio_format.sample_width == 2 and audio_format.channels in (1, 2))
+ 
+     async def begin_streaming_tts(self, chat_id: str, audio_format: AudioFormat,
+diff --git a/plugin/hub.py b/plugin/hub.py
+index 99c6ff3..f914ee0 100644
+--- a/plugin/hub.py
++++ b/plugin/hub.py
+@@ -12,6 +12,7 @@ from __future__ import annotations
+ import asyncio
+ import base64
+ import json
++import re
+ import logging
+ import secrets
+ import time
+@@ -62,6 +63,12 @@ class HubDelegate:
+     async def on_state(self, session: "DeviceSession", sensors: dict) -> None:
+         pass
+ 
++    def client_speech_allowed(self, session: "DeviceSession") -> bool:
++        return True
++
++    async def voice_hint(self, session: "DeviceSession") -> str:
++        return ""
++
+     async def pet_package(self, session: "DeviceSession"):
+         return None
+ 
+@@ -236,12 +243,18 @@ class DeviceSession:
+         self._upload: _Upload | None = None
+         self._audio_out: AudioOut | None = None
+         self._stream_counter = 0
++        self._tts_sent: dict[str, None] = {}
++        self.tts_voice = ""
+         self._pending: dict[str, asyncio.Future] = {}
+         self._tasks: set[asyncio.Task] = set()
+         self._ota_inbox: asyncio.Queue | None = None  # the device's ota.* replies, while an update runs
+ 
+     # -- capabilities -----------------------------------------------------------
+ 
++    @property
++    def client_tts(self) -> bool:
++        return bool(self.hub.enable_client_tts and self.caps.get("tts") == "client")
++
+     @property
+     def display(self) -> dict:
+         d = self.caps.get("display")
+@@ -291,6 +304,14 @@ class DeviceSession:
+ 
+     async def send_reply(self, text: str, *, turn: str | None = None, interim: bool = False) -> None:
+         await self.send_json(protocol.message("reply", text=text, turn=turn, interim=interim or None))
++        if self.client_tts and self.paired and not interim and text.strip() and self.hub.delegate.client_speech_allowed(self):
++            import hashlib
++            identifier = hashlib.sha256((turn + "|" + text).encode()).hexdigest()[:24] if turn else uuid.uuid4().hex[:24]
++            if identifier not in self._tts_sent:
++                self._tts_sent[identifier] = None
++                while len(self._tts_sent) > 64:
++                    del self._tts_sent[next(iter(self._tts_sent))]
++                await self.send_json(protocol.message("tts.speak", id=identifier, text=text[:4096], turn=turn, voice=self.tts_voice or None))
+ 
+     async def send_delta(self, text: str, *, turn: str | None = None) -> None:
+         await self.send_json(protocol.message("reply.delta", text=text, turn=turn))
+@@ -475,6 +496,7 @@ class DeviceHub:
+         max_utterance_s: float = 60.0,
+         enable_opus: bool = False,
+         enable_pets: bool = False,
++        enable_client_tts: bool = False,
+     ):
+         self.store = store
+         self.delegate = delegate
+@@ -485,6 +507,7 @@ class DeviceHub:
+         self.max_utterance_s = max_utterance_s
+         self.enable_opus = bool(enable_opus and opus.available())
+         self.enable_pets = bool(enable_pets)
++        self.enable_client_tts = bool(enable_client_tts)
+         self.sessions: dict[str, DeviceSession] = {}
+         self.loop: asyncio.AbstractEventLoop | None = None
+         self._server = None
+@@ -622,6 +645,15 @@ class DeviceHub:
+                 heartbeat_s=self.heartbeat_s, server="hermes", proto=protocol.VERSION)
+             if self.enable_opus:
+                 welcome["audio"] = {direction: session.audio_format(direction) for direction in ("mic", "speaker")}
++            if session.client_tts:
++                welcome["tts"] = "client"
++                try:
++                    voice = await asyncio.wait_for(self.delegate.voice_hint(session), 2)
++                    if isinstance(voice, str) and re.fullmatch(r"[a-zA-Z0-9_-]{1,128}", voice):
++                        session.tts_voice = voice
++                        welcome["voice"] = voice
++                except Exception:
++                    pass
+             await session.send_json(welcome)
+             log.info("device %s (%s) online, paired=%s", session.device_id, session.name, session.paired)
+             await self.delegate.on_ready(session)
+diff --git a/tests/test_client_tts.py b/tests/test_client_tts.py
+new file mode 100644
+index 0000000..81016d6
+--- /dev/null
++++ b/tests/test_client_tts.py
+@@ -0,0 +1,76 @@
++"""Opt-in client speech, stock behavior, once-only final events and live negotiation."""
++import asyncio
++import base64
++import json
++import secrets
++
++from hermes_gadget_plugin import protocol
++from hermes_gadget_plugin.hub import DeviceHub, DeviceSession, HubDelegate
++from hermes_gadget_plugin.store import DeviceStore
++
++
++def test_extensions_off_unpaired_interim_and_duplicate_finals(tmp_path):
++    class WS:
++        def __init__(self): self.sent = []
++        async def send(self, value): self.sent.append(json.loads(value))
++    async def run():
++        ws = WS()
++        hub = DeviceHub(DeviceStore(tmp_path), HubDelegate())
++        session = DeviceSession(hub, ws, {'device_id': 'hg-0123456789abcdef', 'caps': {'tts': 'client'}})
++        session.paired = True
++        await session.send_reply('Original text', turn='first')
++        assert [item['type'] for item in ws.sent] == ['reply']
++        hub.enable_client_tts = True
++        session.paired = False
++        await session.send_reply('Original text', turn='first')
++        session.paired = True
++        await session.send_reply('Interim', turn='first', interim=True)
++        assert not any(item['type'] == 'tts.speak' for item in ws.sent)
++        session.tts_voice = 'syntheticVoice'
++        await session.send_reply('Final', turn='first')
++        await session.send_reply('Final', turn='first')
++        await session.send_reply('Final', turn='second')
++        spoken = [item for item in ws.sent if item['type'] == 'tts.speak']
++        assert len(spoken) == 2 and spoken[0]['id'] != spoken[1]['id']
++        assert spoken[0]['voice'] == 'syntheticVoice'
++        hub.delegate.client_speech_allowed = lambda session: False
++        await session.send_reply('Voice off', turn='third')
++        assert len([item for item in ws.sent if item['type'] == 'tts.speak']) == 2
++        session.caps = {}
++        assert not session.client_tts
++    asyncio.run(run())
++
++
++def test_live_negotiation_requires_both_sides_and_preserves_readable_reply(tmp_path):
++    from websockets.asyncio.client import connect
++    class Delegate(HubDelegate):
++        async def is_paired(self, session): return True
++        async def voice_hint(self, session): return 'syntheticVoice'
++        async def on_text(self, session, msg_id, text):
++            await session.turn_start('synthetic-turn')
++            await session.send_delta('Original', turn='synthetic-turn')
++            await session.send_reply('Original reply', turn='synthetic-turn')
++            await session.turn_end('synthetic-turn')
++    async def run():
++        for enabled, offered in ((False, True), (True, False), (True, True)):
++            hub = DeviceHub(DeviceStore(tmp_path / f'{enabled}-{offered}'), Delegate(), host='localhost', port=0, enable_client_tts=enabled)
++            await hub.start()
++            try:
++                async with connect(f'ws://localhost:{hub.bound_port}/gadget', subprotocols=[protocol.SUBPROTOCOL]) as ws:
++                    key = secrets.token_bytes(32); device = protocol.device_id_for_key(key)
++                    await ws.send(json.dumps({'type': 'hello', 'proto': 1, 'device_id': device, 'caps': {'tts': 'client'} if offered else {}}))
++                    await ws.recv()
++                    await ws.send(json.dumps({'type': 'auth', 'key': base64.b64encode(key).decode()}))
++                    welcome = json.loads(await ws.recv())
++                    assert ('tts' in welcome) == (enabled and offered)
++                    await ws.send(json.dumps({'type': 'text', 'id': 'synthetic', 'text': 'Original text'}))
++                    values = []
++                    while True:
++                        item = json.loads(await asyncio.wait_for(ws.recv(), 5)); values.append(item)
++                        if item['type'] == 'turn.end': break
++                    assert any(item['type'] == 'reply' and item['text'] == 'Original reply' for item in values)
++                    spoken = [item for item in values if item['type'] == 'tts.speak']
++                    assert len(spoken) == (1 if enabled and offered else 0)
++                    if spoken: assert spoken[0]['voice'] == 'syntheticVoice'
++            finally: await hub.stop()
++    asyncio.run(run())
+-- 
+2.54.0 (Apple Git-157)
+

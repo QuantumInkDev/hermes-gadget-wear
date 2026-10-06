@@ -28,7 +28,7 @@
             android:foregroundServiceType="connectedDevice">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.CHANNEL_EVENT" />
-                <data android:scheme="wear" android:host="*" android:pathPrefix="/hermes/relay/v1" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/hermes/" />
             </intent-filter>
         </service>
     </application>

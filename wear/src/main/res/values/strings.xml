@@ -71,4 +71,7 @@
     <string name="reply_notification">Waiting for or playing your reply</string>
     <string name="start_recording">Start recording</string>
     <string name="finish_recording">Finish recording</string>
+    <string name="client_speech_failed">Phone speech failed. Your reply is available as text. Check the key and voice in the phone companion, or select server voice there and reconnect the watch.</string>
+    <string name="phone_speech">Voice: phone BYOK</string>
+    <string name="server_speech">Voice: server profile</string>
 </resources>

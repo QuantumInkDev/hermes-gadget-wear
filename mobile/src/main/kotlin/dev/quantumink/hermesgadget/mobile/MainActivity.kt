@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -33,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 class MainActivity : ComponentActivity() {
     private var enabled by mutableStateOf(false)
+    private var speechPage by mutableStateOf(false)
     private val permissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             enableRelay()
@@ -54,9 +56,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         enabled = RelaySettings.enabled(this)
         setContent {
-            MaterialTheme {
+            MaterialTheme(colorScheme = darkColorScheme()) {
                 val status by RelaySettings.status.collectAsStateWithLifecycle()
                 Column(
                     Modifier.fillMaxSize().background(Color(0xFF11170F))
@@ -65,46 +68,53 @@ class MainActivity : ComponentActivity() {
                         ).padding(horizontal = 28.dp, vertical = 64.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
-                    Text(
-                        stringResource(R.string.gadget_title),
-                        color = Color(0xFFB6ED93),
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                    Text(
-                        stringResource(R.string.setup_title),
-                        color = Color(0xFFF0F3EB),
-                        style = MaterialTheme.typography.headlineLarge
-                    )
-                    Text(stringResource(R.string.relay_tls_hint), color = Color(0xFFBEC7B7))
-                    Text(stringResource(R.string.relay_vpn_hint), color = Color(0xFFBEC7B7))
-                    Button(onClick = {
-                        if (enabled) {
-                            RelaySettings.setEnabled(this@MainActivity, false)
-                            enabled = false
-                        } else {
-                            requestRelay()
-                        }
-                    }) {
+                    if (speechPage) {
+                        SpeechSettingsPage(this@MainActivity) { speechPage = false }
+                    } else {
+                        Button({
+                            speechPage = true
+                        }) { Text(stringResource(R.string.speech_title)) }
                         Text(
-                            stringResource(
-                                if (enabled) R.string.disable_relay else R.string.enable_relay
-                            )
+                            stringResource(R.string.gadget_title),
+                            color = Color(0xFFB6ED93),
+                            style = MaterialTheme.typography.labelLarge
                         )
+                        Text(
+                            stringResource(R.string.setup_title),
+                            color = Color(0xFFF0F3EB),
+                            style = MaterialTheme.typography.headlineLarge
+                        )
+                        Text(stringResource(R.string.relay_tls_hint), color = Color(0xFFBEC7B7))
+                        Text(stringResource(R.string.relay_vpn_hint), color = Color(0xFFBEC7B7))
+                        Button(onClick = {
+                            if (enabled) {
+                                RelaySettings.setEnabled(this@MainActivity, false)
+                                enabled = false
+                            } else {
+                                requestRelay()
+                            }
+                        }) {
+                            Text(
+                                stringResource(
+                                    if (enabled) R.string.disable_relay else R.string.enable_relay
+                                )
+                            )
+                        }
+                        Button(onClick = ::associateWatch) {
+                            Text(stringResource(R.string.associate_watch))
+                        }
+                        Text(stringResource(R.string.association_hint), color = Color(0xFFBEC7B7))
+                        Button(onClick = {
+                            RelaySettings.stop()
+                        }) { Text(stringResource(R.string.stop_relay)) }
+                        Text(
+                            status.ifBlank {
+                                getString(R.string.relay_idle)
+                            },
+                            color = Color(0xFFB6ED93)
+                        )
+                        Text(stringResource(R.string.privacy_note), color = Color(0xFFBEC7B7))
                     }
-                    Button(onClick = ::associateWatch) {
-                        Text(stringResource(R.string.associate_watch))
-                    }
-                    Text(stringResource(R.string.association_hint), color = Color(0xFFBEC7B7))
-                    Button(onClick = {
-                        RelaySettings.stop()
-                    }) { Text(stringResource(R.string.stop_relay)) }
-                    Text(
-                        status.ifBlank {
-                            getString(R.string.relay_idle)
-                        },
-                        color = Color(0xFFB6ED93)
-                    )
-                    Text(stringResource(R.string.privacy_note), color = Color(0xFFBEC7B7))
                 }
             }
         }

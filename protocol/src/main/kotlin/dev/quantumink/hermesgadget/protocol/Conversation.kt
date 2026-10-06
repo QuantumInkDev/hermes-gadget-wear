@@ -70,6 +70,9 @@ sealed interface ConversationEffect {
         val bytes = bytes.copyOf()
         override fun toString(): String = "PlaybackData(redacted)"
     }
+    class ClientSpeak(val id: String, val text: String, val voice: String) : ConversationEffect {
+        override fun toString(): String = "ClientSpeak(redacted)"
+    }
     data class PetCue(val mode: String) : ConversationEffect
     data object PlaybackFinish : ConversationEffect
     data object PlaybackStop : ConversationEffect
@@ -658,6 +661,9 @@ class Conversation(
             }
         )
     }
+
+    fun acceptsSpeech(message: Message): Boolean =
+        paired && upload == null && state.prompt == null && matchesTurn(message)
 
     private fun canInput(): Boolean = paired && state.prompt == null
     private fun matchesTurn(message: Message): Boolean =

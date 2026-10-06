@@ -16,6 +16,12 @@ dependencies {
 tasks.test {
     workingDir = rootProject.projectDir
     inputs.property(
+        "extensionServerEnabled",
+        providers.environmentVariable("HERMES_GADGET_EXTENSION_PYTHON").map {
+            it.isNotBlank()
+        }.orElse(false)
+    )
+    inputs.property(
         "sdkDevserverEnabled",
         providers.environmentVariable("HERMES_GADGET_PYTHON").map { it.isNotBlank() }.orElse(false)
     )

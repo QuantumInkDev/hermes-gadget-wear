@@ -31,6 +31,7 @@ data class ConnectionState(
     val conversation: ConversationState = ConversationState(),
     val pairingCode: String = "",
     val pairingCommand: String = "",
+    val clientSpeech: Boolean = false,
     val error: String = ""
 ) {
     override fun toString(): String = "ConnectionState(status=" + status + ", content=redacted)"
@@ -98,6 +99,9 @@ class DirectConnection(
         microphoneFormats = offeredFormats("mic"),
         speakerFormats = offeredFormats("speaker")
     )
+    private val spoken = LinkedHashSet<String>()
+    private var clientSpeech = false
+    private val clientSpeechOffered = capabilities["tts"] == JsonPrimitive("client")
     private val pets = PetTransfers()
     private val petEnabled =
         (capabilities["pet"] as? JsonObject)?.get("asset_channel") == JsonPrimitive(4)
@@ -244,11 +248,14 @@ class DirectConnection(
         handshake = newHandshake()
         pets.clear()
         petRequested = false
+        clientSpeech = false
+        spoken.clear()
         reconnectAt = null
         healthySince = null
         state =
             state.copy(
                 status = ConnectionStatus.CONNECTING,
+                clientSpeech = false,
                 error = "",
                 pairingCode = "",
                 pairingCommand = ""
@@ -361,10 +368,17 @@ class DirectConnection(
                     fail("Unsupported audio negotiation.", false)
                     return
                 }
+                if (message.type ==
+                    "welcome"
+                ) {
+                    clientSpeech =
+                        clientSpeechOffered && message.string("tts") == "client"
+                }
                 val paired = handshake.canSendConversation
                 effects(conversation.setPaired(paired))
                 state = state.copy(
                     status = if (paired) ConnectionStatus.PAIRED else ConnectionStatus.PAIRING,
+                    clientSpeech = clientSpeech,
                     pairingCode = if (paired) "" else state.pairingCode,
                     pairingCommand = if (paired) "" else state.pairingCommand
                 )
@@ -386,7 +400,25 @@ class DirectConnection(
                 }
             }
             else -> if (handshake.canSendConversation) {
-                if (petEnabled &&
+                if (message.type == "tts.speak") {
+                    val id = message.string("id").orEmpty()
+                    val text = message.string("text").orEmpty()
+                    val voice = message.string("voice").orEmpty()
+                    if (clientSpeech && conversation.acceptsSpeech(message) &&
+                        runCatching {
+                            SpeechRequest(
+                                ClientSpeech.endpointId(endpoint),
+                                id,
+                                text,
+                                voice,
+                                "pcm16"
+                            )
+                        }.isSuccess && spoken.add(id)
+                    ) {
+                        while (spoken.size > 64) spoken.remove(spoken.first())
+                        effects(listOf(ConversationEffect.ClientSpeak(id, text, voice)))
+                    }
+                } else if (petEnabled &&
                     message.type in setOf("pet.manifest", "asset.start", "asset.end", "asset.abort")
                 ) {
                     pets.message(message, now()).forEach(observer::pet)

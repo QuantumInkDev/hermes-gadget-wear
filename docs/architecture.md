@@ -63,7 +63,7 @@ Device actions have strict parameter validation and one bounded result. Vibratio
 
 ## Upstream extensions
 
-See [upstream](upstream.md). Opus negotiation, client TTS, pet delivery, and reconnect outbox are independent optional proposals. Each needs plugin code, protocol documentation, feature-off compatibility tests, and stock gadget tests on a clean branch against the pinned SDK. Unknown optional fields do not change protocol v1. No extension is advertised as implemented today.
+See [upstream](upstream.md). Opus negotiation, client TTS, pet delivery, and reconnect outbox are independent optional proposals. Each needs plugin code, protocol documentation, feature-off compatibility tests, and stock gadget tests on a clean branch against the pinned SDK. Unknown optional fields do not change protocol v1. The numbered SDK patches implement optional Opus, pets and client speech in isolated test checkouts; live installations remain unchanged.
 
 Pet PNG assets need explicit length/hash metadata, dimensions and row occupancy, bounded chunking, completion/abort semantics, cache quota, and no client-supplied filesystem paths. Profile multiplexing additionally needs per-profile authorization/storage and gateway registration hooks; it is not implemented based on unit-test-only profile behavior.
 
@@ -98,3 +98,37 @@ Opus CSD parsing was checked against Android's [OpusHeader implementation](https
 Pet delivery is an optional authenticated extension: advertise channel 4, request after pairing, accept a bounded manifest and two explicitly identified PNG assets (base plus optional companion). Assets have start/end/abort, exact stream/sequence/length/hash validation, a 15-second inactivity timeout and compressed/decoded geometry limits. Stock servers may ignore the request, so conversation startup never waits for it. The SDK opt-in adapter resolves the current profile's active pet, safely confines metadata paths, transcodes WebP to PNG with alpha and trims blank trailing cells. It never changes the base atlas taxonomy.
 
 The watch checks PNG dimensions before decoding, caches by endpoint/hash with a global quota, and prepares nearest-neighbour frames off the UI thread. State mapping follows `docs/pets.md`; companion listening/talking/sleeping rows are optional. Talking uses playback amplitude with hysteresis, while missing rows use the documented base-row/bob fallbacks. Original procedural sample art is permitted; no personal or Hermes mascot art enters this repository. Companion-sheet tooling measures the base idle alpha bounds, matches shared row scale/baseline, rejects clipping/drift, and leaves the base sheet unchanged. Software tests cover corruption, malformed/partial transfer, missing companions, taxonomy and geometry; real pet legibility/ambient power remain hardware gates.
+
+## M6 design plan
+
+BYOK is explicitly selected per endpoint on the phone; default server speech stays
+unchanged. Shared and endpoint-specific keys/voice overrides live only in an atomic
+AES-GCM Android Keystore vault on the phone. Nonsecret readiness records synchronize
+over Data Layer; no key or device identity enters those records. The watch advertises
+`caps.tts:"client"` only for an active phone relay with matching BYOK readiness, and
+only uses it if the opt-in server acknowledges `welcome.tts:"client"`. Direct/no-phone
+connections and stock servers keep server speech. A lost phone cancels speech and
+surfaces the failure; reconnecting direct negotiates server speech again, never replaying
+input or silently submitting the same text twice to a paid provider.
+
+The server extension suppresses automatic server TTS for acknowledged client sessions,
+sends a bounded optional profile voice hint and a distinct once-only `tts.speak` event
+for final replies, and leaves text display/streaming intact. Interim deltas, transcripts
+and duplicate final events must not create repeat synthesis. The watch sends final reply
+text through a separate bounded ChannelClient stream to the phone. This optional feature
+explicitly discloses reply text to the phone and ElevenLabs; Hermes enrollment/auth stays
+inside watch-owned TLS. The phone calls only the fixed ElevenLabs HTTPS origin, rejects
+redirects, sends its key in the API header, and uses bounded cancellable streaming audio.
+Prefer provider-native Ogg Opus where supported, demux/validate packets rather than
+forwarding container bytes, and retain mono PCM16 fallback for watches without Opus.
+One paid request per explicit speech event, no automatic provider retry. API/stream
+failure leaves the readable reply with a concise notice. Stop/record/profile switch
+closes the channel and request. The connected-device foreground service exists only
+while relay/audio channels are active.
+
+The phone's Test key button performs a read-only subscription request and displays
+reported remaining quota or permission/availability status; development uses mocks and
+original synthetic audio, never existing personal ElevenLabs credentials or billable
+calls. Provider references: [stream speech](https://elevenlabs.io/docs/api-reference/text-to-speech/stream)
+and [subscription](https://elevenlabs.io/docs/api-reference/user/subscription/get).
+Hardware Data Layer, actual provider output/voice/quality and billing remain explicit gates.

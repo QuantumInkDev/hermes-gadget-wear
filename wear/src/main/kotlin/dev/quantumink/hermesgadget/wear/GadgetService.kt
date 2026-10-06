@@ -93,6 +93,7 @@ class GadgetService : Service() {
 
     @Volatile private var connection: DirectConnection? = null
     private var relay: WatchRelay? = null
+    private var speech: WatchSpeech? = null
 
     @Volatile private var visible = false
 
@@ -274,6 +275,9 @@ class GadgetService : Service() {
                     node != null
                 )
             }
+            val byok =
+                selected.getOrNull() == TransportPath.RELAY && node != null &&
+                    WatchSpeech.ready(this, profile.endpoint, node)
             main.post {
                 if (destroyed || request != selectionEpoch.get()) return@post
                 selected.fold(
@@ -290,7 +294,15 @@ class GadgetService : Service() {
                         created.fold(
                             { pipe ->
                                 val reply = mutableState.value.connection.conversation.reply
-                                configure(profile, identity, pipe, reply)
+                                configure(
+                                    profile,
+                                    identity,
+                                    pipe,
+                                    reply,
+                                    speechNode = node?.takeIf {
+                                        byok
+                                    }
+                                )
                                 connection?.connect()
                             },
                             {
@@ -330,6 +342,7 @@ class GadgetService : Service() {
                 connection = it.connection.copy(status = ConnectionStatus.OFFLINE)
             )
         }
+        speech?.stop()
         capture.stop()
         playback.stop()
         connection?.disconnect()
@@ -430,10 +443,12 @@ class GadgetService : Service() {
         identity: DeviceIdentity,
         pipe: WatchRelay? = null,
         previousReply: String = "",
-        notice: String = ""
+        notice: String = "",
+        speechNode: String? = null
     ) {
         closeConnection()
         relay = pipe
+        speech = speechNode?.let { WatchSpeech(this, profile.endpoint, it, opusReady) }
         val path = if (pipe == null) TransportPath.DIRECT else TransportPath.RELAY
         savedIdentity = identity
         val version = epoch.incrementAndGet()
@@ -451,6 +466,7 @@ class GadgetService : Service() {
             }
         }
         val caps = WatchActions.capabilities().toMutableMap()
+        if (speech != null) caps["tts"] = JsonPrimitive("client")
         caps["pet"] = buildJsonObject { put("asset_channel", 4) }
         if (opusReady) {
             val formats = JsonArray(listOf(JsonPrimitive("opus"), JsonPrimitive("pcm16")))
@@ -590,7 +606,31 @@ class GadgetService : Service() {
                         }
                         is ConversationEffect.PlaybackData -> playback.offer(effect.bytes)
                         ConversationEffect.PlaybackFinish -> playback.finish()
-                        ConversationEffect.PlaybackStop -> playback.stop()
+                        ConversationEffect.PlaybackStop -> {
+                            speech?.stop()
+                            playback.stop()
+                        }
+                        is ConversationEffect.ClientSpeak -> if (visible || foreground) {
+                            speech?.speak(
+                                effect.id,
+                                effect.text,
+                                effect.voice,
+                                { header ->
+                                    if (version == epoch.get()) {
+                                        playback.start(16000, header)
+                                        mutableState.update { it.copy(speaking = true) }
+                                    }
+                                },
+                                { if (version == epoch.get()) playback.offer(it) },
+                                { if (version == epoch.get()) playback.finish() },
+                                {
+                                    if (version == epoch.get()) {
+                                        playback.stop()
+                                        connection?.report(getString(R.string.client_speech_failed))
+                                    }
+                                }
+                            )
+                        }
                         is ConversationEffect.PetCue -> petCue(effect.mode, version)
                         is ConversationEffect.Action -> main.post {
                             if (version == epoch.get()) executeAction(effect, generation)
@@ -769,6 +809,8 @@ class GadgetService : Service() {
     private fun closeConnection() {
         selectionEpoch.incrementAndGet()
         epoch.incrementAndGet()
+        speech?.close()
+        speech = null
         capture.stop()
         playback.stop()
         connection?.close()

@@ -16,6 +16,7 @@ import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.ChannelClient
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import dev.quantumink.hermesgadget.protocol.ClientSpeech
 import dev.quantumink.hermesgadget.protocol.DuplexPump
 import dev.quantumink.hermesgadget.protocol.RelayForwarder
 import dev.quantumink.hermesgadget.protocol.RelayProtocol
@@ -62,6 +63,8 @@ class RelayStopReceiver : BroadcastReceiver() {
 
 /** The Play Services listener receives only same-package/same-signature wearable channels. */
 class RelayService : WearableListenerService() {
+    private val speechApi = ElevenLabsApi()
+    private val speechCalls = ConcurrentHashMap<ChannelClient.Channel, okhttp3.Call>()
     private val slots = Semaphore(2)
     private val streams = ConcurrentHashMap<ChannelClient.Channel, RelayStreams>()
     private val pumps = ConcurrentHashMap<ChannelClient.Channel, DuplexPump>()
@@ -88,7 +91,10 @@ class RelayService : WearableListenerService() {
 
     override fun onChannelOpened(channel: ChannelClient.Channel) {
         val client = Wearable.getChannelClient(this)
-        if (channel.path != RelayProtocol.CHANNEL_PATH || !RelaySettings.enabled(this) ||
+        val speech = channel.path == ClientSpeech.CHANNEL_PATH
+        if ((!speech && channel.path != RelayProtocol.CHANNEL_PATH) || !RelaySettings.enabled(
+                this
+            ) ||
             !slots.tryAcquire()
         ) {
             client.close(channel)
@@ -97,6 +103,7 @@ class RelayService : WearableListenerService() {
         val released = AtomicBoolean(false)
         val release = {
             if (released.compareAndSet(false, true)) {
+                speechCalls.remove(channel)?.cancel()
                 streams.remove(channel)?.close()
                 pumps.remove(channel)?.close()
                 RelaySettings.sessions.remove(channel)
@@ -118,7 +125,9 @@ class RelayService : WearableListenerService() {
         }
         try {
             workers.execute {
-                val deadline = clock.schedule({ release() }, 15, TimeUnit.SECONDS)
+                val deadline = clock.schedule({
+                    release()
+                }, if (speech) 75 else 15, TimeUnit.SECONDS)
                 try {
                     val input = Tasks.await(client.getInputStream(channel), 5, TimeUnit.SECONDS)
                     val output = Tasks.await(
@@ -129,6 +138,18 @@ class RelayService : WearableListenerService() {
                     val pipe = RelayStreams(input, output, { client.close(channel) })
                     streams[channel] = pipe
                     check(!released.get())
+                    if (speech) {
+                        val request = ClientSpeech.request(input)
+                        val settings = TtsVault(this).selected(request.endpointId)
+                        check(!released.get() && RelaySettings.enabled(this))
+                        speechApi.stream(settings, request, output) { call ->
+                            speechCalls[channel] = call
+                            if (released.get()) call.cancel()
+                        }
+                        RelaySettings.report(getString(R.string.relay_idle))
+                        release()
+                        return@execute
+                    }
                     val pump = RelayForwarder.accept(
                         pipe,
                         {
@@ -218,6 +239,7 @@ class RelayService : WearableListenerService() {
         pumps.values.forEach { it.close() }
         workers.shutdownNow()
         clock.shutdownNow()
+        speechApi.close()
         super.onDestroy()
     }
 }

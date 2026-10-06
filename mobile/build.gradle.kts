@@ -50,6 +50,8 @@ dependencies {
     implementation(libs.serialization.json)
     implementation(libs.okhttp)
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.okhttp.tls)
     androidTestImplementation(libs.android.test.runner)
     androidTestImplementation(libs.android.test.junit)
 }
