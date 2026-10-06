@@ -35,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 class MainActivity : ComponentActivity() {
     private var enabled by mutableStateOf(false)
     private var speechPage by mutableStateOf(false)
+    private var profilesPage by mutableStateOf(false)
     private val permissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             enableRelay()
@@ -68,9 +69,14 @@ class MainActivity : ComponentActivity() {
                         ).padding(horizontal = 28.dp, vertical = 64.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {
-                    if (speechPage) {
+                    if (profilesPage) {
+                        ProfilesPage(this@MainActivity) { profilesPage = false }
+                    } else if (speechPage) {
                         SpeechSettingsPage(this@MainActivity) { speechPage = false }
                     } else {
+                        Button({ profilesPage = true }) {
+                            Text(stringResource(R.string.profiles_title))
+                        }
                         Button({
                             speechPage = true
                         }) { Text(stringResource(R.string.speech_title)) }

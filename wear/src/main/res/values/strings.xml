@@ -74,4 +74,12 @@
     <string name="client_speech_failed">Phone speech failed. Your reply is available as text. Check the key and voice in the phone companion, or select server voice there and reconnect the watch.</string>
     <string name="phone_speech">Voice: phone BYOK</string>
     <string name="server_speech">Voice: server profile</string>
+    <string name="profiles_title">Profiles</string>
+    <string name="add_profile">Add profile</string>
+    <string name="import_profiles">Import phone setup</string>
+    <string name="import_review">Choose a setup to review. Saving connects with its own watch pairing key. Cleartext warnings must be accepted here.</string>
+    <string name="import_failed">Cannot load phone setup. Open the companion, send saved setup, and check the phone/watch connection.</string>
+    <string name="no_imports">No saved phone setup is available.</string>
+    <string name="remove_profile">Remove active profile</string>
+    <string name="remove_warning">Forget this profile’s settings and cached pet on the watch. Its pairing identity is retained for re-adding the same URL. This does not revoke server enrollment or remove the phone’s voice key.</string>
 </resources>

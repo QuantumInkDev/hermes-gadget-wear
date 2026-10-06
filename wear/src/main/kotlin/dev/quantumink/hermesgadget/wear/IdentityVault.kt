@@ -7,7 +7,6 @@ import android.util.AtomicFile
 import dev.quantumink.hermesgadget.protocol.DeviceIdentity
 import dev.quantumink.hermesgadget.protocol.Endpoint
 import dev.quantumink.hermesgadget.protocol.Message
-import dev.quantumink.hermesgadget.protocol.TransportPreference
 import java.io.File
 import java.security.KeyStore
 import java.security.MessageDigest
@@ -15,21 +14,8 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
-class EndpointProfile(
-    val endpoint: Endpoint,
-    val label: String,
-    val accessToken: String,
-    val transport: TransportPreference = TransportPreference.AUTO
-) {
-    init {
-        require(label.isNotBlank() && label.length <= 32) { "Name must be 1–32 characters." }
-        require(accessToken.length <= 2048) { "Access token is too long." }
-    }
-    override fun toString(): String = "EndpointProfile(content=redacted)"
-}
+typealias EndpointProfile = dev.quantumink.hermesgadget.protocol.EndpointProfile
 
 /** At-rest encryption for settings and independent endpoint identities; all failures are explicit. */
 class IdentityVault(
@@ -39,72 +25,121 @@ class IdentityVault(
 ) {
     private val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
 
-    fun profile(): EndpointProfile? {
+    private fun activeRecord(): EndpointProfile? {
         val bytes = read("endpoint") ?: return null
         try {
-            val message = Message.parse(bytes.toString(Charsets.UTF_8))
-                ?: error("Saved setup is invalid.")
-            require(message.type == "endpoint")
-            val endpoint = Endpoint.parse(
-                requireNotNull(message.string("url")),
-                requireNotNull(message.boolean("private")),
-                requireNotNull(message.boolean("cleartext"))
-            )
-            return EndpointProfile(
-                endpoint,
-                requireNotNull(message.string("label")),
-                message.string("token").orEmpty(),
-                TransportPreference.valueOf(message.string("transport") ?: "AUTO")
+            return EndpointProfile.parse(
+                requireNotNull(Message.parse(bytes.toString(Charsets.UTF_8)))
             )
         } finally {
             bytes.fill(0)
         }
     }
 
-    fun save(profile: EndpointProfile): DeviceIdentity {
-        val identity = identity(
-            profile.endpoint,
-            create =
-            this.profile()?.endpoint?.url != profile.endpoint.url
-        )
-        val message = Message.create(
-            "endpoint",
-            buildJsonObject {
-                put("url", profile.endpoint.url)
-                put("private", profile.endpoint.privateNetwork)
-                put("cleartext", profile.endpoint.cleartextAccepted)
-                put("label", profile.label)
-                put("token", profile.accessToken)
-                put("transport", profile.transport.name)
+    @Synchronized fun profile(): EndpointProfile? {
+        val active = activeRecord()
+        val bytes = read("catalog") ?: return active
+        try {
+            val catalog = dev.quantumink.hermesgadget.protocol.EndpointProfiles.decode(
+                bytes.toString(Charsets.UTF_8)
+            )
+            return catalog.firstOrNull { it.endpoint.url == active?.endpoint?.url }
+                ?: catalog.firstOrNull()
+        } finally {
+            bytes.fill(0)
+        }
+    }
+
+    @Synchronized fun profiles(): List<EndpointProfile> {
+        val bytes = read("catalog")
+        if (bytes != null) {
+            try {
+                return dev.quantumink.hermesgadget.protocol.EndpointProfiles.decode(
+                    bytes.toString(Charsets.UTF_8)
+                )
+            } finally {
+                bytes.fill(0)
             }
-        )
-        write("endpoint", message.encode().toByteArray())
+        }
+        val previous = profile() ?: return emptyList()
+        identity(previous.endpoint) // Validate the existing key before migration.
+        val imported = listOf(previous)
+        writeCatalog(imported)
+        return imported
+    }
+
+    @Synchronized fun save(profile: EndpointProfile): DeviceIdentity {
+        val previous = profiles()
+        val known = previous.any { it.endpoint.url == profile.endpoint.url }
+        val updated = if (known) {
+            previous.map {
+                if (it.endpoint.url == profile.endpoint.url) profile else it
+            }
+        } else {
+            previous + profile
+        }
+        val encoded = dev.quantumink.hermesgadget.protocol.EndpointProfiles.encode(updated)
+        val identity = identity(profile.endpoint, create = !known)
+        write("catalog", encoded.toByteArray())
+        write("endpoint", profile.message().encode().toByteArray())
         return identity
     }
 
-    fun identity(endpoint: Endpoint, create: Boolean = false): DeviceIdentity {
+    @Synchronized fun select(url: String): Pair<EndpointProfile, DeviceIdentity> {
+        val selected = profiles().single { it.endpoint.url == url }
+        val identity = identity(selected.endpoint)
+        write("endpoint", selected.message().encode().toByteArray())
+        return selected to identity
+    }
+
+    @Synchronized fun remove(url: String): Pair<EndpointProfile, DeviceIdentity>? {
+        val previous = profiles()
+        require(previous.any { it.endpoint.url == url })
+        val remaining = previous.filterNot { it.endpoint.url == url }
+        val selected = if (profile()?.endpoint?.url == url) remaining.firstOrNull() else profile()
+        val identity = selected?.let { identity(it.endpoint) }
+        writeCatalog(remaining)
+        if (selected == null) {
+            AtomicFile(File(directory, "endpoint")).delete()
+        } else {
+            write("endpoint", selected.message().encode().toByteArray())
+        }
+        return selected?.let { it to requireNotNull(identity) }
+    }
+
+    private fun writeCatalog(profiles: List<EndpointProfile>) = write(
+        "catalog",
+        dev.quantumink.hermesgadget.protocol.EndpointProfiles.encode(profiles).toByteArray()
+    )
+
+    @Synchronized fun identity(endpoint: Endpoint, create: Boolean = false): DeviceIdentity {
         val digest = MessageDigest.getInstance("SHA-256").digest(endpoint.url.toByteArray())
-        val name = "identity-" + digest.joinToString("") { "%02x".format(it) }
+        val id = digest.joinToString("") { "%02x".format(it) }
+        val name = "identity-" + id
+        val known = read("known-" + id) != null
         val existing = read(name)
         if (existing != null) {
             try {
-                return requireNotNull(
+                val saved = requireNotNull(
                     DeviceIdentity.fromBase64(existing.toString(Charsets.UTF_8))
                 ) {
                     "Saved identity is invalid."
                 }
+                if (!known) write("known-" + id, byteArrayOf(1))
+                return saved
             } finally {
                 existing.fill(0)
             }
         }
-        check(create) { "Saved device identity is missing." }
+        check(create && !known) { "Saved device identity is missing." }
         val identity = DeviceIdentity.generate()
         write(name, identity.enrollmentKey().toByteArray())
+        write("known-" + id, byteArrayOf(1))
         return identity
     }
 
     /** Called only after an explicit reset confirmation. Existing host enrollment is unaffected. */
-    fun reset() {
+    @Synchronized fun reset() {
         if (directory.exists()) check(directory.deleteRecursively()) { "Cannot reset saved setup." }
         if (keyStore.containsAlias(alias)) keyStore.deleteEntry(alias)
     }
@@ -134,7 +169,7 @@ class IdentityVault(
         val file = AtomicFile(File(directory, name))
         if (!file.baseFile.exists() && !File(directory, name + ".bak").exists()) return null
         val encrypted = file.openRead().use { input ->
-            require(input.channel.size() in 30..16384) { "Saved record has invalid size." }
+            require(input.channel.size() in 30..65566) { "Saved record has invalid size." }
             input.readBytes()
         }
         require(encrypted[0].toInt() == 1 && encrypted[1].toInt() == 12) {
@@ -148,7 +183,7 @@ class IdentityVault(
 
     private fun write(name: String, plaintext: ByteArray) {
         try {
-            require(plaintext.size <= 8192) { "Saved record is too large." }
+            require(plaintext.size <= 65536) { "Saved record is too large." }
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.ENCRYPT_MODE, key())
             cipher.updateAAD((name + "|v1").toByteArray())

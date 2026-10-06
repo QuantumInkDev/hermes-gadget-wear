@@ -96,6 +96,14 @@ Validation: strict full build/check, format/lint/warnings-as-errors, both app an
 
 Demo note: original 0.6-second tone and synthetic keys/provider responses only; no existing personal ElevenLabs key, paid synthesis, personal watch operation or real Data Layer exchange was used. Actual provider output, background delivery, billing and voice quality remain open. See [client speech evidence](client-speech.md) and [setup/disclosure](self-host.md). M5 `4f1d588` [CI](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37471127954) passed all jobs.
 
+## M7 profiles — 2026-10-06 — v1 software verified, sync/hardware gate open
+
+Implemented an encrypted eight-profile catalog with legacy active-record migration, independent URL keys, explicit switch/removal, endpoint pet isolation, and phone configuration/import review. Cleartext acceptance is renewed on watch import. Setup sync excludes device/ElevenLabs keys; an explicitly supplied access token is intentionally included. Removal retains identity/known markers until explicit whole reset, so re-adding cannot silently rotate a missing key. Profile teardown serializes stock/client media against epoch changes and rejects late old-profile callbacks. No input is replayed.
+
+Validation: strict full build/check and both app/instrumentation APKs passed; 56 JVM tests, zero failures/errors/skips. Two actual stock SDK processes independently pair/reconnect with distinct identities. Five Android watch-vault migration/key/tamper/bounds/crash-recovery tests and one phone catalog encryption/tamper test passed on owned API 37 emulators. The actual watch service passed switching during recording, reply clearing, independent pairing/reconnect and removal against two synthetic stock servers.
+
+Demo note: synthetic localhost profiles only; personal setup is unchanged. Actual Data Layer setup import, rotary/horizontal-swipe interaction and personal-profile pet/voice remain hardware gates. [V1 usage and v2 proposal](profiles-v2.md) document the gateway boundaries. V2 is not implemented or verified; explicit DECISION and upstream feedback are still required. M6 `ac329d1` [CI](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37476564998) passed all jobs.
+
 ## Milestones
 
 Maintainer voice demo — 2026-10-06: the maintainer reports that the physical watch successfully asked about the weather, received an answer, and played the profile's ElevenLabs voice. This verifies a real hold-to-talk/STT/reply/playback path by maintainer report; no bitrate, STT comparison, battery, or audio-quality measurement is inferred. They described the flow as clunky and authorized advancing the remaining phases while away from the home network. The core M2 conversation demo has passed; the remaining physical media/action, permission, lifecycle, and quality matrix stays open. Phase implementation may advance in sequence under that authorization, with unverified milestone acceptance kept explicit.
@@ -109,7 +117,7 @@ Maintainer voice demo — 2026-10-06: the maintainer reports that the physical w
 | M4: Opus and measurements | Software/cross-codec verified; Ultra speech/bitrate/battery gate open |
 | M5: Pets and companion-sheet tooling | Software/emulator verified; real profile/Ultra gate open |
 | M6: Client BYOK TTS | Software/emulator verified; provider/Data Layer gate open |
-| M7: Multi-endpoint profiles and v2 proposal | Not started |
+| M7: Multi-endpoint profiles and v2 proposal | V1 software/emulator verified; sync/hardware open; v2 proposal only |
 | M8: Tile, complication, ambient, battery, internal testing | Not started |
 
-Next: M7 endpoint management, then M8 in order. Keep M2/M3 hardware gates open while the maintainer is away. Relay TLS and direct cleartext decisions are resolved. Multiplexed gateway v2 remains proposal-only pending decision and upstream feedback.
+Next: M8 watch surfaces and release preparation. Keep M2/M3 hardware gates open while the maintainer is away. Relay TLS and direct cleartext decisions are resolved. Multiplexed gateway v2 remains proposal-only pending decision and upstream feedback.

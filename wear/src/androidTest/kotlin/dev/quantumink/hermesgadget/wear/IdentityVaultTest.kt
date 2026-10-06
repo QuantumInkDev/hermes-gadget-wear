@@ -59,6 +59,52 @@ class IdentityVaultTest {
     }
 
     @Test
+    fun legacyMigrationSelectionRemovalAndCrashRecoveryPreserveKeys() {
+        val firstProfile = EndpointProfile(first, "First", "")
+        val firstKey = vault.save(firstProfile).deviceId
+        check(File(directory, "catalog").delete()) // Existing single-profile v1 record.
+        val restored = IdentityVault(context, directory, alias)
+        assertEquals(listOf(first.url), restored.profiles().map { it.endpoint.url })
+        assertEquals(firstKey, restored.select(first.url).second.deviceId)
+        val secondKey = restored.save(EndpointProfile(second, "Second", "")).deviceId
+        assertNotEquals(firstKey, secondKey)
+        assertEquals(firstKey, restored.select(first.url).second.deviceId)
+        restored.remove(first.url)
+        assertEquals(second.url, restored.profile()?.endpoint?.url)
+        assertEquals(firstKey, restored.save(firstProfile).deviceId)
+        // Catalog committed but the active pointer still references a removed endpoint.
+        val oldPointer = File(directory, "endpoint").readBytes()
+        restored.remove(first.url)
+        File(directory, "endpoint").writeBytes(oldPointer)
+        assertEquals(second.url, restored.profile()?.endpoint?.url)
+        restored.remove(second.url)
+        assertNull(restored.profile())
+        assertEquals(emptyList<EndpointProfile>(), restored.profiles())
+        assertEquals(secondKey, restored.save(EndpointProfile(second, "Second", "")).deviceId)
+        restored.remove(second.url)
+        val id = dev.quantumink.hermesgadget.protocol.ClientSpeech.endpointId(second)
+        check(File(directory, "identity-" + id).delete())
+        assertThrows(IllegalStateException::class.java) {
+            restored.save(EndpointProfile(second, "Second", ""))
+        }
+    }
+
+    @Test
+    fun profileLimitDoesNotCreateAnOrphanIdentity() {
+        repeat(8) { index ->
+            vault.save(
+                EndpointProfile(Endpoint.parse("wss://p$index.example/gadget"), "P$index", "")
+            )
+        }
+        val files = requireNotNull(directory.listFiles()).map { it.name }.toSet()
+        assertThrows(IllegalArgumentException::class.java) {
+            vault.save(EndpointProfile(Endpoint.parse("wss://extra.example/gadget"), "Extra", ""))
+        }
+        assertEquals(files, requireNotNull(directory.listFiles()).map { it.name }.toSet())
+        assertEquals(8, vault.profiles().size)
+    }
+
+    @Test
     fun tamperedIdentityFailsWithoutRotatingOrOverwritingIt() {
         val profile = EndpointProfile(first, "Synthetic test", "")
         vault.save(profile)

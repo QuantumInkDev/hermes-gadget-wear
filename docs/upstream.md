@@ -9,7 +9,7 @@ Baseline: Hermes Gadget SDK `v0.2.0`, commit `323e3303ab68981f810fc3208119cd8a22
 | Pet manifest and bounded PNG asset transfer on channel 4 | Gadget SDK | Patch 2 implemented/tested; Android delivery/cache checks pass; real-profile/Ultra gate open |
 | Optional companion metadata and extra rows in one hatch normalization pass | Hermes Agent | Later-row registration tool implemented/tested; same-hatch generator change remains proposed |
 | Pending outbox on reconnect | Gadget SDK | Proposed; define expiry, order, bounded retention and deduplication |
-| Profile discovery/select with multiplexed gateway | Gadget SDK / Hermes Agent | Design proposal only; **DECISION** and upstream maintainer feedback before implementation |
+| Profile discovery/select with multiplexed gateway | Gadget SDK / Hermes Agent | [V2 design proposal](profiles-v2.md) only; **DECISION** and upstream maintainer feedback before implementation |
 
 Each SDK implementation must be a clean branch/PR series against the pinned baseline, with protocol docs, tests, extensions-off compatibility, and stock gadget coverage. Record actual branch/commit/PR links and maintainer responses here when created. A local proposal is not an upstream agreement. Never install an unreviewed extension into the maintainer's running Hermes environment as part of development.
 

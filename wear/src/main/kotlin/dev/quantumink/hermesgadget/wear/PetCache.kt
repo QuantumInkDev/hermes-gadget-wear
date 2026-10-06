@@ -25,7 +25,12 @@ class PetCache(context: Context) {
     private fun directory(endpoint: String) =
         File(root, hash(endpoint.toByteArray())).apply { mkdirs() }
 
-    fun load(endpoint: String): PetAtlas? = runCatching {
+    @Synchronized fun remove(endpoint: String) {
+        val file = File(root, hash(endpoint.toByteArray()))
+        check(!file.exists() || file.deleteRecursively())
+    }
+
+    @Synchronized fun load(endpoint: String): PetAtlas? = runCatching {
         val file = File(directory(endpoint), "manifest.json")
         if (!file.isFile || file.length() > 16384) return null
         val message =
@@ -38,14 +43,14 @@ class PetCache(context: Context) {
         build(endpoint, PetManifest.parse(message))
     }.getOrNull()
 
-    fun saveManifest(endpoint: String, manifest: PetManifest): PetAtlas? {
+    @Synchronized fun saveManifest(endpoint: String, manifest: PetManifest): PetAtlas? {
         require(manifest.encoded.toByteArray().size <= 16384)
         atomic(File(directory(endpoint), "manifest.json"), manifest.encoded.toByteArray())
         evict()
         return build(endpoint, manifest)
     }
 
-    fun saveAsset(
+    @Synchronized fun saveAsset(
         endpoint: String,
         manifest: PetManifest,
         sheet: PetSheet,

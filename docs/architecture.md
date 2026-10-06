@@ -132,3 +132,29 @@ original synthetic audio, never existing personal ElevenLabs credentials or bill
 calls. Provider references: [stream speech](https://elevenlabs.io/docs/api-reference/text-to-speech/stream)
 and [subscription](https://elevenlabs.io/docs/api-reference/user/subscription/get).
 Hardware Data Layer, actual provider output/voice/quality and billing remain explicit gates.
+
+## M7 design plan
+
+V1 stores at most eight endpoint profiles. The watch's encrypted catalog contains each URL,
+label, access token and approved transport/cleartext policy; its encrypted active record
+remains compatible with the M2–M6 single-profile setup. Migration imports that record once
+and validates the existing endpoint identity before saving the catalog. Each URL has an
+independent random device key; selecting, editing labels/tokens or removing a profile must
+never rotate another endpoint's key. Removal forgets settings and cache but retains the
+identity until explicit whole-vault reset, so re-adding the URL cannot silently replace
+server enrollment. Missing/tampered keys require explicit reset, never regeneration.
+
+The phone offers encrypted endpoint setup and sends only user-configured setup (including
+an explicitly entered optional access token) over the same-package Data Layer. Watch keys,
+HMAC and ElevenLabs keys are excluded. A bounded import page on the watch requires reviewing
+and accepting the selected endpoint before saving; imported cleartext warning acceptance
+is always reset on the watch. No inbound setup can switch the active profile or replay input.
+Profiles switch on a dedicated scroll/rotary list accessible by a horizontal swipe or a
+button. Switching stops/cancels prior media and closes the old transport, clears prompts,
+reply and draft, loads the selected endpoint's cache and starts a fresh handshake.
+
+Multiplexed gateway v2 remains a proposal. It needs a host gateway spanning profile homes,
+profile-scoped stores, authorization and lifecycle, which the stock root plugin does not
+provide. Document the wire and migration questions; implementation and outreach wait for
+an explicit maintainer decision and upstream feedback. Real multiplexed behavior cannot be
+claimed from independent v1 endpoints or unit tests.

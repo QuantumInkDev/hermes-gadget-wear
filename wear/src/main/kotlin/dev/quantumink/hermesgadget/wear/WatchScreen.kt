@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -92,6 +93,9 @@ fun WatchScreen(
 ) {
     val watch by service.state.collectAsStateWithLifecycle()
     var route by remember { mutableStateOf("home") }
+    var editing by remember { mutableStateOf<EndpointProfile?>(null) }
+    var newProfile by remember { mutableStateOf(false) }
+    var imported by remember { mutableStateOf(false) }
     var textDraft by remember(watch.profile?.endpoint?.url) { mutableStateOf("") }
     val feedback = LocalHapticFeedback.current
     var haptic by remember { mutableLongStateOf(watch.haptic) }
@@ -120,17 +124,108 @@ fun WatchScreen(
             }
             item { Secondary(stringResource(R.string.back), onClick = { route = "setup" }) }
         }
+        route == "profiles" -> RoundPage {
+            item { Heading(stringResource(R.string.profiles_title)) }
+            watch.profiles.forEach { profile ->
+                item {
+                    Primary(profile.label, enabled = !watch.saving) {
+                        service.selectProfile(profile.endpoint.url) {
+                            route = "home"
+                            connect()
+                        }
+                    }
+                }
+            }
+            item {
+                Secondary(
+                    stringResource(R.string.add_profile),
+                    enabled = !watch.saving,
+                    onClick = {
+                        editing = null
+                        newProfile = true
+                        imported = false
+                        route = "setup"
+                    }
+                )
+            }
+            item {
+                Secondary(
+                    stringResource(R.string.import_profiles),
+                    enabled = !watch.importing,
+                    onClick = {
+                        service.importProfiles()
+                        route = "imports"
+                    }
+                )
+            }
+            if (watch.profile != null) {
+                item {
+                    Secondary(
+                        stringResource(R.string.remove_profile),
+                        onClick = { route = "remove" },
+                        enabled = !watch.saving
+                    )
+                }
+                item {
+                    Secondary(stringResource(R.string.back), onClick = {
+                        route = "home"
+                        connect()
+                    })
+                }
+            }
+            if (watch.setupError.isNotEmpty()) item { Body(watch.setupError) }
+        }
+        route == "imports" -> RoundPage {
+            item { Heading(stringResource(R.string.import_profiles)) }
+            item { Body(stringResource(R.string.import_review)) }
+            if (watch.importing) item { Body(stringResource(R.string.preparing)) }
+            watch.imports.forEach { profile ->
+                item {
+                    Secondary(profile.label, onClick = {
+                        editing = profile
+                        newProfile = false
+                        imported = true
+                        route = "setup"
+                    })
+                }
+            }
+            if (!watch.importing && watch.imports.isEmpty()) {
+                item { Body(stringResource(R.string.no_imports)) }
+            }
+            if (watch.setupError.isNotEmpty()) item { Body(watch.setupError) }
+            item { Secondary(stringResource(R.string.back), onClick = { route = "profiles" }) }
+        }
+        route == "remove" -> RoundPage {
+            item { Heading(stringResource(R.string.remove_profile)) }
+            item { Body(stringResource(R.string.remove_warning)) }
+            item {
+                Primary(stringResource(R.string.remove_profile), enabled = !watch.saving) {
+                    watch.profile?.let { profile ->
+                        service.removeProfile(profile.endpoint.url) {
+                            route = "home"
+                            connect()
+                        }
+                    }
+                }
+            }
+            item { Secondary(stringResource(R.string.back), onClick = { route = "profiles" }) }
+        }
         watch.profile == null || route == "setup" -> SetupPage(
-            watch,
+            watch.copy(profile = if (newProfile) null else editing ?: watch.profile),
+            imported = imported,
             onSave = { url, label, token, local, accepted, transport ->
                 service.save(url, label, token, local, accepted, transport) {
                     route = "home"
+                    editing = null
+                    newProfile = false
+                    imported = false
                     connect()
                 }
             },
             onBack = { route = "home" },
             onReset = { route = "reset" },
-            permissions = permissions
+            permissions = permissions,
+            profiles = { route = "profiles" }
         )
         route == "text" -> TextPage(
             text = textDraft,
@@ -156,9 +251,16 @@ fun WatchScreen(
                 startRecording,
                 settings = {
                     service.disconnect()
+                    editing = null
+                    newProfile = false
+                    imported = false
                     route = "setup"
                 },
-                type = { if (service.prepareTextInput()) route = "text" }
+                type = { if (service.prepareTextInput()) route = "text" },
+                profiles = {
+                    service.disconnect()
+                    route = "profiles"
+                }
             )
         }
     }
@@ -170,7 +272,9 @@ private fun SetupPage(
     onSave: (String, String, String, Boolean, Boolean, TransportPreference) -> Unit,
     onBack: () -> Unit,
     onReset: () -> Unit,
-    permissions: () -> Unit
+    permissions: () -> Unit,
+    profiles: () -> Unit,
+    imported: Boolean = false
 ) {
     val profile = watch.profile
     var url by remember(profile) { mutableStateOf(profile?.endpoint?.url.orEmpty()) }
@@ -178,7 +282,7 @@ private fun SetupPage(
     var token by remember(profile) { mutableStateOf(profile?.accessToken.orEmpty()) }
     var local by remember(profile) { mutableStateOf(profile?.endpoint?.privateNetwork ?: false) }
     var accepted by remember(profile) {
-        mutableStateOf(profile?.endpoint?.cleartextAccepted ?: false)
+        mutableStateOf(!imported && (profile?.endpoint?.cleartextAccepted ?: false))
     }
     var showToken by remember { mutableStateOf(token.isNotEmpty()) }
     var transport by remember(profile) {
@@ -255,6 +359,7 @@ private fun SetupPage(
                     !(transport == TransportPreference.RELAY && cleartext)
             ) { onSave(url, label, token, local, accepted && cleartext, transport) }
         }
+        item { Secondary(stringResource(R.string.profiles_title), profiles) }
         item { Secondary(stringResource(R.string.permissions), permissions) }
         if (profile != null) item { Secondary(stringResource(R.string.back), onBack) }
         item { Secondary(stringResource(R.string.reset_setup), onReset) }
@@ -337,7 +442,8 @@ private fun ConversationPage(
     connect: () -> Unit,
     startRecording: () -> Unit,
     settings: () -> Unit,
-    type: () -> Unit
+    type: () -> Unit,
+    profiles: () -> Unit
 ) {
     val connection = watch.connection
     val conversation = connection.conversation
@@ -362,7 +468,23 @@ private fun ConversationPage(
         service::finishRecording,
         service::cancelRecording
     )
-    RoundPage(gesture) {
+    val swipe = Modifier.pointerInput(prompt?.id, conversation.mode) {
+        if (prompt != null || conversation.mode == ConversationMode.LISTENING) return@pointerInput
+        var moved = 0f
+        var opened = false
+        detectHorizontalDragGestures(onDragStart = {
+            moved = 0f
+            opened = false
+        }) { change, delta ->
+            moved += delta
+            if (!opened && kotlin.math.abs(moved) > 72.dp.toPx()) {
+                opened = true
+                change.consume()
+                profiles()
+            }
+        }
+    }
+    RoundPage(gesture.then(swipe)) {
         item { PetView(watch) }
         if (prompt != null) {
             item { Heading(stringResource(R.string.approval)) }
@@ -527,6 +649,7 @@ private fun ConversationPage(
             } else {
                 item { Secondary(stringResource(R.string.disconnect), service::disconnect) }
             }
+            item { Secondary(stringResource(R.string.profiles_title), profiles) }
             item { Secondary(stringResource(R.string.settings), settings) }
         }
     }

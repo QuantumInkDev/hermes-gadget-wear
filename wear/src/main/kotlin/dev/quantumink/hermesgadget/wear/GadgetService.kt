@@ -48,6 +48,9 @@ import kotlinx.serialization.json.put
 
 data class WatchState(
     val profile: EndpointProfile? = null,
+    val profiles: List<EndpointProfile> = emptyList(),
+    val imports: List<EndpointProfile> = emptyList(),
+    val importing: Boolean = false,
     val connection: ConnectionState = ConnectionState(),
     val loading: Boolean = true,
     val saving: Boolean = false,
@@ -76,6 +79,7 @@ class GadgetService : Service() {
     private val transportWorker = Executors.newSingleThreadExecutor()
     private val selectionEpoch = AtomicLong()
     private val epoch = AtomicLong()
+    private val mediaLock = Any()
     private val petWorker = java.util.concurrent.ThreadPoolExecutor(
         1,
         1,
@@ -136,14 +140,18 @@ class GadgetService : Service() {
             val restored = runCatching {
                 vault = IdentityVault(this)
                 val profile = vault.profile()
-                profile?.let { it to vault.identity(it.endpoint) }
+                Triple(profile, profile?.let { vault.identity(it.endpoint) }, vault.profiles())
             }
             main.post {
                 if (destroyed) return@post
                 restored.fold(
                     onSuccess = { saved ->
-                        if (saved != null) configure(saved.first, saved.second)
-                        mutableState.update { it.copy(loading = false) }
+                        if (saved.first !=
+                            null
+                        ) {
+                            configure(saved.first!!, requireNotNull(saved.second))
+                        }
+                        mutableState.update { it.copy(loading = false, profiles = saved.third) }
                     },
                     onFailure = {
                         mutableState.update {
@@ -219,13 +227,13 @@ class GadgetService : Service() {
         }
         mutableState.update { it.copy(saving = true, setupError = "") }
         storage.execute {
-            val result = runCatching { vault.save(profile) }
+            val result = runCatching { vault.save(profile) to vault.profiles() }
             main.post {
                 if (destroyed) return@post
                 result.fold(
-                    onSuccess = { identity ->
-                        configure(profile, identity)
-                        mutableState.update { it.copy(saving = false) }
+                    onSuccess = { saved ->
+                        configure(profile, saved.first)
+                        mutableState.update { it.copy(saving = false, profiles = saved.second) }
                         ready()
                     },
                     onFailure = {
@@ -234,6 +242,80 @@ class GadgetService : Service() {
                         }
                     }
                 )
+            }
+        }
+    }
+
+    fun selectProfile(url: String, ready: () -> Unit) = changeProfiles({ vault.select(url) }, ready)
+
+    fun removeProfile(url: String, ready: () -> Unit) = changeProfiles({
+        val saved = vault.remove(url)
+        petCache.remove(url)
+        saved
+    }, ready)
+
+    private fun changeProfiles(
+        operation: () -> Pair<EndpointProfile, DeviceIdentity>?,
+        ready: () -> Unit
+    ) {
+        if (mutableState.value.loading || mutableState.value.saving) return
+        closeConnection()
+        mutableState.update { it.copy(saving = true, setupError = "") }
+        storage.execute {
+            val result = runCatching { operation() to vault.profiles() }
+            main.post {
+                if (destroyed) return@post
+                result.fold({ (saved, profiles) ->
+                    if (saved == null) {
+                        savedIdentity = null
+                        mutableState.value = WatchState(loading = false, profiles = profiles)
+                    } else {
+                        configure(saved.first, saved.second)
+                        mutableState.update { it.copy(saving = false, profiles = profiles) }
+                    }
+                    ready()
+                }, {
+                    mutableState.update {
+                        it.copy(
+                            saving = false,
+                            connection = ConnectionState(),
+                            setupError = getString(R.string.storage_failed)
+                        )
+                    }
+                })
+            }
+        }
+    }
+
+    fun importProfiles() {
+        if (mutableState.value.importing) return
+        mutableState.update { it.copy(importing = true, setupError = "", imports = emptyList()) }
+        transportWorker.execute {
+            val result = runCatching {
+                val node = requireNotNull(WatchRelay.reachablePhone(this))
+                val uri = android.net.Uri.Builder().scheme("wear").authority(node)
+                    .path(dev.quantumink.hermesgadget.protocol.EndpointProfiles.SETUP_PATH).build()
+                val item = com.google.android.gms.tasks.Tasks.await(
+                    com.google.android.gms.wearable.Wearable.getDataClient(this).getDataItem(uri),
+                    5,
+                    java.util.concurrent.TimeUnit.SECONDS
+                ) ?: error("No phone setup")
+                val text = com.google.android.gms.wearable.DataMapItem.fromDataItem(item)
+                    .dataMap.getString("profiles").orEmpty()
+                dev.quantumink.hermesgadget.protocol.EndpointProfiles.decode(text)
+            }
+            main.post {
+                if (destroyed) return@post
+                result.fold({ profiles ->
+                    mutableState.update { it.copy(importing = false, imports = profiles) }
+                }, {
+                    mutableState.update {
+                        it.copy(
+                            importing = false,
+                            setupError = getString(R.string.import_failed)
+                        )
+                    }
+                })
             }
         }
     }
@@ -335,6 +417,7 @@ class GadgetService : Service() {
     }
 
     fun disconnect() {
+        epoch.incrementAndGet()
         selectionEpoch.incrementAndGet()
         mutableState.update {
             it.copy(
@@ -448,7 +531,8 @@ class GadgetService : Service() {
     ) {
         closeConnection()
         relay = pipe
-        speech = speechNode?.let { WatchSpeech(this, profile.endpoint, it, opusReady) }
+        val speechEngine = speechNode?.let { WatchSpeech(this, profile.endpoint, it, opusReady) }
+        speech = speechEngine
         val path = if (pipe == null) TransportPath.DIRECT else TransportPath.RELAY
         savedIdentity = identity
         val version = epoch.incrementAndGet()
@@ -559,86 +643,106 @@ class GadgetService : Service() {
                 }
                 override fun effect(effect: ConversationEffect, generation: Long) {
                     if (version != epoch.get()) return
-                    when (effect) {
-                        is ConversationEffect.CaptureStart -> {
-                            if (!visible || !foreground) {
-                                connection?.cancelRecording()
-                            } else {
-                                val current = connection ?: return
-                                capture.start(
-                                    { bytes ->
-                                        if (effect.format ==
-                                            "opus"
-                                        ) {
-                                            current.capturedOpus(effect.token, bytes)
-                                        } else {
-                                            current.captured(effect.token, bytes)
-                                        }
-                                    },
-                                    {
-                                        current.captureFailed(
-                                            effect.token,
-                                            getString(R.string.capture_failed)
-                                        )
-                                    },
-                                    format = effect.format,
-                                    onHeader = { current.codecHeader(effect.token, it) },
-                                    onLevel = { current.captureLevel(effect.token, it) },
-                                    onFinished = { current.finishRecording(effect.token) }
-                                )
-                            }
-                        }
-                        ConversationEffect.CaptureStop -> {
-                            capture.stop()
-                            main.post {
-                                if (version == epoch.get() &&
-                                    foreground
-                                ) {
-                                    beginForeground(false)
-                                }
-                            }
-                        }
-                        is ConversationEffect.PlaybackStart -> if (visible ||
-                            foreground
-                        ) {
-                            playback.start(effect.rate, effect.opusHeader)
-                            mutableState.update { it.copy(speaking = true) }
-                        }
-                        is ConversationEffect.PlaybackData -> playback.offer(effect.bytes)
-                        ConversationEffect.PlaybackFinish -> playback.finish()
-                        ConversationEffect.PlaybackStop -> {
-                            speech?.stop()
-                            playback.stop()
-                        }
-                        is ConversationEffect.ClientSpeak -> if (visible || foreground) {
-                            speech?.speak(
+                    if (effect == ConversationEffect.PlaybackStop) speechEngine?.stop()
+                    if (effect is ConversationEffect.ClientSpeak) {
+                        if (visible || foreground) {
+                            speechEngine?.speak(
                                 effect.id,
                                 effect.text,
                                 effect.voice,
                                 { header ->
-                                    if (version == epoch.get()) {
-                                        playback.start(16000, header)
-                                        mutableState.update { it.copy(speaking = true) }
+                                    synchronized(mediaLock) {
+                                        if (version == epoch.get()) {
+                                            playback.start(16000, header)
+                                            mutableState.update { it.copy(speaking = true) }
+                                        }
                                     }
                                 },
-                                { if (version == epoch.get()) playback.offer(it) },
-                                { if (version == epoch.get()) playback.finish() },
                                 {
-                                    if (version == epoch.get()) {
-                                        playback.stop()
-                                        connection?.report(getString(R.string.client_speech_failed))
+                                    synchronized(mediaLock) {
+                                        if (version == epoch.get()) playback.offer(it)
+                                    }
+                                },
+                                {
+                                    synchronized(mediaLock) {
+                                        if (version == epoch.get()) playback.finish()
+                                    }
+                                },
+                                {
+                                    synchronized(mediaLock) {
+                                        if (version == epoch.get()) {
+                                            playback.stop()
+                                            connection?.report(
+                                                getString(R.string.client_speech_failed)
+                                            )
+                                        }
                                     }
                                 }
                             )
                         }
-                        is ConversationEffect.PetCue -> petCue(effect.mode, version)
-                        is ConversationEffect.Action -> main.post {
-                            if (version == epoch.get()) executeAction(effect, generation)
+                        return
+                    }
+                    synchronized(mediaLock) {
+                        if (version != epoch.get()) return
+                        when (effect) {
+                            is ConversationEffect.CaptureStart -> {
+                                if (!visible || !foreground) {
+                                    connection?.cancelRecording()
+                                } else {
+                                    val current = connection ?: return
+                                    capture.start(
+                                        { bytes ->
+                                            if (effect.format ==
+                                                "opus"
+                                            ) {
+                                                current.capturedOpus(effect.token, bytes)
+                                            } else {
+                                                current.captured(effect.token, bytes)
+                                            }
+                                        },
+                                        {
+                                            current.captureFailed(
+                                                effect.token,
+                                                getString(R.string.capture_failed)
+                                            )
+                                        },
+                                        format = effect.format,
+                                        onHeader = { current.codecHeader(effect.token, it) },
+                                        onLevel = { current.captureLevel(effect.token, it) },
+                                        onFinished = { current.finishRecording(effect.token) }
+                                    )
+                                }
+                            }
+                            ConversationEffect.CaptureStop -> {
+                                capture.stop()
+                                main.post {
+                                    if (version == epoch.get() &&
+                                        foreground
+                                    ) {
+                                        beginForeground(false)
+                                    }
+                                }
+                            }
+                            is ConversationEffect.PlaybackStart -> if (visible ||
+                                foreground
+                            ) {
+                                playback.start(effect.rate, effect.opusHeader)
+                                mutableState.update { it.copy(speaking = true) }
+                            }
+                            is ConversationEffect.PlaybackData -> playback.offer(effect.bytes)
+                            ConversationEffect.PlaybackFinish -> playback.finish()
+                            ConversationEffect.PlaybackStop -> {
+                                playback.stop()
+                            }
+                            is ConversationEffect.PetCue -> petCue(effect.mode, version)
+                            is ConversationEffect.Action -> main.post {
+                                if (version == epoch.get()) executeAction(effect, generation)
+                            }
+                            is ConversationEffect.Haptic -> mutableState.update {
+                                if (version == epoch.get()) it.copy(haptic = it.haptic + 1) else it
+                            }
+                            else -> Unit
                         }
-                        is ConversationEffect.Haptic -> mutableState.update {
-                            if (version == epoch.get()) it.copy(haptic = it.haptic + 1) else it
-                        }
-                        else -> Unit
                     }
                 }
             },
@@ -811,8 +915,10 @@ class GadgetService : Service() {
         epoch.incrementAndGet()
         speech?.close()
         speech = null
-        capture.stop()
-        playback.stop()
+        synchronized(mediaLock) {
+            capture.stop()
+            playback.stop()
+        }
         connection?.close()
         connection = null
         relay?.close()

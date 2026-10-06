@@ -45,4 +45,19 @@
     <string name="speech_key_missing">No key is stored for this selection.</string>
     <string name="speech_quota_unknown">Key accepted. Quota was not reported.</string>
     <string name="speech_quota">Key accepted. Reported remaining characters: %1$d.</string>
+    <string name="profiles_title">Hermes profiles</string>
+    <string name="profile_sync_disclosure">Save up to eight endpoints and send setup to your paired watch. URLs, names and optional access tokens are shared with the watch; pairing and ElevenLabs keys are excluded. The watch asks you to review each import. Removing phone setup also removes its phone voice key, but does not delete watch setup or server enrollment.</string>
+    <string name="profile_name">Profile name</string>
+    <string name="profile_url">Gadget WebSocket URL</string>
+    <string name="profile_token">Optional access token</string>
+    <string name="profile_private">Mark as LAN / tailnet</string>
+    <string name="profile_private_on">LAN / tailnet selected</string>
+    <string name="profile_cleartext_warning">Cleartext exposes pairing keys, audio and replies to the local network. Public endpoints and phone relay require wss. The watch must accept this warning separately.</string>
+    <string name="profile_accept">Accept cleartext for this endpoint</string>
+    <string name="profile_accepted">Cleartext warning accepted</string>
+    <string name="profile_save_sync">Save and send setup</string>
+    <string name="profile_resync">Send saved setup again</string>
+    <string name="profile_delete">Remove phone profile and its voice key</string>
+    <string name="profiles_saved">Saved setup sent. Review imports on the watch.</string>
+    <string name="profiles_failed">Setup could not be loaded, saved or sent. Check URL, name, token, vault and phone/watch connection. Local changes may be saved; use Send saved setup again.</string>
 </resources>
