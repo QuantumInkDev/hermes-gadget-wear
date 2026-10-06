@@ -2,7 +2,7 @@
 
 Updated: 2026-10-05
 
-M0/M1 are complete. M2 direct-mode software is implemented and verified locally, including a stock SDK and round watch emulator demo. M2 remains open until the physical Watch Ultra / real-Hermes demo passes. The phone remains a starter; M3 has not started.
+M0/M1 are complete. M2 direct-mode software is implemented and verified locally, including a stock SDK and round watch emulator demo. [Code CI](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37392054562) passed for `ea5f3c0`; both debug APKs were uploaded. M2 remains open until the physical Watch Ultra / real-Hermes demo passes. The phone remains a starter; M3 has not started.
 
 Verified locally: both debug APKs and the watch instrumentation APK build; strict ktlint/Android lint/Kotlin/Gradle checks pass; 29 JVM tests pass with zero skips (including two live SDK tests); three Android Keystore tests and one opt-in setup UI test pass on Wear OS 7 / API 37. See [progress](docs/progress.md) and [synthetic screenshots](docs/demo/m2/README.md) for exact evidence and boundaries. The targeted cleartext XML lint suppression implements the approved dynamic-host choice; other lint rules remain strict.
 

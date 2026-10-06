@@ -16,7 +16,7 @@ Demonstrated through the app: configure a synthetic loopback endpoint with expli
 
 The SDK received successful results from Android vibration, app-window brightness, and notification actions. Notification denial omitted that action from the initial manifest; granting it on reconnect added it. This image has no system clock activity handling `ACTION_SET_TIMER`, so `timer.start` was correctly omitted. Timer bounds/errors pass JVM tests; executing a real clock timer remains a hardware check. No physical vibration sensation, speaker quality, STT quality, or battery result is claimed.
 
-The three Keystore instrumentation tests validate persistence, separate endpoint identities, encrypted records, a non-exportable key, tamper failure, and explicit recovery from missing records/keys. The opt-in setup UI test validates a background/return draft and both cleartext gates. It accepts only a synthetic localhost devserver argument and refuses to replace existing saved setup.
+The three Keystore instrumentation tests validate persistence, separate endpoint identities, encrypted records, a non-exportable key, tamper failure, and explicit recovery from missing records/keys. The opt-in setup UI test validates draft preservation across an activity stop/return and both cleartext gates. It accepts only a synthetic localhost devserver argument and refuses to replace existing saved setup.
 
 To reproduce the storage tests on a connected test watch/emulator:
 
