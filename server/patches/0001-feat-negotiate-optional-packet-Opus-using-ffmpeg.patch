@@ -1,0 +1,564 @@
+From 9c400f986d351a2777bb1ae177210ead49b79d4a Mon Sep 17 00:00:00 2001
+From: Justin Garcia <dev@quantumink.dev>
+Date: Tue, 6 Oct 2026 08:59:11 -0400
+Subject: [PATCH] feat: negotiate optional packet Opus using ffmpeg
+
+---
+ docs/wear-opus.md  |   9 +++
+ plugin/adapter.py  |   3 +-
+ plugin/hub.py      |  95 +++++++++++++++++++++++++---
+ plugin/opus.py     | 151 +++++++++++++++++++++++++++++++++++++++++++++
+ tests/test_opus.py | 137 ++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 387 insertions(+), 8 deletions(-)
+ create mode 100644 docs/wear-opus.md
+ create mode 100644 plugin/opus.py
+ create mode 100644 tests/test_opus.py
+
+diff --git a/docs/wear-opus.md b/docs/wear-opus.md
+new file mode 100644
+index 0000000..233df01
+--- /dev/null
++++ b/docs/wear-opus.md
+@@ -0,0 +1,9 @@
++# Optional packet Opus extension
++
++Base: SDK v0.2.0. Opt in with `platforms.gadget.extra.enable_opus: true`. The default is false. Missing ffmpeg/libopus or absent device offers keep PCM16 and omit the welcome extension. No native Python codec package is required. Do not enable on a running installation before review and device testing.
++
++Devices offer `formats: ["opus", "pcm16"]` in each 16 kHz mono mic/speaker capability. When enabled, `welcome.audio` selects `mic` and `speaker` separately. An absent selection means PCM16. Upload starts with `audio.start` format opus, rate 16000, frame_ms 20, id and stream. Before any packet, send `audio.codec` with stream and `opus_header`: Base64 RFC 7845 mono mapping-family-zero OpusHead. Android's unified AOPUS CSD must be unpacked; it is not a packet. Binary channel 1 frames carry one 20 ms packet (at most 1275 bytes), with ordinary stream/sequence framing. Missing headers, sequence gaps, wrong durations and limits reject the recording rather than sending damaged audio to STT.
++
++`audio.end` reconstructs CRC-protected Ogg pages and decodes through ffmpeg off the event loop into the existing mono 16 kHz PCM/WAV STT path. Limits are 60 seconds / 3000 packets, a bounded subprocess timeout, and no disk audio. Cancel discards the buffer. The optional output encoder consumes the existing resampled PCM pipeline, demuxes ffmpeg Ogg pages, sends `audio.start` with the RFC header, and sends paced raw packets. Provider Ogg bytes must never be treated as raw packets. No direct-provider Opus optimization is claimed in this patch. Android decodes at 48 kHz and plays through AudioTrack; codec delay comes from the header.
++
++Tests use real ffmpeg, malformed headers/packets, opt-in and extensions-off negotiation, unpaired rejection, sequence rejection, SDK WAV upload delivery, output framing and elapsed playback pacing. Stock protocol/audio unit tests run unchanged. Required hardware validation: Ultra encoder/decoder availability, Bluetooth throughput/latency, same utterances through PCM and Opus STT, audio quality, interruption and battery. Synthetic tones do not establish STT accuracy.
+diff --git a/plugin/adapter.py b/plugin/adapter.py
+index 7e398a2..9e47734 100644
+--- a/plugin/adapter.py
++++ b/plugin/adapter.py
+@@ -145,6 +145,7 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
+         self._path = str(extra.get("path") or "/gadget")
+         self._heartbeat_s = int(extra.get("heartbeat_s") or 20)
+         self._max_utterance_s = float(extra.get("max_utterance_s") or 60)
++        self._enable_opus = extra.get("enable_opus") is True
+         self._speak_replies = _flag(extra.get("speak_replies"), True)
+         self._auto_home = _flag(extra.get("auto_home"), True)
+         self._tls_cert = extra.get("tls_cert")
+@@ -182,7 +183,7 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
+         self._hub = DeviceHub(
+             self._store, self, host=self._host, port=self._port, path=self._path,
+             access_token=self._access_token, heartbeat_s=self._heartbeat_s, ssl_context=ssl_ctx,
+-            max_utterance_s=self._max_utterance_s)
++            max_utterance_s=self._max_utterance_s, enable_opus=self._enable_opus)
+         try:
+             await self._hub.start()
+         except OSError as exc:
+diff --git a/plugin/hub.py b/plugin/hub.py
+index 17e05c3..5b62ae5 100644
+--- a/plugin/hub.py
++++ b/plugin/hub.py
+@@ -19,7 +19,7 @@ import uuid
+ from dataclasses import dataclass, field
+ from typing import Any
+ 
+-from . import audio, protocol
++from . import audio, opus, protocol
+ from .store import DeviceStore
+ 
+ log = logging.getLogger("hermes_gadget.hub")
+@@ -87,6 +87,9 @@ class _Upload:
+     next_seq: int = 0
+     gaps: int = 0
+     truncated: bool = False
++    format: str = "pcm16"
++    opus_header: bytes | None = None
++    packets: list[bytes] = field(default_factory=list)
+ 
+ 
+ class AudioOut:
+@@ -101,10 +104,12 @@ class AudioOut:
+         self._session = session
+         self.stream = stream
+         self.rate = session.speaker_rate
++        self.format = session.audio_format("speaker")
++        self._turn = None
+         self._resampler = audio.Resampler(src_rate, self.rate, channels)
+         self._frame_bytes = max(2, self.rate * 2 * AUDIO_FRAME_MS // 1000)
+         self._buf = bytearray()
+-        self._queue: asyncio.Queue[bytes | None] = asyncio.Queue()
++        self._queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=1501 if self.format == "opus" else 0)
+         self._task: asyncio.Task | None = None
+         self.closed = False
+         self.aborted = False
+@@ -112,13 +117,17 @@ class AudioOut:
+         self.done = asyncio.Event()
+ 
+     async def start(self, *, turn: str | None = None) -> None:
+-        await self._session.send_json(
+-            protocol.message("audio.start", stream=self.stream, rate=self.rate, format="pcm16", turn=turn))
++        self._turn = turn
++        if self.format == "pcm16":
++            await self._session.send_json(
++                protocol.message("audio.start", stream=self.stream, rate=self.rate, format="pcm16", turn=turn))
+         self._task = asyncio.create_task(self._pump())
+ 
+     def write(self, pcm: bytes) -> None:
+         if self.closed:
+             return
++        if self.format == "opus" and len(pcm) > 16000 * 2 * 60:
++            raise ValueError("Opus output outside limit")
+         self._buf += self._resampler.process(pcm)
+         fb = self._frame_bytes
+         while len(self._buf) >= fb:
+@@ -151,6 +160,24 @@ class AudioOut:
+         seq = 0
+         base = loop.time()
+         try:
++            if self.format == "opus":
++                async def on_header(head):
++                    await self._session.send_json(protocol.message("audio.start", stream=self.stream,
++                        rate=self.rate, format="opus", frame_ms=20, opus_header=base64.b64encode(head).decode(),
++                        turn=self._turn))
++                async def on_packet(data):
++                    nonlocal seq, base
++                    ahead = self.sent_seconds - (loop.time() - base)
++                    if ahead < 0:
++                        base -= ahead
++                    elif ahead > PLAYBACK_LEAD_S:
++                        await asyncio.sleep(ahead - PLAYBACK_LEAD_S)
++                    await self._session.send_binary(protocol.binary(protocol.CHANNEL_AUDIO, self.stream, seq, data))
++                    seq += 1
++                    self.sent_seconds += 0.020
++                await opus.encode_stream(self._queue, self.rate, on_header, on_packet)
++                await self._session.send_json(protocol.message("audio.end", stream=self.stream))
++                return
+             while True:
+                 frame = await self._queue.get()
+                 if frame is None:
+@@ -167,6 +194,12 @@ class AudioOut:
+         except asyncio.CancelledError:
+             pass
+         except Exception as exc:  # connection dropped mid-stream
++            if self.format == "opus":
++                try:
++                    await self._session.send_json(protocol.message("audio.abort", stream=self.stream))
++                    await self._session.send_notice("Opus playback interrupted")
++                except Exception:
++                    pass
+             log.debug("audio pump stopped: %s", exc)
+         finally:
+             self.done.set()
+@@ -220,6 +253,13 @@ class DeviceSession:
+         spk = self.caps.get("speaker") or {}
+         return int(spk.get("rate") or 16000) if isinstance(spk, dict) else 16000
+ 
++    def audio_format(self, direction: str) -> str:
++        cap = self.caps.get(direction)
++        if not self.hub.enable_opus or not isinstance(cap, dict) or cap.get("rate") != 16000:
++            return "pcm16"
++        formats = cap.get("formats")
++        return "opus" if isinstance(formats, list) and "opus" in formats else "pcm16"
++
+     @property
+     def charset(self) -> str:
+         return str(self.display.get("charset") or "ascii")
+@@ -430,6 +470,7 @@ class DeviceHub:
+         heartbeat_s: int = 20,
+         ssl_context=None,
+         max_utterance_s: float = 60.0,
++        enable_opus: bool = False,
+     ):
+         self.store = store
+         self.delegate = delegate
+@@ -438,6 +479,7 @@ class DeviceHub:
+         self.heartbeat_s = max(5, int(heartbeat_s))
+         self.ssl_context = ssl_context
+         self.max_utterance_s = max_utterance_s
++        self.enable_opus = bool(enable_opus and opus.available())
+         self.sessions: dict[str, DeviceSession] = {}
+         self.loop: asyncio.AbstractEventLoop | None = None
+         self._server = None
+@@ -571,9 +613,11 @@ class DeviceHub:
+             if previous is not None:
+                 await previous.close("replaced by a newer connection")
+             session.paired = bool(await self.delegate.is_paired(session))
+-            await session.send_json(protocol.message(
+-                "welcome", session=session.session_id, paired=session.paired,
+-                heartbeat_s=self.heartbeat_s, server="hermes", proto=protocol.VERSION))
++            welcome = protocol.message("welcome", session=session.session_id, paired=session.paired,
++                heartbeat_s=self.heartbeat_s, server="hermes", proto=protocol.VERSION)
++            if self.enable_opus:
++                welcome["audio"] = {direction: session.audio_format(direction) for direction in ("mic", "speaker")}
++            await session.send_json(welcome)
+             log.info("device %s (%s) online, paired=%s", session.device_id, session.name, session.paired)
+             await self.delegate.on_ready(session)
+             heartbeat = asyncio.create_task(self._heartbeat(session))
+@@ -637,6 +681,13 @@ class DeviceHub:
+ 
+     async def _h_audio_start(self, session: DeviceSession, msg: dict) -> None:
+         fmt = msg.get("format", "pcm16")
++        if fmt == "opus":
++            if not session.paired or session.audio_format("mic") != "opus" or msg.get("rate") != 16000 or msg.get("frame_ms") != 20:
++                await session.send_notice("Opus is unavailable")
++                return
++            session._upload = _Upload(id=str(msg.get("id") or ""), stream=int(msg.get("stream") or 0),
++                rate=16000, started=time.monotonic(), format="opus")
++            return
+         if fmt != "pcm16":
+             await session.send_notice(f"Unsupported audio format {fmt!r}")
+             return
+@@ -652,6 +703,15 @@ class DeviceHub:
+         up = session._upload
+         if frame is None or frame.channel != protocol.CHANNEL_AUDIO or up is None or frame.stream != up.stream:
+             return
++        if up.format == "opus":
++            try:
++                if up.opus_header is None or frame.seq != up.next_seq & 0xffff or len(up.packets) >= min(3001, int(self.max_utterance_s * 50)):
++                    raise ValueError("Opus upload interrupted")
++                up.packets.append(opus.packet(frame.payload))
++                up.next_seq += 1
++            except ValueError:
++                up.truncated = True
++            return
+         if frame.seq != up.next_seq & 0xFFFF:
+             up.gaps += 1
+         up.next_seq = frame.seq + 1
+@@ -667,6 +727,14 @@ class DeviceHub:
+         session._upload = None
+         if up is None or int(msg.get("stream") or 0) != up.stream:
+             return
++        if up.format == "opus":
++            try:
++                if up.truncated or up.opus_header is None:
++                    raise ValueError("Opus upload interrupted")
++                up.pcm = bytearray(await asyncio.to_thread(opus.decode, up.opus_header, up.packets, up.rate))
++            except (ValueError, OSError, TimeoutError):
++                await session.send_notice("Opus upload interrupted")
++                return
+         seconds = audio.duration_s(bytes(up.pcm), up.rate)
+         if up.gaps:
+             log.debug("[%s] utterance had %d sequence gaps", session.device_id, up.gaps)
+@@ -676,6 +744,18 @@ class DeviceHub:
+         wav = audio.wav_bytes(bytes(up.pcm), up.rate)
+         session.spawn(self.delegate.on_utterance(session, up.id, wav, seconds))
+ 
++    async def _h_audio_codec(self, session: DeviceSession, msg: dict) -> None:
++        up = session._upload
++        if up is None or up.format != "opus" or up.stream != msg.get("stream") or up.opus_header is not None:
++            return
++        try:
++            value = msg.get("opus_header")
++            if not isinstance(value, str) or len(value) > 88:
++                raise ValueError("Invalid Opus header")
++            up.opus_header = opus.header(base64.b64decode(value, validate=True))
++        except ValueError:
++            up.truncated = True
++
+     async def _h_audio_cancel(self, session: DeviceSession, msg: dict) -> None:
+         session._upload = None
+ 
+@@ -728,6 +808,7 @@ class DeviceHub:
+         "text": _h_text,
+         "audio.start": _h_audio_start,
+         "audio.end": _h_audio_end,
++        "audio.codec": _h_audio_codec,
+         "audio.cancel": _h_audio_cancel,
+         "cancel": _h_cancel,
+         "session.new": _h_session_new,
+diff --git a/plugin/opus.py b/plugin/opus.py
+new file mode 100644
+index 0000000..b978fc5
+--- /dev/null
++++ b/plugin/opus.py
+@@ -0,0 +1,151 @@
++"""Optional raw-packet Opus bridge through ffmpeg; no Python native codec dependency."""
++from __future__ import annotations
++import asyncio
++import shutil
++import struct
++import subprocess
++from functools import lru_cache
++
++MAX_PACKET = 1275
++
++@lru_cache(maxsize=1)
++def available() -> bool:
++    exe = shutil.which("ffmpeg")
++    if not exe:
++        return False
++    try:
++        result = subprocess.run([exe, "-v", "error", "-encoders"], capture_output=True, timeout=5)
++        decoder = subprocess.run([exe, "-v", "error", "-decoders"], capture_output=True, timeout=5)
++        return result.returncode == 0 and decoder.returncode == 0 and b"libopus" in result.stdout and b"opus" in decoder.stdout
++    except (OSError, subprocess.TimeoutExpired):
++        return False
++
++def header(value: bytes) -> bytes:
++    if len(value) != 19 or value[:8] != b"OpusHead" or value[8:10] != b"\x01\x01" or value[18] != 0:
++        raise ValueError("Unsupported mono Opus header")
++    return value
++
++def packet(value: bytes) -> bytes:
++    if not 1 <= len(value) <= MAX_PACKET:
++        raise ValueError("Invalid Opus packet size")
++    toc = value[0]
++    if toc & 128:
++        samples = 120 << ((toc >> 3) & 3)
++    elif toc & 96 == 96:
++        samples = 960 if toc & 8 else 480
++    else:
++        config = (toc >> 3) & 3
++        samples = 2880 if config == 3 else 480 << config
++    frames = 1 if toc & 3 == 0 else 2 if toc & 3 in (1, 2) else (value[1] & 63 if len(value) > 1 else 0)
++    if samples * frames != 960:
++        raise ValueError("Only 20 ms Opus packets are supported")
++    return value
++
++def _crc(value: bytes) -> int:
++    crc = 0
++    for byte in value:
++        crc ^= byte << 24
++        for _ in range(8):
++            crc = ((crc << 1) ^ (0x04C11DB7 if crc & 0x80000000 else 0)) & 0xffffffff
++    return crc
++
++def page(data: bytes, sequence: int, granule: int, flags: int = 0) -> bytes:
++    lace = bytes([255] * (len(data) // 255) + [len(data) % 255])
++    if len(lace) > 255:
++        raise ValueError("Ogg page too large")
++    raw = bytearray(b"OggS\0" + bytes([flags]) + struct.pack("<QII", granule, 1, sequence) + b"\0" * 4 + bytes([len(lace)]) + lace + data)
++    struct.pack_into("<I", raw, 22, _crc(raw))
++    return bytes(raw)
++
++def wrap(head: bytes, packets: list[bytes]) -> bytes:
++    header(head)
++    if not 1 <= len(packets) <= 3001:
++        raise ValueError("Opus upload outside limit")
++    tags = b"OpusTags" + struct.pack("<II", 0, 0)
++    output = bytearray(page(head, 0, 0, 2) + page(tags, 1, 0))
++    for i, data in enumerate(packets):
++        output += page(packet(data), i + 2, (i + 1) * 960, 4 if i == len(packets) - 1 else 0)
++    return bytes(output)
++
++def decode(head: bytes, packets: list[bytes], rate: int = 16000) -> bytes:
++    if rate != 16000 or not available():
++        raise ValueError("Opus is unavailable")
++    try:
++        proc = subprocess.run([shutil.which("ffmpeg"), "-nostdin", "-v", "error", "-f", "ogg", "-i", "pipe:0",
++        "-f", "s16le", "-ac", "1", "-ar", str(rate), "pipe:1"], input=wrap(head, packets),
++            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=15)
++    except subprocess.TimeoutExpired:
++        raise ValueError("Opus decode timed out") from None
++    if proc.returncode or len(proc.stdout) > 16000 * 2 * 61:
++        raise ValueError("Opus decode failed")
++    return proc.stdout
++
++async def _packets(reader):
++    pending = bytearray()
++    while True:
++        try:
++            raw = await reader.readexactly(27)
++        except asyncio.IncompleteReadError as exc:
++            if exc.partial or pending:
++                raise ValueError("Truncated Ogg stream") from None
++            return
++        if raw[:5] != b"OggS\0":
++            raise ValueError("Malformed Ogg page")
++        lace = await reader.readexactly(raw[26])
++        data = await reader.readexactly(sum(lace))
++        offset = 0
++        for length in lace:
++            pending += data[offset:offset + length]
++            offset += length
++            if len(pending) > 8192:
++                raise ValueError("Ogg packet too large")
++            if length < 255:
++                yield bytes(pending)
++                pending.clear()
++
++async def encode_stream(queue, rate: int, on_header, on_packet) -> None:
++    if rate != 16000 or not available():
++        raise ValueError("Opus is unavailable")
++    proc = await asyncio.create_subprocess_exec(shutil.which("ffmpeg"), "-nostdin", "-v", "error",
++        "-f", "s16le", "-ar", str(rate), "-ac", "1", "-i", "pipe:0", "-c:a", "libopus",
++        "-application", "voip", "-b:a", "24000", "-frame_duration", "20", "-page_duration", "20000",
++        "-flush_packets", "1", "-f", "ogg", "pipe:1", stdin=asyncio.subprocess.PIPE,
++        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL, limit=65536)
++    async def write():
++        total = 0
++        try:
++            while True:
++                pcm = await queue.get()
++                if pcm is None:
++                    break
++                total += len(pcm)
++                if total > 16000 * 2 * 60:
++                    raise ValueError("Opus output outside limit")
++                proc.stdin.write(pcm)
++                await proc.stdin.drain()
++        finally:
++            proc.stdin.close()
++    writer = asyncio.create_task(write())
++    async def read():
++        count = 0
++        async for data in _packets(proc.stdout):
++            if count == 0:
++                await on_header(header(data))
++            elif count != 1:
++                await on_packet(packet(data))
++            elif not data.startswith(b"OpusTags"):
++                raise ValueError("Missing Opus tags")
++            count += 1
++            if count > 3003:
++                raise ValueError("Opus output outside limit")
++        await writer
++        if await proc.wait() != 0 or count < 3:
++            raise ValueError("Opus encode failed")
++    try:
++        await asyncio.wait_for(read(), timeout=75)
++    finally:
++        writer.cancel()
++        await asyncio.gather(writer, return_exceptions=True)
++        if proc.returncode is None:
++            proc.kill()
++        await proc.wait()
+diff --git a/tests/test_opus.py b/tests/test_opus.py
+new file mode 100644
+index 0000000..613e2a9
+--- /dev/null
++++ b/tests/test_opus.py
+@@ -0,0 +1,137 @@
++"""Real ffmpeg round trips plus opt-in/stock negotiation and malformed upload checks."""
++import asyncio
++import base64
++import json
++import math
++import struct
++import io
++import wave
++import time
++import pytest
++from hermes_gadget_plugin import opus, protocol
++from hermes_gadget_plugin.hub import DeviceHub, DeviceSession, HubDelegate
++from hermes_gadget_plugin.store import DeviceStore
++
++async def encoded():
++    pcm = b"".join(struct.pack("<h", int(8000 * math.sin(2 * math.pi * 440 * i / 16000))) for i in range(48000))
++    queue = asyncio.Queue()
++    await queue.put(pcm)
++    await queue.put(None)
++    heads, packets = [], []
++    async def head(value): heads.append(value)
++    async def packet(value): packets.append(value)
++    await opus.encode_stream(queue, 16000, head, packet)
++    return pcm, heads[0], packets
++
++def test_real_ffmpeg_packet_round_trip_and_bitrate():
++    assert opus.available(), "ffmpeg with libopus required for extension tests"
++    pcm, head, packets = asyncio.run(encoded())
++    decoded = opus.decode(head, packets)
++    assert 95000 <= len(decoded) <= 98000
++    assert sum(map(len, packets)) < len(pcm) // 4
++    assert len(packets) in (150, 151)
++    assert opus.wrap(head, packets).startswith(b"OggS")
++
++def test_invalid_header_packets_and_limits():
++    for data in [b"", b"OpusHead", b"x" * 19]:
++        with pytest.raises(ValueError): opus.header(data)
++    for data in [b"", b"x" * 1276, b"\x83\0", b"\x00"]:
++        with pytest.raises(ValueError): opus.packet(data)
++
++def test_hub_opt_in_pacing_and_decode_and_sequence_rejection(tmp_path):
++    class WS:
++        def __init__(self): self.sent = []
++        async def send(self, value): self.sent.append(value)
++    class Delegate(HubDelegate):
++        def __init__(self): self.wav = None
++        async def on_utterance(self, session, msg_id, wav, seconds): self.wav = wav
++    async def run():
++        delegate, ws = Delegate(), WS()
++        caps = {name: {"rate": 16000, "formats": ["opus", "pcm16"]} for name in ("mic", "speaker")}
++        hub = DeviceHub(DeviceStore(tmp_path), delegate, enable_opus=True)
++        session = DeviceSession(hub, ws, {"device_id": "hg-0123456789abcdef", "caps": caps})
++        session.paired = True
++        assert session.audio_format("mic") == "opus"
++        stock = DeviceHub(DeviceStore(tmp_path / "stock"), delegate)
++        assert DeviceSession(stock, ws, {"device_id": session.device_id, "caps": caps}).audio_format("mic") == "pcm16"
++        session.caps["mic"]["formats"] = None
++        assert session.audio_format("mic") == "pcm16"
++        session.caps["mic"]["formats"] = ["opus", "pcm16"]
++        pcm, head, packets = await encoded()
++        start = {"format": "opus", "frame_ms": 20, "rate": 16000, "stream": 1, "id": "synthetic"}
++        await hub._h_audio_start(session, start)
++        await hub._h_audio_codec(session, {"stream": 1, "opus_header": base64.b64encode(head).decode()})
++        for seq, data in enumerate(packets): hub._on_binary(session, protocol.binary(1, 1, seq, data))
++        await hub._h_audio_end(session, {"stream": 1})
++        await asyncio.gather(*session._tasks)
++        with wave.open(io.BytesIO(delegate.wav)) as wav: assert wav.getframerate() == 16000
++        delegate.wav = None
++        await hub._h_audio_start(session, start)
++        await hub._h_audio_codec(session, {"stream": 1, "opus_header": base64.b64encode(head).decode()})
++        hub._on_binary(session, protocol.binary(1, 1, 2, packets[0]))
++        await hub._h_audio_end(session, {"stream": 1})
++        assert delegate.wav is None
++        started = time.monotonic()
++        output = await session.open_audio(16000)
++        output.write(pcm)
++        output.finish()
++        await asyncio.wait_for(output.done.wait(), 10)
++        messages = [json.loads(value) for value in ws.sent if isinstance(value, str)]
++        assert any(value.get("type") == "audio.start" and value.get("format") == "opus" for value in messages)
++        assert any(value.get("type") == "audio.end" for value in messages)
++        assert output.sent_seconds >= 3
++        assert time.monotonic() - started >= 2.4
++        session.paired = False
++        await hub._h_audio_start(session, start)
++        assert session._upload is None
++    asyncio.run(run())
++
++
++def test_live_websocket_negotiation_and_stock_fallback(tmp_path):
++    import secrets
++    from websockets.asyncio.client import connect
++    class Delegate(HubDelegate):
++        def __init__(self): self.received = asyncio.Event()
++        async def on_utterance(self, session, msg_id, wav, seconds):
++            output = await session.open_audio(16000)
++            with wave.open(io.BytesIO(wav)) as source: output.write(source.readframes(source.getnframes()))
++            output.finish()
++            self.received.set()
++    async def run():
++        for enabled in (False, True):
++            delegate = Delegate()
++            hub = DeviceHub(DeviceStore(tmp_path / str(enabled)), delegate, host="127.0.0.1", port=0, enable_opus=enabled)
++            await hub.start()
++            key = secrets.token_bytes(32)
++            device_id = protocol.device_id_for_key(key)
++            caps = {name: {"rate": 16000, "formats": ["opus", "pcm16"]} for name in ("mic", "speaker")}
++            try:
++                async with connect("ws://127.0.0.1:" + str(hub.bound_port) + "/gadget", subprotocols=[protocol.SUBPROTOCOL]) as ws:
++                    await ws.send(json.dumps({"type": "hello", "proto": 1, "device_id": device_id, "caps": caps}))
++                    assert json.loads(await ws.recv())["type"] == "challenge"
++                    await ws.send(json.dumps({"type": "auth", "key": base64.b64encode(key).decode()}))
++                    welcome = json.loads(await ws.recv())
++                    if not enabled:
++                        assert "audio" not in welcome
++                        continue
++                    assert welcome["audio"] == {"mic": "opus", "speaker": "opus"}
++                    pcm, head, packets = await encoded()
++                    await ws.send(json.dumps({"type": "audio.start", "stream": 1, "id": "synthetic", "rate": 16000, "format": "opus", "frame_ms": 20}))
++                    await ws.send(json.dumps({"type": "audio.codec", "stream": 1, "opus_header": base64.b64encode(head).decode()}))
++                    for seq, data in enumerate(packets): await ws.send(protocol.binary(1, 1, seq, data))
++                    await ws.send(json.dumps({"type": "audio.end", "stream": 1}))
++                    output_head, output_packets = None, []
++                    while True:
++                        value = await asyncio.wait_for(ws.recv(), 10)
++                        if isinstance(value, bytes):
++                            output_packets.append(protocol.parse_binary(value).payload)
++                        else:
++                            value = json.loads(value)
++                            if value["type"] == "audio.start":
++                                assert value["format"] == "opus"
++                                output_head = base64.b64decode(value["opus_header"])
++                            if value["type"] == "audio.end": break
++                    assert delegate.received.is_set()
++                    assert len(opus.decode(output_head, output_packets)) in range(94000, 98001)
++            finally: await hub.stop()
++    asyncio.run(run())

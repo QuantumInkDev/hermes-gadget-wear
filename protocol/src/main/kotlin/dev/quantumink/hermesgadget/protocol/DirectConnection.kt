@@ -12,7 +12,9 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.ssl.SSLException
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -85,7 +87,16 @@ class DirectConnection(
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
     private val actions = WatchActions.manifest(availableActions)
-    private val conversation = Conversation(availableActions, previousReply)
+    private fun offeredFormats(direction: String): Set<String> {
+        val formats = (capabilities[direction] as? JsonObject)?.get("formats") as? JsonArray
+        return formats?.mapNotNull { (it as? JsonPrimitive)?.content }?.toSet() ?: setOf("pcm16")
+    }
+    private val conversation = Conversation(
+        availableActions,
+        previousReply,
+        microphoneFormats = offeredFormats("mic"),
+        speakerFormats = offeredFormats("speaker")
+    )
     private val stopped = AtomicBoolean(false)
     private val overloaded = AtomicBoolean(false)
     private val executor = ThreadPoolExecutor(
@@ -154,7 +165,7 @@ class DirectConnection(
         return result
     }
     fun startRecording() = user { conversation.startRecording(now()) }
-    fun finishRecording() = user { conversation.finishRecording(now()) }
+    fun finishRecording(token: String? = null) = user { conversation.finishRecording(now(), token) }
     fun cancelRecording() = user { conversation.cancelRecording(now()) }
     fun cancel(newSession: Boolean = false) = user { conversation.cancel(now(), newSession) }
     fun answer(id: String, yes: Boolean) = user { conversation.answer(id, yes, now()) }
@@ -165,6 +176,22 @@ class DirectConnection(
     fun report(message: String) = dispatch {
         conversation.report(message, now())
         publish()
+    }
+
+    fun codecHeader(token: String, header: ByteArray) {
+        val copy = header.copyOf()
+        user { conversation.codecHeader(token, copy, now()) }
+    }
+    fun capturedOpus(token: String, packet: ByteArray) {
+        val copy = packet.copyOf()
+        user { conversation.captureOpus(token, copy, now()) }
+    }
+    fun captureLevel(token: String, pcm: ByteArray) {
+        val copy = pcm.copyOf()
+        dispatch {
+            conversation.captureLevel(token, copy, now())
+            publish()
+        }
     }
 
     fun captured(token: String, bytes: ByteArray) {
@@ -310,6 +337,12 @@ class DirectConnection(
         }
         when (message.type) {
             "welcome", "paired", "unpaired" -> {
+                if (message.type == "welcome" &&
+                    runCatching { conversation.selectAudio(message) }.isFailure
+                ) {
+                    fail("Unsupported audio negotiation.", false)
+                    return
+                }
                 val paired = handshake.canSendConversation
                 effects(conversation.setPaired(paired))
                 state = state.copy(

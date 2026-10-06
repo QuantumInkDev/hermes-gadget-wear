@@ -66,6 +66,16 @@ Maintainer infrastructure: enabled a tailnet-only HTTPS proxy on the existing al
 
 Demo note: JVM relay pairing/text/reconnect and Android loopback TLS passed; actual ChannelClient, companion association, background foreground-service startup, Bluetooth interruption, phone Tailscale VPN, and off-network conversation remain hardware gates. M3 acceptance is not complete. No server extensions have been installed into the running Hermes environment.
 
+## M4 Opus — 2026-10-06 — software verified, Ultra measurements open
+
+Implemented optional per-direction `welcome.audio` selection, missing-selection PCM fallback, RFC OpusHead configuration separate from packets, Android unified CSD parsing, 20 ms packet validation, codec token guards, bounded capture/playback, and an actual local codec probe before advertising Opus. Capture release flushes the encoder before `audio.end`; cancellation discards it. Android decodes Opus at 48 kHz for AudioTrack. No mid-stream format switch or input replay occurs.
+
+Prepared SDK patch 1 against the exact v0.2.0 base on local branch `wear/optional-extensions`, commit `9c400f9`, with SDK protocol documentation and tests. `enable_opus` defaults false and requires ffmpeg Opus support. Uplink wraps packets in CRC-protected Ogg and decodes off the event loop into stock STT WAV. Downlink uses a persistent bounded ffmpeg pipe, demuxes raw packets and enforces the playback lead. Elapsed-time testing caught a copied pacing-clock sign error; the optional Opus path now rebases correctly. Provider-direct Opus is not implemented. Nothing was installed into live Hermes.
+
+Validation: strict build/check passed with 42 JVM tests and zero failures/errors/skips, including enabled unmodified SDK direct/relay integrations and four new negotiation/header/token/packet tests. The isolated exported patch series applies cleanly and its 21 Python tests pass, including real ffmpeg, live WebSocket enrollment/Opus loopback, stock extensions-off behavior, malformed input, sequence rejection, unpaired rejection, and elapsed pacing. Two Android codec tests plus the relay TLS regression passed on the owned round API 37 emulator. Android-to-ffmpeg and ffmpeg-to-Android packet decoding both passed. The stock SDK offline-draft UI regression passed after the capture changes. The opt-in service-level emulator demo passed negotiated Opus capture, flush on release, SDK reply/loopback playback path, and cancellation. Host microphone/speaker were disabled. No personal watch was reset or modified.
+
+Demo note: [measured synthetic payload table](audio-measurements.md) records PCM 256 kbit/s versus Android Opus 23.584 kbit/s uplink and host ffmpeg 36.264 kbit/s downlink for one original three-second tone. This is not Bluetooth throughput, end-to-end latency, actual speech/STT accuracy, or Ultra battery evidence. M4 acceptance remains open for the required actual-device comparison. Continue M5 in order under the maintainer's advance authorization.
+
 ## Milestones
 
 Maintainer voice demo — 2026-10-06: the maintainer reports that the physical watch successfully asked about the weather, received an answer, and played the profile's ElevenLabs voice. This verifies a real hold-to-talk/STT/reply/playback path by maintainer report; no bitrate, STT comparison, battery, or audio-quality measurement is inferred. They described the flow as clunky and authorized advancing the remaining phases while away from the home network. The core M2 conversation demo has passed; the remaining physical media/action, permission, lifecycle, and quality matrix stays open. Phase implementation may advance in sequence under that authorization, with unverified milestone acceptance kept explicit.
@@ -76,7 +86,7 @@ Maintainer voice demo — 2026-10-06: the maintainer reports that the physical w
 | M1: Protocol vectors and devserver integration | Complete; local and CI checks passed |
 | M2: Watch direct mode and real Hermes demo | Core physical typed/voice demo passed; remaining Ultra matrix open |
 | M3: Phone relay and transport selection | Software verified; actual Data Layer/off-network gate open |
-| M4: Opus and measurements | Not started |
+| M4: Opus and measurements | Software/cross-codec verified; Ultra speech/bitrate/battery gate open |
 | M5: Pets and companion-sheet tooling | Not started |
 | M6: Client BYOK TTS | Not started |
 | M7: Multi-endpoint profiles and v2 proposal | Not started |

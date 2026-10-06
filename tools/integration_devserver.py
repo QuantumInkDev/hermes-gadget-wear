@@ -13,14 +13,16 @@ from hermes_gadget_plugin.hub import DeviceHub
 from hermes_gadget_plugin.store import DeviceStore
 
 
-async def tls_server(directory: Path, ready, certificate: Path, key: Path) -> None:
+async def tls_server(directory: Path, ready, certificate: Path | None, key: Path | None, opus: bool = False) -> None:
     """Use the stock hub's native TLS hook and the unmodified SDK echo delegate."""
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.load_cert_chain(certificate, key)
+    context = None
+    if certificate and key:
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(certificate, key)
     brain = EchoBrain(require_pairing=True, loopback=True)
     hub = DeviceHub(
         DeviceStore(directory), brain, host=socket.gethostbyname("localhost"),
-        port=0, path="/gadget", ssl_context=context,
+        port=0, path="/gadget", ssl_context=context, **({"enable_opus": True} if opus else {}),
     )
     brain.hub = hub
     await hub.start()
@@ -35,12 +37,12 @@ async def tls_server(directory: Path, ready, certificate: Path, key: Path) -> No
         await hub.stop()
 
 
-async def main(ready_file: Path, certificate: Path | None, key: Path | None) -> None:
+async def main(ready_file: Path, certificate: Path | None, key: Path | None, opus: bool = False) -> None:
     with tempfile.TemporaryDirectory(prefix="gadget-integration-") as directory:
         ready = asyncio.get_running_loop().create_future()
         coroutine = (
-            tls_server(Path(directory), ready, certificate, key)
-            if certificate and key else
+            tls_server(Path(directory), ready, certificate, key, opus)
+            if (certificate and key) or opus else
             serve(
                 socket.gethostbyname("localhost"),
                 0,
@@ -69,7 +71,8 @@ if __name__ == "__main__":
     parser.add_argument("--ready-file", type=Path, required=True)
     parser.add_argument("--tls-cert", type=Path)
     parser.add_argument("--tls-key", type=Path)
+    parser.add_argument("--opus", action="store_true", help="Requires the isolated patched SDK environment")
     args = parser.parse_args()
     if bool(args.tls_cert) != bool(args.tls_key):
         parser.error("TLS certificate and key must be supplied together")
-    asyncio.run(main(args.ready_file, args.tls_cert, args.tls_key))
+    asyncio.run(main(args.ready_file, args.tls_cert, args.tls_key, args.opus))

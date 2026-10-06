@@ -1,6 +1,7 @@
 package dev.quantumink.hermesgadget.protocol
 
 import java.io.ByteArrayOutputStream
+import java.util.Base64
 import kotlin.math.sqrt
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -52,7 +53,9 @@ data class ConversationState(
     val canAnswer: Boolean = false,
     val card: Card? = null,
     val picture: Picture? = null,
-    val level: Float = 0f
+    val level: Float = 0f,
+    val microphoneFormat: String = "pcm16",
+    val speakerFormat: String = "pcm16"
 ) {
     override fun toString(): String = "ConversationState(mode=" + mode + ", content=redacted)"
 }
@@ -60,9 +63,9 @@ data class ConversationState(
 sealed interface ConversationEffect {
     data class Send(val message: Message) : ConversationEffect
     data class SendBinary(val frame: BinaryFrame) : ConversationEffect
-    data class CaptureStart(val token: String) : ConversationEffect
+    data class CaptureStart(val token: String, val format: String = "pcm16") : ConversationEffect
     data object CaptureStop : ConversationEffect
-    data class PlaybackStart(val rate: Int) : ConversationEffect
+    data class PlaybackStart(val rate: Int, val opusHeader: ByteArray? = null) : ConversationEffect
     class PlaybackData(bytes: ByteArray) : ConversationEffect {
         val bytes = bytes.copyOf()
         override fun toString(): String = "PlaybackData(redacted)"
@@ -76,7 +79,24 @@ sealed interface ConversationEffect {
 /** One ordered event stream. All deadlines are monotonic milliseconds. No Android or disk state. */
 class Conversation(
     private val availableActions: Set<String> = WatchActions.names,
-    previousReply: String = ""
+    previousReply: String = "",
+    supportsOpus: Boolean = false,
+    private val microphoneFormats: Set<String> = if (supportsOpus) {
+        setOf(
+            "opus",
+            "pcm16"
+        )
+    } else {
+        setOf("pcm16")
+    },
+    private val speakerFormats: Set<String> = if (supportsOpus) {
+        setOf(
+            "opus",
+            "pcm16"
+        )
+    } else {
+        setOf("pcm16")
+    }
 ) {
     val busy: Boolean
         get() = upload != null || turn != null || state.mode == ConversationMode.THINKING ||
@@ -84,6 +104,8 @@ class Conversation(
     var state = ConversationState(reply = previousReply.take(32768))
         private set
     private var paired = false
+    private var microphoneFormat = "pcm16"
+    private var speakerFormat = "pcm16"
     private var turn: String? = null
     private var inputCounter = 0L
     private var upload: Upload? = null
@@ -94,12 +116,18 @@ class Conversation(
     private val actionsSeen = linkedSetOf<String>()
     private val actionsPending = linkedMapOf<String, Long>()
 
-    private class Upload(val token: String, val stream: Int, val started: Long) {
+    private class Upload(
+        val token: String,
+        val stream: Int,
+        val started: Long,
+        val format: String
+    ) {
         var sequence = 0
         var bytes = 0
         var meterAt = 0L
+        var headerSent = false
     }
-    private class Stream(val id: Int, var sequence: Int = 0)
+    private class Stream(val id: Int, var sequence: Int = 0, val format: String = "pcm16")
     private class ImageTransfer(
         val stream: Stream,
         val width: Int,
@@ -257,15 +285,21 @@ class Conversation(
                 }
                 "audio.start" -> {
                     playback = null
-                    require(
-                        message.int("rate") == 16000 &&
-                            (message.field("format") == null || message.string("format") == "pcm16")
-                    )
+                    val format = message.string("format") ?: "pcm16"
+                    require(message.int("rate") == 16000 && format == speakerFormat)
+                    val header = if (format == "opus") {
+                        require(message.int("frame_ms") == 20)
+                        val encoded = requireNotNull(message.string("opus_header"))
+                        require(encoded.length <= 88)
+                        OpusConfiguration.header(Base64.getDecoder().decode(encoded))
+                    } else {
+                        null
+                    }
                     if (!matchesTurn(message) || upload != null || state.prompt != null) {
                         listOf(ConversationEffect.PlaybackStop)
                     } else {
-                        playback = Stream(stream(message))
-                        listOf(ConversationEffect.PlaybackStart(16000))
+                        playback = Stream(stream(message), format = format)
+                        listOf(ConversationEffect.PlaybackStart(16000, header))
                     }
                 }
                 "audio.end", "audio.abort" -> {
@@ -301,7 +335,11 @@ class Conversation(
             val output = playback ?: return emptyList()
             if (frame.stream != output.id) return emptyList()
             if (frame.sequence != output.sequence || payload.isEmpty() || payload.size > 32000 ||
-                payload.size % 2 != 0
+                (output.format == "pcm16" && payload.size % 2 != 0) ||
+                (
+                    output.format == "opus" &&
+                        runCatching { OpusConfiguration.require20ms(payload) }.isFailure
+                    )
             ) {
                 playback = null
                 notice("Audio interrupted.", now)
@@ -351,7 +389,7 @@ class Conversation(
         if (!canInput() || upload != null) return emptyList()
         val token = "a" + ++inputCounter
         val stream = (inputCounter % 250 + 1).toInt()
-        upload = Upload(token, stream, now)
+        upload = Upload(token, stream, now, microphoneFormat)
         playback = null
         turn = null
         state =
@@ -363,17 +401,18 @@ class Conversation(
                 put("id", token)
                 put("stream", stream)
                 put("rate", 16000)
-                put("format", "pcm16")
+                put("format", microphoneFormat)
+                if (microphoneFormat == "opus") put("frame_ms", 20)
                 put("mode", "hold")
             },
-            ConversationEffect.CaptureStart(token),
+            ConversationEffect.CaptureStart(token, microphoneFormat),
             ConversationEffect.Haptic.LISTEN_START
         )
     }
 
     fun capture(token: String, bytes: ByteArray, now: Long): List<ConversationEffect> {
         val input = upload ?: return emptyList()
-        if (input.token != token) return emptyList()
+        if (input.token != token || input.format != "pcm16") return emptyList()
         if (bytes.size !in 2..640 ||
             bytes.size % 2 != 0
         ) {
@@ -389,8 +428,61 @@ class Conversation(
         return listOf(ConversationEffect.SendBinary(frame))
     }
 
-    fun finishRecording(now: Long): List<ConversationEffect> {
+    fun selectAudio(message: Message) {
+        val choices = message.field("audio") as? JsonObject
+        val audio = choices?.let { Message.create("audio", it) }
+        require(message.field("audio") == null || choices != null)
+        microphoneFormat = Protocol.selectedAudioFormat(audio?.string("mic"), microphoneFormats)
+        speakerFormat = Protocol.selectedAudioFormat(audio?.string("speaker"), speakerFormats)
+        state = state.copy(microphoneFormat = microphoneFormat, speakerFormat = speakerFormat)
+    }
+
+    fun codecHeader(token: String, header: ByteArray, now: Long): List<ConversationEffect> {
         val input = upload ?: return emptyList()
+        if (input.token != token || input.format != "opus" || input.headerSent) return emptyList()
+        if (runCatching {
+                OpusConfiguration.header(header)
+            }.isFailure
+        ) {
+            return cancelRecording(now, "Microphone codec failed.")
+        }
+        input.headerSent = true
+        return listOf(
+            send("audio.codec") {
+                put("stream", input.stream)
+                put("opus_header", Base64.getEncoder().encodeToString(header))
+            }
+        )
+    }
+
+    fun captureOpus(token: String, packet: ByteArray, now: Long): List<ConversationEffect> {
+        val input = upload ?: return emptyList()
+        if (input.token != token || input.format != "opus") return emptyList()
+        if (!input.headerSent ||
+            runCatching { OpusConfiguration.require20ms(packet) }.isFailure
+        ) {
+            return cancelRecording(now, "Microphone codec failed.")
+        }
+        if (input.bytes + 640 > 16000 * 2 * 60) return finishRecording(now)
+        input.bytes += 640
+        return listOf(
+            ConversationEffect.SendBinary(
+                BinaryFrame(BinaryFrame.AUDIO, input.stream, input.sequence++, packet)
+            )
+        )
+    }
+
+    fun captureLevel(token: String, pcm: ByteArray, now: Long) {
+        val input = upload ?: return
+        if (input.token == token && pcm.size <= 640 && now - input.meterAt >= 100) {
+            input.meterAt = now
+            state = state.copy(level = pcmLevel(pcm))
+        }
+    }
+
+    fun finishRecording(now: Long, token: String? = null): List<ConversationEffect> {
+        val input = upload ?: return emptyList()
+        if (token != null && input.token != token) return emptyList()
         if (input.bytes < 8000) return cancelRecording(now, "Recording too short.")
         upload = null
         state = state.copy(mode = ConversationMode.THINKING, level = 0f)

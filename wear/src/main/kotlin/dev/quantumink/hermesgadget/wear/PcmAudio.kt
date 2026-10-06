@@ -19,18 +19,28 @@ import kotlin.math.max
 class PcmCapture(private val context: Context) {
     private class Capture {
         val stopped = AtomicBoolean(false)
+        val finishing = AtomicBoolean(false)
 
         @Volatile var recorder: AudioRecord? = null
     }
     private var active: Capture? = null
 
     @Synchronized
-    fun start(onFrame: (ByteArray) -> Unit, onFailure: () -> Unit) {
+    fun start(
+        onFrame: (ByteArray) -> Unit,
+        onFailure: () -> Unit,
+        format: String = "pcm16",
+        onHeader: (ByteArray) -> Unit = {},
+        onLevel: (ByteArray) -> Unit = {},
+        onFinished: () -> Unit = {}
+    ) {
         stop()
         val capture = Capture()
         active = capture
         Thread({
+            var encoder: OpusEncoder? = null
             try {
+                if (format == "opus") encoder = OpusEncoder()
                 if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) !=
                     PackageManager.PERMISSION_GRANTED
                 ) {
@@ -56,24 +66,45 @@ class PcmCapture(private val context: Context) {
                 if (capture.stopped.get()) return@Thread
                 recorder.startRecording()
                 val bytes = ByteArray(640)
-                while (!capture.stopped.get()) {
+                while (!capture.stopped.get() && !capture.finishing.get()) {
                     val count = recorder.read(bytes, 0, bytes.size, AudioRecord.READ_BLOCKING)
                     if (count < 0) {
-                        if (!capture.stopped.get()) onFailure()
+                        if (!capture.stopped.get() && !capture.finishing.get()) onFailure()
                         break
                     }
-                    if (count > 0 && !capture.stopped.get()) onFrame(bytes.copyOf(count))
+                    if (count > 0 && !capture.stopped.get()) {
+                        val frame = bytes.copyOf(count)
+                        if (encoder == null) {
+                            onFrame(frame)
+                        } else {
+                            onLevel(frame)
+                            encoder.push(frame, onHeader, onFrame)
+                        }
+                    }
                 }
             } catch (_: Exception) {
                 if (!capture.stopped.get()) onFailure()
             } finally {
+                if (capture.finishing.get() && !capture.stopped.get()) {
+                    runCatching { encoder?.finish(onHeader, onFrame) }.onFailure { onFailure() }
+                }
+                encoder?.close()
                 capture.recorder?.let { recorder ->
                     runCatching { recorder.stop() }
                     recorder.release()
                 }
                 capture.recorder = null
+                if (capture.finishing.get() && !capture.stopped.get()) onFinished()
             }
         }, "watch-microphone").apply { isDaemon = true }.start()
+    }
+
+    @Synchronized
+    fun finish(): Boolean {
+        val capture = active ?: return false
+        capture.finishing.set(true)
+        capture.recorder?.let { runCatching { it.stop() } }
+        return true
     }
 
     @Synchronized
@@ -102,13 +133,16 @@ class PcmPlayback(context: Context, private val onInterrupted: () -> Unit) {
     private var active: Playback? = null
 
     @Synchronized
-    fun start(rate: Int) {
+    fun start(rate: Int, opusHeader: ByteArray? = null) {
         stop()
         require(rate == 16000)
+        val outputRate = if (opusHeader == null) rate else 48000
         val playback = Playback()
         active = playback
         Thread({
+            var decoder: OpusDecoder? = null
             try {
+                if (opusHeader != null) decoder = OpusDecoder(opusHeader)
                 val attributes = AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
@@ -128,15 +162,15 @@ class PcmPlayback(context: Context, private val onInterrupted: () -> Unit) {
                 if (playback.stopped.get()) return@Thread
                 check(manager.requestAudioFocus(focus) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
                 val minimum = AudioTrack.getMinBufferSize(
-                    rate,
+                    outputRate,
                     AudioFormat.CHANNEL_OUT_MONO,
                     AudioFormat.ENCODING_PCM_16BIT
                 )
-                check(minimum in 1..32000)
+                check(minimum in 1..96000)
                 val track = AudioTrack.Builder().setAudioAttributes(attributes)
                     .setAudioFormat(
                         AudioFormat.Builder().setSampleRate(
-                            rate
+                            outputRate
                         ).setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                             .setEncoding(AudioFormat.ENCODING_PCM_16BIT).build()
                     )
@@ -147,10 +181,25 @@ class PcmPlayback(context: Context, private val onInterrupted: () -> Unit) {
                 if (playback.stopped.get()) return@Thread
                 track.play()
                 var samples = 0L
+                fun writePcm(bytes: ByteArray) {
+                    var offset = 0
+                    while (offset < bytes.size && !playback.stopped.get()) {
+                        val count = track.write(
+                            bytes,
+                            offset,
+                            bytes.size - offset,
+                            AudioTrack.WRITE_BLOCKING
+                        )
+                        check(count > 0)
+                        offset += count
+                        samples += count / 2
+                    }
+                }
                 while (!playback.stopped.get()) {
                     when (val packet = playback.queue.poll(1, TimeUnit.SECONDS)) {
                         null -> Unit
                         Packet.End -> {
+                            decoder?.finish(::writePcm)
                             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
                             while (!playback.stopped.get() && System.nanoTime() < deadline &&
                                 (track.playbackHeadPosition.toLong() and 0xffffffffL) < samples
@@ -160,17 +209,12 @@ class PcmPlayback(context: Context, private val onInterrupted: () -> Unit) {
                             break
                         }
                         is Packet.Data -> {
-                            var offset = 0
-                            while (offset < packet.bytes.size && !playback.stopped.get()) {
-                                val count = track.write(
-                                    packet.bytes,
-                                    offset,
-                                    packet.bytes.size - offset,
-                                    AudioTrack.WRITE_BLOCKING
-                                )
-                                check(count > 0)
-                                offset += count
-                                samples += count / 2
+                            if (decoder ==
+                                null
+                            ) {
+                                writePcm(packet.bytes)
+                            } else {
+                                decoder.push(packet.bytes, ::writePcm)
                             }
                             playback.queuedBytes.addAndGet(-packet.bytes.size)
                         }
@@ -179,6 +223,7 @@ class PcmPlayback(context: Context, private val onInterrupted: () -> Unit) {
             } catch (_: Exception) {
                 if (!playback.stopped.get()) onInterrupted()
             } finally {
+                decoder?.close()
                 playback.stopped.set(true)
                 playback.track?.let { track ->
                     runCatching { track.stop() }

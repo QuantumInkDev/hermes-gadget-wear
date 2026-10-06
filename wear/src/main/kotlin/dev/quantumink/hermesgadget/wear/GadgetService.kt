@@ -38,7 +38,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -82,6 +84,8 @@ class GadgetService : Service() {
     private var brightness: ((Float?) -> Boolean)? = null
     private var destroyed = false
     private var savedIdentity: DeviceIdentity? = null
+
+    @Volatile private var opusReady = false
     private var advertisedActions: Set<String> = emptySet()
 
     override fun onCreate() {
@@ -104,6 +108,7 @@ class GadgetService : Service() {
             )
         )
         storage.execute {
+            opusReady = OpusSupport.probe()
             val restored = runCatching {
                 vault = IdentityVault(this)
                 val profile = vault.profile()
@@ -342,7 +347,7 @@ class GadgetService : Service() {
     }
 
     fun finishRecording() {
-        connection?.finishRecording()
+        if (!capture.finish()) connection?.finishRecording()
     }
     fun cancelRecording() {
         capture.stop()
@@ -396,6 +401,15 @@ class GadgetService : Service() {
         val actions = availableActions()
         advertisedActions = actions
         val caps = WatchActions.capabilities().toMutableMap()
+        if (opusReady) {
+            val formats = JsonArray(listOf(JsonPrimitive("opus"), JsonPrimitive("pcm16")))
+            listOf("mic", "speaker").forEach { name ->
+                (caps[name] as? JsonObject)?.let {
+                    caps[name] =
+                        JsonObject(it + ("formats" to formats))
+                }
+            }
+        }
         if (!packageManager.hasSystemFeature(PackageManager.FEATURE_MICROPHONE)) caps.remove("mic")
         if (!packageManager.hasSystemFeature(
                 PackageManager.FEATURE_AUDIO_OUTPUT
@@ -443,13 +457,25 @@ class GadgetService : Service() {
                             } else {
                                 val current = connection ?: return
                                 capture.start(
-                                    { bytes -> current.captured(effect.token, bytes) },
+                                    { bytes ->
+                                        if (effect.format ==
+                                            "opus"
+                                        ) {
+                                            current.capturedOpus(effect.token, bytes)
+                                        } else {
+                                            current.captured(effect.token, bytes)
+                                        }
+                                    },
                                     {
                                         current.captureFailed(
                                             effect.token,
                                             getString(R.string.capture_failed)
                                         )
-                                    }
+                                    },
+                                    format = effect.format,
+                                    onHeader = { current.codecHeader(effect.token, it) },
+                                    onLevel = { current.captureLevel(effect.token, it) },
+                                    onFinished = { current.finishRecording(effect.token) }
                                 )
                             }
                         }
@@ -466,7 +492,7 @@ class GadgetService : Service() {
                         is ConversationEffect.PlaybackStart -> if (visible ||
                             foreground
                         ) {
-                            playback.start(effect.rate)
+                            playback.start(effect.rate, effect.opusHeader)
                         }
                         is ConversationEffect.PlaybackData -> playback.offer(effect.bytes)
                         ConversationEffect.PlaybackFinish -> playback.finish()
