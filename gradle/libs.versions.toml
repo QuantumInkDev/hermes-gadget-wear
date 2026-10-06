@@ -15,6 +15,10 @@ android-test-runner = "1.7.0"
 android-test-junit = "1.3.0"
 play-services-wearable = "20.0.1"
 fragment = "1.8.9"
+wear-tiles = "1.6.2"
+wear-protolayout = "1.4.2"
+wear-complications = "1.3.0"
+concurrent = "1.3.0"
 
 [libraries]
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
@@ -37,6 +41,12 @@ android-test-junit = { module = "androidx.test.ext:junit", version.ref = "androi
 play-services-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "play-services-wearable" }
 
 fragment = { module = "androidx.fragment:fragment", version.ref = "fragment" }
+
+wear-tiles = { module = "androidx.wear.tiles:tiles", version.ref = "wear-tiles" }
+wear-protolayout = { module = "androidx.wear.protolayout:protolayout", version.ref = "wear-protolayout" }
+wear-complications = { module = "androidx.wear.watchface:watchface-complications-data-source-ktx", version.ref = "wear-complications" }
+
+concurrent-futures = { module = "androidx.concurrent:concurrent-futures", version.ref = "concurrent" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

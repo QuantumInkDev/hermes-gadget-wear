@@ -82,4 +82,6 @@
     <string name="no_imports">No saved phone setup is available.</string>
     <string name="remove_profile">Remove active profile</string>
     <string name="remove_warning">Forget this profile’s settings and cached pet on the watch. Its pairing identity is retained for re-adding the same URL. This does not revoke server enrollment or remove the phone’s voice key.</string>
+    <string name="tile_name">Ask Hermes</string>
+    <string name="complication_name">Hermes state</string>
 </resources>

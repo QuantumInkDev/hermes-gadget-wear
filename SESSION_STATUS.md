@@ -20,6 +20,23 @@ M6 phone BYOK shared/per-endpoint vault, quota checks, native Opus/PCM streaming
 
 M6 `ac329d1` CI passed all jobs. M7 v1 encrypted endpoint catalog, independent keys, migration/removal, phone setup/import review and media teardown are implemented. Strict checks passed with 56 JVM tests, zero failures/errors/skips. Actual two-stock-server tests, five owned-watch vault tests, one owned-phone vault test and actual watch-service switching during recording/reply clearing/reconnect/removal passed. Actual Data Layer import, swipe/rotary and physical profile media remain open. See docs/profiles-v2.md; v2 remains proposal-only.
 
-CONTINUE HERE: M8 surfaces/release prep. The maintainer authorizes advancement with open hardware gates. Do not mark Ultra throughput/STT/quality/battery or actual Data Layer complete. Multiplexed gateway v2 remains proposal-only pending explicit DECISION and upstream-maintainer feedback; no maintainer messages have been authorized.
+M7 `009b174` CI passed all jobs. M8 watch Tile, generic complication, sparse ambient outline,
+compact conversation controls, service-owned drafts and foreground release after turn/audio
+are implemented. Strict checks, both debug/instrumentation APKs and both unsigned release
+bundles passed with 56 JVM tests and zero failures/errors/skips. Eleven owned-watch device
+tests passed (six vault, two surfaces, lifecycle, draft, profile); final compact-layout draft
+regression passed again. Actual Tile render/tap/process-death excerpt, system ambient/wake and
+normal/1.3 font captures are in docs/demo/m8/. Official bundletool 1.18.3 validated both unsigned
+bundles; package/SDK/standalone/version codes/signing absence were inspected. CI publishes
+review bundles and debug apps. Original store art and privacy/Data Safety/listing/signing
+checklists are prepared. No signing credentials or Play upload access was supplied.
+
+CONTINUE HERE: real-device/publisher gates in docs/release.md. M8 is software verified, not
+battery or Play accepted. Test real relay/Data Layer, profile sync/background/VPN, actual
+provider voice/billing, physical Ultra audio/STT/legibility/pet/ambient power, Tile/complication
+and button mapping; then supply signing/publisher/privacy/Play setup and perform internal-track
+installation. Do not deploy the optional server patches into live Hermes without their review.
+
+The maintainer authorizes advancement with open hardware gates. Do not mark Ultra throughput/STT/quality/battery or actual Data Layer complete. Multiplexed gateway v2 remains proposal-only pending explicit DECISION and upstream-maintainer feedback; no maintainer messages have been authorized.
 
 Physical pairing approval was already fulfilled. Private ADB/settings/captures remain ignored; screen timeout was restored. Use only the owned Hermes test AVD for local checks and exact serials. Existing unrelated AVDs remain untouched. The public demo uses synthetic data and original procedural artwork. No PR has been created.

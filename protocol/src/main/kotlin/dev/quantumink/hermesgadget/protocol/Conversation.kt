@@ -45,6 +45,7 @@ class Picture(val width: Int, val height: Int, pixels: ByteArray, val expiresAt:
 
 data class ConversationState(
     val mode: ConversationMode = ConversationMode.READY,
+    val busy: Boolean = false,
     val reply: String = "",
     val transcript: String = "",
     val status: String = "",

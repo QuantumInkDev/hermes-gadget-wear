@@ -16,7 +16,7 @@ Corrections to the brief: `linux/client.py` now hosts the native C++ core throug
 | `server` | Index of proposed upstream patch series | No replacement stock server or hidden private fork |
 | `tools` | Pinned upstream setup and devserver integration helpers, later companion-sheet tooling | Private runtime files under ignored `.local` |
 
-Both Android artifacts use application ID `dev.quantumink.hermesgadget` and must share a signing certificate for the Data Layer; namespaces distinguish watch and phone code. Watch minimum API 33 (Wear OS 4), phone minimum API 29, compile/target API 37. The [current Play policy](https://developer.android.com/google/play/requirements/target-sdk) requires API 36 for phone submissions and at least API 35 for Wear submissions; re-check at M8. No release signing credentials are committed. Starter apps declare themselves dependent until usable standalone transport exists.
+Both Android artifacts use application ID `dev.quantumink.hermesgadget` and must share a signing certificate for the Data Layer; namespaces distinguish watch and phone code. Watch minimum API 33 (Wear OS 4), phone minimum API 29, compile/target API 37. The [current Play policy](https://developer.android.com/google/play/requirements/target-sdk) requires API 36 for phone submissions and at least API 35 for Wear submissions; verified again on 2026-10-06 for M8. No release signing credentials are committed. The watch now declares standalone because direct transport is usable without the phone.
 
 ## Protocol and state ownership
 
@@ -158,3 +158,30 @@ profile-scoped stores, authorization and lifecycle, which the stock root plugin 
 provide. Document the wire and migration questions; implementation and outreach wait for
 an explicit maintainer decision and upstream feedback. Real multiplexed behavior cannot be
 claimed from independent v1 endpoints or unit tests.
+
+## M8 design plan
+
+Tile and short-text complication expose a local snapshot and launch the app; they never
+open sockets, start a microphone or synthesize speech in the background. Connection/pet
+state is process-local and becomes Offline after process death. An encrypted, bounded
+120-character last-reply excerpt survives process death for the active endpoint's Tile;
+it is isolated on profile switch and cleared by whole reset. A complication
+shares only generic state with the selected watch face, never reply text, URLs or keys.
+Update on meaningful state changes with throttling; no periodic network polling.
+
+Ambient replaces the interactive composition with a static sparse monochrome outline of
+the current pet's idle frame (procedural robot if absent), with a minute tick pixel shift
+only when the system is not already providing burn-in shifting.
+No pet animation, mic gesture, haptics or reply text remains in ambient. Respect low-bit
+anti-aliasing constraints and keep the outline within the round safe area. Existing idle
+connection timeouts remain; entering ambient cancels capture. Only a user-started active
+conversation/playback may retain a foreground service, and it is released after the turn
+and actual audio drain, not kept for a ready idle screen. No wake lock or boot autoconnect.
+
+Release prep produces unsigned release app bundles, dependency/build evidence, a synthetic
+round-screen capture set, privacy/Data Safety drafts, self-host/Quick Button instructions
+and an explicit hardware/release checklist. It does not invent a signing identity, publish
+a privacy URL or upload to a Play account. The internal track, Ultra battery/quality tests,
+real relay/import/BYOK and Play review remain gates until their prerequisites are available.
+The pinned AndroidX Tiles/ProtoLayout/complication APIs and official ambient guidance were
+checked against current primary documentation before implementation.

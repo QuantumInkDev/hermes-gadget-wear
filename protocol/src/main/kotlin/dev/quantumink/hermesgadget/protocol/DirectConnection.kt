@@ -550,7 +550,7 @@ class DirectConnection(
 
     private fun publish() {
         if (stopped.get()) return
-        state = state.copy(conversation = conversation.state)
+        state = state.copy(conversation = conversation.state.copy(busy = conversation.busy))
         if (state != published) {
             published = state
             observer.stateChanged(state)

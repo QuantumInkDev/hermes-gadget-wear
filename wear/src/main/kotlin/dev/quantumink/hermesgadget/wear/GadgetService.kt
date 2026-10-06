@@ -36,10 +36,12 @@ import dev.quantumink.hermesgadget.protocol.WatchActions
 import java.net.Proxy
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -55,12 +57,14 @@ data class WatchState(
     val loading: Boolean = true,
     val saving: Boolean = false,
     val setupError: String = "",
+    val draft: String = "",
     val path: TransportPath = TransportPath.DIRECT,
     val selecting: Boolean = false,
     val transportNotice: String = "",
     val pet: PetAtlas? = null,
     val petCue: String = "",
     val speaking: Boolean = false,
+    val speechPending: Boolean = false,
     val playbackLevel: Float = 0f,
     val haptic: Long = 0
 ) {
@@ -75,6 +79,12 @@ class GadgetService : Service() {
     private val mutableState = MutableStateFlow(WatchState())
     val state: StateFlow<WatchState> = mutableState.asStateFlow()
     private val main = Handler(Looper.getMainLooper())
+    private val surfaceScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate
+    )
+    private var lastSavedSurface: Triple<String, String, String>? = null
+
+    @Volatile private var textEditing = false
     private val storage = Executors.newSingleThreadExecutor()
     private val transportWorker = Executors.newSingleThreadExecutor()
     private val selectionEpoch = AtomicLong()
@@ -118,7 +128,10 @@ class GadgetService : Service() {
             this,
             onInterrupted = { connection?.report("Playback interrupted.") },
             onLevel = { level -> mutableState.update { it.copy(playbackLevel = level) } },
-            onFinished = { mutableState.update { it.copy(speaking = false, playbackLevel = 0f) } }
+            onFinished = {
+                mutableState.update { it.copy(speaking = false, playbackLevel = 0f) }
+                main.post { releaseIdleForeground() }
+            }
         )
         val notifications = getSystemService(NotificationManager::class.java)
         notifications.createNotificationChannel(
@@ -135,6 +148,36 @@ class GadgetService : Service() {
                 NotificationManager.IMPORTANCE_DEFAULT
             )
         )
+        surfaceScope.launch {
+            mutableState.collect { watch ->
+                WatchSurfaces.publish(this@GadgetService, watch)
+                val profile = watch.profile
+                if (profile != null && !watch.connection.conversation.busy &&
+                    watch.connection.conversation.reply.isNotEmpty()
+                ) {
+                    val snapshot = Triple(
+                        profile.endpoint.url,
+                        profile.label,
+                        watch.connection.conversation.reply.take(120)
+                    )
+                    if (snapshot != lastSavedSurface && !watch.loading && !watch.saving) {
+                        lastSavedSurface = snapshot
+                        val version = epoch.get()
+                        storage.execute {
+                            if (version == epoch.get() && ::vault.isInitialized) {
+                                runCatching {
+                                    vault.saveSurface(
+                                        profile.endpoint,
+                                        profile.label,
+                                        snapshot.third
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         storage.execute {
             opusReady = OpusSupport.probe()
             val restored = runCatching {
@@ -196,7 +239,7 @@ class GadgetService : Service() {
         brightness = null
         capture.stop()
         connection?.cancelRecording()
-        if (!foreground) disconnect()
+        if (!foreground && !textEditing) disconnect()
     }
 
     fun save(
@@ -433,22 +476,54 @@ class GadgetService : Service() {
         brightness?.invoke(null)
     }
 
+    fun updateDraft(value: String) {
+        mutableState.update { it.copy(draft = value.take(4096)) }
+    }
+
     fun text(value: String, completed: (Boolean) -> Unit) {
+        val version = epoch.get()
         val active = connection
         if (visible && mutableState.value.connection.status == ConnectionStatus.PAIRED &&
             mutableState.value.connection.conversation.prompt == null && active != null &&
             beginForeground(false)
         ) {
             active.text(value).whenComplete { accepted, failure ->
-                main.post { completed(failure == null && accepted == true) }
+                main.post {
+                    releaseIdleForeground()
+                    completed(
+                        version == epoch.get() && active === connection &&
+                            failure == null && accepted == true
+                    )
+                }
             }
         } else {
             completed(false)
         }
     }
 
-    fun prepareTextInput(): Boolean = visible &&
-        mutableState.value.connection.status == ConnectionStatus.PAIRED && beginForeground(false)
+    fun prepareTextInput(): Boolean {
+        textEditing = visible && mutableState.value.connection.status == ConnectionStatus.PAIRED
+        return textEditing
+    }
+    fun finishTextInput() {
+        textEditing = false
+    }
+    fun enterAmbient() {
+        cancelRecording()
+        brightness?.invoke(null)
+        releaseIdleForeground()
+    }
+
+    private fun releaseIdleForeground() {
+        main.postDelayed({
+            if (destroyed || !foreground) return@postDelayed
+            val watch = mutableState.value
+            if (!watch.connection.conversation.busy && !watch.speaking && !watch.speechPending) {
+                endForeground()
+                if (!visible) disconnect()
+            }
+        }, 750)
+    }
 
     fun startRecording() {
         if (!visible || mutableState.value.connection.status != ConnectionStatus.PAIRED ||
@@ -489,7 +564,10 @@ class GadgetService : Service() {
         closeConnection()
         mutableState.update { it.copy(saving = true) }
         storage.execute {
-            val result = runCatching { IdentityVault(this).reset() }
+            val result = runCatching {
+                IdentityVault(this).reset()
+                petCache.reset()
+            }
             main.post {
                 if (destroyed) return@post
                 mutableState.value = if (result.isSuccess) {
@@ -632,6 +710,7 @@ class GadgetService : Service() {
                             }
                         }
                     }
+                    main.post { if (version == epoch.get()) releaseIdleForeground() }
                     if (state.status in setOf(ConnectionStatus.OFFLINE, ConnectionStatus.ERROR)) {
                         main.post {
                             if (version == epoch.get()) {
@@ -643,9 +722,15 @@ class GadgetService : Service() {
                 }
                 override fun effect(effect: ConversationEffect, generation: Long) {
                     if (version != epoch.get()) return
-                    if (effect == ConversationEffect.PlaybackStop) speechEngine?.stop()
+                    if (effect == ConversationEffect.PlaybackStop) {
+                        speechEngine?.stop()
+                    }
                     if (effect is ConversationEffect.ClientSpeak) {
                         if (visible || foreground) {
+                            synchronized(mediaLock) {
+                                if (version != epoch.get()) return
+                                mutableState.update { it.copy(speechPending = true) }
+                            }
                             speechEngine?.speak(
                                 effect.id,
                                 effect.text,
@@ -654,7 +739,9 @@ class GadgetService : Service() {
                                     synchronized(mediaLock) {
                                         if (version == epoch.get()) {
                                             playback.start(16000, header)
-                                            mutableState.update { it.copy(speaking = true) }
+                                            mutableState.update {
+                                                it.copy(speaking = true, speechPending = false)
+                                            }
                                         }
                                     }
                                 },
@@ -665,12 +752,16 @@ class GadgetService : Service() {
                                 },
                                 {
                                     synchronized(mediaLock) {
-                                        if (version == epoch.get()) playback.finish()
+                                        if (version == epoch.get()) {
+                                            mutableState.update { it.copy(speechPending = false) }
+                                            playback.finish()
+                                        }
                                     }
                                 },
                                 {
                                     synchronized(mediaLock) {
                                         if (version == epoch.get()) {
+                                            mutableState.update { it.copy(speechPending = false) }
                                             playback.stop()
                                             connection?.report(
                                                 getString(R.string.client_speech_failed)
@@ -732,6 +823,7 @@ class GadgetService : Service() {
                             is ConversationEffect.PlaybackData -> playback.offer(effect.bytes)
                             ConversationEffect.PlaybackFinish -> playback.finish()
                             ConversationEffect.PlaybackStop -> {
+                                mutableState.update { it.copy(speechPending = false) }
                                 playback.stop()
                             }
                             is ConversationEffect.PetCue -> petCue(effect.mode, version)
@@ -757,6 +849,7 @@ class GadgetService : Service() {
         mutableState.update {
             it.copy(
                 profile = profile,
+                draft = if (sameEndpoint) it.draft else "",
                 connection = ConnectionState(
                     conversation = ConversationState(reply = previousReply)
                 ),
@@ -915,7 +1008,9 @@ class GadgetService : Service() {
         epoch.incrementAndGet()
         speech?.close()
         speech = null
+        textEditing = false
         synchronized(mediaLock) {
+            mutableState.update { it.copy(speechPending = false) }
             capture.stop()
             playback.stop()
         }
@@ -930,6 +1025,14 @@ class GadgetService : Service() {
     override fun onDestroy() {
         destroyed = true
         closeConnection()
+        WatchSurfaces.publish(
+            this,
+            mutableState.value.copy(
+                connection = mutableState.value.connection.copy(status = ConnectionStatus.OFFLINE)
+            ),
+            force = true
+        )
+        surfaceScope.cancel()
         main.removeCallbacksAndMessages(null)
         storage.shutdownNow()
         petWorker.shutdownNow()

@@ -104,6 +104,44 @@ Validation: strict full build/check and both app/instrumentation APKs passed; 56
 
 Demo note: synthetic localhost profiles only; personal setup is unchanged. Actual Data Layer setup import, rotary/horizontal-swipe interaction and personal-profile pet/voice remain hardware gates. [V1 usage and v2 proposal](profiles-v2.md) document the gateway boundaries. V2 is not implemented or verified; explicit DECISION and upstream feedback are still required. M6 `ac329d1` [CI](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37476564998) passed all jobs.
 
+## M8 software and release preparation — 2026-10-06
+
+Implemented a local-only launch Tile with an encrypted 120-character last-reply excerpt,
+a generic short-text complication, and Compose ambient mode with a sparse monochrome pet
+outline and minute clock. Surface updates coalesce meaningfully at a two-second limit;
+there is no background network polling or microphone initiation. Ambient observes pet changes,
+not audio levels, stops capture and respects low-bit/system burn-in behavior. Unsent drafts
+are service-owned memory, preserved across ambient/reconnect and cleared for a new endpoint.
+The main conversation groups the pet/status and speaking hint compactly so typing is visible.
+
+Foreground lifetime now follows protocol turn activity and actual playback drain, including
+pending phone speech. Idle ready screens release the service. Playback callbacks are guarded
+against an older stream clearing a newer stream's state. Whole Reset clears pet storage;
+removing the active profile clears its encrypted surface excerpt without rotating enrollment.
+
+Validation: strict full checks, both debug/instrumentation APK builds and both release bundles
+passed; 56 JVM tests, zero failures/errors/skips. Eleven owned-watch instrumentation tests
+passed across six vault/surface-storage checks, two outline/Tile/complication checks, one actual
+stock-SDK foreground/ambient-capture check, the offline-draft regression and actual two-profile
+media/switch/reconnect/removal. The draft regression passed again on the final compact layout.
+Actual system Tile render/tap, process-death cached excerpt, sleep/ambient/wake and default/1.3
+font captures passed. See the [synthetic demo](demo/m8/README.md). A complication provider
+payload is verified; selecting it on a physical watch face is not yet verified.
+
+Both unsigned release app bundles passed official bundletool 1.18.3 validation and manifest
+inspection: matching package ID, distinct Wear/phone version codes, target API 37, correct
+minimum APIs, Wear standalone=true, no debug flag or signing records. CI now builds/uploads
+unsigned review bundles separately from debug APKs. Optional private signing configuration
+is ignored; no key was created and no Play upload was made. Original 512×512 icon and
+1024×500 feature graphic, privacy/Data Safety/listing drafts, setup/Ultra button instructions,
+and a bounded reconnect-outbox proposal are prepared.
+
+Demo note: only owned synthetic emulators and stock test servers were operated; the personal
+watch and live Hermes remain unchanged. Ultra battery/PCM-versus-Opus speech/quality, real
+Data Layer/VPN/background relay and import, paid provider output/billing, physical complication
+and button mapping, publisher/privacy hosting, signing and Play internal-track installation
+remain acceptance gates. M7 `009b174` [CI](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37478273116) passed all jobs.
+
 ## Milestones
 
 Maintainer voice demo — 2026-10-06: the maintainer reports that the physical watch successfully asked about the weather, received an answer, and played the profile's ElevenLabs voice. This verifies a real hold-to-talk/STT/reply/playback path by maintainer report; no bitrate, STT comparison, battery, or audio-quality measurement is inferred. They described the flow as clunky and authorized advancing the remaining phases while away from the home network. The core M2 conversation demo has passed; the remaining physical media/action, permission, lifecycle, and quality matrix stays open. Phase implementation may advance in sequence under that authorization, with unverified milestone acceptance kept explicit.
@@ -118,6 +156,6 @@ Maintainer voice demo — 2026-10-06: the maintainer reports that the physical w
 | M5: Pets and companion-sheet tooling | Software/emulator verified; real profile/Ultra gate open |
 | M6: Client BYOK TTS | Software/emulator verified; provider/Data Layer gate open |
 | M7: Multi-endpoint profiles and v2 proposal | V1 software/emulator verified; sync/hardware open; v2 proposal only |
-| M8: Tile, complication, ambient, battery, internal testing | Not started |
+| M8: Tile, complication, ambient, battery, internal testing | Software/emulator and unsigned bundles verified; Ultra battery/signing/Play gates open |
 
-Next: M8 watch surfaces and release preparation. Keep M2/M3 hardware gates open while the maintainer is away. Relay TLS and direct cleartext decisions are resolved. Multiplexed gateway v2 remains proposal-only pending decision and upstream feedback.
+Next: execute the real-device and publisher checklist in [release preparation](release.md). Keep all recorded hardware gates open while the maintainer is away. Relay TLS and direct cleartext decisions are resolved. Multiplexed gateway v2 remains proposal-only pending decision and upstream feedback.

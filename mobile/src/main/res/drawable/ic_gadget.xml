@@ -1,6 +1,6 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="48dp" android:height="48dp"
-    android:viewportWidth="48" android:viewportHeight="48">
-    <path android:fillColor="#11170F" android:pathData="M0,0h48v48h-48z" />
-    <path android:fillColor="#B6ED93" android:pathData="M12,12h6v9h12v-9h6v24h-6v-9h-12v9h-6z" />
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <!-- Original sample robot, consistent with procedural store art. -->
+    <path android:fillColor="#11170F" android:pathData="M0,0H48V48H0Z" />
+    <path android:fillColor="#FFBA66" android:pathData="M10,12H38V36H10Z M23,6H25V12H23Z M22,5H26V8H22Z" />
+    <path android:fillColor="#11170F" android:pathData="M15,19H19V23H15Z M29,19H33V23H29Z M19,29H29V31H19Z" />
 </vector>

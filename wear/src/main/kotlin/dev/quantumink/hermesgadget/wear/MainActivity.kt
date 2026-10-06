@@ -14,11 +14,22 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.wear.compose.foundation.AmbientMode
+import androidx.wear.compose.foundation.AmbientTickEffect
+import androidx.wear.compose.foundation.LocalAmbientModeManager
+import androidx.wear.compose.foundation.rememberAmbientModeManager
 import androidx.wear.compose.material3.MaterialTheme
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 class MainActivity : ComponentActivity() {
     private var gadget by mutableStateOf<GadgetService?>(null)
@@ -60,27 +71,53 @@ class MainActivity : ComponentActivity() {
                 true
             }
         )
+        if (current.state.value.profile != null && !current.state.value.loading) requestConnection()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
-                val service = gadget
-                if (service == null) {
-                    WaitingScreen()
-                } else {
-                    WatchScreen(
-                        service = service,
-                        connect = ::requestConnection,
-                        startRecording = ::requestRecording,
-                        permissions = {
-                            startActivity(
-                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                                    .setData(Uri.fromParts("package", packageName, null))
-                            )
+            val ambientManager = rememberAmbientModeManager()
+            CompositionLocalProvider(LocalAmbientModeManager provides ambientManager) {
+                MaterialTheme {
+                    val ambient = ambientManager.currentAmbientMode as? AmbientMode.Ambient
+                    var minute by remember {
+                        mutableLongStateOf(System.currentTimeMillis() / 60000)
+                    }
+                    ambientManager.AmbientTickEffect { minute = System.currentTimeMillis() / 60000 }
+                    LaunchedEffect(ambient != null, gadget) {
+                        if (ambient != null) {
+                            gadget?.enterAmbient()
+                            minute = System.currentTimeMillis() / 60000
                         }
-                    )
+                    }
+                    val service = gadget
+                    if (service == null) {
+                        WaitingScreen()
+                    } else if (ambient != null) {
+                        val pets = remember(service) {
+                            service.state.map { it.pet }.distinctUntilChanged()
+                        }
+                        val pet by pets.collectAsStateWithLifecycle(initialValue = null)
+                        AmbientPet(
+                            pet,
+                            minute,
+                            ambient.isLowBitAmbientSupported,
+                            ambient.isBurnInProtectionRequired
+                        )
+                    } else {
+                        WatchScreen(
+                            service = service,
+                            connect = ::requestConnection,
+                            startRecording = ::requestRecording,
+                            permissions = {
+                                startActivity(
+                                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                        .setData(Uri.fromParts("package", packageName, null))
+                                )
+                            }
+                        )
+                    }
                 }
             }
         }

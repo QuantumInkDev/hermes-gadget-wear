@@ -26,13 +26,21 @@ jobs:
       - name: Prepare optional extension integration server
         run: python3 tools/setup-extensions.py
       - name: Build, test, lint, and format check
-        run: HERMES_GADGET_PYTHON="$PWD/.local/venv/bin/python" HERMES_GADGET_EXTENSION_PYTHON="$PWD/.local/extension-venv/bin/python" ./gradlew check :wear:assembleDebug :wear:assembleDebugAndroidTest :mobile:assembleDebug :mobile:assembleDebugAndroidTest --warning-mode=fail
+        run: HERMES_GADGET_PYTHON="$PWD/.local/venv/bin/python" HERMES_GADGET_EXTENSION_PYTHON="$PWD/.local/extension-venv/bin/python" ./gradlew check :wear:assembleDebug :wear:assembleDebugAndroidTest :mobile:assembleDebug :mobile:assembleDebugAndroidTest :wear:bundleRelease :mobile:bundleRelease --warning-mode=fail
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: debug-apps
           path: |
             wear/build/outputs/apk/debug/*.apk
             mobile/build/outputs/apk/debug/*.apk
+          retention-days: 7
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: unsigned-review-bundles
+          path: |
+            wear/build/outputs/bundle/release/*.aab
+            mobile/build/outputs/bundle/release/*.aab
           retention-days: 7
 
   extensions:

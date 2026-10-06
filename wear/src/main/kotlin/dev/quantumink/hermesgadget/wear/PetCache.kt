@@ -25,6 +25,10 @@ class PetCache(context: Context) {
     private fun directory(endpoint: String) =
         File(root, hash(endpoint.toByteArray())).apply { mkdirs() }
 
+    @Synchronized fun reset() {
+        check(!root.exists() || root.deleteRecursively())
+    }
+
     @Synchronized fun remove(endpoint: String) {
         val file = File(root, hash(endpoint.toByteArray()))
         check(!file.exists() || file.deleteRecursively())

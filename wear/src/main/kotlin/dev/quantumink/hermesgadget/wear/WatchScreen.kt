@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -96,7 +97,9 @@ fun WatchScreen(
     var editing by remember { mutableStateOf<EndpointProfile?>(null) }
     var newProfile by remember { mutableStateOf(false) }
     var imported by remember { mutableStateOf(false) }
-    var textDraft by remember(watch.profile?.endpoint?.url) { mutableStateOf("") }
+    val textDraft = watch.draft
+    val editingText = route == "text"
+    DisposableEffect(editingText) { onDispose { if (editingText) service.finishTextInput() } }
     val feedback = LocalHapticFeedback.current
     var haptic by remember { mutableLongStateOf(watch.haptic) }
     LaunchedEffect(watch.loading, watch.profile?.endpoint?.url) {
@@ -229,13 +232,13 @@ fun WatchScreen(
         )
         route == "text" -> TextPage(
             text = textDraft,
-            changed = { textDraft = it.take(4096) },
+            changed = service::updateDraft,
             connection = watch.connection,
             connect = connect,
             send = { value, completed ->
                 service.text(value) { accepted ->
                     if (accepted) {
-                        if (textDraft == value) textDraft = ""
+                        if (service.state.value.draft == value) service.updateDraft("")
                         route = "home"
                     }
                     completed(accepted)
@@ -485,7 +488,6 @@ private fun ConversationPage(
         }
     }
     RoundPage(gesture.then(swipe)) {
-        item { PetView(watch) }
         if (prompt != null) {
             item { Heading(stringResource(R.string.approval)) }
             item { Body(prompt.title) }
@@ -511,13 +513,30 @@ private fun ConversationPage(
             }
         } else {
             item {
-                Text(
-                    watch.profile?.label.orEmpty(),
-                    color = Accent,
-                    style = MaterialTheme.typography.labelMedium
-                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    PetView(watch, compact = true)
+                    Column(
+                        Modifier.weight(1f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            watch.profile?.label.orEmpty(),
+                            color = Accent,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 2
+                        )
+                        Text(
+                            stringResource(title),
+                            style = MaterialTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
             }
-            item { Heading(stringResource(title)) }
             if (connection.status == ConnectionStatus.PAIRING) {
                 item {
                     Heading(
@@ -533,18 +552,6 @@ private fun ConversationPage(
                     }
                 }
             } else if (paired) {
-                item {
-                    Body(
-                        stringResource(
-                            if (connection.clientSpeech) {
-                                R.string.phone_speech
-                            } else {
-                                R.string.server_speech
-                            }
-                        ),
-                        muted = true
-                    )
-                }
                 if (conversation.mode in
                     setOf(ConversationMode.READY, ConversationMode.LISTENING)
                 ) {
@@ -557,7 +564,7 @@ private fun ConversationPage(
                                 R.string.start_recording
                             }
                         )
-                        Box(
+                        Row(
                             Modifier.fillMaxWidth().semantics {
                                 role = Role.Button
                                 contentDescription = actionLabel
@@ -566,23 +573,19 @@ private fun ConversationPage(
                                     true
                                 }
                             },
-                            contentAlignment = Alignment.Center
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             VoiceMark(conversation.level, listening)
-                        }
-                    }
-                    item {
-                        Body(
-                            stringResource(
-                                if (conversation.mode ==
-                                    ConversationMode.LISTENING
-                                ) {
-                                    R.string.release_send
-                                } else {
-                                    R.string.hold_talk
-                                }
+                            Text(
+                                stringResource(
+                                    if (listening) R.string.release_send else R.string.hold_talk
+                                ),
+                                Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 2
                             )
-                        )
+                        }
                     }
                 }
                 if (conversation.status.isNotEmpty()) {
@@ -634,6 +637,18 @@ private fun ConversationPage(
                             R.string.direct_tls
                         } else {
                             R.string.direct_private
+                        }
+                    ),
+                    muted = true
+                )
+            }
+            item {
+                Body(
+                    stringResource(
+                        if (connection.clientSpeech) {
+                            R.string.phone_speech
+                        } else {
+                            R.string.server_speech
                         }
                     ),
                     muted = true
@@ -762,7 +777,7 @@ private fun Input(
 
 @Composable
 private fun VoiceMark(level: Float, listening: Boolean) {
-    Canvas(Modifier.size(64.dp)) {
+    Canvas(Modifier.size(48.dp)) {
         drawCircle(Accent.copy(alpha = 0.18f), style = Stroke(3.dp.toPx()))
         drawCircle(
             Accent,

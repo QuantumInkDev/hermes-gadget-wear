@@ -1,49 +1,83 @@
 # Hermes Gadget for Wear OS
 
-A Wear OS watch app and Android phone companion for talking to your own Hermes agent, approving prompts, and seeing your profile's pet on your wrist.
+A Wear OS watch app and Android phone companion for talking to your own Hermes agent,
+answering approval prompts, and seeing your profile's pet on your wrist. There is no
+project-hosted conversation backend, account, analytics or advertising.
 
-**Status:** M0 and M1 are complete. M2 direct mode is implemented and verified against the stock SDK and a round watch emulator: pairing, typed replies, PCM capture/playback, prompts, cards, images, and supported device actions. The physical Watch Ultra / real-Hermes demo remains open. See the [synthetic watch demo](docs/demo/m2/README.md).
+**Status:** M0/M1 are complete; the core M2 real-Hermes Ultra conversation passed.
+M3–M7 software and emulator checks are recorded in [progress](docs/progress.md).
+M8 adds watch shortcuts, ambient rendering and release preparation. Actual phone/watch
+Data Layer, off-network relay, provider output, the remaining Ultra quality/battery matrix
+and Play internal testing remain acceptance gates. An unsigned bundle is not a Play release.
 
-The initial target is the Samsung Galaxy Watch Ultra, with support planned for Wear OS 4+ devices. The app will connect to user-configured Hermes servers, using a phone relay by default or a direct WebSocket connection when configured. There is no hosted backend or analytics service planned.
+Hold to speak, release to send, swipe up to cancel, or type a message. Save independently
+paired endpoint profiles. Direct connections validate TLS; private LAN/tailnet `ws` requires
+explicit per-endpoint consent. The phone relay forwards watch-owned TLS bytes and requires
+`wss`. Connection failure never silently downgrades TLS or replays input. Optional server
+extensions add Opus, pets and phone BYOK voice; stock SDK v0.2.0 remains supported.
 
-## Project brief
+## Documentation
 
-The [project brief](docs/hermes-gadget-wear-prompt.md) defines the requirements, upstream sources, acceptance criteria, and milestones. [Progress](docs/progress.md) records what has actually been delivered.
+Start with the [self-host and watch setup guide](docs/self-host.md).
+The [brief](docs/hermes-gadget-wear-prompt.md), [PRD](docs/PRD.md),
+[architecture](docs/architecture.md), [pet analysis](docs/pets.md),
+[client speech](docs/client-speech.md) and [profiles](docs/profiles-v2.md) explain the design.
+[Upstream proposals](docs/upstream.md) and the [SDK patch series](server/README.md) are local
+work, not upstream approval. Gateway v2 remains proposal-only.
 
-Design and verified upstream corrections are in the [PRD](docs/PRD.md), [architecture](docs/architecture.md), and [pet analysis](docs/pets.md). Server extensions are tracked in [upstream proposals](docs/upstream.md). The [self-host guide](docs/self-host.md) covers private TLS access. Decisions marked **DECISION** in the brief require maintainer input.
+[Release preparation](docs/release.md), [privacy draft](docs/privacy.md) and
+[Data Safety worksheet](docs/data-safety.md) describe the outstanding publisher/device gates.
+[Session status](SESSION_STATUS.md) records where to continue.
 
 ## Modules
 
 | Directory | Purpose |
 | --- | --- |
-| `protocol/` | Pure Kotlin/JVM protocol, direct transport, endpoint policy, conversation reducer, media framing, and action validation |
-| `wear/` | Direct-mode watch app, encrypted identities, PCM backends, prompts, and device actions |
-| `mobile/` | Android Compose starter; onboarding and relay follow in M3 |
-| `server/` | Index of proposed upstream changes; no server fork or patches yet |
-| `tools/` | Pinned SDK installation and actual devserver integration launcher |
+| `protocol/` | Pure Kotlin/JVM wire protocol, transports, endpoint policy, conversation, media and action validation |
+| `wear/` | Watch UI, Keystore identities/catalog, direct/relay connections, PCM/Opus, pets, Tile, complication and ambient |
+| `mobile/` | Setup/import, opt-in opaque relay, companion association, encrypted BYOK vault and phone speech |
+| `server/` | Three optional upstreamable SDK patches; no live gateway installation |
+| `tools/` | Pinned SDK setup/integrations, pet registration and original store-art generation |
 
 ## Build and verify
 
-Install JDK 17, Python 3.10+, Git, and the Android SDK packages `platforms;android-37.0`, `build-tools;36.0.0`, and `ndk;27.1.12297006`. Set `JAVA_HOME` and `ANDROID_HOME`, or configure the SDK location in an ignored `local.properties`. The checked-in Gradle 9.4.1 wrapper verifies the distribution checksum. Both apps compile/target API 37; watch minimum API is 33, phone minimum API is 29.
+Install JDK 17, Python 3.10+, Git and Android SDK packages `platforms;android-37.0`,
+`build-tools;36.0.0`, and `ndk;27.1.12297006`. Set `JAVA_HOME` and `ANDROID_HOME`, or use
+ignored `local.properties`. Gradle 9.4.1 verifies its distribution checksum. Both apps
+compile/target API 37; Wear minimum is 33 and phone minimum is 29.
 
 ```bash
 python3 tools/setup-devserver.py
-HERMES_GADGET_PYTHON="$PWD/.local/venv/bin/python" ./gradlew check :wear:assembleDebug :wear:assembleDebugAndroidTest :mobile:assembleDebug --warning-mode=fail
+python3 tools/setup-extensions.py
+HERMES_GADGET_PYTHON="$PWD/.local/venv/bin/python" \
+HERMES_GADGET_EXTENSION_PYTHON="$PWD/.local/extension-venv/bin/python" \
+./gradlew check :wear:assembleDebug :wear:assembleDebugAndroidTest \
+  :mobile:assembleDebug :mobile:assembleDebugAndroidTest \
+  :wear:bundleRelease :mobile:bundleRelease --warning-mode=fail
 ```
 
-The setup script pins SDK `v0.2.0` to commit `323e3303ab68981f810fc3208119cd8a22e64af0`, rejects a modified checkout, and installs test dependencies into ignored `.local/` state. On Windows, use `.local/venv/Scripts/python.exe` and `gradlew.bat` with the same environment variable.
+Setup pins SDK v0.2.0 commit `323e3303ab68981f810fc3208119cd8a22e64af0`. Stock and patched
+SDK environments stay separate under ignored `.local/`. Extension setup requires a fresh
+unmodified checkout; it refuses to reset existing changes. On Windows use each environment's
+`Scripts/python.exe` and `gradlew.bat`.
 
-`check` runs 29 JVM tests, Android host unit-test tasks, Android lint, and ktlint. Kotlin, lint, and Gradle warnings fail verification. The two live integration tests are skipped when `HERMES_GADGET_PYTHON` is absent; CI sets it, and the recorded local run has zero skipped tests. Android host unit-test tasks have no source tests; four watch instrumentation tests were run on the emulator separately. CI compiles their APK but does not run an emulator. The approved dynamic-host cleartext exception has one narrowly documented XML lint suppression; all other lint checks remain strict.
+The gate includes 56 JVM tests, strict Android lint/ktlint and Kotlin/Gradle warnings.
+Live SDK tests require both Python environment variables; CI supplies them. Android host
+unit-test tasks have no source tests; recorded device instrumentation runs are separate.
+CI builds both instrumentation APKs but does not execute an emulator. The optional extension
+job runs 31 Python SDK/tool tests with ffmpeg. Format with `./gradlew ktlintFormat`.
 
-Debug APKs are written to `wear/build/outputs/apk/debug/` and `mobile/build/outputs/apk/debug/`. [CI](.github/workflows/ci.yml) runs the same gate, scans secrets, and publishes both debug APKs. Format Kotlin with `./gradlew ktlintFormat`.
+Debug APKs are in `wear/build/outputs/apk/debug/` and `mobile/build/outputs/apk/debug/`.
+Release bundles are in each module's `build/outputs/bundle/release/`; without private signing
+configuration they are unsigned. [CI](.github/workflows/ci.yml) scans secrets and publishes
+both debug apps and unsigned review bundles. Signing keys and Play upload access are not
+included. Both form factors need matching certificates for Data Layer.
 
-## Next gates
+## Repository hygiene
 
-Finish M2 with an approved physical-watch pairing and real-Hermes conversation. Direct mode uses validated TLS by default. The maintainer approved private LAN/tailnet cleartext only after two per-endpoint choices; public cleartext destinations, redirects, proxies, and TLS downgrade are rejected. Before M3, resolve watch-owned TLS through an opaque phone relay versus a trusted-phone relay. Hardware, battery, and release acceptance remain open.
-
-## Public repository hygiene
-
-Keep personal server addresses, tailnet details, credentials, signing keys, and personal pet art out of commits and screenshots. Store maintainer setup notes in the ignored `.local/` directory. Never commit Android `local.properties`, device keys, or BYOK secrets.
+Never commit personal endpoints, tailnet details, credentials, signing keys, device identities
+or personal pet art. Maintainer setup belongs in ignored `.local/`. Public demos use synthetic
+servers and original procedural art. Existing enrolled devices must not be reset for tests.
 
 ## License
 

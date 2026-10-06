@@ -70,3 +70,25 @@ The provider documents native Opus output; the app validates Ogg/Opus packets wi
 ## Multiple profiles
 
 Each stock Hermes profile has its own adapter URL/port and enrollment store. Save it as a separate watch profile with an independent device key. Use Profiles or a horizontal swipe to choose it. Phone setup can be imported after watch review; it does not remotely switch the watch. See [profile management and gateway proposal](profiles-v2.md). Separate v1 endpoints are supported; the multiplexed v2 gateway remains a proposal.
+
+## Tile, complication, ambient and Ultra launch
+
+Add **Ask Hermes** to the watch's Tile carousel. Tap it to open the app, then hold to speak;
+Tiles do not record in the background. The Tile shows a bounded local last-reply excerpt.
+Choose **Hermes state** in a watch face's short-text complication slot; tap opens the app.
+It shows generic state, never conversation text or endpoint credentials.
+
+The ambient display uses a static monochrome idle-pet outline, minute pixel shifting when not provided by the system, and no
+mic gestures or animated reply. Wake to interact. Capture is canceled when entering ambient.
+The watch releases its foreground service after the active turn and audio drain. A connection
+can remain while the app is visible until its existing idle timeout; opening via Tile, app
+or button connects on demand. Stock offline-push limitations still apply.
+
+On Galaxy Watch Ultra, Samsung documents Settings → Buttons and gestures → Action,
+then Start action with → Short press or Double press. The available list depends on
+software and can be limited to supported features. Select Hermes Gadget only if offered;
+this project does not claim arbitrary Quick Button mapping or intercept a reserved button.
+Use Home button → Double press → Hermes Gadget when the Quick Button list excludes it.
+Older menus may be under Advanced features → Customize buttons. Verify on the physical
+watch. See Samsung's [Quick Button guide](https://www.samsung.com/us/support/answer/ANS10007058/)
+and [Home key guide](https://www.samsung.com/us/support/answer/ANS10003380/).

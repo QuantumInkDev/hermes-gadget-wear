@@ -14,10 +14,11 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import kotlinx.serialization.json.put
 
 typealias EndpointProfile = dev.quantumink.hermesgadget.protocol.EndpointProfile
 
-/** At-rest encryption for settings and independent endpoint identities; all failures are explicit. */
+/** Encrypt settings and separate endpoint identities; storage failures are explicit. */
 class IdentityVault(
     context: Context,
     private val directory: File = File(context.filesDir, "gadget-vault"),
@@ -98,6 +99,7 @@ class IdentityVault(
         val remaining = previous.filterNot { it.endpoint.url == url }
         val selected = if (profile()?.endpoint?.url == url) remaining.firstOrNull() else profile()
         val identity = selected?.let { identity(it.endpoint) }
+        if (profile()?.endpoint?.url == url) AtomicFile(File(directory, "surface")).delete()
         writeCatalog(remaining)
         if (selected == null) {
             AtomicFile(File(directory, "endpoint")).delete()
@@ -136,6 +138,39 @@ class IdentityVault(
         write(name, identity.enrollmentKey().toByteArray())
         write("known-" + id, byteArrayOf(1))
         return identity
+    }
+
+    @Synchronized fun saveSurface(endpoint: Endpoint, label: String, reply: String) {
+        if (profile()?.endpoint?.url != endpoint.url) return
+        val message = Message.create(
+            "surface",
+            kotlinx.serialization.json.buildJsonObject {
+                put(
+                    "endpoint",
+                    dev.quantumink.hermesgadget.protocol.ClientSpeech.endpointId(endpoint)
+                )
+                put("label", label.take(32))
+                put("reply", reply.take(120))
+            }
+        )
+        write("surface", message.encode().toByteArray())
+    }
+
+    @Synchronized fun surface(): Pair<String, String>? {
+        val endpoint = profile()?.endpoint ?: return null
+        val bytes = read("surface") ?: return null
+        try {
+            val saved = requireNotNull(Message.parse(bytes.toString(Charsets.UTF_8)))
+            if (saved.type != "surface" || saved.string("endpoint") !=
+                dev.quantumink.hermesgadget.protocol.ClientSpeech.endpointId(endpoint)
+            ) {
+                return null
+            }
+            return saved.string("label").orEmpty().take(32) to
+                saved.string("reply").orEmpty().take(120)
+        } finally {
+            bytes.fill(0)
+        }
     }
 
     /** Called only after an explicit reset confirmation. Existing host enrollment is unaffected. */

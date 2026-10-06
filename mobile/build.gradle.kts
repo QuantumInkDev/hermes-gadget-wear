@@ -1,6 +1,13 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+}
+
+val signingFile = rootProject.file(".local/signing.properties")
+val releaseSigning = Properties().apply {
+    if (signingFile.exists()) signingFile.inputStream().use { load(it) }
 }
 
 android {
@@ -16,9 +23,26 @@ android {
         applicationId = "dev.quantumink.hermesgadget"
         minSdk = 29
         targetSdk = 37
-        versionCode = 1
+        versionCode = 10000
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    if (signingFile.exists()) {
+        signingConfigs.create("privateRelease") {
+            val configured = rootProject.file(
+                requireNotNull(releaseSigning.getProperty("storeFile"))
+            )
+                .canonicalFile
+            require(
+                configured.toPath().startsWith(rootProject.file(".local").canonicalFile.toPath())
+            )
+            storeFile = configured
+            storePassword = requireNotNull(releaseSigning.getProperty("storePassword"))
+            keyAlias = requireNotNull(releaseSigning.getProperty("keyAlias"))
+            keyPassword = requireNotNull(releaseSigning.getProperty("keyPassword"))
+        }
+        buildTypes.getByName("release").signingConfig = signingConfigs.getByName("privateRelease")
     }
 
     buildFeatures {

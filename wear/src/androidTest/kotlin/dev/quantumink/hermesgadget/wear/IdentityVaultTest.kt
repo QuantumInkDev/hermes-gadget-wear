@@ -105,6 +105,29 @@ class IdentityVaultTest {
     }
 
     @Test
+    fun encryptedSurfaceIsBoundedAndNeverCrossesTheActiveProfile() {
+        vault.save(EndpointProfile(first, "First", ""))
+        val reply = "Original private reply ".repeat(20)
+        vault.saveSurface(first, "First", reply)
+        assertEquals(reply.take(120), vault.surface()?.second)
+        assertFalse(
+            File(directory, "surface").readBytes().toString(Charsets.ISO_8859_1)
+                .contains("Original private reply")
+        )
+        vault.save(EndpointProfile(second, "Second", ""))
+        assertNull(vault.surface())
+        vault.saveSurface(first, "First", "Late old reply")
+        assertNull(vault.surface())
+        vault.saveSurface(second, "Second", "Original second")
+        assertEquals("Original second", vault.surface()?.second)
+        vault.remove(second.url)
+        assertNull(vault.surface())
+        assertFalse(File(directory, "surface").exists())
+        vault.reset()
+        assertNull(vault.surface())
+    }
+
+    @Test
     fun tamperedIdentityFailsWithoutRotatingOrOverwritingIt() {
         val profile = EndpointProfile(first, "Synthetic test", "")
         vault.save(profile)

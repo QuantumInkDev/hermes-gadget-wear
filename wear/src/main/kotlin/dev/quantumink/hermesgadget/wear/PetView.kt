@@ -26,7 +26,7 @@ import dev.quantumink.hermesgadget.protocol.PetStates
 import kotlinx.coroutines.delay
 
 @Composable
-fun PetView(watch: WatchState) {
+fun PetView(watch: WatchState, compact: Boolean = false) {
     val conversation = watch.connection.conversation
     val mode = when {
         conversation.prompt != null -> "waiting"
@@ -69,7 +69,7 @@ fun PetView(watch: WatchState) {
     )
     val image = remember(bitmap) { bitmap?.asImageBitmap() }
     Canvas(
-        Modifier.size(96.dp, 104.dp).semantics {
+        Modifier.size(if (compact) 48.dp else 96.dp, if (compact) 52.dp else 104.dp).semantics {
             contentDescription =
                 "${atlas?.name ?: "Sample pet"}: $mode"
         }

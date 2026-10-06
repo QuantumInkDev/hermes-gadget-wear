@@ -190,9 +190,7 @@ class PcmPlayback(
                 var levelAt = 0L
                 fun writePcm(bytes: ByteArray) {
                     val now = System.nanoTime()
-                    if (active === playback &&
-                        now - levelAt >= TimeUnit.MILLISECONDS.toNanos(100)
-                    ) {
+                    if (now - levelAt >= TimeUnit.MILLISECONDS.toNanos(100)) {
                         var sum = 0.0
                         for (index in 0 until bytes.size - 1 step 2) {
                             val value =
@@ -202,11 +200,14 @@ class PcmPlayback(
                                     ).toShort().toDouble() / 32768.0
                             sum += value * value
                         }
-                        onLevel(
-                            kotlin.math.sqrt(
-                                sum / (bytes.size / 2).coerceAtLeast(1)
-                            ).toFloat().coerceIn(0f, 1f)
-                        )
+                        synchronized(this@PcmPlayback) {
+                            if (active === playback && !playback.stopped.get()) {
+                                onLevel(
+                                    kotlin.math.sqrt(sum / (bytes.size / 2).coerceAtLeast(1))
+                                        .toFloat().coerceIn(0f, 1f)
+                                )
+                            }
+                        }
                         levelAt = now
                     }
                     var offset = 0
@@ -259,9 +260,12 @@ class PcmPlayback(
                 playback.track = null
                 playback.focus?.let(manager::abandonAudioFocusRequest)
                 playback.queue.clear()
-                if (active === playback) {
-                    onLevel(0f)
-                    onFinished()
+                synchronized(this@PcmPlayback) {
+                    if (active === playback) {
+                        active = null
+                        onLevel(0f)
+                        onFinished()
+                    }
                 }
             }
         }, "watch-speaker").apply { isDaemon = true }.start()
