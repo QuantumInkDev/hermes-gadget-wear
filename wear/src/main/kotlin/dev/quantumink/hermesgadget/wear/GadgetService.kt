@@ -22,11 +22,16 @@ import dev.quantumink.hermesgadget.protocol.ConnectionObserver
 import dev.quantumink.hermesgadget.protocol.ConnectionState
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
 import dev.quantumink.hermesgadget.protocol.ConversationEffect
+import dev.quantumink.hermesgadget.protocol.ConversationState
 import dev.quantumink.hermesgadget.protocol.DeviceIdentity
 import dev.quantumink.hermesgadget.protocol.DirectConnection
 import dev.quantumink.hermesgadget.protocol.Endpoint
+import dev.quantumink.hermesgadget.protocol.TransportPath
+import dev.quantumink.hermesgadget.protocol.TransportPolicy
+import dev.quantumink.hermesgadget.protocol.TransportPreference
 import dev.quantumink.hermesgadget.protocol.WatchAction
 import dev.quantumink.hermesgadget.protocol.WatchActions
+import java.net.Proxy
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +48,9 @@ data class WatchState(
     val loading: Boolean = true,
     val saving: Boolean = false,
     val setupError: String = "",
+    val path: TransportPath = TransportPath.DIRECT,
+    val selecting: Boolean = false,
+    val transportNotice: String = "",
     val haptic: Long = 0
 ) {
     override fun toString(): String = "WatchState(content=redacted)"
@@ -57,12 +65,15 @@ class GadgetService : Service() {
     val state: StateFlow<WatchState> = mutableState.asStateFlow()
     private val main = Handler(Looper.getMainLooper())
     private val storage = Executors.newSingleThreadExecutor()
+    private val transportWorker = Executors.newSingleThreadExecutor()
+    private val selectionEpoch = AtomicLong()
     private val epoch = AtomicLong()
     private lateinit var vault: IdentityVault
     private lateinit var capture: PcmCapture
     private lateinit var playback: PcmPlayback
 
     @Volatile private var connection: DirectConnection? = null
+    private var relay: WatchRelay? = null
 
     @Volatile private var visible = false
 
@@ -157,6 +168,7 @@ class GadgetService : Service() {
         token: String,
         privateNetwork: Boolean,
         accepted: Boolean,
+        transport: TransportPreference = TransportPreference.AUTO,
         ready: () -> Unit
     ) {
         if (mutableState.value.saving || mutableState.value.loading) return
@@ -164,7 +176,8 @@ class GadgetService : Service() {
             EndpointProfile(
                 Endpoint.parse(url, privateNetwork, accepted),
                 label.trim(),
-                token.trim()
+                token.trim(),
+                transport
             )
         } catch (failure: IllegalArgumentException) {
             mutableState.update {
@@ -198,6 +211,11 @@ class GadgetService : Service() {
 
     fun connect() {
         val profile = mutableState.value.profile ?: return
+        if (mutableState.value.selecting || mutableState.value.connection.status in
+            setOf(ConnectionStatus.CONNECTING, ConnectionStatus.PAIRING, ConnectionStatus.PAIRED)
+        ) {
+            return
+        }
         if (Build.VERSION.SDK_INT >= 37 && profile.endpoint.privateNetwork &&
             checkSelfPermission(Manifest.permission.ACCESS_LOCAL_NETWORK) !=
             PackageManager.PERMISSION_GRANTED
@@ -205,13 +223,85 @@ class GadgetService : Service() {
             connection?.report(getString(R.string.local_permission_needed))
             return
         }
-        if (availableActions() != advertisedActions) {
-            savedIdentity?.let { configure(profile, it) }
+        val identity = savedIdentity ?: return
+        val request = selectionEpoch.incrementAndGet()
+        mutableState.update {
+            it.copy(
+                selecting = true,
+                connection = it.connection.copy(status = ConnectionStatus.CONNECTING)
+            )
         }
-        connection?.connect()
+        transportWorker.execute {
+            val node = if (profile.endpoint.isTls &&
+                profile.transport != TransportPreference.DIRECT
+            ) {
+                WatchRelay.reachablePhone(this)
+            } else {
+                null
+            }
+            val selected = runCatching {
+                TransportPolicy.select(
+                    profile.endpoint,
+                    profile.transport,
+                    node != null
+                )
+            }
+            main.post {
+                if (destroyed || request != selectionEpoch.get()) return@post
+                selected.fold(
+                    { path ->
+                        val created = runCatching {
+                            if (path ==
+                                TransportPath.RELAY
+                            ) {
+                                WatchRelay(this, profile.endpoint, requireNotNull(node))
+                            } else {
+                                null
+                            }
+                        }
+                        created.fold(
+                            { pipe ->
+                                val reply = mutableState.value.connection.conversation.reply
+                                configure(profile, identity, pipe, reply)
+                                connection?.connect()
+                            },
+                            {
+                                mutableState.update {
+                                    it.copy(
+                                        selecting = false,
+                                        connection = it.connection.copy(
+                                            status = ConnectionStatus.ERROR,
+                                            error = getString(R.string.relay_unavailable)
+                                        )
+                                    )
+                                }
+                            }
+                        )
+                    },
+                    { failure ->
+                        mutableState.update {
+                            it.copy(
+                                selecting = false,
+                                connection = it.connection.copy(
+                                    status = ConnectionStatus.ERROR,
+                                    error = failure.message.orEmpty()
+                                )
+                            )
+                        }
+                    }
+                )
+            }
+        }
     }
 
     fun disconnect() {
+        selectionEpoch.incrementAndGet()
+        mutableState.update {
+            it.copy(
+                selecting = false,
+                connection = it.connection.copy(status = ConnectionStatus.OFFLINE)
+            )
+        }
         capture.stop()
         playback.stop()
         connection?.disconnect()
@@ -291,8 +381,16 @@ class GadgetService : Service() {
         }
     }
 
-    private fun configure(profile: EndpointProfile, identity: DeviceIdentity) {
+    private fun configure(
+        profile: EndpointProfile,
+        identity: DeviceIdentity,
+        pipe: WatchRelay? = null,
+        previousReply: String = "",
+        notice: String = ""
+    ) {
         closeConnection()
+        relay = pipe
+        val path = if (pipe == null) TransportPath.DIRECT else TransportPath.RELAY
         savedIdentity = identity
         val version = epoch.incrementAndGet()
         val actions = availableActions()
@@ -313,6 +411,19 @@ class GadgetService : Service() {
                     if (version != epoch.get()) return
                     mutableState.update {
                         if (version == epoch.get()) it.copy(connection = state) else it
+                    }
+                    if (TransportPolicy.canFallBack(profile.transport, path, state)) {
+                        main.post {
+                            if (!destroyed && version == epoch.get()) {
+                                configure(
+                                    profile,
+                                    identity,
+                                    previousReply = state.conversation.reply,
+                                    notice = getString(R.string.relay_fallback)
+                                )
+                                connection?.connect()
+                            }
+                        }
                     }
                     if (state.status in setOf(ConnectionStatus.OFFLINE, ConnectionStatus.ERROR)) {
                         main.post {
@@ -373,10 +484,22 @@ class GadgetService : Service() {
             accessToken = profile.accessToken.takeIf { it.isNotEmpty() },
             availableActions = actions,
             sensors = battery(),
-            capabilities = JsonObject(caps)
+            capabilities = JsonObject(caps),
+            httpClient = pipe?.client,
+            connectionProxy = pipe?.bridge?.proxy ?: Proxy.NO_PROXY,
+            previousReply = previousReply
         )
         mutableState.update {
-            it.copy(profile = profile, connection = ConnectionState(), setupError = "")
+            it.copy(
+                profile = profile,
+                connection = ConnectionState(
+                    conversation = ConversationState(reply = previousReply)
+                ),
+                setupError = "",
+                selecting = false,
+                path = path,
+                transportNotice = notice
+            )
         }
     }
 
@@ -523,11 +646,14 @@ class GadgetService : Service() {
     }
 
     private fun closeConnection() {
+        selectionEpoch.incrementAndGet()
         epoch.incrementAndGet()
         capture.stop()
         playback.stop()
         connection?.close()
         connection = null
+        relay?.close()
+        relay = null
         endForeground()
         brightness?.invoke(null)
     }
@@ -537,6 +663,7 @@ class GadgetService : Service() {
         closeConnection()
         main.removeCallbacksAndMessages(null)
         storage.shutdownNow()
+        transportWorker.shutdownNow()
         super.onDestroy()
     }
 

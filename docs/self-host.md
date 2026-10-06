@@ -1,12 +1,12 @@
 # Self-host connection guide
 
-Status: M2 direct onboarding works against the stock SDK on an emulator. Physical Watch Ultra / real-Hermes acceptance is still pending.
+Status: direct typed and voice conversations have passed on the physical Ultra against real Hermes. Phone relay software is implemented; the actual phone/watch and off-network relay checks remain open.
 
 Install the stock Hermes Gadget SDK plugin and run `hermes gadget info` on the host to obtain its actual endpoint. Pairing is approved on that host using `hermes gadget pair` or the approve command displayed by the server. Keep all actual addresses and credentials in local configuration, never this repository.
 
 ## Private TLS through Tailscale Serve
 
-For the planned phone relay, install Tailscale on the Hermes host and Android phone and join both to the same tailnet. The phone uses the Tailscale system VPN. Tailscale Serve can terminate TLS on the Hermes host and proxy to its local cleartext gadget listener; watch-owned TLS through the opaque relay ends at that trusted host.
+For the phone relay, install Tailscale on the Hermes host and Android phone and join both to the same tailnet. The phone uses the Tailscale system VPN. Tailscale Serve can terminate TLS on the Hermes host and proxy to its local cleartext gadget listener; watch-owned TLS through the opaque relay ends at that trusted host.
 
 On the Hermes host, inspect existing Serve configuration before changing it:
 
@@ -14,15 +14,15 @@ On the Hermes host, inspect existing Serve configuration before changing it:
 tailscale serve status
 ```
 
-If HTTPS port 8443 is unused and the local gadget plugin uses port 8765:
+If HTTPS port 8765 is unused and the local gadget plugin uses port 8765:
 
 ```bash
-tailscale serve --bg --https=8443 8765
+tailscale serve --bg --https=8765 http://127.0.0.1:8765
 ```
 
 Substitute the actual local plugin port if different. Follow Tailscale's consent flow if HTTPS certificates need enabling. From the printed HTTPS address, replace the scheme with `wss` and append the plugin's path (normally `/gadget`); preserve the printed TLS port. Use that DNS name for certificate validation, not the old LAN address. Verify a WebSocket upgrade with certificate validation and then an authenticated, paired conversation. A browser HTTP error alone is not a gadget test.
 
-Serve access remains within the tailnet and is subject to its access rules. Do not replace or reset existing Serve/Funnel services. To remove only this new listener, use `tailscale serve --https=8443 off`. See [Serve](https://tailscale.com/docs/features/tailscale-serve) and its [command reference](https://tailscale.com/docs/reference/tailscale-cli/serve).
+Serve access remains within the tailnet and is subject to its access rules. Do not replace or reset existing Serve/Funnel services. To remove only this new listener, use `tailscale serve --https=8765 off`. See [Serve](https://tailscale.com/docs/features/tailscale-serve) and its [command reference](https://tailscale.com/docs/reference/tailscale-cli/serve).
 
 ## Native plugin TLS or public direct access
 
@@ -47,4 +47,12 @@ Approve the displayed code on your own Hermes host. Conversations are disabled u
 
 Vibration, notifications, app-window brightness, and a system-clock timer are advertised only when supported/permitted. Notification denial leaves typed/voice conversations available. Timer execution requires an installed clock activity handling the Android timer intent. Screen brightness resets when leaving or disconnecting.
 
-The app disconnects after 90 seconds of ordinary inactivity; a stalled active turn/prompt has a 120-second inactivity cap. Server pushes sent while disconnected are lost with the stock SDK, except pending prompts re-sent by the adapter. There is no phone relay yet, and a direct watch connection cannot use the phone VPN automatically. Validate reachability from the watch itself.
+The app disconnects after 90 seconds of ordinary inactivity; a stalled active turn/prompt has a 120-second inactivity cap. Server pushes sent while disconnected are lost with the stock SDK, except pending prompts re-sent by the adapter. A direct watch connection cannot use the phone VPN automatically. For direct mode, validate reachability from the watch itself.
+
+## Enable phone relay
+
+Install the matching phone APK and enable relay in the companion. Keep Tailscale connected on the phone for private tailnet endpoints. Use Allow background relay to associate the watch in Android’s companion dialog; otherwise Android may reject a background foreground-service start. Grant nearby network permission when needed. An active relay shows a private notification with Stop relay, and disabling relay closes active channels.
+
+On the watch, enter the certificate-valid `wss` URL and select Automatic (phone preferred), Phone relay, or Direct in setup. The phone forwards raw TLS bytes; pairing keys, HMAC, prompts, audio, and replies remain inside watch-owned TLS to the trusted Hermes host. The phone can observe the target address, timing, and volume. An unavailable automatic relay can fall back directly to the same endpoint and security policy, with no input replay. TLS/authentication failures require correction and do not trigger a weaker transport. Private `ws` URLs work only in direct mode with the existing warning.
+
+A new endpoint URL receives an independent identity and pairing. Changing a LAN URL to a TLS URL does not silently reuse its old device key. Actual Data Layer, companion association, foreground startup, Tailscale Android VPN reachability, Bluetooth interruption, and off-network conversations remain hardware acceptance checks.

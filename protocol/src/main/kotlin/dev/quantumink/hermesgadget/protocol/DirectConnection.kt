@@ -1,6 +1,7 @@
 package dev.quantumink.hermesgadget.protocol
 
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.UnknownHostException
 import java.util.concurrent.ArrayBlockingQueue
@@ -65,6 +66,8 @@ class DirectConnection(
     private val sensors: JsonObject = JsonObject(emptyMap()),
     private val capabilities: JsonObject = WatchActions.capabilities(),
     httpClient: OkHttpClient? = null,
+    connectionProxy: Proxy = Proxy.NO_PROXY,
+    previousReply: String = "",
     private val now: () -> Long = { TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) },
     private val idleMillis: Long = 90000
 ) : AutoCloseable {
@@ -74,7 +77,7 @@ class DirectConnection(
     private val ownsClient = httpClient == null
     private val client = (httpClient ?: OkHttpClient()).newBuilder()
         .dns(EndpointDns(endpoint))
-        .proxy(Proxy.NO_PROXY)
+        .proxy(connectionProxy)
         .followRedirects(false)
         .followSslRedirects(false)
         .retryOnConnectionFailure(false)
@@ -82,7 +85,7 @@ class DirectConnection(
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
     private val actions = WatchActions.manifest(availableActions)
-    private val conversation = Conversation(availableActions)
+    private val conversation = Conversation(availableActions, previousReply)
     private val stopped = AtomicBoolean(false)
     private val overloaded = AtomicBoolean(false)
     private val executor = ThreadPoolExecutor(
@@ -115,6 +118,13 @@ class DirectConnection(
     private var activityAt = now()
 
     init {
+        require(
+            connectionProxy == Proxy.NO_PROXY || (
+                endpoint.isTls && connectionProxy.type() == Proxy.Type.HTTP &&
+                    (connectionProxy.address() as? InetSocketAddress)?.address?.isLoopbackAddress ==
+                    true
+                )
+        ) { "Only a TLS loopback relay proxy is supported." }
         timer.scheduleAtFixedRate({ dispatch(::tick) }, 100, 100, TimeUnit.MILLISECONDS)
     }
 

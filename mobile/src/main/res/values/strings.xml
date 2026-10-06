@@ -2,10 +2,22 @@
     <string name="app_name">Hermes Gadget</string>
     <string name="gadget_title">HERMES GADGET</string>
     <string name="setup_title">A little closer\nto your agent.</string>
-    <string name="setup_intro">Talk to your own Hermes from your watch. Your server, your profiles, your control.</string>
-    <string name="server_title">Bring your own Hermes</string>
-    <string name="server_body">Install the Hermes Gadget plugin on your host. You will need its gadget endpoint and access to approve pairing.</string>
-    <string name="relay_title">Keep your server private</string>
-    <string name="relay_body">The phone companion is designed to reach your server through your own Tailscale app. Public access is optional.</string>
     <string name="privacy_note">No account with us. No hosted backend. No analytics.</string>
+    <string name="enable_relay">Enable phone relay</string>
+    <string name="disable_relay">Disable phone relay</string>
+    <string name="relay_channel">Watch relay</string>
+    <string name="relay_idle">Ready for your watch</string>
+    <string name="relay_active">Relaying watch conversation</string>
+    <string name="relay_notification">Encrypted connection to your own Hermes</string>
+    <string name="stop_relay">Disconnect</string>
+    <string name="relay_failed">Could not reach your server. Check Tailscale and the endpoint.</string>
+    <string name="relay_background_denied">Open the phone companion to resume. Android blocked background relay startup.</string>
+    <string name="relay_tls_hint">The watch must use a wss endpoint. Keep Tailscale connected on this phone; pairing keys stay on the watch.</string>
+    <string name="relay_vpn_hint">For tailnet endpoints, keep Tailscale connected on this phone. Set the watch to Automatic or Phone relay with your wss server URL.</string>
+    <string name="associate_watch">Allow background relay</string>
+    <string name="association_hint">Choose your watch in Android’s companion dialog. This lets a watch request start the relay while this app is in the background.</string>
+    <string name="association_ready">Companion association saved. Background relay is available.</string>
+    <string name="association_cancelled">Association cancelled. Background relay may be blocked.</string>
+    <string name="association_unavailable">Companion association is unavailable. Open this app before connecting from the watch.</string>
+    <string name="local_permission_needed">Nearby network permission is required for private endpoints.</string>
 </resources>

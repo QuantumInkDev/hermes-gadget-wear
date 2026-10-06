@@ -48,7 +48,10 @@ dependencies {
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.okhttp)
     implementation(libs.serialization.json)
+    implementation(libs.play.services.wearable)
+    constraints { implementation(libs.fragment) }
     testImplementation(libs.junit)
     androidTestImplementation(libs.android.test.runner)
     androidTestImplementation(libs.android.test.junit)
+    androidTestImplementation(libs.okhttp.tls)
 }

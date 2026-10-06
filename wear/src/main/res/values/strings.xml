@@ -40,6 +40,13 @@
     <string name="dismiss">Dismiss</string>
     <string name="agent_image">Image from your agent</string>
     <string name="direct_tls">Direct · TLS</string>
+    <string name="phone_tls">Phone relay · watch TLS</string>
+    <string name="transport_auto">Connection: automatic</string>
+    <string name="transport_phone">Connection: phone relay</string>
+    <string name="transport_direct">Connection: direct</string>
+    <string name="relay_tls_required">Phone relay requires a wss endpoint.</string>
+    <string name="relay_unavailable">Phone relay is unavailable. Open the companion or choose direct.</string>
+    <string name="relay_fallback">Phone relay unavailable. Using a direct connection to this endpoint.</string>
     <string name="direct_private">Direct · private cleartext</string>
     <string name="connecting">Connecting</string>
     <string name="reconnecting">Reconnecting</string>

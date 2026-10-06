@@ -74,11 +74,14 @@ sealed interface ConversationEffect {
 }
 
 /** One ordered event stream. All deadlines are monotonic milliseconds. No Android or disk state. */
-class Conversation(private val availableActions: Set<String> = WatchActions.names) {
+class Conversation(
+    private val availableActions: Set<String> = WatchActions.names,
+    previousReply: String = ""
+) {
     val busy: Boolean
         get() = upload != null || turn != null || state.mode == ConversationMode.THINKING ||
             state.prompt != null
-    var state = ConversationState()
+    var state = ConversationState(reply = previousReply.take(32768))
         private set
     private var paired = false
     private var turn: String? = null

@@ -7,6 +7,7 @@ import android.util.AtomicFile
 import dev.quantumink.hermesgadget.protocol.DeviceIdentity
 import dev.quantumink.hermesgadget.protocol.Endpoint
 import dev.quantumink.hermesgadget.protocol.Message
+import dev.quantumink.hermesgadget.protocol.TransportPreference
 import java.io.File
 import java.security.KeyStore
 import java.security.MessageDigest
@@ -17,7 +18,12 @@ import javax.crypto.spec.GCMParameterSpec
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-class EndpointProfile(val endpoint: Endpoint, val label: String, val accessToken: String) {
+class EndpointProfile(
+    val endpoint: Endpoint,
+    val label: String,
+    val accessToken: String,
+    val transport: TransportPreference = TransportPreference.AUTO
+) {
     init {
         require(label.isNotBlank() && label.length <= 32) { "Name must be 1–32 characters." }
         require(accessToken.length <= 2048) { "Access token is too long." }
@@ -47,7 +53,8 @@ class IdentityVault(
             return EndpointProfile(
                 endpoint,
                 requireNotNull(message.string("label")),
-                message.string("token").orEmpty()
+                message.string("token").orEmpty(),
+                TransportPreference.valueOf(message.string("transport") ?: "AUTO")
             )
         } finally {
             bytes.fill(0)
@@ -68,6 +75,7 @@ class IdentityVault(
                 put("cleartext", profile.endpoint.cleartextAccepted)
                 put("label", profile.label)
                 put("token", profile.accessToken)
+                put("transport", profile.transport.name)
             }
         )
         write("endpoint", message.encode().toByteArray())

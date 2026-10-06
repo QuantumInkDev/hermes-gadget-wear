@@ -54,20 +54,32 @@ The physical test exposed a draft-loss bug: the connection could idle out while 
 
 Updated validation: the strict full build/check command above passed again after the fix and final test changes. All 31 JVM tests passed with zero failures/errors/skips, including the enabled stock SDK tests and two new queued-submission rejection/close regressions. The opt-in draft UI regression passed on the owned round API 37 emulator with isolated stock SDK state: draft retained after disconnect, Send disabled offline, Connect inside the editor, draft retained after reconnect, no automatic replay, and a fresh Send producing the echo reply. It required visible editor nodes and fresh accessibility state after lazy-list updates. No identity-reset instrumentation ran on the personal watch. The physical display timeout was temporarily extended for the automated text demo and restored to its original value afterward.
 
-M2 is **not complete**: physical microphone/playback and STT, real clock timer execution, prompts/cards/images/actions, permission-denied behavior, and background/idle behavior on the Ultra remain hardware checks. Personal endpoint details were not written to tracked files. M3 is not started. The current direct endpoint is reachable on the home LAN; morning testing should happen before leaving that network. Away-from-home phone connectivity requires the M3 relay.
+The core physical M2 voice/STT/reply demo passed by maintainer report below. The remaining Ultra media/action, permission, lifecycle, and quality matrix remains open. Phase implementation advances in order under the maintainer's explicit authorization; incomplete hardware acceptance is recorded separately.
+
+## M3 phone relay — 2026-10-06 — software verified, hardware gate open
+
+Resolved relay trust: the maintainer requires watch-owned TLS through an opaque phone relay, with direct fallback under the configured endpoint's policy. Implemented bounded ChannelClient streams, an authenticated watch loopback CONNECT bridge, normal OkHttp TLS/hostname checks, same-package wearable capability discovery, Automatic/Phone/Direct selection, and same-endpoint network fallback. Certificate/authentication failures do not trigger fallback, and no input is replayed. The last reply is retained across transport replacement. The watch connects on app open and still idles out. The phone requires opt-in, provides Stop controls, uses a connected-device foreground service only for active channels, and offers Android companion association for background startup. No identity/key handling exists on the phone.
+
+Local checks: the strict full build/check command passed with 38 JVM tests and zero failures/errors/skips. A live pinned SDK TLS test pairs and reconnects through a simulated byte-forwarding phone; ciphertext capture contains neither the enrollment key nor the synthetic plaintext prompt. TLS trust rejection, header bounds, proxy authentication/authority, manual overrides, and fallback restrictions are covered. An API 37 Android TLS test verifies untrusted-certificate rejection and a trusted HTTPS exchange through the real loopback socket. The first rapid follow-up connection exposed asynchronous pump teardown; the bridge now waits up to one second for its bounded slot before rejecting a new connection. Test trust exists only in test code.
+
+Maintainer infrastructure: enabled a tailnet-only HTTPS proxy on the existing allowed Gadget port, with Funnel disabled and the backend unchanged. A default-trust TLS WebSocket upgrade negotiated `hermes-gadget.v1`; no enrollment or conversation was sent. The live policy already contained the own-device Gadget grant, with no Gadget port in the box-to-box grant, so no ACL edit was made. Configuration and verification files are ignored. This host probe does not prove the phone's Android VPN or off-network reachability. A new TLS URL receives an independent endpoint identity; the personal watch's saved LAN setup is preserved until the maintainer selects it.
+
+Demo note: JVM relay pairing/text/reconnect and Android loopback TLS passed; actual ChannelClient, companion association, background foreground-service startup, Bluetooth interruption, phone Tailscale VPN, and off-network conversation remain hardware gates. M3 acceptance is not complete. No server extensions have been installed into the running Hermes environment.
 
 ## Milestones
+
+Maintainer voice demo — 2026-10-06: the maintainer reports that the physical watch successfully asked about the weather, received an answer, and played the profile's ElevenLabs voice. This verifies a real hold-to-talk/STT/reply/playback path by maintainer report; no bitrate, STT comparison, battery, or audio-quality measurement is inferred. They described the flow as clunky and authorized advancing the remaining phases while away from the home network. The core M2 conversation demo has passed; the remaining physical media/action, permission, lifecycle, and quality matrix stays open. Phase implementation may advance in sequence under that authorization, with unverified milestone acceptance kept explicit.
 
 | Milestone | Status |
 | --- | --- |
 | M0: Gradle skeleton, CI, PRD, architecture, pet analysis | Complete; local and CI checks passed |
 | M1: Protocol vectors and devserver integration | Complete; local and CI checks passed |
-| M2: Watch direct mode and real Hermes demo | Software and emulator verified; physical Ultra / real-Hermes gate open |
-| M3: Phone relay and transport selection | Not started |
+| M2: Watch direct mode and real Hermes demo | Core physical typed/voice demo passed; remaining Ultra matrix open |
+| M3: Phone relay and transport selection | Software verified; actual Data Layer/off-network gate open |
 | M4: Opus and measurements | Not started |
 | M5: Pets and companion-sheet tooling | Not started |
 | M6: Client BYOK TTS | Not started |
 | M7: Multi-endpoint profiles and v2 proposal | Not started |
 | M8: Tile, complication, ambient, battery, internal testing | Not started |
 
-Next: finish the physical M2 voice/media/action demo; pairing approval is already fulfilled and the typed round trip passed. The cleartext policy is resolved. The supplied maintainer endpoint is kept out of public files. For M3, resolve whether the relay must preserve watch-owned TLS or the phone is explicitly trusted. Multiplexed gateway v2 remains a later decision. No upstream patches or PRs have been submitted.
+Next: M4 optional Opus implementation and software measurement, then M5–M8 in order. Keep M2/M3 hardware gates open while the maintainer is away. Relay TLS and direct cleartext decisions are resolved. Multiplexed gateway v2 remains proposal-only pending decision and upstream feedback.

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Play Services discovers this exact resource name at runtime. -->
+    <string-array name="android_wear_capabilities" translatable="false" tools:ignore="UnusedResources">
+        <item>hermes_gadget_relay_v1</item>
+    </string-array>
+</resources>

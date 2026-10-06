@@ -71,6 +71,8 @@ import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
 import dev.quantumink.hermesgadget.protocol.ConversationMode
+import dev.quantumink.hermesgadget.protocol.TransportPath
+import dev.quantumink.hermesgadget.protocol.TransportPreference
 import kotlinx.coroutines.withTimeoutOrNull
 
 private val Accent = Color(0xFFB6ED93)
@@ -93,6 +95,13 @@ fun WatchScreen(
     var textDraft by remember(watch.profile?.endpoint?.url) { mutableStateOf("") }
     val feedback = LocalHapticFeedback.current
     var haptic by remember { mutableLongStateOf(watch.haptic) }
+    LaunchedEffect(watch.loading, watch.profile?.endpoint?.url) {
+        if (!watch.loading && watch.profile != null &&
+            watch.connection.status == ConnectionStatus.OFFLINE
+        ) {
+            connect()
+        }
+    }
     LaunchedEffect(watch.haptic) {
         if (watch.haptic != haptic) feedback.performHapticFeedback(HapticFeedbackType.LongPress)
         haptic = watch.haptic
@@ -113,8 +122,8 @@ fun WatchScreen(
         }
         watch.profile == null || route == "setup" -> SetupPage(
             watch,
-            onSave = { url, label, token, local, accepted ->
-                service.save(url, label, token, local, accepted) {
+            onSave = { url, label, token, local, accepted, transport ->
+                service.save(url, label, token, local, accepted, transport) {
                     route = "home"
                     connect()
                 }
@@ -158,7 +167,7 @@ fun WatchScreen(
 @Composable
 private fun SetupPage(
     watch: WatchState,
-    onSave: (String, String, String, Boolean, Boolean) -> Unit,
+    onSave: (String, String, String, Boolean, Boolean, TransportPreference) -> Unit,
     onBack: () -> Unit,
     onReset: () -> Unit,
     permissions: () -> Unit
@@ -172,6 +181,9 @@ private fun SetupPage(
         mutableStateOf(profile?.endpoint?.cleartextAccepted ?: false)
     }
     var showToken by remember { mutableStateOf(token.isNotEmpty()) }
+    var transport by remember(profile) {
+        mutableStateOf(profile?.transport ?: TransportPreference.AUTO)
+    }
     val cleartext = url.trim().startsWith("ws:", ignoreCase = true)
     RoundPage {
         item { Heading(stringResource(R.string.setup_title)) }
@@ -210,14 +222,38 @@ private fun SetupPage(
                 Secondary(stringResource(R.string.access_token), onClick = { showToken = true })
             }
         }
+        item {
+            Secondary(
+                stringResource(
+                    when (transport) {
+                        TransportPreference.AUTO -> R.string.transport_auto
+                        TransportPreference.RELAY -> R.string.transport_phone
+                        TransportPreference.DIRECT -> R.string.transport_direct
+                    }
+                ),
+                onClick = {
+                    transport =
+                        TransportPreference.entries[
+                            (transport.ordinal + 1) %
+                                TransportPreference.entries.size
+                        ]
+                }
+            )
+        }
+        if (transport == TransportPreference.RELAY &&
+            cleartext
+        ) {
+            item { Body(stringResource(R.string.relay_tls_required)) }
+        }
         if (watch.setupError.isNotEmpty()) item { Body(watch.setupError) }
         item {
             Primary(
                 stringResource(R.string.save_connect),
                 enabled =
                 !watch.saving && url.isNotBlank() && label.isNotBlank() &&
-                    (!cleartext || (local && accepted))
-            ) { onSave(url, label, token, local, accepted && cleartext) }
+                    (!cleartext || (local && accepted)) &&
+                    !(transport == TransportPreference.RELAY && cleartext)
+            ) { onSave(url, label, token, local, accepted && cleartext, transport) }
         }
         item { Secondary(stringResource(R.string.permissions), permissions) }
         if (profile != null) item { Secondary(stringResource(R.string.back), onBack) }
@@ -455,7 +491,9 @@ private fun ConversationPage(
             item {
                 Body(
                     stringResource(
-                        if (watch.profile?.endpoint?.isTls ==
+                        if (watch.path == TransportPath.RELAY) {
+                            R.string.phone_tls
+                        } else if (watch.profile?.endpoint?.isTls ==
                             true
                         ) {
                             R.string.direct_tls
@@ -465,6 +503,11 @@ private fun ConversationPage(
                     ),
                     muted = true
                 )
+            }
+            if (watch.transportNotice.isNotEmpty()) {
+                item {
+                    Body(watch.transportNotice, muted = true)
+                }
             }
             if (connection.status in setOf(ConnectionStatus.OFFLINE, ConnectionStatus.ERROR)) {
                 item { Primary(stringResource(R.string.connect), onClick = connect) }
