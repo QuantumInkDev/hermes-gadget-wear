@@ -154,10 +154,11 @@ now pass with both personal identity ciphertexts unchanged. Strict checks, 56 JV
 four owned API 37 emulator regressions and both validated unsigned bundles also pass.
 A fresh controlled cellular/VPN Phone TLS request passed with phone Wi-Fi off and no USB
 tether function. Phone Disable/Enable preserved the unsent draft, but bounded failure/reconnect remains
-open. Both screen timeouts and phone Wi-Fi were restored; relay is enabled and phone TLS
-setup is Automatic. Watch Automatic review awaits a stable interactive screen. The
-idle app was restarted to clear the transient test draft/screen; both identities remained
-unchanged. `e9bfbce` [CI](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37573623286) passed all three jobs. See the [sanitized physical report](physical-results.md).
+open. Both screen timeouts and phone Wi-Fi were restored; relay is enabled and both
+phone/watch TLS profiles are saved as Automatic. Reopening watch server settings verified
+the saved preference; both identity ciphertexts were unchanged and the original watch
+screen timeout was verified restored. An earlier idle app restart cleared the transient
+test draft/screen without changing those identities. `e9bfbce` [CI](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37573623286) passed all three jobs. See the [sanitized physical report](physical-results.md).
 Hardware speech, radio throughput, battery and Play acceptance remain open.
 
 Continuation — 2026-10-06: the maintainer again confirms physical hold-to-talk, visible

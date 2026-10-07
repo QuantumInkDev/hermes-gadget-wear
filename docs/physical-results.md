@@ -17,6 +17,7 @@ maintainer storage. These results supplement the [acceptance runbook](device-tes
 | Background startup | After closing the previous connection, the phone had no relay foreground service and its keyguard was showing. A fresh watch request started the background relay and returned another marker. |
 | Watch foreground lifetime | Foreground service was observed during the relay turn and released after the reply. |
 | Companion chooser | The original unrestricted single-device request offered an unrelated device. The corrected request shows a device list. Final system state retained one association for the bonded watch; extra own-app associations were removed and other apps' associations were unchanged. |
+| Automatic transport restored | Phone and watch TLS profiles are saved as Automatic. Reopening watch server settings verified the saved preference. Both identity ciphertexts were unchanged, and the original watch screen timeout was verified restored. |
 
 The returned text sometimes included a server-generated prelude. The relay check confirms
 the fresh marker in the incoming reply rather than requiring the entire reply to equal it.
@@ -68,10 +69,9 @@ listed above. Earlier attempts stopped during watch UI navigation before sending
 they were not transport failures. Bluetooth-specific throughput and interruption remain
 open; the Phone label identifies the app path, not the underlying Data Layer radio.
 
-Phone Wi-Fi remains at its original setting. Both screen timeouts and the phone Wi-Fi setting are restored. The relay is enabled
-and the phone TLS setup is saved with Automatic transport. Watch Automatic review and
-the complete bounded Disconnect/reconnect check remain open; interactive watch setup
-requires a stable awake screen. After the idle turn, the watch app was restarted to
+Both screen timeouts and the phone Wi-Fi setting are restored. The relay is enabled,
+and both phone/watch TLS profiles are saved with Automatic transport. The complete bounded
+Disconnect/reconnect check remains open. After the idle turn, the watch app was restarted to
 clear the transient test screen and unsent synthetic draft. Both identity ciphertexts
 were unchanged after restart; no app data was cleared.
 

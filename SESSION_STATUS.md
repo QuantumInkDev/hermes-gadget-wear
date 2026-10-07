@@ -18,9 +18,10 @@ and rebuilt/validated unsigned bundles pass. The physical three-second tone prod
 A fresh controlled cellular/VPN Phone TLS request also passed with phone Wi-Fi off and
 no USB tether function. Phone Disable/Enable preserved an unsent synthetic draft, but bounded failure/reconnect
 was not fully observed. Both temporary screen timeouts and phone Wi-Fi were restored;
-relay is enabled and phone TLS setup is Automatic. Watch Automatic review remains open
-pending a stable interactive screen. The idle watch app was restarted to clear the
-transient test draft/screen; both identity ciphertexts were unchanged afterward. Preserve both
+relay is enabled and both phone/watch TLS profiles are saved as Automatic. The watch
+setting was verified by reopening server settings; both identity ciphertexts were unchanged
+and its original screen timeout was verified restored. An earlier idle app restart cleared
+the transient test draft/screen without changing those identities. Preserve both
 LAN/TLS endpoint identities; CI debug certificates differ from the local devices.
 
 The decoder/chooser fixes and sanitized results were pushed as `e9bfbce`; all three
