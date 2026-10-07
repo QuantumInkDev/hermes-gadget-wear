@@ -157,8 +157,7 @@ class OpusDecoder(header: ByteArray) : AutoCloseable {
 
     fun push(packet: ByteArray, pcm: (ByteArray) -> Unit) {
         require(packet.size in 1..1275)
-        val index = codec.dequeueInputBuffer(10000)
-        check(index >= 0)
+        val index = input(pcm)
         requireNotNull(codec.getInputBuffer(index)).apply {
             clear()
             put(packet)
@@ -168,10 +167,20 @@ class OpusDecoder(header: ByteArray) : AutoCloseable {
     }
 
     fun finish(pcm: (ByteArray) -> Unit) {
-        val index = codec.dequeueInputBuffer(10000)
-        check(index >= 0)
+        val index = input(pcm)
         codec.queueInputBuffer(index, 0, 0, packets * 20000, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
         drain(true, pcm)
+    }
+
+    private fun input(pcm: (ByteArray) -> Unit): Int {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+        while (System.nanoTime() < deadline) {
+            val index = codec.dequeueInputBuffer(10000)
+            if (index >= 0) return index
+            check(index == MediaCodec.INFO_TRY_AGAIN_LATER)
+            drain(false, pcm)
+        }
+        error("Opus decoder input timed out.")
     }
 
     private fun drain(final: Boolean, pcm: (ByteArray) -> Unit) {

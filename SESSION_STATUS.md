@@ -1,33 +1,44 @@
 # Session status
 
-Updated: 2026-10-06
+Updated: 2026-10-07
 
-Latest continuation: the maintainer reconfirmed physical hold-to-talk, transcript/tool
-activity and ElevenLabs server voice. Their reported auth interruption was T3/Claude;
-they completed `claude auth login` after returning home. Current Gadget TLS/hostname and
-WebSocket upgrade checks pass without enrollment/conversation. M8 `962f7f1` CI passed all
-jobs. Both devices are home; the saved watch ADB connection is unavailable and current
-connection IP:port plus phone USB debugging have been requested. Continue using
-docs/device-testing.md when the devices become controllable. Preserve the existing
-watch enrollment and use local matching-signature APKs; CI debug signatures differ.
+Latest continuation: both personal devices were verified as Samsung Ultra models on
+Android 16/API 36 and received local matching-signature apps. Original watch enrollment
+was preserved. Real direct and forced Phone TLS replies passed, along with reviewed phone
+setup import, independent TLS enrollment and fresh locked-phone background startup. The
+phone companion chooser correction is installed; one matching watch association remains.
+See docs/physical-results.md. Phone Wi-Fi/screen timeout were restored.
+
+The Ultra baseline passed 10 of 12 allowed instrumentation tests; two Opus burst tests
+failed on unavailable decoder input buffers. The bounded output-draining correction is
+now installed and all 12 tests pass on the Ultra, with both personal identity ciphertexts
+unchanged. Strict checks, 56 JVM tests, four owned API 37 emulator codec/TLS regressions,
+and rebuilt/validated unsigned bundles pass. The physical three-second tone produced
+8,905 Opus payload bytes in 151 packets; speech-quality and battery acceptance remain open.
+A fresh controlled cellular/VPN Phone TLS request also passed with phone Wi-Fi off and
+no USB tether function. Phone Disable/Enable preserved an unsent synthetic draft, but bounded failure/reconnect
+was not fully observed. Both temporary screen timeouts and phone Wi-Fi were restored;
+relay is enabled and phone TLS setup is Automatic. Watch Automatic review remains open
+pending a stable interactive screen; the synthetic reconnect draft remains unsent. Preserve both
+LAN/TLS endpoint identities; CI debug certificates differ from the local devices.
 
 M0/M1 complete. The core M2 physical Ultra demo passed: automated real-Hermes typed round trip, followed by maintainer-reported weather/STT/reply/ElevenLabs playback. The maintainer found the flow clunky and authorized continuing M3–M8 while away/off the home network. Remaining Ultra action/media, permission/lifecycle, audio-quality and battery checks stay open.
 
-M3 software is implemented: watch-owned TLS through an opaque ChannelClient phone relay and loopback CONNECT bridge; Automatic/Phone/Direct override; same-endpoint network fallback without input replay; last-reply preservation; opt-in companion, stop controls, connected-device foreground service, Android companion association. Relay cannot use ws and certificate/authentication errors do not trigger downgrade. The watch connects on app open and idles out as before. Actual Data Layer, background startup, Bluetooth interruption, phone VPN and off-network conversation are unverified. See [progress](docs/progress.md), [architecture](docs/architecture.md), and [self-host setup](docs/self-host.md).
+M3 software is implemented: watch-owned TLS through an opaque ChannelClient phone relay and loopback CONNECT bridge; Automatic/Phone/Direct override; same-endpoint network fallback without input replay; last-reply preservation; opt-in companion, stop controls, connected-device foreground service, Android companion association. Relay cannot use ws and certificate/authentication errors do not trigger downgrade. The watch connects on app open and idles out as before. Actual Data Layer import, forced TLS relay, locked-phone background startup and cellular/VPN conversation now pass; Bluetooth-specific throughput and interruption still need their named observations. See [progress](docs/progress.md), [architecture](docs/architecture.md), and [self-host setup](docs/self-host.md).
 
 Verified: strict full Android/JVM build, lint, format, warnings-as-errors, both debug APKs and watch instrumentation APK; 38 JVM tests, zero failures/errors/skips, including actual stock SDK direct and relay tests. API 37 Android loopback TLS test rejects untrusted certificates and accepts test-injected trust. Existing M2 Keystore/setup/draft emulator results are recorded in progress; no personal-watch reset tests were run. M3 commit `210bbcc` was pushed; [CI](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37465546979) passed.
 
-Maintainer TLS infrastructure is configured privately: tailnet-only Serve HTTPS proxy on the existing allowed Gadget port, Funnel disabled, backend unchanged. Certificate/hostname validation and the real WebSocket upgrade passed using default trust without sending enrollment/conversation. Read-only live ACL verification confirmed the existing own-device grant and no Gadget port in box-to-box access; no policy edit made. Actual phone access remains unverified. Private files are under `.local/tailscale/`; never print or track them or the `.hermes/.env` credential. The personal watch's saved LAN profile remains unchanged. A new TLS URL needs its independent endpoint identity/pairing.
+Maintainer TLS infrastructure is configured privately: tailnet-only Serve HTTPS proxy on the existing allowed Gadget port, Funnel disabled, backend unchanged. Certificate/hostname validation and the real WebSocket upgrade passed using default trust without sending enrollment/conversation. Read-only live ACL verification confirmed the existing own-device grant and no Gadget port in box-to-box access; no policy edit made. Actual phone access through the TLS relay is now verified in the physical report. Private files are under `.local/tailscale/`; never print or track them or the `.hermes/.env` credential. The personal watch retains its original LAN identity and its independently enrolled TLS identity.
 
-M4 optional Opus is implemented with per-direction selection, stock PCM fallback, platform probe, MediaCodec capture/playback, unified CSD extraction and raw 20 ms packets. The isolated SDK patch has real ffmpeg pipes, bounded Ogg wrapping, paced output and protocol docs. [Measurements](docs/audio-measurements.md) are synthetic software counts only. Strict app checks/42 JVM tests, three Android codec/TLS tests, the stock draft regression, and 21 Python patch/compatibility/live-WebSocket tests passed. The live Hermes environment remains unchanged. The opt-in service-level Opus emulator demo also passed: actual AudioRecord capture, negotiated Opus upload, SDK loopback response/playback path, encoder flush on release and recording cancellation. Host microphone/speaker were disabled; this does not measure physical quality. The patch series was exported from `9c400f9` on local SDK branch `wear/optional-extensions`. No upstream PR/review is claimed.
+M4 optional Opus is implemented with per-direction selection, stock PCM fallback, platform probe, MediaCodec capture/playback, unified CSD extraction and raw 20 ms packets. The isolated SDK patch has real ffmpeg pipes, bounded Ogg wrapping, paced output and protocol docs. [Measurements](docs/audio-measurements.md) include synthetic emulator and physical Ultra payload counts, not speech or network throughput. Strict app checks/42 JVM tests, three Android codec/TLS tests, the stock draft regression, and 21 Python patch/compatibility/live-WebSocket tests passed. The live Hermes environment remains unchanged. The opt-in service-level Opus emulator demo also passed: actual AudioRecord capture, negotiated Opus upload, SDK loopback response/playback path, encoder flush on release and recording cancellation. Host microphone/speaker were disabled; this does not measure physical quality. The patch series was exported from `9c400f9` on local SDK branch `wear/optional-extensions`. No upstream PR/review is claimed.
 
 M4 commit `82a206b` was pushed; [CI](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37468005261) passed all three jobs. M5 pet delivery, cache/renderer/state fallbacks, original placeholder and registration tooling are implemented. Strict app checks and 46 JVM tests passed with zero failures/errors/skips. The exported SDK patches (Opus `9c400f9`, pets `2bcdfc7`) applied to a fresh pinned checkout; 29 Python SDK/tool tests passed. Two Android pet delivery/cache/corruption checks and the stock draft regression passed on the owned emulator. [Pet docs](docs/pets.md) and [synthetic capture](docs/demo/m5/README.md) record limits. Real-profile pets, Ultra legibility/lip sync and ambient power remain open.
 
 M5 staged-export gitleaks, personal-value and local-document-link checks passed.
 
-M6 phone BYOK shared/per-endpoint vault, quota checks, native Opus/PCM streaming, cancellation and server negotiation are implemented. Strict full checks passed: 53 JVM tests, zero failures/errors/skips, 31 Python tests from a fresh three-patch export, actual owned-phone Keystore and owned-watch native Opus decode instrumentation. Stock-readable replies and optional client speech are checked against actual SDK processes. No paid provider call, personal key or live gateway extension was used. Provider output/billing/voice quality and Data Layer remain open.
+M6 phone BYOK shared/per-endpoint vault, quota checks, native Opus/PCM streaming, cancellation and server negotiation are implemented. Strict full checks passed: 53 JVM tests, zero failures/errors/skips, 31 Python tests from a fresh three-patch export, actual owned-phone Keystore and owned-watch native Opus decode instrumentation. Stock-readable replies and optional client speech are checked against actual SDK processes. No paid provider call, personal key or live gateway extension was used. Actual phone BYOK provider output/billing/voice quality and its speech Data Layer path remain open.
 
-M6 `ac329d1` CI passed all jobs. M7 v1 encrypted endpoint catalog, independent keys, migration/removal, phone setup/import review and media teardown are implemented. Strict checks passed with 56 JVM tests, zero failures/errors/skips. Actual two-stock-server tests, five owned-watch vault tests, one owned-phone vault test and actual watch-service switching during recording/reply clearing/reconnect/removal passed. Actual Data Layer import, swipe/rotary and physical profile media remain open. See docs/profiles-v2.md; v2 remains proposal-only.
+M6 `ac329d1` CI passed all jobs. M7 v1 encrypted endpoint catalog, independent keys, migration/removal, phone setup/import review and media teardown are implemented. Strict checks passed with 56 JVM tests, zero failures/errors/skips. Actual two-stock-server tests, five owned-watch vault tests, one owned-phone vault test and actual watch-service switching during recording/reply clearing/reconnect/removal passed. Actual phone Data Layer import now passes; swipe/rotary and physical profile media remain open. See docs/profiles-v2.md; v2 remains proposal-only.
 
 M7 `009b174` CI passed all jobs. M8 watch Tile, generic complication, sparse ambient outline,
 compact conversation controls, service-owned drafts and foreground release after turn/audio
@@ -41,11 +52,11 @@ review bundles and debug apps. Original store art and privacy/Data Safety/listin
 checklists are prepared. No signing credentials or Play upload access was supplied.
 
 CONTINUE HERE: real-device/publisher gates in docs/release.md. M8 is software verified, not
-battery or Play accepted. Test real relay/Data Layer, profile sync/background/VPN, actual
-provider voice/billing, physical Ultra audio/STT/legibility/pet/ambient power, Tile/complication
+battery or Play accepted. Continue relay interruption/radio measurements, actual provider voice/billing, physical
+Ultra audio/STT/legibility/pet/ambient power, Tile/complication
 and button mapping; then supply signing/publisher/privacy/Play setup and perform internal-track
 installation. Do not deploy the optional server patches into live Hermes without their review.
 
-The maintainer authorizes advancement with open hardware gates. Do not mark Ultra throughput/STT/quality/battery or actual Data Layer complete. Multiplexed gateway v2 remains proposal-only pending explicit DECISION and upstream-maintainer feedback; no maintainer messages have been authorized.
+The maintainer authorizes advancement with open hardware gates. Do not mark Ultra throughput/STT/quality/battery or the untested client-speech Data Layer path complete. Multiplexed gateway v2 remains proposal-only pending explicit DECISION and upstream-maintainer feedback; no maintainer messages have been authorized.
 
-Physical pairing approval was already fulfilled. Private ADB/settings/captures remain ignored; screen timeout was restored. Use only the owned Hermes test AVD for local checks and exact serials. Existing unrelated AVDs remain untouched. The public demo uses synthetic data and original procedural artwork. No PR has been created.
+Physical pairing approval was already fulfilled. Private ADB/settings/captures remain ignored; verify restoration of the temporary device settings at the end of a hardware pass. Use only the owned Hermes test AVD for local checks and exact serials. Existing unrelated AVDs remain untouched. The public demo uses synthetic data and original procedural artwork. No PR has been created.

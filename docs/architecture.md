@@ -83,7 +83,16 @@ The common relay implementation forwards TCP bytes over one ChannelClient stream
 
 Channel discovery uses a versioned companion capability, matching package IDs and signatures, and reachable nodes. Auto mode tries a reachable relay before direct; a manual choice is visible. Relay opening and fallback are generation-guarded, close the prior connection, and do not replay input. TLS validation/authentication failures do not trigger a weaker fallback. Cleartext relay is excluded by the maintainer's approved TLS requirement. A phone-side local-network permission or foreground-service denial is a surfaced relay failure, not a TLS bypass.
 
-Validation starts with a JVM end-to-end TLS/WebSocket demo through two byte bridges to the unmodified SDK, checks certificate rejection and header/authority/buffer limits, then Android loopback/TLS instrumentation. Actual ChannelClient pairing, Bluetooth throughput, Tailscale reachability, and foreground behavior on the phone/watch remain hardware gates while the maintainer is away.
+Validation starts with a JVM end-to-end TLS/WebSocket demo through two byte bridges to the unmodified SDK, checks certificate rejection and header/authority/buffer limits, then Android loopback/TLS instrumentation. The later [physical report](physical-results.md) records actual ChannelClient relay, Tailscale cellular reachability and foreground behavior. Bluetooth-specific throughput remains open.
+
+Physical continuation plan (2026-10-06): the unfiltered single-device companion request
+offered an unrelated nearby Bluetooth device. Use Android's device list so the owner can
+select their actual watch before granting background privileges. Android documents that
+[`setSingleDevice(true)` stops at the first matching device](https://developer.android.com/reference/android/companion/AssociationRequest.Builder#setSingleDevice(boolean));
+an unrestricted filter cannot identify the intended watch. Verify the corrected chooser
+on the phone, then exercise forced Phone TLS, reviewed setup import, background startup,
+cellular/VPN access and bounded interruption. Preserve existing endpoint identities and
+publish only sanitized physical results.
 
 ## M4 design plan
 
@@ -92,6 +101,15 @@ Opus is optional and explicitly negotiated per direction in `welcome.audio`; an 
 The SDK extension is opt-in, with stock behavior unchanged when disabled or unsupported. Prefer the existing ffmpeg binary, check its Opus support, and use bounded pipes without shell commands. Uplink reconstruction wraps ordered packets in Ogg pages with CRC, 48 kHz granules and encoder pre-skip, then decodes off the event loop into the existing PCM/WAV STT path. Downlink feeds resampled PCM to a persistent ffmpeg encoder, parses bounded Ogg pages into raw packets, and retains the existing playback lead pacing. Provider Ogg/Opus output must be demuxed rather than forwarded as packets. Prove software round trips and extensions-off stock compatibility before any live installation; keep the Ultra bitrate, latency and same-utterance STT measurements open until hardware is available.
 
 Opus CSD parsing was checked against Android's [OpusHeader implementation](https://android.googlesource.com/platform/frameworks/av/+/ec660f185a1e212b1d22125de81e9bd1d0ff58a3/media/libstagefright/foundation/OpusHeader.cpp), and raw-packet durations against [RFC 6716](https://www.rfc-editor.org/rfc/rfc6716.html). Codec-specific configuration is not a media packet.
+
+Physical codec correction plan (2026-10-06): the Ultra passed native 48 kHz provider
+decoding, but both three-second burst tests exhausted decoder input buffers after the
+single 10 ms wait. Drain available output while retrying input-buffer acquisition within
+a bounded deadline, including acquisition for end-of-stream. Keep packet order and
+timestamps intact. Android's [MediaCodec buffer contract](https://developer.android.com/reference/android/media/MediaCodec)
+requires output buffers to be released so a codec can continue. Verify the existing
+failing burst/cross-codec tests and the passing provider case on the same watch; preserve
+the stock PCM fallback and all personal endpoint identities.
 
 ## M5 design plan
 

@@ -5,6 +5,9 @@ needs an observed result on the named devices; a configured setting or emulator 
 does not close the physical gate. Keep endpoints, device serials, screenshots, credentials
 and measurement records in ignored `.local/`. Publish only sanitized results.
 
+The first [physical results](physical-results.md) record direct/TLS relay, background
+startup, cellular/VPN relay and the corrected Ultra decoder checks.
+
 ## Update without losing enrollment
 
 1. Obtain the watch's current **connection** IP:port from the main Wireless debugging screen.
@@ -63,6 +66,12 @@ TTS and may have no pet; that is a compatibility result, not extension acceptanc
   Existing server voice does not prove phone BYOK. Never copy a server key automatically.
 
 ## Lifecycle, surfaces and battery
+
+For instrumentation on an enrolled personal watch, select only reviewed classes. The
+initial allowlist was `OpusCodecTest`, `ProviderOpusTest`, `RelayTlsTest`,
+`IdentityVaultTest` and `WatchSurfaceTest`; vault tests use unique test directories and
+aliases. Do not run the complete suite or reuse emulator scripts that clear app data.
+Snapshot identity ciphertext hashes privately before and after testing.
 
 - Check mic/notification permission denial and recovery, approval guard/expiry, switching
   during capture/playback and disconnect while editing. Preserve enrollment throughout.

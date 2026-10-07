@@ -144,6 +144,20 @@ remain acceptance gates. M7 `009b174` [CI](https://github.com/QuantumInkDev/herm
 
 ## Milestones
 
+Physical continuation — 2026-10-06–07: local app updates preserved the original watch
+identity. Real direct and forced Phone TLS replies, phone setup import, independent TLS
+enrollment and fresh locked-phone background startup passed. The companion request now
+shows a device list; the installed phone correction retains one matching watch association.
+Twelve safe Ultra instrumentation checks initially passed ten and failed two Opus burst
+decoder cases. The bounded output-draining correction is installed; all 12 Ultra checks
+now pass with both personal identity ciphertexts unchanged. Strict checks, 56 JVM tests,
+four owned API 37 emulator regressions and both validated unsigned bundles also pass.
+A fresh controlled cellular/VPN Phone TLS request passed with phone Wi-Fi off and no USB
+tether function. Phone Disable/Enable preserved the unsent draft, but bounded failure/reconnect remains
+open. Both screen timeouts and phone Wi-Fi were restored; relay is enabled and phone TLS
+setup is Automatic. Watch Automatic review awaits a stable interactive screen. See the [sanitized physical report](physical-results.md).
+Hardware speech, radio throughput, battery and Play acceptance remain open.
+
 Continuation — 2026-10-06: the maintainer again confirms physical hold-to-talk, visible
 transcription, command/tool activity, a reply and the configured ElevenLabs server voice.
 The reported interruption was T3's Claude authentication, resolved by the maintainer with
@@ -161,11 +175,11 @@ Maintainer voice demo — 2026-10-06: the maintainer reports that the physical w
 | M0: Gradle skeleton, CI, PRD, architecture, pet analysis | Complete; local and CI checks passed |
 | M1: Protocol vectors and devserver integration | Complete; local and CI checks passed |
 | M2: Watch direct mode and real Hermes demo | Core physical typed/voice demo passed; remaining Ultra matrix open |
-| M3: Phone relay and transport selection | Software verified; actual Data Layer/off-network gate open |
-| M4: Opus and measurements | Software/cross-codec verified; Ultra speech/bitrate/battery gate open |
+| M3: Phone relay and transport selection | Real TLS Data Layer/background/cellular VPN passed; radio/interruption gates open |
+| M4: Opus and measurements | Software/cross-codec and Ultra synthetic codec verified; speech/radio/battery gates open |
 | M5: Pets and companion-sheet tooling | Software/emulator verified; real profile/Ultra gate open |
 | M6: Client BYOK TTS | Software/emulator verified; provider/Data Layer gate open |
-| M7: Multi-endpoint profiles and v2 proposal | V1 software/emulator verified; sync/hardware open; v2 proposal only |
+| M7: Multi-endpoint profiles and v2 proposal | V1 software/emulator and physical phone import verified; remaining hardware open; v2 proposal only |
 | M8: Tile, complication, ambient, battery, internal testing | Software/emulator and unsigned bundles verified; Ultra battery/signing/Play gates open |
 
-Next: execute the real-device and publisher checklist in [release preparation](release.md). Keep all recorded hardware gates open while the maintainer is away. Relay TLS and direct cleartext decisions are resolved. Multiplexed gateway v2 remains proposal-only pending decision and upstream feedback.
+Next: execute the real-device and publisher checklist in [release preparation](release.md). Keep untested hardware gates open and record each new physical observation separately. Relay TLS and direct cleartext decisions are resolved. Multiplexed gateway v2 remains proposal-only pending decision and upstream feedback.

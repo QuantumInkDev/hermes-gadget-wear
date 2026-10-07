@@ -166,7 +166,7 @@ class MainActivity : ComponentActivity() {
         val request = AssociationRequest.Builder().addDeviceFilter(
             BluetoothDeviceFilter.Builder().build()
         )
-            .setSingleDevice(true).build()
+            .setSingleDevice(false).build()
         val callback = object : CompanionDeviceManager.Callback() {
             override fun onAssociationPending(intentSender: IntentSender) {
                 association.launch(IntentSenderRequest.Builder(intentSender).build())
