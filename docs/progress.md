@@ -155,7 +155,9 @@ four owned API 37 emulator regressions and both validated unsigned bundles also 
 A fresh controlled cellular/VPN Phone TLS request passed with phone Wi-Fi off and no USB
 tether function. Phone Disable/Enable preserved the unsent draft, but bounded failure/reconnect remains
 open. Both screen timeouts and phone Wi-Fi were restored; relay is enabled and phone TLS
-setup is Automatic. Watch Automatic review awaits a stable interactive screen. See the [sanitized physical report](physical-results.md).
+setup is Automatic. Watch Automatic review awaits a stable interactive screen. The
+idle app was restarted to clear the transient test draft/screen; both identities remained
+unchanged. `e9bfbce` [CI](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37573623286) passed all three jobs. See the [sanitized physical report](physical-results.md).
 Hardware speech, radio throughput, battery and Play acceptance remain open.
 
 Continuation — 2026-10-06: the maintainer again confirms physical hold-to-talk, visible

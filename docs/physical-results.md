@@ -29,7 +29,7 @@ An explicit five-class allowlist initially ran 12 tests on the Ultra. Ten passed
 Keystore/catalog/surface-vault checks, two outline/Tile/complication payload checks,
 native provider Ogg Opus decoding, and loopback TLS certificate validation. The test
 vaults use unique directories and aliases. Both personal identity ciphertexts were
-unchanged afterward. No whole-app reset or personal-key deletion was performed.
+unchanged afterward. No app-data or personal-key deletion was performed.
 
 Two three-second Opus burst tests failed when `dequeueInputBuffer` returned no available
 buffer after a single 10 ms wait. The decoder now drains pending output while acquiring
@@ -71,7 +71,9 @@ open; the Phone label identifies the app path, not the underlying Data Layer rad
 Phone Wi-Fi remains at its original setting. Both screen timeouts and the phone Wi-Fi setting are restored. The relay is enabled
 and the phone TLS setup is saved with Automatic transport. Watch Automatic review and
 the complete bounded Disconnect/reconnect check remain open; interactive watch setup
-requires a stable awake screen. The synthetic reconnect draft remains unsent.
+requires a stable awake screen. After the idle turn, the watch app was restarted to
+clear the transient test screen and unsent synthetic draft. Both identity ciphertexts
+were unchanged after restart; no app data was cleared.
 
 Physical Tile/complication placement, button mapping, comparable PCM-versus-Opus speech,
 real-profile pets, phone BYOK/provider billing, timed unplugged battery measurements,

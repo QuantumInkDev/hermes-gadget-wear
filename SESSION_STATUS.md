@@ -7,7 +7,7 @@ Android 16/API 36 and received local matching-signature apps. Original watch enr
 was preserved. Real direct and forced Phone TLS replies passed, along with reviewed phone
 setup import, independent TLS enrollment and fresh locked-phone background startup. The
 phone companion chooser correction is installed; one matching watch association remains.
-See docs/physical-results.md. Phone Wi-Fi/screen timeout were restored.
+See docs/physical-results.md. Both screen timeouts and phone Wi-Fi were restored.
 
 The Ultra baseline passed 10 of 12 allowed instrumentation tests; two Opus burst tests
 failed on unavailable decoder input buffers. The bounded output-draining correction is
@@ -19,8 +19,12 @@ A fresh controlled cellular/VPN Phone TLS request also passed with phone Wi-Fi o
 no USB tether function. Phone Disable/Enable preserved an unsent synthetic draft, but bounded failure/reconnect
 was not fully observed. Both temporary screen timeouts and phone Wi-Fi were restored;
 relay is enabled and phone TLS setup is Automatic. Watch Automatic review remains open
-pending a stable interactive screen; the synthetic reconnect draft remains unsent. Preserve both
+pending a stable interactive screen. The idle watch app was restarted to clear the
+transient test draft/screen; both identity ciphertexts were unchanged afterward. Preserve both
 LAN/TLS endpoint identities; CI debug certificates differ from the local devices.
+
+The decoder/chooser fixes and sanitized results were pushed as `e9bfbce`; all three
+[CI jobs](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37573623286) passed.
 
 M0/M1 complete. The core M2 physical Ultra demo passed: automated real-Hermes typed round trip, followed by maintainer-reported weather/STT/reply/ElevenLabs playback. The maintainer found the flow clunky and authorized continuing M3–M8 while away/off the home network. Remaining Ultra action/media, permission/lifecycle, audio-quality and battery checks stay open.
 
