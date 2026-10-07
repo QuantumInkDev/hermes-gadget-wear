@@ -28,6 +28,8 @@ that identity. Upload/signing access was not supplied during this implementation
 
 ## Internal-track checklist
 
+Use the [physical-device runbook](device-testing.md) to record the device gates below.
+
 - Finish real phone/watch Data Layer, association/background/VPN, off-network and interruption
   tests, plus profile import and provider voice/billing output verification.
 - On the Ultra, compare the same spoken phrases over PCM and Opus, record bitrate, latency,

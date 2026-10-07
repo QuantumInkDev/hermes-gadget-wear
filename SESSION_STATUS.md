@@ -2,6 +2,15 @@
 
 Updated: 2026-10-06
 
+Latest continuation: the maintainer reconfirmed physical hold-to-talk, transcript/tool
+activity and ElevenLabs server voice. Their reported auth interruption was T3/Claude;
+they completed `claude auth login` after returning home. Current Gadget TLS/hostname and
+WebSocket upgrade checks pass without enrollment/conversation. M8 `962f7f1` CI passed all
+jobs. Both devices are home; the saved watch ADB connection is unavailable and current
+connection IP:port plus phone USB debugging have been requested. Continue using
+docs/device-testing.md when the devices become controllable. Preserve the existing
+watch enrollment and use local matching-signature APKs; CI debug signatures differ.
+
 M0/M1 complete. The core M2 physical Ultra demo passed: automated real-Hermes typed round trip, followed by maintainer-reported weather/STT/reply/ElevenLabs playback. The maintainer found the flow clunky and authorized continuing M3–M8 while away/off the home network. Remaining Ultra action/media, permission/lifecycle, audio-quality and battery checks stay open.
 
 M3 software is implemented: watch-owned TLS through an opaque ChannelClient phone relay and loopback CONNECT bridge; Automatic/Phone/Direct override; same-endpoint network fallback without input replay; last-reply preservation; opt-in companion, stop controls, connected-device foreground service, Android companion association. Relay cannot use ws and certificate/authentication errors do not trigger downgrade. The watch connects on app open and idles out as before. Actual Data Layer, background startup, Bluetooth interruption, phone VPN and off-network conversation are unverified. See [progress](docs/progress.md), [architecture](docs/architecture.md), and [self-host setup](docs/self-host.md).

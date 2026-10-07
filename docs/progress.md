@@ -144,6 +144,16 @@ remain acceptance gates. M7 `009b174` [CI](https://github.com/QuantumInkDev/herm
 
 ## Milestones
 
+Continuation — 2026-10-06: the maintainer again confirms physical hold-to-talk, visible
+transcription, command/tool activity, a reply and the configured ElevenLabs server voice.
+The reported interruption was T3's Claude authentication, resolved by the maintainer with
+`claude auth login`; it was not reported as a watch enrollment problem. A fresh host-side
+probe passed default-trust certificate/hostname validation and the Gadget WebSocket
+subprotocol upgrade without sending enrollment or conversation. The devices are home,
+but the saved watch ADB connection is unavailable; current watch connection details and
+phone USB debugging were requested. [Physical acceptance steps](device-testing.md) are
+prepared. No new relay, BYOK, Opus, action or battery acceptance is inferred from this report.
+
 Maintainer voice demo — 2026-10-06: the maintainer reports that the physical watch successfully asked about the weather, received an answer, and played the profile's ElevenLabs voice. This verifies a real hold-to-talk/STT/reply/playback path by maintainer report; no bitrate, STT comparison, battery, or audio-quality measurement is inferred. They described the flow as clunky and authorized advancing the remaining phases while away from the home network. The core M2 conversation demo has passed; the remaining physical media/action, permission, lifecycle, and quality matrix stays open. Phase implementation may advance in sequence under that authorization, with unverified milestone acceptance kept explicit.
 
 | Milestone | Status |

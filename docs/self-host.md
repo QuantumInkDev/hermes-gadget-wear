@@ -2,6 +2,9 @@
 
 Status: direct typed and voice conversations have passed on the physical Ultra against real Hermes. Phone relay software is implemented; the actual phone/watch and off-network relay checks remain open.
 
+Follow the [physical-device runbook](device-testing.md) for compatible APK updates, TLS
+profile import, relay proof, interruptions and measured audio/battery acceptance.
+
 Install the stock Hermes Gadget SDK plugin and run `hermes gadget info` on the host to obtain its actual endpoint. Pairing is approved on that host using `hermes gadget pair` or the approve command displayed by the server. Keep all actual addresses and credentials in local configuration, never this repository.
 
 ## Private TLS through Tailscale Serve
