@@ -87,12 +87,19 @@ extending its screen timeout. The original timeout was 15 seconds; a 10-minute v
 written and verified. Power/window queries confirmed the watch remained awake and unlocked.
 Both existing encrypted identity records were backed up before any update attempt. The
 installed APK's v2 signing block was read in small ranges; its certificate matches the local
-debug builds. A full rollback APK transfer has not completed, so no watch update is claimed.
+debug builds. A full rollback APK transfer has not completed. A subsequent preserve-data
+installation timed out; its installed hash could not be rechecked. Watch update status
+and physical carousel acceptance are unconfirmed, and the installed hash must be checked
+before another install attempt.
 
 Large sync and streamed transfers stalled, including an uncompressed retry. Smaller reads
 also eventually stalled and needed transport reconnection. Partial files are ignored private
 artifacts, not usable rollback packages. A wireless-debugging off/on reset and its new
-connection port were requested. No new URL enrollment or physical carousel/media acceptance
+connection port were requested. Live routing checks then showed different watch/Mac IPv4
+subnets and no local watch-subnet route; the watch also stopped answering ping. The maintainer
+was asked to use the Mac's home Wi-Fi. An isolated watch-only ADB server did not restore a
+stable connection and was stopped; phone USB debugging remained authorized.
+No new URL enrollment or physical carousel/media acceptance
 is inferred from this preparation. The real phone was updated with a matching-signature
 carousel/review-fix APK while preserving app data.
 

@@ -84,18 +84,29 @@ instrumentation tests. Owned-watch combined-capacity recovery, rejection before 
 and the original three-profile swipe/draft/recording/approval checks pass. See
 [review resolutions](docs/carousel-review.md) and the
 [follow-up plan](docs/superpowers/plans/2026-10-11-carousel-review-followup.md).
+Review fixes were pushed as `556c365`; both CI runs passed Android, extensions and secrets
+jobs. PR #1 remains a draft and is linked to this thread.
 
 A physical watch pass is authorized for existing approved endpoints. The real phone received
-the matching-signature carousel build. Both existing encrypted watch identities were backed
+the matching-signature review-fix build. Both existing encrypted watch identities were backed
 up and the installed APK's v2 signing certificate matches the local debug build. Full/stream/
-bounded-chunk rollback transfers repeatedly stall while the watch is awake and unlocked.
-No successful watch update or physical carousel acceptance is recorded for this pass.
-The maintainer reset Wireless debugging and supplied a new port; it currently refuses
-connection at the previous address. Verify the current full address and port before retrying.
-Private backups and helpers are in `.local/profile-carousel/physical-watch/`.
+bounded-chunk rollback transfers repeatedly stalled while awake/unlocked. Preserve-data
+watch install also timed out; the installed APK hash could not yet be rechecked, so update
+status and physical carousel acceptance are unconfirmed. CHECK THE INSTALLED HASH before
+repeating installation when the watch reconnects. Private backup/signature/artifact records
+and helpers are in `.local/profile-carousel/physical-watch/`.
+
+Live network checks found the watch and Mac on different IPv4 subnets, using the Mac's default
+router rather than a local watch-subnet route. The earlier watch address later stopped
+answering ping as well. The maintainer was asked to move the watch to the Mac's home Wi-Fi
+and provide its full current wireless-debugging address. Connection ports changed during
+restarts; do not keep reconnecting to stale values. A temporary watch-only ADB server was
+tried without disturbing phone USB debugging and then stopped; it did not establish a stable
+connection. Default ADB and the two owned test emulators remain available.
 
 The maintainer authorized a temporary watch screen timeout: original 15 seconds, confirmed
 extended to 10 minutes. Its original value is in private `watch-settings-before.json`.
+An attempted restoration could not connect after the port changed; restoration is pending.
 RESTORE AND VERIFY THAT VALUE when this physical pass ends. Preserve both identity ciphertexts
 and existing setup; never reset the personal app, run owned-emulator seed/reset tests on it,
 or replace it with a CI-signed APK. Live publisher deployment and new URL pairing remain

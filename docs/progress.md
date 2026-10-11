@@ -63,7 +63,9 @@ swipe/draft/recording/approval regression pass independently against synthetic S
 The maintainer also authorized a physical watch pass and temporary screen-timeout extension.
 Existing encrypted enrollment was backed up and its installed signing certificate matched
 the local build. Large ADB transfers stalled even while awake/unlocked, so the physical
-carousel update and acceptance are pending a reachable wireless-debugging connection. The
+carousel update and acceptance are unconfirmed pending a reachable wireless-debugging
+connection. Live checks found different watch/Mac IPv4 subnets; moving the watch to the
+Mac's home Wi-Fi was requested. Check the installed APK hash before retrying installation. The
 real phone received the matching-signature carousel build. No new endpoint pairing or live
 catalog deployment was performed. Keep device settings restoration explicit in the physical
 report; no partial transfer or emulator check counts as personal-watch acceptance.
