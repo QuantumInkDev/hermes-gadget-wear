@@ -86,3 +86,14 @@ are separate artifacts and can have different hashes. APKs/AABs stay ignored.
 | mobile | 10000 | 9,104,355 | `fad98dfee3a1d383298136c8998fb22ba036e98ce2937a82b97abc19965eff3e` |
 
 [Actual synthetic watch captures](demo/m8/README.md) and [original store-art drafts](store-assets/README.md) are available for review. Physical battery/quality and Play gates remain open.
+
+## Multi-source carousel acceptance gate
+
+The [carousel demo](demo/carousel/README.md) is software/emulator evidence. Before installing
+its live publishers, review each private mapping, profile avatar, catalog-only credential,
+HTTPS publication and explicit Gadget endpoint. Approve newly paired URLs individually and
+preserve existing enrollment ciphertexts/signatures. Test the new catalog refresh/portrait
+Data Layer path on the real paired devices, three independent TLS conversations, stable
+pages/order/drafts through source loss/return, locked-phone/background relay and ambient/wake.
+Record actual owner pet/portrait/companion behavior separately. This does not close existing
+speech, battery, signing, privacy hosting or Play gates.

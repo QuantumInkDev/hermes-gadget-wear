@@ -13,7 +13,7 @@ from hermes_gadget_plugin.hub import DeviceHub
 from hermes_gadget_plugin.store import DeviceStore
 
 
-async def tls_server(directory: Path, ready, certificate: Path | None, key: Path | None, opus: bool = False, pets: bool = False, client_tts: bool = False, prompt_fixture: bool = False) -> None:
+async def tls_server(directory: Path, ready, certificate: Path | None, key: Path | None, opus: bool = False, pets: bool = False, client_tts: bool = False, prompt_fixture: bool = False, companion: bool = False, fixture_index: int = 0) -> None:
     """Use the stock hub's native TLS hook and the unmodified SDK echo delegate."""
     context = None
     if certificate and key:
@@ -44,8 +44,12 @@ async def tls_server(directory: Path, ready, certificate: Path | None, key: Path
                 draw.rectangle((x + 12, y + 25, x + 22, y + 35), fill=(20, 24, 20, 255))
                 draw.rectangle((x + 48, y + 25, x + 58, y + 35), fill=(20, 24, 20, 255))
         image.save(sheet, "WEBP", lossless=True)
+        if companion:
+            from carousel_fixtures import generate
+            sheet = generate(directory, fixture_index)
         async def sample_pet(session):
-            return package(directory, sheet, "Sample robot", "sample-robot")
+            if companion: await asyncio.sleep(.7)
+            return package(directory, sheet, f"Carousel robot {fixture_index + 1}" if companion else "Sample robot", "sample-robot")
         brain.pet_package = sample_pet
     hub = DeviceHub(
         DeviceStore(directory), brain, host=socket.gethostbyname("localhost"),
@@ -64,11 +68,11 @@ async def tls_server(directory: Path, ready, certificate: Path | None, key: Path
         await hub.stop()
 
 
-async def main(ready_file: Path, certificate: Path | None, key: Path | None, opus: bool = False, pets: bool = False, client_tts: bool = False, prompt_fixture: bool = False) -> None:
+async def main(ready_file: Path, certificate: Path | None, key: Path | None, opus: bool = False, pets: bool = False, client_tts: bool = False, prompt_fixture: bool = False, companion: bool = False, fixture_index: int = 0) -> None:
     with tempfile.TemporaryDirectory(prefix="gadget-integration-") as directory:
         ready = asyncio.get_running_loop().create_future()
         coroutine = (
-            tls_server(Path(directory), ready, certificate, key, opus, pets, client_tts, prompt_fixture)
+            tls_server(Path(directory), ready, certificate, key, opus, pets, client_tts, prompt_fixture, companion, fixture_index)
             if (certificate and key) or opus or pets or client_tts or prompt_fixture else
             serve(
                 socket.gethostbyname("localhost"),
@@ -102,7 +106,9 @@ if __name__ == "__main__":
     parser.add_argument("--pets", action="store_true", help="Original synthetic pet; isolated patched SDK only")
     parser.add_argument("--client-tts", action="store_true", help="Isolated patched SDK speech negotiation")
     parser.add_argument("--prompt-fixture", action="store_true", help="Synthetic carousel approval only")
+    parser.add_argument("--companion", action="store_true", help="Original registered carousel fixture")
+    parser.add_argument("--fixture-index", type=int, default=0)
     args = parser.parse_args()
     if bool(args.tls_cert) != bool(args.tls_key):
         parser.error("TLS certificate and key must be supplied together")
-    asyncio.run(main(args.ready_file, args.tls_cert, args.tls_key, args.opus, args.pets, args.client_tts, args.prompt_fixture))
+    asyncio.run(main(args.ready_file, args.tls_cert, args.tls_key, args.opus, args.pets, args.client_tts, args.prompt_fixture, args.companion, args.fixture_index))

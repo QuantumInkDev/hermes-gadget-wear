@@ -60,7 +60,9 @@ fun PetView(watch: WatchState, compact: Boolean = false, animated: Boolean = tru
         }
     }
     val bitmap = frames?.get(
-        if (row ==
+        if (!animated) {
+            0
+        } else if (row ==
             "talking"
         ) {
             mouth.coerceAtMost(frames.lastIndex)

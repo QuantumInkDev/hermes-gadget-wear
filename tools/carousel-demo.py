@@ -18,8 +18,10 @@ def main():
     parser.add_argument('--test', default='dev.quantumink.hermesgadget.wear.WatchCarouselTest')
     parser.add_argument('--reset-owned-emulator', action='store_true', required=True)
     parser.add_argument('--captures', type=Path)
+    parser.add_argument('--legacy-pets', action='store_true')
+    parser.add_argument('--pets', action='store_true', help='Isolated extension SDK and original companion fixtures')
     args = parser.parse_args()
-    python = os.environ['HERMES_GADGET_PYTHON']
+    python = os.environ['HERMES_GADGET_EXTENSION_PYTHON' if args.pets or args.legacy_pets else 'HERMES_GADGET_PYTHON']
     if not args.serial.startswith('emulator-'):
         parser.error('Physical devices are excluded')
     adb = [args.adb, '-P', args.adb_port, '-s', args.serial]
@@ -36,7 +38,8 @@ def main():
         try:
             for index in range(3):
                 ready = Path(temporary) / f'ready-{index}.json'
-                process = subprocess.Popen([python, '-u', 'tools/integration_devserver.py', '--prompt-fixture', '--ready-file', str(ready)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+                extra = ['--pets', '--companion', '--fixture-index', str(index)] if args.pets else ['--pets'] if args.legacy_pets else []
+                process = subprocess.Popen([python, '-u', 'tools/integration_devserver.py', '--prompt-fixture', '--ready-file', str(ready)] + extra, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
                 processes.append(process)
                 def approve(server=process):
                     for line in server.stdout:
@@ -58,8 +61,17 @@ def main():
                     raise RuntimeError('Install failed; existing package was preserved')
             if 'Success' not in run('shell', 'pm', 'clear', 'dev.quantumink.hermesgadget'):
                 raise RuntimeError('Owned emulator reset failed')
+            run('shell', 'run-as', 'dev.quantumink.hermesgadget', 'mkdir', '-p', 'files')
+            for index in range(3):
+                portrait = Path('docs/demo/carousel/fixtures') / f'box-{index + 1}' / 'portrait.png'
+                if portrait.exists():
+                    destination = '/data/local/tmp/carousel-portrait.png'
+                    run('push', str(portrait), destination)
+                    run('shell', 'run-as', 'dev.quantumink.hermesgadget', 'cp', destination, f'files/synthetic-portrait-{index}.png')
+                    run('shell', 'rm', destination)
             run('shell', 'input', 'keyevent', '224')
             command = ['shell', 'am', 'instrument', '-w', '-r', '-e', 'class', args.test]
+            if args.pets: command += ['-e', 'syntheticCompanion', 'true']
             for name, port in zip(('syntheticEndpoint', 'syntheticSecondEndpoint', 'syntheticThirdEndpoint'), ports):
                 command += ['-e', name, 'ws://localhost:' + port + '/gadget']
             command += ['dev.quantumink.hermesgadget.test/androidx.test.runner.AndroidJUnitRunner']

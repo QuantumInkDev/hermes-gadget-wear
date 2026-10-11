@@ -159,7 +159,7 @@ Hardware Data Layer, actual provider output/voice/quality and billing remain exp
 
 ## M7 design plan
 
-V1 stores at most eight endpoint profiles. The watch's encrypted catalog contains each URL,
+V1 stores at most 32 endpoint profiles (original limit: eight). The watch's encrypted catalog contains each URL,
 label, access token and approved transport/cleartext policy; its encrypted active record
 remains compatible with the M2–M6 single-profile setup. Migration imports that record once
 and validates the existing endpoint identity before saving the catalog. Each URL has an
@@ -209,3 +209,23 @@ a privacy URL or upload to a Play account. The internal track, Ultra battery/qua
 real relay/import/BYOK and Play review remain gates until their prerequisites are available.
 The pinned AndroidX Tiles/ProtoLayout/complication APIs and official ambient guidance were
 checked against current primary documentation before implementation.
+
+## Multi-source carousel implementation
+
+The standalone publisher projects owner mappings without opening a Gadget session. Catalog
+source credentials live only in the phone's separate AES-GCM vault. HTTPS/hostname checks,
+no redirects, source-bound asset paths, 32-profile/64 KiB envelopes and bounded fanout keep
+discovery separate from enrollment. Partial responses persist independently; generation
+checks discard work invalidated by source edits. Owner order survives offline and withdrawn
+records. Catalog reachability is displayed separately from the Gadget connection status.
+
+The phone publishes normalized portrait assets before the version-1 roster, and answers an
+on-demand bounded refresh channel. The watch keeps a separate encrypted roster/selection,
+verified atomic portrait cache and approved URL vault; metadata cannot enroll a new URL.
+Only selected and adjacent artwork is prepared on bounded workers. The settled approved
+page selects one URL-scoped conversation; recording/approval disables page changes and
+prior epoch guards reject old callbacks. Memory-only drafts are bounded per URL. Navigation
+and unfinished setup fields are activity-owned above ambient replacement. The selected
+foreground pet crossfades in a fixed area, while ambient uses its static monochrome outline.
+There are no new periodic idle/ambient discovery timers. Real paired-device catalog transfer
+and live three-box publication remain acceptance gates; see the [demo](demo/carousel/README.md).

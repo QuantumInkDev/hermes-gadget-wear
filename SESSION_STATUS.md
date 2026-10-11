@@ -73,17 +73,29 @@ installation. Do not deploy the optional server patches into live Hermes without
 
 The maintainer authorizes advancement with open hardware gates. Do not mark Ultra throughput/STT/quality/battery or the untested client-speech Data Layer path complete. Multiplexed gateway v2 remains proposal-only pending explicit DECISION and upstream-maintainer feedback; no maintainer messages have been authorized.
 
-Physical pairing approval was already fulfilled. Private ADB/settings/captures remain ignored; verify restoration of the temporary device settings at the end of a hardware pass. Use only the owned Hermes test AVD for local checks and exact serials. Existing unrelated AVDs remain untouched. The public demo uses synthetic data and original procedural artwork. No PR has been created.
+Physical pairing approval was already fulfilled. Private ADB/settings/captures remain ignored; verify restoration of the temporary device settings at the end of a hardware pass. Use only the owned Hermes test AVD for local checks and exact serials. Existing unrelated AVDs remain untouched. The public demo uses synthetic data and original procedural artwork. No PR existed at the start of carousel implementation.
 
 ## Carousel implementation checkpoint — 2026-10-11
 
-Approved app/isolated catalog development is on `feature/multi-box-profile-carousel`.
-The [implementation plan](docs/superpowers/plans/2026-10-11-multi-box-profile-carousel.md)
-tracks five delivery tasks. Catalog contract/publisher and encrypted phone discovery/source
-setup, ordering and photo fallback are committed. Protocol tests passed against three
-independent stock SDK processes; publisher checks passed 5/5; phone JVM tests passed 6/6
-and owned-phone vault/photo instrumentation passed 3/3. Strict phone lint/APKs passed.
-Watch roster/portrait storage and draft isolation are under verification; the pager,
-ambient-safe setup and portrait-to-pet presentation are still pending. No live service,
-personal artwork or personal enrollment has changed. Owned emulators were used through
-isolated ADB after T3 device-panel boot errors.
+Approved app/isolated catalog work is implemented on `feature/multi-box-profile-carousel`.
+The [five-task plan](docs/superpowers/plans/2026-10-11-multi-box-profile-carousel.md) covers
+bounded publisher/contract, phone sources/discovery/photo/cache, watch enrollment-safe roster,
+endpoint drafts, stable pager, ambient-safe review and selected-only portrait/pet transitions.
+Strict checks and all APKs pass: 67 JVM tests, zero failures/errors/skips; five publisher tests.
+Owned API 37 phone vault/photo and watch cache/catalog checks passed. New swipe/Next/rotary,
+recording/approval protection, three separate identities/drafts/artworks, actual sleep/wake
+review and moving/frozen-renderer checks passed. Original draft/profile/lifecycle, companion
+and base-only pet regressions passed. [Sanitized demo](docs/demo/carousel/README.md).
+
+No live box, ACL/Serve policy, personal artwork/credential or personal device enrollment
+was changed. Read-only inventories produced private proposed mappings (three sources) and
+installation/rollback notes in `.local/profile-carousel/rollout-review/`. Unverified Gadget
+URLs remain null and portraits await owner review; no address was inferred. The new catalog
+Data/Channel Layer path and physical three-box relay remain acceptance gates. Existing SDK
+extension exports remain isolated. T3 device-panel boot failed twice; owned AVDs were operated
+through isolated ADB only. Preserve existing personal LAN/TLS keys and app signatures.
+
+CONTINUE HERE: finish the fresh branch review and its important fixes, then present the
+reviewable branch/APKs and private rollout package. Real catalog publication, owner artwork,
+new endpoint pairing and hardware acceptance are next separate review steps. Existing
+battery/speech/provider/Play gates in docs/release.md remain open.

@@ -54,19 +54,23 @@ class WatchCarouselTest {
             "Never overwrite an existing enrollment",
             File(context.filesDir, "gadget-vault").listFiles().isNullOrEmpty()
         )
+        val pets = InstrumentationRegistry.getArguments().getString("syntheticCompanion") == "true"
         val vault = IdentityVault(context)
         val portraitCache = PortraitCache(File(context.filesDir, "portrait-cache"))
         val pages = urls.mapIndexed { index, url ->
             val endpoint = Endpoint.parse(url, true, true)
             vault.save(EndpointProfile(endpoint, "Agent", ""))
-            val bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888)
-            bitmap.eraseColor(
-                listOf(
-                    android.graphics.Color.BLUE,
-                    android.graphics.Color.GREEN,
-                    android.graphics.Color.MAGENTA
-                )[index]
-            )
+            val bitmap = android.graphics.BitmapFactory.decodeFile(
+                File(context.filesDir, "synthetic-portrait-$index.png").path
+            ) ?: Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888).apply {
+                eraseColor(
+                    listOf(
+                        android.graphics.Color.BLUE,
+                        android.graphics.Color.GREEN,
+                        android.graphics.Color.MAGENTA
+                    )[index]
+                )
+            }
             val bytes = ByteArrayOutputStream().also {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
                 bitmap.recycle()
@@ -128,6 +132,18 @@ class WatchCarouselTest {
             waitUntil { find { it.text?.toString() == "Synthetic box 1" } != null }
             waitUntil { service.state.value.artwork[pages.first().key]?.portrait != null }
             capture("01-portrait-first")
+            if (pets) {
+                waitUntil { service.state.value.pet?.rows?.containsKey("talking") == true }
+                waitUntil {
+                    find {
+                        it.contentDescription?.toString()?.startsWith(
+                            "Carousel robot 1:"
+                        ) == true
+                    } != null
+                }
+                SystemClock.sleep(350)
+                capture("07-pet-first")
+            }
             instrumentation.runOnMainSync { service.updateDraft("Unsent first") }
             swipe(true)
             waitUntil {
@@ -138,6 +154,11 @@ class WatchCarouselTest {
             waitUntil { find { it.text?.toString() == "Synthetic box 2" } != null }
             assertEquals("", service.state.value.connection.conversation.reply)
             capture("02-portrait-second")
+            if (pets) {
+                waitUntil { service.state.value.pet?.name == "Carousel robot 2" }
+                SystemClock.sleep(350)
+                capture("08-pet-second")
+            }
             instrumentation.runOnMainSync { service.updateDraft("Unsent second") }
             swipe(false)
             waitUntil {
@@ -145,11 +166,13 @@ class WatchCarouselTest {
                     service.state.value.connection.status == ConnectionStatus.PAIRED
             }
             assertEquals("Unsent first", service.state.value.draft)
+            if (pets) assertEquals("Carousel robot 1", service.state.value.pet?.name)
             instrumentation.runOnMainSync { service.startRecording() }
             waitUntil {
                 service.state.value.connection.conversation.mode ==
                     dev.quantumink.hermesgadget.protocol.ConversationMode.LISTENING
             }
+            if (pets) capture("10-listening")
             swipe(true)
             SystemClock.sleep(700)
             assertEquals(urls.first(), service.state.value.profile?.endpoint?.url)
@@ -174,6 +197,19 @@ class WatchCarouselTest {
                     service.state.value.connection.status == ConnectionStatus.PAIRED &&
                     find { it.text?.toString() == "Synthetic box 2" } != null
             }
+            val beforeRotary = android.graphics.Rect().also {
+                requireNotNull(find { it.text?.toString() == "Synthetic box 2" })
+                    .getBoundsInScreen(it)
+            }
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(
+                automation.executeShellCommand("input rotaryencoder scroll --axis SCROLL,-8")
+            ).use { it.readBytes() }
+            SystemClock.sleep(500)
+            val afterRotary = find { it.text?.toString() == "Synthetic box 2" }?.let { node ->
+                android.graphics.Rect().also { node.getBoundsInScreen(it) }
+            }
+            org.junit.Assert.assertNotEquals(beforeRotary, afterRotary)
+            assertEquals(urls[1], service.state.value.profile?.endpoint?.url)
             scrollTo { it.text?.toString() == "Next" }
             click { it.text?.toString() == "Next" }
             waitUntil {
@@ -183,6 +219,12 @@ class WatchCarouselTest {
             assertEquals("", service.state.value.draft)
             waitUntil { find { it.text?.toString() == "Synthetic box 3" } != null }
             capture("03-portrait-third")
+            if (pets) {
+                waitUntil { service.state.value.pet?.rows?.containsKey("talking") == true }
+                assertEquals("Carousel robot 3", service.state.value.pet?.name)
+                SystemClock.sleep(350)
+                capture("09-pet-third")
+            }
             assertEquals(
                 3,
                 urls.map {

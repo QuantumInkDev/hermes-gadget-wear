@@ -7,9 +7,37 @@ available boxes, showing profile pictures first and pets/additional animations a
 become available. The [design proposal](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md)
 was approved alongside PRD/architecture/pet updates. Discovery uses
 read-only profile/avatar metadata while conversation pairing remains independent per
-Gadget URL. Isolated catalog/protocol and phone discovery implementation now exists; server deployment
-and real-box feature acceptance remain unclaimed. The carousel and final feature checks
-are still in progress.
+Gadget URL. App and isolated publisher implementation is now software verified on
+`feature/multi-box-profile-carousel`; live deployment and real-box acceptance remain open.
+
+The phone stores three HTTPS sources and catalog-only credentials encrypted, independently
+merges bounded responses, retains offline/withdrawn cards and owner ordering, and syncs
+normalized content-addressed portraits. Source edits invalidate stale requests. Manual
+phone setup and photo selection remain available. The watch keeps approved setup and keys
+separate from discovered metadata, displays stable swipe pages, preserves endpoint drafts,
+and requires review for new URLs. Selected foreground pets crossfade into a fixed artwork
+area; cached neighbors/offline pages stay static. Activity-owned review/page memory survives
+ambient composition replacement. Setup capacity is 32 without changing existing key records.
+
+Validation: strict full checks/builds and both debug/instrumentation APKs passed with warnings
+as errors; 67 JVM tests (57 protocol, eight phone, two watch), zero failures/errors/skips.
+Five isolated publisher Python tests passed. Three real TLS HTTP fixtures verify credential
+scope, default-trust refusal, independent auth/offline states and stable withdrawal/return.
+Three stock SDK processes verify independent pairing/reconnect. Owned API 37 instrumentation
+passed phone vault/photo checks, watch cache/label enrollment preservation, actual swipe,
+accessible Next, vertical/rotary scrolling, recording/approval switch protection, separate
+drafts/identities, actual ambient/wake review restoration, fixed artwork placement and
+selected-only movement. Original draft/profile/lifecycle and companion/base-only pet
+regressions passed. The publisher suite is included in CI.
+
+Demo note: [three-source original artwork and actual emulator captures](demo/carousel/README.md).
+The new catalog Data/Channel Layer path has not yet been exercised between real paired
+phone/watch devices; the carousel test seeds an isolated watch cache. Private read-only
+inventories and proposed per-box mappings/installation/rollback notes are prepared under
+ignored maintainer storage. Only the previously approved conversation URL is mapped; other
+URLs and owner artwork remain review steps. No live service, personal artwork, credentials,
+ACL/Serve policy or existing enrollment was changed. Physical three-box TLS relay, source
+loss/recovery, background delivery, artwork/lip sync and battery remain acceptance gates.
 
 ## Repository bootstrap — 2026-10-05
 

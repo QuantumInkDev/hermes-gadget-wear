@@ -1,7 +1,10 @@
 package dev.quantumink.hermesgadget.wear
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -174,16 +177,26 @@ fun ProfileIdentity(
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         val pet = if (selected) watch.pet ?: artwork?.pet else artwork?.pet
-        if (pet == null && artwork?.portrait != null) {
-            Image(
-                remember(artwork.portrait) {
-                    artwork.portrait.asImageBitmap()
-                },
-                "${page.label} profile picture",
-                Modifier.size(80.dp)
-            )
-        } else {
-            PetView(watch.copy(pet = pet), animated = selected)
+        Crossfade(
+            targetState = pet,
+            modifier = Modifier.size(96.dp, 104.dp),
+            animationSpec = tween(220),
+            label = "profile artwork"
+        ) { shown ->
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (shown == null && artwork?.portrait != null) {
+                    Image(
+                        remember(artwork.portrait) { artwork.portrait.asImageBitmap() },
+                        "${page.label} profile picture",
+                        Modifier.size(80.dp)
+                    )
+                } else {
+                    PetView(
+                        watch.copy(pet = shown),
+                        animated = selected && page.status == CatalogStatus.AVAILABLE
+                    )
+                }
+            }
         }
         Text(
             page.label,

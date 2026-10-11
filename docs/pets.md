@@ -110,3 +110,21 @@ tool tests. API 37 pet delivery/cache and cache-corruption instrumentation passe
 stock SDK draft regression still passed. Strict build/lint/format/warnings checks pass.
 [Synthetic round-screen capture](demo/m5/README.md). Personal pet transfer, Ultra
 legibility, physical lip sync and ambient power remain unverified.
+
+## Carousel presentation — 2026-10-11
+
+Each stable page chooses its validated endpoint pet, last good cached portrait, then the
+original neutral robot. Portraits and pets occupy a fixed 96×104 dp area; a 220 ms crossfade
+keeps the identity text in place. Only the selected available foreground page animates;
+neighbor previews and offline/ambient remain static. Existing wave/work/jump/error cues,
+legacy fallback and amplitude mouth hysteresis are retained. Ambient chooses the selected
+page's pet, including a neutral outline for an unapproved card, rather than a previous
+conversation's pet.
+
+[Original three-color fixtures](demo/carousel/fixtures/manifest.json) include unchanged
+1536×1872 base sheets plus registered 1152×624 listening/talking/sleeping companions.
+The renderer test rejects corrupt pet bytes while retaining a portrait, checks identity
+placement through arrival and compares actual moving/frozen rendered frames. Actual-service
+base-only and companion delivery tests pass; the three-page test checks endpoint artwork
+isolation and real synthetic listening. [Captures and reproduction](demo/carousel/README.md).
+These are synthetic software checks; owner artwork, physical lip sync and power remain open.

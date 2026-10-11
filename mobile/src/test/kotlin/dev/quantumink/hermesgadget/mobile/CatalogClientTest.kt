@@ -18,6 +18,96 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CatalogClientTest {
+    @Test fun threeTlsCatalogsKeepCredentialScopeAndStablePagesThroughFailureWithdrawalAndReturn() {
+        val certificate = HeldCertificate.Builder().addSubjectAlternativeName("localhost").build()
+        val serverTrust = HandshakeCertificates.Builder().heldCertificate(certificate).build()
+        val trust = HandshakeCertificates.Builder().addTrustedCertificate(
+            certificate.certificate
+        ).build()
+        val servers = (0..2).map {
+            MockWebServer().apply {
+                useHttps(serverTrust.sslSocketFactory(), false)
+                start()
+            }
+        }
+        val client = CatalogClient(
+            OkHttpClient.Builder().sslSocketFactory(
+                trust.sslSocketFactory(),
+                trust.trustManager
+            ).build()
+        )
+        val engine = CatalogDiscovery(client::fetch)
+        val sources = servers.mapIndexed { index, server ->
+            CatalogSource(
+                "box$index",
+                "Box $index",
+                server.url("/catalog/v1").toString(),
+                "key$index"
+            )
+        }
+        val previous = sources.map { source ->
+            CatalogPage(
+                source.id,
+                source.label,
+                CatalogProfile("p", "Agent", null, null),
+                CatalogStatus.AVAILABLE,
+                1
+            )
+        }
+        fun body() = MockResponse().setBody(
+            """{"version":1,"profiles":[{"id":"p","name":"Agent"}]}"""
+        )
+        try {
+            assertEquals(
+                CatalogStatus.ATTENTION,
+                assertThrows(CatalogFailure::class.java) {
+                    CatalogClient().fetch(sources.first())
+                }.status
+            )
+            servers[0].enqueue(body())
+            servers[1].enqueue(MockResponse().setResponseCode(401))
+            servers[2].enqueue(body())
+            val first = engine.refresh(sources, previous, true) {}.get(4, TimeUnit.SECONDS)
+            assertEquals(previous.map { it.key }, first.map { it.key })
+            assertEquals(
+                listOf(
+                    CatalogStatus.AVAILABLE,
+                    CatalogStatus.ATTENTION,
+                    CatalogStatus.AVAILABLE
+                ),
+                first.map { it.status }
+            )
+            servers[0].enqueue(MockResponse().setBody("""{"version":1,"profiles":[]}"""))
+            servers[1].enqueue(body())
+            servers[2].enqueue(MockResponse().setResponseCode(503))
+            val second = engine.refresh(sources, first, true) {}.get(4, TimeUnit.SECONDS)
+            assertEquals(
+                listOf(
+                    CatalogStatus.WITHDRAWN,
+                    CatalogStatus.AVAILABLE,
+                    CatalogStatus.OFFLINE
+                ),
+                second.map { it.status }
+            )
+            servers.forEach { it.enqueue(body()) }
+            val third = engine.refresh(sources, second, true) {}.get(4, TimeUnit.SECONDS)
+            assertEquals(previous.map { it.key }, third.map { it.key })
+            assertTrue(third.all { it.status == CatalogStatus.AVAILABLE })
+            servers.forEachIndexed { index, server ->
+                repeat(3) {
+                    assertEquals(
+                        "Bearer key$index",
+                        server.takeRequest(1, TimeUnit.SECONDS)
+                            ?.getHeader("Authorization")
+                    )
+                }
+            }
+        } finally {
+            engine.close()
+            servers.forEach { it.close() }
+        }
+    }
+
     @Test fun sourceEditRejectsPendingOldConfigurationAndRefreshesTheNewOne() {
         val source = CatalogSource("a", "Box", "https://a.example.invalid/catalog/v1", "old")
         val entered = java.util.concurrent.CountDownLatch(1)

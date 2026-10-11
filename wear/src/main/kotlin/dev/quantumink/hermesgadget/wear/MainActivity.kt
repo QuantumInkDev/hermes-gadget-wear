@@ -96,7 +96,17 @@ class MainActivity : ComponentActivity() {
                         WaitingScreen()
                     } else if (ambient != null) {
                         val pets = remember(service) {
-                            service.state.map { it.pet }.distinctUntilChanged()
+                            service.state.map { watch ->
+                                val page = ProfilePages.merge(watch.profiles, watch.catalog)
+                                    .singleOrNull { it.key == watch.selectedPage }
+                                if (page?.approved?.endpoint?.url == watch.profile?.endpoint?.url &&
+                                    page?.approved != null
+                                ) {
+                                    watch.pet ?: watch.artwork[page.key]?.pet
+                                } else {
+                                    page?.let { watch.artwork[it.key]?.pet }
+                                }
+                            }.distinctUntilChanged()
                         }
                         val pet by pets.collectAsStateWithLifecycle(initialValue = null)
                         AmbientPet(

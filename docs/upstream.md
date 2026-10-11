@@ -19,3 +19,10 @@ M4 local branch `wear/optional-extensions`, first patch `feat: negotiate optiona
 M5 local SDK patch 2 `2bcdfc7` implements authenticated, opt-in profile pet delivery. [Pet documentation](pets.md) records the companion metadata proposal, original-fixture evidence, renderer fallback and registration-tool limits. No Hermes Agent generator change, real-profile delivery, upstream review, or live installation is claimed.
 
 M6 local SDK patch 3 `8a1d854` acknowledges optional client speech, sends bounded final reply text and a profile voice hint, deduplicates finals, respects voice-off, and suppresses automatic server synthesis for acknowledged client sessions. Default `enable_client_tts` is false. Stock clients and extension-off servers retain their speech behavior. Explicit voice attachments retain their existing server path. Actual Hermes adapter/profile integration, real provider output and phone/watch transport remain unverified. No upstream review or live installation is claimed.
+
+Carousel catalog implementation is an isolated standalone [publisher](../server/catalog/README.md),
+not a Gadget wire extension. Its five auth/projection/persistence/artwork tests pass without
+modifying stock SDK v0.2.0. The app's real three-stock-server and three-TLS-catalog tests pass;
+independent URLs and pairing keys remain the routing boundary. Proposed private per-box
+mappings, installation and rollback notes are prepared for owner review. No live deployment,
+new pairing, upstream PR or agreement is claimed. Existing SDK patch exports remain unchanged.
