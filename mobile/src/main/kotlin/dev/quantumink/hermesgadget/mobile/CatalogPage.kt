@@ -1,6 +1,8 @@
 package dev.quantumink.hermesgadget.mobile
 
 import android.content.Context
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Button
@@ -28,6 +30,7 @@ fun CatalogPage(context: Context, back: () -> Unit) {
     val pages by repository.pages.collectAsStateWithLifecycle()
     val notice by repository.notice.collectAsStateWithLifecycle()
     val health by repository.health.collectAsStateWithLifecycle()
+    val watchPictures by repository.watchPictures.collectAsStateWithLifecycle()
     var sources by remember { mutableStateOf(emptyList<CatalogSource>()) }
     var id by remember { mutableStateOf<String?>(null) }
     var label by remember { mutableStateOf("") }
@@ -38,6 +41,10 @@ fun CatalogPage(context: Context, back: () -> Unit) {
         mutableStateOf<dev.quantumink.hermesgadget.protocol.CatalogPage?>(null)
     }
     var error by remember { mutableStateOf("") }
+    var picturePage by remember {
+        mutableStateOf<dev.quantumink.hermesgadget.protocol.CatalogPage?>(null)
+    }
+    var photoKey by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     fun work(action: () -> Unit) {
         if (busy) return
@@ -58,6 +65,27 @@ fun CatalogPage(context: Context, back: () -> Unit) {
                     "Catalog needs attention. Check HTTPS, credentials and profile limits."
             })
             busy = false
+        }
+    }
+    val photo = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        val key = photoKey
+        photoKey = null
+        if (uri != null && key != null) {
+            work {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+                    val output = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(8192)
+                    while (output.size() <= 8 * 1024 * 1024) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        output.write(buffer, 0, count)
+                    }
+                    output.toByteArray()
+                } ?: error("Photo unavailable")
+                repository.selectWatchPhoto(key, bytes)
+            }
         }
     }
     LaunchedEffect(Unit) {
@@ -155,8 +183,42 @@ fun CatalogPage(context: Context, back: () -> Unit) {
                 dismissButton = { Button(onClick = { retiring = null }) { Text("Cancel") } }
             )
         }
+        picturePage?.let { page ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { picturePage = null },
+                title = { Text("Picture for ${page.profile.name}") },
+                text = {
+                    Text(
+                        "Keep the imported box picture or choose one " +
+                            "just for this watch profile. " +
+                            "A watch picture stays selected when the box refreshes. " +
+                            "The box's original is unchanged."
+                    )
+                },
+                confirmButton = {
+                    Button(enabled = !busy, onClick = {
+                        picturePage = null
+                        photoKey = page.key
+                        photo.launch(
+                            PickVisualMediaRequest(PickVisualMedia.ImageOnly)
+                        )
+                    }) { Text("Choose watch picture") }
+                },
+                dismissButton = {
+                    Column {
+                        Button(enabled = !busy, onClick = {
+                            picturePage = null
+                            work { repository.useBoxPicture(page.key) }
+                        }) { Text("Use box picture") }
+                        Button(onClick = { picturePage = null }) { Text("Cancel") }
+                    }
+                }
+            )
+        }
         pages.forEach { page ->
             Text("${page.profile.name} · ${page.sourceLabel}")
+            Text(if (page.key in watchPictures) "Using watch picture" else "Using box picture")
+            Button(enabled = !busy, onClick = { picturePage = page }) { Text("Picture options") }
             if (page.status == CatalogStatus.WITHDRAWN) {
                 Button(enabled = !busy, onClick = {
                     retiring = page
@@ -173,7 +235,7 @@ fun CatalogPage(context: Context, back: () -> Unit) {
                     CatalogStatus.AVAILABLE -> if (page.profile.gadgetUrl ==
                         null
                     ) {
-                        "Watch setup needed"
+                        "No conversation endpoint. Set up this profile on its Hermes box, then refresh."
                     } else {
                         "Catalog available"
                     }

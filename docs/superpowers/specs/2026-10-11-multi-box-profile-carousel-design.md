@@ -1,8 +1,9 @@
 # Multi-box profile carousel
 
 Status: recommended design approved by the maintainer, 2026-10-11. App and isolated
-catalog development are authorized. Live server changes will be prepared for review;
-new endpoint pairing and personal artwork review remain separate gates.
+catalog development were authorized first. The maintainer's later request to set up the
+profiles authorizes the concrete live catalog and independent listener rollout. New endpoint
+review/pairing still uses the normal watch-owner flow; optional SDK extensions remain isolated.
 
 ## Intended experience
 

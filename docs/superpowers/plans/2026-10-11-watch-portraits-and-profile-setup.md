@@ -1,0 +1,29 @@
+# Watch portraits and live profile setup
+
+Status: the maintainer requested a portrait export/regeneration prompt, explicit watch-specific
+picture overrides, and setup of missing profile connections with publication instructions.
+This instruction authorizes the reviewed live catalog rollout and preparation/configuration
+of per-profile Gadget listeners. Preserve existing pairing records; new watch enrollment uses
+the normal owner review/approval flow. Optional SDK extensions and multiplexed Gadget v2 are
+outside this change.
+
+1. Collect byte-identical original portraits into ignored owner storage with named files,
+   a manifest, ZIP and precise round PNG master/runtime dimensions. Do not regenerate art
+   unless requested; the user asked for a prompt.
+2. Retain imported box portraits as the default. Store explicit watch overrides separately,
+   keyed by source/profile identity, including cards without a Gadget URL. Keep the latest
+   box portrait cached beneath the override, allow returning to it, and preserve the choice
+   through source refresh/offline/restart. Keep pictures separate from endpoint/pairing data.
+   Test duplicate identities on different sources, replacement, clearing and retention.
+3. Inspect actual host/plugin/gateway configuration. Roll out the reviewed isolated catalogs,
+   then add distinct loopback Gadget ports and TLS publication for the actual profile homes.
+   Use stock SDK adapters; do not reuse the default profile's endpoint for other profiles.
+   Recheck live source identity, listeners, policy ETag and routes before every mutation.
+   Back up configuration and retain precise rollback. Verify each TLS WebSocket upgrade and
+   explicit catalog URL mapping; distinguish listener availability from paired readiness.
+4. Document per-box and per-profile prerequisites, plugin/config/service/TLS/access rules,
+   phone source setup, watch review/pairing, pictures, offline behavior and troubleshooting.
+   Record current personal setup privately and release instructions generically.
+5. Run strict checks, relevant owned-device tests and secret/private-value checks. Preserve
+   personal installation signatures and identities if updating/testing the devices. Record
+   what passed and what still needs a device/user/server prerequisite.

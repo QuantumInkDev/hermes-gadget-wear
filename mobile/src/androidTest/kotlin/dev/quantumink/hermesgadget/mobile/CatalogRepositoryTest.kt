@@ -25,6 +25,174 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class CatalogRepositoryTest {
+    @Test fun explicitWatchPictureOverridesChangingBoxImageBeforeSetupAndAcrossRestart() {
+        fixture { context, vault, setup, portraits ->
+            vault.saveSources(
+                listOf(
+                    CatalogSource("a", "Box", "https://a.example.invalid/catalog/v1", "synthetic")
+                )
+            )
+            var box = portraits.normalize(photo(1))
+            val fetch: (CatalogSource) -> List<CatalogProfile> = {
+                listOf(CatalogProfile("p", "Agent", null, box))
+            }
+            var repository = CatalogRepository(
+                context,
+                vault,
+                setup,
+                portraits,
+                fetchProfiles = fetch,
+                publish = { _, _ -> }
+            )
+            try {
+                repository.refresh(true).get(4, TimeUnit.SECONDS)
+                repository.selectWatchPhoto("a:p", photo(2))
+                val chosen = requireNotNull(repository.savedPages().single().profile.portrait)
+                org.junit.Assert.assertNotEquals(box.sha256, chosen.sha256)
+                box = portraits.normalize(photo(3))
+                assertEquals(
+                    chosen.sha256,
+                    repository.refresh(
+                        true
+                    ).get(4, TimeUnit.SECONDS).single().profile.portrait?.sha256
+                )
+                assertEquals(box.sha256, vault.pages().single().profile.portrait?.sha256)
+                assertTrue(repository.watchPictures.value.contains("a:p"))
+                assertNotNull(portraits.file(box.sha256))
+                repository.close()
+                repository = CatalogRepository(
+                    context,
+                    vault,
+                    setup,
+                    portraits,
+                    fetchProfiles = fetch,
+                    publish = { _, _ -> }
+                )
+                assertEquals(
+                    chosen.sha256,
+                    repository.savedPages().single().profile.portrait?.sha256
+                )
+                assertEquals(
+                    chosen.sha256,
+                    repository.refresh(
+                        true
+                    ).get(4, TimeUnit.SECONDS).single().profile.portrait?.sha256
+                )
+                repository.useBoxPicture("a:p")
+                assertEquals(box.sha256, repository.savedPages().single().profile.portrait?.sha256)
+                assertFalse(repository.watchPictures.value.contains("a:p"))
+                assertTrue(vault.overrides().isEmpty())
+                assertTrue(portraits.file(chosen.sha256) == null)
+                assertTrue(setup.profiles().isEmpty())
+            } finally {
+                repository.close()
+            }
+        }
+    }
+
+    @Test fun duplicateProfileIdsOnDifferentBoxesKeepSeparateWatchPictures() {
+        fixture { context, vault, setup, portraits ->
+            val box = portraits.normalize(photo(1))
+            vault.savePages(
+                listOf("a", "b").map { source ->
+                    CatalogPage(
+                        source,
+                        "Box",
+                        CatalogProfile("p", "Agent", null, box),
+                        CatalogStatus.OFFLINE,
+                        1
+                    )
+                }
+            )
+            val repository =
+                CatalogRepository(context, vault, setup, portraits, publish = { _, _ -> })
+            try {
+                repository.selectWatchPhoto("a:p", photo(2))
+                val pages = repository.savedPages().associateBy { it.key }
+                org.junit.Assert.assertNotEquals(
+                    box.sha256,
+                    pages.getValue("a:p").profile.portrait?.sha256
+                )
+                assertEquals(box.sha256, pages.getValue("b:p").profile.portrait?.sha256)
+                assertEquals(setOf("a:p"), repository.watchPictures.value)
+                val page = vault.pages().first { it.key == "a:p" }
+                vault.savePages(
+                    vault.pages().map {
+                        if (it.key ==
+                            page.key
+                        ) {
+                            CatalogPage(
+                                it.sourceId,
+                                it.sourceLabel,
+                                it.profile,
+                                CatalogStatus.WITHDRAWN,
+                                2
+                            )
+                        } else {
+                            it
+                        }
+                    }
+                )
+                repository.retirePage("a:p")
+                assertTrue(vault.overrides().isEmpty())
+                assertNotNull(portraits.file(box.sha256))
+            } finally {
+                repository.close()
+            }
+        }
+    }
+
+    @Test fun phoneSetupPhotoTakesPriorityOverExistingBoxPortraitWithoutChangingEndpoint() {
+        fixture { context, vault, setup, portraits ->
+            val endpoint = Endpoint.parse("wss://agent.example.invalid/gadget")
+            val profile = EndpointProfile(endpoint, "Agent", "syntheticSavedToken")
+            setup.save(profile)
+            val box = portraits.normalize(photo(1))
+            vault.savePages(
+                listOf(
+                    CatalogPage(
+                        "a",
+                        "Box",
+                        CatalogProfile("p", "Agent", endpoint.url, box),
+                        CatalogStatus.AVAILABLE,
+                        1
+                    )
+                )
+            )
+            val repository =
+                CatalogRepository(context, vault, setup, portraits, publish = { _, _ -> })
+            try {
+                repository.selectPhoto(profile, photo(2))
+                org.junit.Assert.assertNotEquals(
+                    box.sha256,
+                    repository.savedPages().single().profile.portrait?.sha256
+                )
+                assertEquals(box.sha256, vault.pages().single().profile.portrait?.sha256)
+                assertEquals(
+                    dev.quantumink.hermesgadget.protocol.EndpointProfiles.encode(listOf(profile)),
+                    dev.quantumink.hermesgadget.protocol.EndpointProfiles.encode(setup.profiles())
+                )
+                repository.useBoxPicture("a:p")
+                assertEquals(box.sha256, repository.savedPages().single().profile.portrait?.sha256)
+                assertTrue(vault.fallbacks().isEmpty())
+                vault.savePages(
+                    listOf(
+                        CatalogPage(
+                            "a",
+                            "Box",
+                            CatalogProfile("p", "Agent", endpoint.url, null),
+                            CatalogStatus.AVAILABLE,
+                            2
+                        )
+                    )
+                )
+                assertTrue(repository.savedPages().single().profile.portrait == null)
+            } finally {
+                repository.close()
+            }
+        }
+    }
+
     @Test fun confirmedSetupRemovalReclaimsFallbackCapacityAcrossRestart() {
         fixture { context, vault, setup, portraits ->
             var repository =

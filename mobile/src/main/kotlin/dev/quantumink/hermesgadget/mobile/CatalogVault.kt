@@ -71,6 +71,18 @@ class CatalogVault(
         write("fallbacks", ProfileCatalog.encodePages(pages).toByteArray())
     }
 
+    @Synchronized fun overrides(): List<CatalogPage> = read("watch-pictures")?.let { bytes ->
+        try {
+            ProfileCatalog.decodePages(bytes.toString(Charsets.UTF_8))
+        } finally {
+            bytes.fill(0)
+        }
+    }.orEmpty()
+
+    @Synchronized fun saveOverrides(pages: List<CatalogPage>) {
+        write("watch-pictures", ProfileCatalog.encodePages(pages).toByteArray())
+    }
+
     private fun key(): SecretKey {
         if (store.containsAlias(alias)) {
             return store.getKey(alias, null) as? SecretKey

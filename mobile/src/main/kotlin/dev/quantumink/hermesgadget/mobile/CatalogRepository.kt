@@ -40,6 +40,8 @@ class CatalogRepository internal constructor(
     val notice = mutableNotice.asStateFlow()
     private val mutableHealth = MutableStateFlow<Map<String, CatalogStatus>>(emptyMap())
     val health = mutableHealth.asStateFlow()
+    private val mutableWatchPictures = MutableStateFlow<Set<String>>(emptySet())
+    val watchPictures = mutableWatchPictures.asStateFlow()
     private val discovery = CatalogDiscovery { source ->
         val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(8)
         fetchProfiles(source).map { profile ->
@@ -105,7 +107,7 @@ class CatalogRepository internal constructor(
     @Synchronized fun refresh(force: Boolean = false): CompletableFuture<List<CatalogPage>> {
         active?.takeIf { !it.isDone }?.let { return it }
         val sources = vault.sources()
-        val old = combined(vault.pages())
+        val old = combined(vault.pages(), false)
         portraits.protect(references(old))
         val result = CompletableFuture<List<CatalogPage>>()
         active = result
@@ -114,8 +116,9 @@ class CatalogRepository internal constructor(
             synchronized(this) {
                 if (version != revision || result.isCancelled) return@refresh
                 mutableHealth.value = discovery.statuses()
-                vault.savePages(combined(incoming))
-                val saved = combined(incoming)
+                val raw = combined(incoming, false)
+                vault.savePages(raw)
+                val saved = combined(raw)
                 mutablePages.value = saved
                 portraits.protect(references(saved))
                 sync.execute {
@@ -145,8 +148,9 @@ class CatalogRepository internal constructor(
                     try {
                         synchronized(this) {
                             if (version != revision || result.isCancelled) return@execute
-                            val saved = combined(incoming)
-                            vault.savePages(saved)
+                            val raw = combined(incoming, false)
+                            vault.savePages(raw)
+                            val saved = combined(raw)
                             mutablePages.value = saved
                             portraits.protect(references(saved))
                             portraits.retain(references(saved))
@@ -173,7 +177,7 @@ class CatalogRepository internal constructor(
     }
 
     @Synchronized fun selectPhoto(profile: EndpointProfile, bytes: ByteArray) {
-        val previous = combined(vault.pages())
+        val previous = combined(vault.pages(), false)
         portraits.protect(references(previous))
         val portrait = portraits.normalize(bytes)
         invalidate()
@@ -194,7 +198,7 @@ class CatalogRepository internal constructor(
         )
         val oldFallback = vault.fallbacks().singleOrNull { it.profile.id == id }?.profile?.portrait
         vault.saveFallbacks(vault.fallbacks().filterNot { it.profile.id == id } + fallback)
-        val updated = combined(
+        val raw = combined(
             previous.map { page ->
                 if (page.profile.gadgetUrl == profile.endpoint.url && oldFallback != null &&
                     page.profile.portrait?.sha256 == oldFallback.sha256
@@ -214,22 +218,78 @@ class CatalogRepository internal constructor(
                 } else {
                     page
                 }
+            },
+            false
+        )
+        val keys = raw.filter {
+            it.profile.gadgetUrl == profile.endpoint.url
+        }.map { it.key }.toSet()
+        vault.saveOverrides(
+            vault.overrides().filterNot { it.key in keys } + raw.filter { it.key in keys }.map {
+                withPortrait(it, portrait)
             }
         )
-        vault.savePages(updated)
+        vault.savePages(raw)
+        val updated = combined(raw)
         mutablePages.value = updated
         portraits.protect(references(updated))
         portraits.retain(references(updated))
         publish(updated, portraits)
     }
 
+    @Synchronized fun selectWatchPhoto(key: String, bytes: ByteArray) {
+        val raw = combined(vault.pages(), false)
+        val page = raw.single { it.key == key }
+        portraits.protect(references(raw))
+        val portrait = portraits.normalize(bytes)
+        vault.saveOverrides(
+            vault.overrides().filterNot {
+                it.key == key
+            } + withPortrait(page, portrait)
+        )
+        invalidate()
+        publishPictures(raw)
+    }
+
+    @Synchronized fun useBoxPicture(key: String) {
+        val raw = combined(vault.pages(), false)
+        val page = raw.single { it.key == key }
+        val fallbackId = page.profile.gadgetUrl?.let { url ->
+            ClientSpeech.endpointId(dev.quantumink.hermesgadget.protocol.Endpoint.parse(url))
+        } ?: page.profile.id.takeIf { page.sourceId == "manual" }
+        vault.saveFallbacks(vault.fallbacks().filterNot { it.profile.id == fallbackId })
+        vault.saveOverrides(vault.overrides().filterNot { it.key == key })
+        vault.savePages(raw)
+        invalidate()
+        publishPictures(raw)
+    }
+
+    private fun publishPictures(raw: List<CatalogPage>) {
+        val effective = combined(raw)
+        mutablePages.value = effective
+        portraits.protect(references(raw))
+        portraits.retain(references(raw))
+        publish(effective, portraits)
+    }
+
+    private fun withPortrait(page: CatalogPage, portrait: PortraitDescriptor): CatalogPage =
+        CatalogPage(
+            page.sourceId,
+            page.sourceLabel,
+            CatalogProfile(page.profile.id, page.profile.name, page.profile.gadgetUrl, portrait),
+            page.status,
+            page.checkedAt
+        )
+
     @Synchronized fun retirePage(key: String) {
         val previous = vault.pages()
         require(previous.single { it.key == key }.status == CatalogStatus.WITHDRAWN)
         val remaining = previous.filterNot { it.key == key }
+        vault.saveOverrides(vault.overrides().filterNot { it.key == key })
         retireFallbacks(remaining)
-        val pages = combined(remaining)
-        vault.savePages(pages)
+        val raw = combined(remaining, false)
+        vault.savePages(raw)
+        val pages = combined(raw)
         mutablePages.value = pages
         invalidate()
         portraits.protect(references(pages))
@@ -240,8 +300,11 @@ class CatalogRepository internal constructor(
     /** Called after owner-confirmed removal from the independent phone setup vault. */
     @Synchronized fun setupRemoved() {
         retireFallbacks(vault.pages())
-        val pages = combined(vault.pages())
-        vault.savePages(pages)
+        val raw = combined(vault.pages(), false)
+        val retained = raw.map { it.key }.toSet()
+        vault.saveOverrides(vault.overrides().filter { it.key in retained })
+        vault.savePages(raw)
+        val pages = combined(raw)
         mutablePages.value = pages
         invalidate()
         portraits.protect(references(pages))
@@ -262,18 +325,24 @@ class CatalogRepository internal constructor(
     }
 
     @Synchronized fun movePage(key: String, delta: Int) {
-        val pages = combined(vault.pages()).toMutableList()
+        val pages = combined(vault.pages(), false).toMutableList()
         val index = pages.indexOfFirst { it.key == key }
         require(index >= 0)
         val target = (index + delta).coerceIn(0, pages.lastIndex)
         pages.add(target, pages.removeAt(index))
         vault.savePages(pages)
-        mutablePages.value = pages
+        val effective = combined(pages)
+        mutablePages.value = effective
         invalidate()
-        publish(pages, portraits)
+        publish(effective, portraits)
     }
 
-    private fun combined(previous: List<CatalogPage>): List<CatalogPage> {
+    private fun combined(
+        previous: List<CatalogPage>,
+        applyOverrides: Boolean = true
+    ): List<CatalogPage> {
+        val overrides = vault.overrides().associateBy { it.key }
+        mutableWatchPictures.value = overrides.keys
         val fallbacks = vault.fallbacks().associate { it.profile.id to it.profile.portrait }
         val discovered = previous.filter { it.sourceId != "manual" }.map { page ->
             val fallback = page.profile.gadgetUrl?.let { url ->
@@ -283,7 +352,7 @@ class CatalogRepository internal constructor(
                     )
                 ]
             }
-            if (page.profile.portrait == null && fallback != null) {
+            if (applyOverrides && page.profile.portrait == null && fallback != null) {
                 CatalogPage(
                     page.sourceId,
                     page.sourceLabel,
@@ -312,24 +381,24 @@ class CatalogRepository internal constructor(
                     profile.endpoint.url.takeIf {
                         profile.endpoint.isTls
                     },
-                    fallbacks[id] ?: previous.singleOrNull {
-                        it.sourceId ==
-                            "manual" &&
-                            it.profile.id == id
-                    }?.profile?.portrait
+                    fallbacks[id].takeIf { applyOverrides }
                 ),
                 CatalogStatus.AVAILABLE,
                 0
             )
         }
         val order = previous.mapIndexed { index, page -> page.key to index }.toMap()
-        return (discovered + manual).sortedBy {
+        return (discovered + manual).map { page ->
+            val portrait = overrides[page.key]?.profile?.portrait
+            if (applyOverrides && portrait != null) withPortrait(page, portrait) else page
+        }.sortedBy {
             order[it.key] ?: Int.MAX_VALUE
         }.also { ProfileCatalog.encodePages(it) }
     }
 
     private fun references(pages: List<CatalogPage>): Set<String> =
-        (pages + vault.fallbacks()).mapNotNull { it.profile.portrait?.sha256 }.toSet()
+        (pages + vault.pages() + vault.fallbacks() + vault.overrides())
+            .mapNotNull { it.profile.portrait?.sha256 }.toSet()
 
     @Synchronized private fun cleanup() {
         val keep = references(combined(vault.pages()))

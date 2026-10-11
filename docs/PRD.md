@@ -52,6 +52,14 @@ specifies an automatic phone catalog, independent TLS Gadget endpoints, stable o
 portrait/pet fallbacks and safe selection. The maintainer approved app and isolated catalog implementation;
 real-box acceptance is not claimed. The multiplexed Gadget v2 gate remains separate.
 
+The maintainer subsequently requests live setup and explicit watch-specific portrait choice.
+Imported box pictures are the default. A profile can choose a phone-selected watch picture
+that takes precedence over future box portrait refreshes; returning to the box picture uses
+its latest cached image. This choice is per source/profile, works before conversation setup,
+and never changes a box's original artwork or endpoint/pairing. Validated pets retain priority.
+The [implementation plan](superpowers/plans/2026-10-11-watch-portraits-and-profile-setup.md)
+also covers the generic publication setup instructions and private live rollout evidence.
+
 ## Milestone gates
 
 Follow M0–M8 from the brief. M0 delivers these design documents, runnable starter apps, a pure JVM module, reproducible wrapper/catalog, build/test/lint/format CI, and secret scanning. M1 adds wire models, framing, identity, handshake/heartbeat behavior, upstream vectors, and a JVM test using the actual SDK development server. M2 requires the maintainer's endpoint and approval plus a real hardware demo. M3–M8 retain the original measurements and release gates; unit tests alone never close them.

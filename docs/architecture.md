@@ -220,8 +220,13 @@ checks discard work invalidated by source edits. A conflicting or oversized merg
 update becomes Attention with its prior cards retained; healthy sources continue. Owner order
 survives offline and withdrawn records. Catalog reachability is displayed separately from the Gadget connection status.
 
-The phone persists owner-selected fallbacks separately from source metadata, preserving them
-through portrait-less refreshes and restarts. Server portraits take precedence. Image ingestion
+The phone persists legacy owner-selected fallbacks separately from source metadata, preserving
+them through portrait-less refreshes and restarts. Explicit watch-specific overrides are stored
+in a separate encrypted record keyed by source/profile identity. Keep raw box portrait metadata
+beneath the effective override so a later refresh updates it and returning to the box picture
+can restore the latest cached image without another download. Overrides work on setup-needed
+cards and do not change URLs or pairing. Protect/cache both referenced images and retire only
+unreferenced choices on confirmed removal. Image ingestion
 enforces the 8 MiB limit while protecting committed fallbacks; final/failure cleanup removes
 unreferenced files. Owner-confirmed forgetting of a withdrawn catalog card recovers historical
 capacity; phone/watch endpoint setup and URL-scoped identity files remain independent.

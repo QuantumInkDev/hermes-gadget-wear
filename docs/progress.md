@@ -1,5 +1,42 @@
 # Progress
 
+## Portrait overrides and authorized live setup — 2026-10-11
+
+The maintainer requested a private export of all portraits and an exact regeneration prompt,
+box-imported pictures with a per-profile watch override, setup of the missing conversation
+profiles, and publication instructions. The ignored pack contains 18 byte-identical originals,
+a hash manifest and ZIP; the prompt specifies 1024×1024 RGBA masters and exact 256×256
+RGBA watch PNGs, transparent round framing, safe face/headgear bounds, no text and a 256 KiB limit.
+
+The phone's encrypted source/profile overrides retain the latest imported box portrait beneath
+the chosen watch image. Native Picture options offers the system picker and Use box picture.
+Tests cover refresh/offline/restart, overrides before URL setup, duplicated profile IDs across
+boxes, withdrawal cleanup, returning to the latest box image and unchanged endpoint setup.
+Strict full checks/debug APK builds pass with warnings as errors; 71 JVM tests and all 12
+owned API 37 phone storage/repository/portrait instrumentation tests pass. The live local
+catalog and picture-choice dialog were also exercised through native phone UI.
+
+The requested setup authorizes the previously prepared live rollout. Three independent HTTPS
+catalogs now serve 12, four and two profiles and all 18 authenticated portraits; unauthenticated
+reads return 401 and unknown assets 404. Every stock SDK v0.2.0 profile now has its own listener
+and verified explicit WSS mapping. All 18 loopback upgrades and default-trust WSS upgrades from
+the respective boxes pass; this is transport evidence, not enrollment or physical speech.
+The root macOS managed Gadget pin was scoped to the default profile, and the Windows managed
+plugin allow-lists now include Gadget while preserving other entries. Normal Windows gateway
+restarts drained cleanly. Existing default service/route and approved device records remain.
+
+Catalog and conversation policy additions are restricted to the owner's exact box addresses
+and ports, validated and published with the current ETag. Existing TLS routes remain and
+Funnel stays off. Windows catalog state/assets have explicit owner SID permissions; jobs
+start at login and continue while locked. All personal values, art, logs and rollback material
+remain ignored. [Setup guide](profile-setup.md) explains what users need once per box and
+once per profile, managed settings, TLS/access, catalogs, pictures and independent pairing.
+
+Demo note: software/native UI and real server transport checks passed. Actual phone source
+entry and watch portrait delivery await the reconnected phone's USB debugging authorization.
+New endpoints still require normal watch review and profile-specific approval. Locked-phone
+catalog delivery, source loss/return, physical speech/pets, battery and publication gates remain open.
+
 ## Approved multi-box carousel — 2026-10-11
 
 The maintainer requests horizontal swipe pages for profiles across three intermittently

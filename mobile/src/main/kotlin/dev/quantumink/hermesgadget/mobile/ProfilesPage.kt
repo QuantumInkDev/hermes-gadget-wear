@@ -178,7 +178,7 @@ fun ProfilesPage(context: Context, back: () -> Unit) {
                     ActivityResultContracts.PickVisualMedia.ImageOnly
                 )
             )
-        }) { Text("Choose profile picture") }
+        }) { Text("Choose watch picture") }
         Button(enabled = !busy, onClick = { work { ProfileSync.publish(context, vault) } }) {
             Text(stringResource(R.string.profile_resync))
         }

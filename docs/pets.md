@@ -114,7 +114,10 @@ legibility, physical lip sync and ambient power remain unverified.
 ## Carousel presentation — 2026-10-11
 
 Each stable page chooses its validated endpoint pet, last good cached portrait, then the
-original neutral robot. Portraits and pets occupy a fixed 96×104 dp area; a 220 ms crossfade
+original neutral robot. The portrait can be the imported box image or an explicit per-profile
+watch override selected on the phone. An override survives box refreshes without changing
+the box's original image; a validated endpoint pet still takes priority over either portrait.
+Portraits and pets occupy a fixed 96×104 dp area; a 220 ms crossfade
 keeps the identity text in place. Only the selected available foreground page animates;
 neighbor previews and offline/ambient remain static. Existing wave/work/jump/error cues,
 legacy fallback and amplitude mouth hysteresis are retained. Ambient chooses the selected

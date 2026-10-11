@@ -1,5 +1,42 @@
 # Session status
 
+## Current continuation — portraits and live setup, 2026-10-11
+
+The maintainer requested all original portraits in one private folder, a precise round-image
+regeneration prompt, imported box pictures with explicit watch overrides, and setup of the
+missing profile endpoints with publication instructions. This request authorizes the concrete
+live rollout previously prepared for review; earlier no-deployment notes below are historical.
+
+All three owner-context catalogs are now live over private HTTPS: 12, four and two profiles.
+All 18 portraits passed authenticated HTTPS hash/length checks, with 401 without credentials.
+All 18 stock SDK v0.2.0 listeners passed loopback WebSocket checks and default-trust WSS
+upgrades from their own boxes. Catalog mappings now contain only verified explicit URLs.
+The 17 new conversation ports and three catalog routes preserve existing Serve routes;
+owner-only policy additions passed validation and ETag-guarded publication. Existing default
+conversation service/enrollment remains intact. Physical phone reachability is not inferred
+from these host-side checks. Windows jobs run at owner login and continue while locked.
+
+The root managed Gadget port pin on macOS was scoped to its default profile to prevent
+secondary port collisions. On Windows, Gadget was added to the managed plugin allow-list
+without changing other entries; normal gateway restarts drained cleanly. Private per-profile
+configuration backups, verification, access-policy evidence and rollback notes belong under
+`.local/profile-carousel/rollout-review/`; no personal endpoints, art or credentials are tracked.
+
+The phone now stores explicit watch pictures independently of the latest imported box image,
+keyed by box/profile. Picture options supports choosing an override and restoring the box
+picture, including before connection setup. Strict checks and debug APK builds pass with
+warnings as errors; 71 JVM tests and 12 owned API 37 phone vault/portrait/repository tests
+pass. Native phone UI discovery and picture controls were exercised against the live local
+catalog. Original portrait pack and exact 1024-master/256-runtime prompt are in ignored storage.
+
+Continue with real phone source entry, watch metadata/portrait delivery and per-profile URL
+review/pairing. The watch is online through its recorded isolated ADB server; the reconnected
+phone currently reports unauthorized and needs the owner's USB debugging approval. Preserve
+both original watch identities and local signatures. [Publication setup](docs/profile-setup.md)
+documents box/profile prerequisites and diagnostics. Real speech, locked-phone catalog,
+source loss/return, battery and signing/Play gates remain open; keep using [release](docs/release.md).
+
+
 Updated: 2026-10-11
 
 New maintainer scope: swipeable watch profiles from three independently available boxes,
