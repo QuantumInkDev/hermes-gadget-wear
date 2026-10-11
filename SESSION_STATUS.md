@@ -78,6 +78,8 @@ Physical pairing approval was already fulfilled. Private ADB/settings/captures r
 ## Carousel implementation checkpoint — 2026-10-11
 
 Approved app/isolated catalog work is implemented on `feature/multi-box-profile-carousel`.
+[Draft application PR #1](https://github.com/QuantumInkDev/hermes-gadget-wear/pull/1) is open
+and linked to the implementation thread. Local strict gates pass; CI is reported by the PR.
 The [five-task plan](docs/superpowers/plans/2026-10-11-multi-box-profile-carousel.md) covers
 bounded publisher/contract, phone sources/discovery/photo/cache, watch enrollment-safe roster,
 endpoint drafts, stable pager, ambient-safe review and selected-only portrait/pet transitions.
