@@ -16,5 +16,35 @@ object ProfileSync {
             5,
             TimeUnit.SECONDS
         )
+        CatalogRepository.get(context).refresh(true)
+    }
+
+    fun publishCatalog(
+        context: Context,
+        pages: List<dev.quantumink.hermesgadget.protocol.CatalogPage>,
+        portraits: PortraitStore
+    ) {
+        val client = Wearable.getDataClient(context)
+        val tasks = pages.mapNotNull { it.profile.portrait?.sha256 }.distinct().mapNotNull { hash ->
+            portraits.file(hash)?.let { file ->
+                val item = PutDataMapRequest.create(
+                    dev.quantumink.hermesgadget.protocol.ProfileCatalog.PORTRAIT_PATH + hash
+                )
+                item.dataMap.putAsset(
+                    "portrait",
+                    com.google.android.gms.wearable.Asset.createFromBytes(file.readBytes())
+                )
+                client.putDataItem(item.asPutDataRequest())
+            }
+        }
+        if (tasks.isNotEmpty()) Tasks.await(Tasks.whenAll(tasks), 5, TimeUnit.SECONDS)
+        val record = PutDataMapRequest.create(
+            dev.quantumink.hermesgadget.protocol.ProfileCatalog.DATA_PATH
+        )
+        record.dataMap.putString(
+            "pages",
+            dev.quantumink.hermesgadget.protocol.ProfileCatalog.encodePages(pages)
+        )
+        Tasks.await(client.putDataItem(record.asPutDataRequest().setUrgent()), 5, TimeUnit.SECONDS)
     }
 }

@@ -1,6 +1,8 @@
 package dev.quantumink.hermesgadget.mobile
 
 import android.content.Context
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Button
@@ -26,6 +28,11 @@ import kotlinx.coroutines.withContext
 
 @Composable
 fun ProfilesPage(context: Context, back: () -> Unit) {
+    var catalogs by remember { mutableStateOf(false) }
+    if (catalogs) {
+        CatalogPage(context) { catalogs = false }
+        return
+    }
     val vault = remember { ProfileVault(context) }
     val scope = rememberCoroutineScope()
     var profiles by remember { mutableStateOf(emptyList<EndpointProfile>()) }
@@ -62,7 +69,28 @@ fun ProfilesPage(context: Context, back: () -> Unit) {
         result.fold({ profiles = it }, { notice = context.getString(R.string.profiles_failed) })
         busy = false
     }
+    val photo = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        val selected = profiles.singleOrNull { it.endpoint.url == url }
+        if (uri != null && selected != null) {
+            work {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+                    val output = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(8192)
+                    while (output.size() <= 8 * 1024 * 1024) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        output.write(buffer, 0, count)
+                    }
+                    output.toByteArray()
+                } ?: error("Photo unavailable")
+                CatalogRepository.get(context).selectPhoto(selected, bytes)
+            }
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Button(enabled = !busy, onClick = { catalogs = true }) { Text("Boxes and discovery") }
         Text(stringResource(R.string.profiles_title))
         Text(stringResource(R.string.profile_sync_disclosure))
         profiles.forEach { profile ->
@@ -144,6 +172,13 @@ fun ProfilesPage(context: Context, back: () -> Unit) {
                 }
             }
         ) { Text(stringResource(R.string.profile_save_sync)) }
+        Button(enabled = !busy && profiles.any { it.endpoint.url == url }, onClick = {
+            photo.launch(
+                PickVisualMediaRequest(
+                    ActivityResultContracts.PickVisualMedia.ImageOnly
+                )
+            )
+        }) { Text("Choose profile picture") }
         Button(enabled = !busy, onClick = { work { ProfileSync.publish(context, vault) } }) {
             Text(stringResource(R.string.profile_resync))
         }

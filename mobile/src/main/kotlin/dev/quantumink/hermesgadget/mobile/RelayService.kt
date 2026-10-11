@@ -91,8 +91,11 @@ class RelayService : WearableListenerService() {
 
     override fun onChannelOpened(channel: ChannelClient.Channel) {
         val client = Wearable.getChannelClient(this)
+        val catalog =
+            channel.path == dev.quantumink.hermesgadget.protocol.ProfileCatalog.REFRESH_PATH
         val speech = channel.path == ClientSpeech.CHANNEL_PATH
-        if ((!speech && channel.path != RelayProtocol.CHANNEL_PATH) || !RelaySettings.enabled(
+        if ((!catalog && !speech && channel.path != RelayProtocol.CHANNEL_PATH) ||
+            !RelaySettings.enabled(
                 this
             ) ||
             !slots.tryAcquire()
@@ -125,9 +128,19 @@ class RelayService : WearableListenerService() {
         }
         try {
             workers.execute {
-                val deadline = clock.schedule({
-                    release()
-                }, if (speech) 75 else 15, TimeUnit.SECONDS)
+                val deadline = clock.schedule(
+                    {
+                        release()
+                    },
+                    if (speech) {
+                        75
+                    } else if (catalog) {
+                        20
+                    } else {
+                        15
+                    },
+                    TimeUnit.SECONDS
+                )
                 try {
                     val input = Tasks.await(client.getInputStream(channel), 5, TimeUnit.SECONDS)
                     val output = Tasks.await(
@@ -138,6 +151,23 @@ class RelayService : WearableListenerService() {
                     val pipe = RelayStreams(input, output, { client.close(channel) })
                     streams[channel] = pipe
                     check(!released.get())
+                    if (catalog) {
+                        val force = input.read() == 1
+                        check(!released.get() && RelaySettings.enabled(this))
+                        val pages = CatalogRepository.get(
+                            this
+                        ).refresh(force).get(15, TimeUnit.SECONDS)
+                        check(!released.get())
+                        val bytes = dev.quantumink.hermesgadget.protocol.ProfileCatalog.encodePages(
+                            pages
+                        ).toByteArray()
+                        val writer = java.io.DataOutputStream(output)
+                        writer.writeInt(bytes.size)
+                        writer.write(bytes)
+                        writer.flush()
+                        release()
+                        return@execute
+                    }
                     if (speech) {
                         val request = ClientSpeech.request(input)
                         val settings = TtsVault(this).selected(request.endpointId)

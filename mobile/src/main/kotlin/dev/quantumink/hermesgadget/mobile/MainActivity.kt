@@ -33,6 +33,25 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 class MainActivity : ComponentActivity() {
+    private val catalogNetwork = object : android.net.ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: android.net.Network) {
+            if (RelaySettings.enabled(this@MainActivity)) {
+                runCatching { CatalogRepository.get(this@MainActivity).refresh() }
+            }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        getSystemService(android.net.ConnectivityManager::class.java)
+            .registerDefaultNetworkCallback(catalogNetwork)
+    }
+
+    override fun onStop() {
+        getSystemService(android.net.ConnectivityManager::class.java)
+            .unregisterNetworkCallback(catalogNetwork)
+        super.onStop()
+    }
     private var enabled by mutableStateOf(false)
     private var speechPage by mutableStateOf(false)
     private var profilesPage by mutableStateOf(false)
