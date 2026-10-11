@@ -7,7 +7,9 @@ available boxes, showing profile pictures first and pets/additional animations a
 become available. The [design proposal](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md)
 was approved alongside PRD/architecture/pet updates. Discovery uses
 read-only profile/avatar metadata while conversation pairing remains independent per
-Gadget URL. No new implementation, server deployment or feature acceptance is recorded.
+Gadget URL. Isolated catalog/protocol and phone discovery implementation now exists; server deployment
+and real-box feature acceptance remain unclaimed. The carousel and final feature checks
+are still in progress.
 
 ## Repository bootstrap — 2026-10-05
 

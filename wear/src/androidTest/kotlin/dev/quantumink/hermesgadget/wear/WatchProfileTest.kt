@@ -92,7 +92,10 @@ class WatchProfileTest {
                 service.state.value.connection.conversation.reply ==
                     "You said: Original first reply"
             }
-            instrumentation.runOnMainSync { service.startRecording() }
+            instrumentation.runOnMainSync {
+                service.updateDraft("Unsent first profile")
+                service.startRecording()
+            }
             waitUntil {
                 service.state.value.connection.conversation.mode ==
                     dev.quantumink.hermesgadget.protocol.ConversationMode.LISTENING
@@ -114,6 +117,8 @@ class WatchProfileTest {
             val secondKey = vault.identity(secondProfile.endpoint).deviceId
             org.junit.Assert.assertNotEquals(firstKey, secondKey)
             assertEquals(2, service.state.value.profiles.size)
+            assertEquals("", service.state.value.draft)
+            instrumentation.runOnMainSync { service.updateDraft("Unsent second profile") }
             instrumentation.runOnMainSync { service.text("Original second reply") {} }
             waitUntil {
                 service.state.value.connection.conversation.reply ==
@@ -128,6 +133,7 @@ class WatchProfileTest {
             }
             assertEquals("", service.state.value.connection.conversation.reply)
             assertEquals(firstKey, vault.identity(firstProfile.endpoint).deviceId)
+            assertEquals("Unsent first profile", service.state.value.draft)
             instrumentation.runOnMainSync { service.removeProfile(endpoint) { service.connect() } }
             waitUntil {
                 service.state.value.profile?.endpoint?.url == second &&
@@ -137,6 +143,7 @@ class WatchProfileTest {
             assertEquals("", service.state.value.connection.conversation.reply)
             assertEquals(firstKey, vault.identity(firstProfile.endpoint).deviceId)
             assertEquals(secondKey, vault.identity(secondProfile.endpoint).deviceId)
+            assertEquals("Unsent second profile", service.state.value.draft)
         } finally {
             bound.get()?.let { service ->
                 instrumentation.runOnMainSync { service.disconnect() }

@@ -74,3 +74,16 @@ installation. Do not deploy the optional server patches into live Hermes without
 The maintainer authorizes advancement with open hardware gates. Do not mark Ultra throughput/STT/quality/battery or the untested client-speech Data Layer path complete. Multiplexed gateway v2 remains proposal-only pending explicit DECISION and upstream-maintainer feedback; no maintainer messages have been authorized.
 
 Physical pairing approval was already fulfilled. Private ADB/settings/captures remain ignored; verify restoration of the temporary device settings at the end of a hardware pass. Use only the owned Hermes test AVD for local checks and exact serials. Existing unrelated AVDs remain untouched. The public demo uses synthetic data and original procedural artwork. No PR has been created.
+
+## Carousel implementation checkpoint — 2026-10-11
+
+Approved app/isolated catalog development is on `feature/multi-box-profile-carousel`.
+The [implementation plan](docs/superpowers/plans/2026-10-11-multi-box-profile-carousel.md)
+tracks five delivery tasks. Catalog contract/publisher and encrypted phone discovery/source
+setup, ordering and photo fallback are committed. Protocol tests passed against three
+independent stock SDK processes; publisher checks passed 5/5; phone JVM tests passed 6/6
+and owned-phone vault/photo instrumentation passed 3/3. Strict phone lint/APKs passed.
+Watch roster/portrait storage and draft isolation are under verification; the pager,
+ambient-safe setup and portrait-to-pet presentation are still pending. No live service,
+personal artwork or personal enrollment has changed. Owned emulators were used through
+isolated ADB after T3 device-panel boot errors.

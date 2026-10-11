@@ -93,6 +93,18 @@ class IdentityVault(
         return selected to identity
     }
 
+    /** Discovery may rename existing setup; it cannot create enrollment or change its URL. */
+    @Synchronized fun updateLabels(labels: Map<String, String>): List<EndpointProfile> {
+        val previous = profiles()
+        val updated = previous.map { profile ->
+            labels[profile.endpoint.url]?.takeIf { it != profile.label }?.let { label ->
+                EndpointProfile(profile.endpoint, label, profile.accessToken, profile.transport)
+            } ?: profile
+        }
+        if (updated != previous) writeCatalog(updated)
+        return updated
+    }
+
     @Synchronized fun remove(url: String): Pair<EndpointProfile, DeviceIdentity>? {
         val previous = profiles()
         require(previous.any { it.endpoint.url == url })

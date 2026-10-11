@@ -58,6 +58,11 @@ data class WatchState(
     val saving: Boolean = false,
     val setupError: String = "",
     val draft: String = "",
+    val catalog: List<dev.quantumink.hermesgadget.protocol.CatalogPage> = emptyList(),
+    val catalogRefreshing: Boolean = false,
+    val catalogNotice: String = "",
+    val selectedPage: String = "",
+    val artwork: Map<String, PageArtwork> = emptyMap(),
     val path: TransportPath = TransportPath.DIRECT,
     val selecting: Boolean = false,
     val transportNotice: String = "",
@@ -90,6 +95,8 @@ class GadgetService : Service() {
     private val selectionEpoch = AtomicLong()
     private val epoch = AtomicLong()
     private val mediaLock = Any()
+    private val drafts = ProfileDrafts()
+    private lateinit var catalog: WatchCatalogController
     private val petWorker = java.util.concurrent.ThreadPoolExecutor(
         1,
         1,
@@ -124,6 +131,20 @@ class GadgetService : Service() {
         super.onCreate()
         capture = PcmCapture(this)
         petCache = PetCache(this)
+        catalog = WatchCatalogController(
+            this,
+            petCache,
+            allowed = { pages ->
+                ProfilePages.merge(mutableState.value.profiles, pages).size <= 32
+            },
+            loaded = ::applyCatalog,
+            busy = { refreshing, notice ->
+                mutableState.update {
+                    it.copy(catalogRefreshing = refreshing, catalogNotice = notice)
+                }
+            },
+            artwork = { artwork -> mutableState.update { it.copy(artwork = artwork) } }
+        )
         playback = PcmPlayback(
             this,
             onInterrupted = { connection?.report("Playback interrupted.") },
@@ -195,6 +216,7 @@ class GadgetService : Service() {
                             configure(saved.first!!, requireNotNull(saved.second))
                         }
                         mutableState.update { it.copy(loading = false, profiles = saved.third) }
+                        catalog.start()
                     },
                     onFailure = {
                         mutableState.update {
@@ -230,6 +252,60 @@ class GadgetService : Service() {
         visible = true
         timerLauncher = timer
         brightness = screenBrightness
+        refreshCatalog(false)
+    }
+
+    fun refreshCatalog(force: Boolean = true) {
+        if (visible) catalog.refresh(force)
+    }
+
+    private fun applyCatalog(
+        pages: List<dev.quantumink.hermesgadget.protocol.CatalogPage>,
+        selected: String
+    ) {
+        if (ProfilePages.merge(mutableState.value.profiles, pages).size > 32) {
+            mutableState.update {
+                it.copy(catalogNotice = "At most 32 pages are supported. Saved setup was kept.")
+            }
+            return
+        }
+        mutableState.update {
+            it.copy(catalog = pages, selectedPage = it.selectedPage.ifBlank { selected })
+        }
+        if (!::vault.isInitialized) return
+        storage.execute {
+            val profiles = runCatching {
+                vault.updateLabels(
+                    pages.mapNotNull { page ->
+                        page.profile.gadgetUrl?.let { it to page.profile.name }
+                    }.toMap()
+                )
+            }
+            main.post {
+                if (destroyed) return@post
+                profiles.onSuccess { updated ->
+                    mutableState.update { watch ->
+                        watch.copy(
+                            profiles = updated,
+                            profile = updated.singleOrNull {
+                                it.endpoint.url == watch.profile?.endpoint?.url
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun preparePages(keys: List<String>) {
+        val watch = mutableState.value
+        val pages = ProfilePages.merge(watch.profiles, watch.catalog)
+        catalog.prepare(keys.mapNotNull { key -> pages.singleOrNull { it.key == key } })
+    }
+
+    fun rememberPage(key: String) {
+        mutableState.update { it.copy(selectedPage = key) }
+        catalog.rememberPage(key)
     }
 
     fun hidden() {
@@ -294,6 +370,7 @@ class GadgetService : Service() {
     fun removeProfile(url: String, ready: () -> Unit) = changeProfiles({
         val saved = vault.remove(url)
         petCache.remove(url)
+        drafts.remove(url)
         saved
     }, ready)
 
@@ -311,7 +388,16 @@ class GadgetService : Service() {
                 result.fold({ (saved, profiles) ->
                     if (saved == null) {
                         savedIdentity = null
-                        mutableState.value = WatchState(loading = false, profiles = profiles)
+                        mutableState.update {
+                            it.copy(
+                                profile = null,
+                                profiles = profiles,
+                                saving = false,
+                                draft = "",
+                                pet = null,
+                                connection = ConnectionState()
+                            )
+                        }
                     } else {
                         configure(saved.first, saved.second)
                         mutableState.update { it.copy(saving = false, profiles = profiles) }
@@ -477,6 +563,7 @@ class GadgetService : Service() {
     }
 
     fun updateDraft(value: String) {
+        drafts.update(value)
         mutableState.update { it.copy(draft = value.take(4096)) }
     }
 
@@ -562,6 +649,8 @@ class GadgetService : Service() {
 
     fun reset() {
         closeConnection()
+        drafts.clear()
+        catalog.reset()
         mutableState.update { it.copy(saving = true) }
         storage.execute {
             val result = runCatching {
@@ -849,7 +938,7 @@ class GadgetService : Service() {
         mutableState.update {
             it.copy(
                 profile = profile,
-                draft = if (sameEndpoint) it.draft else "",
+                draft = drafts.select(profile.endpoint.url),
                 connection = ConnectionState(
                     conversation = ConversationState(reply = previousReply)
                 ),
@@ -1024,6 +1113,7 @@ class GadgetService : Service() {
 
     override fun onDestroy() {
         destroyed = true
+        catalog.close()
         closeConnection()
         WatchSurfaces.publish(
             this,
