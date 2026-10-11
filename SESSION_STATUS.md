@@ -144,6 +144,27 @@ conflicting sources remain isolated, phone-selected fallbacks survive refresh/re
 portrait ingestion and replicated retention are bounded, and owner-confirmed withdrawal
 retirement frees catalog capacity without removing endpoint setup or pairing keys.
 
-CONTINUE HERE: review the private rollout mappings and publication/rollback notes. Real catalog publication, owner artwork,
-new endpoint pairing and hardware acceptance are next separate review steps. Existing
-battery/speech/provider/Play gates in docs/release.md remain open.
+## Concrete catalog rollout review — 2026-10-11
+
+Three private packages now include explicit stable-ID/portrait mappings, hash-checked offline
+Pillow wheels, dedicated credential generation, owner-context job definitions and guarded
+installation/HTTPS publication/removal controllers. The scoped catalog-access proposal passed
+the provider validation endpoint without a policy write. Existing source profile/config/art
+hashes and Serve configuration are unchanged; no live source catalog was deployed.
+Private portrait exports meet the watch limits and the review gallery is in this thread.
+
+Five private package tests and seven publisher tests pass with warnings as errors. An actual
+isolated macOS launchd catalog started, served authenticated portraits and was removed with
+its port released and state preserved. Windows definitions parsed on both actual hosts with
+their required cmdlets available; Windows native job execution and HTTPS publication remain
+untested. Public app/publisher code was unchanged during this preparation.
+
+CONTINUE HERE: obtain the approved design's live publication/artwork review for the concrete
+packages in `.local/profile-carousel/rollout-review/packages/` and private scoped policy
+proposal/controller. Recheck hashes, source availability, port and current Serve/policy ETag
+before deployment; controllers refuse stale review state. The private package README gives
+installation, start, authenticated checks, publication and ownership-checked rollback steps.
+Then configure the reviewed sources through the phone UI and verify real watch portrait
+delivery, stable source loss/return and locked-phone refresh. Setup-needed cards remain
+non-conversational until their independent Gadget endpoints and new pairing are approved.
+Existing battery/speech/provider/Play gates in docs/release.md remain open.

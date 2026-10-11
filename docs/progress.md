@@ -74,6 +74,32 @@ cleared. See the [physical report](physical-results.md). Live three-box catalog/
 delivery, manual vertical/rotary usability and the remaining release matrix stay open.
 No new endpoint pairing or live catalog deployment was performed.
 
+## Live catalog rollout preparation — 2026-10-11
+
+The [rollout preparation plan](superpowers/plans/2026-10-11-catalog-rollout-review.md)
+now has three concrete private source packages: explicit stable-ID mappings, references to
+existing portraits, hash-checked offline Pillow wheels, a dedicated credential generated
+only at installation, owner-context job definitions and guarded publication/removal controls.
+The proposed catalog-only tailnet grant passes the provider's validation endpoint; it has
+not been applied. Current listener/Serve observations are recorded privately, and publication
+refuses drift instead of replacing existing routes. New conversation URLs remain unmapped.
+
+Validation: five private package tests pass with warnings as errors, including actual
+isolated macOS installation, authenticated catalog/portrait reads, launchd startup and removal,
+input preservation, and refusal of tampered packages, existing directories, occupied ports or
+changed publication configuration. The isolated job/LaunchAgent was removed and its port
+released. Both proposed Windows definitions parse on their respective hosts with all required
+task cmdlets available; actual Windows job startup remains untested. Seven publisher tests
+pass. All private portrait exports meet dimension/length/hash/metadata limits. Source
+profile/config/portrait hashes and Serve configuration are unchanged after preparation.
+
+Demo note: the private portrait review is rendered in the implementation thread and stored
+with the ignored rollout packages. It is an export preview, not a real-watch artwork result.
+No live catalog, policy, Gadget configuration, enrollment or optional SDK patch was changed.
+Next is the approved design's concrete live publication/artwork review, followed by real
+phone/watch catalog delivery and source loss/return. Setup-needed profiles still require
+independently reviewed Gadget endpoints and pairing; speech/battery/Play gates remain open.
+
 ## Repository bootstrap — 2026-10-05
 
 Prepared a public MIT repository with a README, the project brief, project-specific agent instructions, and development/secret ignores. The brief's maintainer-only section is stored locally under the ignored `.local/` directory.
