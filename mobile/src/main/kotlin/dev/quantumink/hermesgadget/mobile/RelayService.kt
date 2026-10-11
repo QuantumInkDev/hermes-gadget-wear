@@ -24,7 +24,6 @@ import dev.quantumink.hermesgadget.protocol.RelayStreams
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
-import java.util.concurrent.Semaphore
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -65,10 +64,12 @@ class RelayStopReceiver : BroadcastReceiver() {
 class RelayService : WearableListenerService() {
     private val speechApi = ElevenLabsApi()
     private val speechCalls = ConcurrentHashMap<ChannelClient.Channel, okhttp3.Call>()
-    private val slots = Semaphore(2)
+    private val capacity = RelayCapacity()
     private val streams = ConcurrentHashMap<ChannelClient.Channel, RelayStreams>()
     private val pumps = ConcurrentHashMap<ChannelClient.Channel, DuplexPump>()
     private val workers = ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS, ArrayBlockingQueue(2))
+    private val catalogWorkers =
+        ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, ArrayBlockingQueue(1))
     private val clock = Executors.newSingleThreadScheduledExecutor()
     private val foreground = AtomicBoolean(false)
     private val owned = ConcurrentHashMap<ChannelClient.Channel, () -> Unit>()
@@ -85,7 +86,7 @@ class RelayService : WearableListenerService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (streams.isEmpty() && pumps.isEmpty() && slots.availablePermits() == 2) stopSelf()
+        if (streams.isEmpty() && pumps.isEmpty() && capacity.idle) stopSelf()
         return START_NOT_STICKY
     }
 
@@ -97,9 +98,13 @@ class RelayService : WearableListenerService() {
         if ((!catalog && !speech && channel.path != RelayProtocol.CHANNEL_PATH) ||
             !RelaySettings.enabled(
                 this
-            ) ||
-            !slots.tryAcquire()
+            )
         ) {
+            client.close(channel)
+            return
+        }
+        val lease = capacity.acquire(catalog)
+        if (lease == null) {
             client.close(channel)
             return
         }
@@ -112,12 +117,8 @@ class RelayService : WearableListenerService() {
                 RelaySettings.sessions.remove(channel)
                 owned.remove(channel)
                 client.close(channel)
-                slots.release()
-                if (slots.availablePermits() == 2) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    foreground.set(false)
-                    stopSelf()
-                }
+                lease.close()
+                releaseForegroundIfIdle()
             }
         }
         RelaySettings.sessions[channel] = release
@@ -127,7 +128,8 @@ class RelayService : WearableListenerService() {
             return
         }
         try {
-            workers.execute {
+            val executor = if (catalog) catalogWorkers else workers
+            executor.execute {
                 val deadline = clock.schedule(
                     {
                         release()
@@ -223,6 +225,14 @@ class RelayService : WearableListenerService() {
         if (owned.isEmpty()) RelaySettings.report(getString(R.string.relay_idle))
     }
 
+    @Synchronized private fun releaseForegroundIfIdle() {
+        if (capacity.idle) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            foreground.set(false)
+            stopSelf()
+        }
+    }
+
     @Synchronized private fun beginForeground(): Boolean = try {
         if (!foreground.get()) {
             startForegroundService(Intent(this, RelayService::class.java))
@@ -268,6 +278,7 @@ class RelayService : WearableListenerService() {
         owned.values.toList().forEach { it() }
         pumps.values.forEach { it.close() }
         workers.shutdownNow()
+        catalogWorkers.shutdownNow()
         clock.shutdownNow()
         speechApi.close()
         super.onDestroy()

@@ -25,6 +25,127 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class CatalogRepositoryTest {
+    @Test fun confirmedSetupRemovalReclaimsFallbackCapacityAcrossRestart() {
+        fixture { context, vault, setup, portraits ->
+            var repository =
+                CatalogRepository(context, vault, setup, portraits, publish = { _, _ -> })
+            try {
+                repeat(33) { index ->
+                    val profile =
+                        EndpointProfile(
+                            Endpoint.parse("wss://agent$index.example.invalid/gadget"),
+                            "Agent",
+                            ""
+                        )
+                    setup.save(profile)
+                    repository.selectPhoto(profile, photo(index))
+                    val hash = requireNotNull(
+                        repository.savedPages().single().profile.portrait
+                    ).sha256
+                    setup.remove(profile.endpoint.url)
+                    repository.setupRemoved()
+                    assertTrue(repository.savedPages().isEmpty())
+                    assertTrue(
+                        "Removed setup must free its fallback record",
+                        vault.fallbacks().isEmpty()
+                    )
+                    assertTrue(
+                        "Unreferenced portrait must be retired",
+                        portraits.file(hash) == null
+                    )
+                    repository.close()
+                    repository =
+                        CatalogRepository(context, vault, setup, portraits, publish = { _, _ -> })
+                }
+            } finally {
+                repository.close()
+            }
+        }
+    }
+
+    @Test fun sourceReferenceKeepsFallbackUntilConfirmedCardRetirement() {
+        fixture { context, vault, setup, portraits ->
+            val profile =
+                EndpointProfile(Endpoint.parse("wss://agent.example.invalid/gadget"), "Agent", "")
+            setup.save(profile)
+            vault.savePages(
+                listOf(
+                    CatalogPage(
+                        "a",
+                        "Box",
+                        CatalogProfile("p", "Agent", profile.endpoint.url, null),
+                        CatalogStatus.OFFLINE,
+                        1
+                    )
+                )
+            )
+            val repository =
+                CatalogRepository(context, vault, setup, portraits, publish = { _, _ -> })
+            try {
+                repository.selectPhoto(profile, photo(1))
+                val chosen = requireNotNull(repository.savedPages().single().profile.portrait)
+                val initial = repository.savedPages().single()
+                vault.savePages(
+                    listOf(
+                        CatalogPage(
+                            initial.sourceId,
+                            initial.sourceLabel,
+                            initial.profile,
+                            CatalogStatus.WITHDRAWN,
+                            2
+                        )
+                    )
+                )
+                repository.retirePage(initial.key)
+                assertEquals("manual", repository.savedPages().single().sourceId)
+                assertEquals(1, vault.fallbacks().size)
+                assertNotNull(portraits.file(chosen.sha256))
+                vault.savePages(
+                    listOf(
+                        CatalogPage(
+                            initial.sourceId,
+                            initial.sourceLabel,
+                            initial.profile,
+                            CatalogStatus.OFFLINE,
+                            3
+                        )
+                    )
+                )
+                setup.remove(profile.endpoint.url)
+                repository.setupRemoved()
+                assertEquals(1, vault.fallbacks().size)
+                assertNotNull(portraits.file(chosen.sha256))
+                val page = repository.savedPages().single()
+                vault.savePages(
+                    listOf(
+                        CatalogPage(
+                            page.sourceId,
+                            page.sourceLabel,
+                            page.profile,
+                            CatalogStatus.WITHDRAWN,
+                            2
+                        )
+                    )
+                )
+                repository.retirePage(page.key)
+                assertTrue(vault.fallbacks().isEmpty())
+                assertTrue(portraits.file(chosen.sha256) == null)
+            } finally {
+                repository.close()
+            }
+        }
+    }
+
+    private fun photo(color: Int): ByteArray {
+        val bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(android.graphics.Color.BLUE + color)
+        }
+        return ByteArrayOutputStream().also {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            bitmap.recycle()
+        }.toByteArray()
+    }
+
     @Test fun ownerFallbackSurvivesPortraitlessRefreshAndRestart() {
         fixture { context, vault, setup, portraits ->
             val endpoint = Endpoint.parse("wss://synthetic.example.invalid/gadget")

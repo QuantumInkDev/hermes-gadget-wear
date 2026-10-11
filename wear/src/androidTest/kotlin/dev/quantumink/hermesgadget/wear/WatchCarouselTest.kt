@@ -49,10 +49,17 @@ class WatchCarouselTest {
     @Test fun changedManualEndpointRequiresReviewWithoutOldConnection() =
         runScenario(false, changeEndpoint = true)
 
+    @Test fun oversizedRestoredCatalogLeavesSavedSetupUsable() =
+        runScenario(false, oversizedRestore = true)
+
+    @Test fun manualSetupCannotExceedCombinedPageCapacity() = runScenario(false, capacity = true)
+
     private fun runScenario(
         unapprovedStart: Boolean,
         refreshPortrait: Boolean = false,
-        changeEndpoint: Boolean = false
+        changeEndpoint: Boolean = false,
+        oversizedRestore: Boolean = false,
+        capacity: Boolean = false
     ) {
         val urls = listOf(
             "syntheticEndpoint",
@@ -114,7 +121,23 @@ class WatchCarouselTest {
         )
         vault.select(urls.first())
         WatchCatalogVault(context).apply {
-            savePages(if (unapprovedStart) pages + pending else pages)
+            val extra = (0 until if (oversizedRestore) 32 else 29).map { index ->
+                CatalogPage(
+                    "box",
+                    "Pending box",
+                    CatalogProfile("pending$index", "Pending agent", null, null),
+                    CatalogStatus.OFFLINE,
+                    1
+                )
+            }
+            savePages(
+                when {
+                    oversizedRestore -> extra
+                    capacity -> pages + extra
+                    unapprovedStart -> pages + pending
+                    else -> pages
+                }
+            )
             select(if (unapprovedStart) pending.key else pages.first().key)
         }
         listOf(Manifest.permission.POST_NOTIFICATIONS, Manifest.permission.RECORD_AUDIO).forEach {
@@ -151,6 +174,49 @@ class WatchCarouselTest {
             assertTrue(latch.await(5, TimeUnit.SECONDS))
             val service = requireNotNull(bound.get())
             waitUntil { !service.state.value.loading }
+            if (oversizedRestore || capacity) {
+                assertEquals(3, service.state.value.profiles.size)
+                val before = File(context.filesDir, "gadget-vault").listFiles().orEmpty()
+                    .filter { it.name.startsWith("identity-") }.map { it.name }.toSet()
+                if (oversizedRestore) {
+                    assertTrue(service.state.value.catalog.isEmpty())
+                    assertTrue(service.state.value.catalogNotice.contains("32"))
+                } else {
+                    assertEquals(
+                        32,
+                        ProfilePages.merge(
+                            service.state.value.profiles,
+                            service.state.value.catalog
+                        ).size
+                    )
+                    instrumentation.runOnMainSync {
+                        service.save(
+                            "wss://new.example.invalid/gadget",
+                            "New agent",
+                            "",
+                            false,
+                            false
+                        ) {
+                        }
+                    }
+                    waitUntil {
+                        !service.state.value.saving &&
+                            service.state.value.setupError.isNotEmpty()
+                    }
+                    assertEquals(3, vault.profiles().size)
+                }
+                val edited = CountDownLatch(1)
+                instrumentation.runOnMainSync {
+                    service.save(urls.first(), "Renamed", "", true, true) { edited.countDown() }
+                }
+                assertTrue("Existing setup remains editable", edited.await(5, TimeUnit.SECONDS))
+                assertEquals(
+                    before,
+                    File(context.filesDir, "gadget-vault").listFiles().orEmpty()
+                        .filter { it.name.startsWith("identity-") }.map { it.name }.toSet()
+                )
+                return
+            }
             if (unapprovedStart) {
                 waitUntil { service.state.value.catalog.any { it.key == pending.key } }
                 SystemClock.sleep(1200)

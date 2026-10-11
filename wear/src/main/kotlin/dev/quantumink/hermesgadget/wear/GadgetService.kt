@@ -124,6 +124,15 @@ class GadgetService : Service() {
     private var destroyed = false
     private var savedIdentity: DeviceIdentity? = null
 
+    @Volatile private var pendingSetup: EndpointProfile? = null
+    private var rejectedCatalogNotice = ""
+
+    private fun rosterProfiles(): List<EndpointProfile> {
+        val profiles = mutableState.value.profiles
+        val pending = pendingSetup ?: return profiles
+        return profiles.filterNot { it.endpoint.url == pending.endpoint.url } + pending
+    }
+
     @Volatile private var opusReady = false
     private var advertisedActions: Set<String> = emptySet()
 
@@ -135,12 +144,15 @@ class GadgetService : Service() {
             this,
             petCache,
             allowed = { pages ->
-                ProfilePages.merge(mutableState.value.profiles, pages).size <= 32
+                ProfilePages.merge(rosterProfiles(), pages).size <= 32
             },
             loaded = ::applyCatalog,
             busy = { refreshing, notice ->
                 mutableState.update {
-                    it.copy(catalogRefreshing = refreshing, catalogNotice = notice)
+                    it.copy(
+                        catalogRefreshing = refreshing,
+                        catalogNotice = rejectedCatalogNotice.ifBlank { notice }
+                    )
                 }
             },
             artwork = { artwork -> mutableState.update { it.copy(artwork = artwork) } }
@@ -263,15 +275,22 @@ class GadgetService : Service() {
         pages: List<dev.quantumink.hermesgadget.protocol.CatalogPage>,
         selected: String
     ) {
-        if (ProfilePages.merge(mutableState.value.profiles, pages).size > 32) {
+        if (ProfilePages.merge(rosterProfiles(), pages).size > 32) {
+            rejectedCatalogNotice = "At most 32 pages are supported. Saved setup was kept. " +
+                "Remove unused pages on the phone and refresh."
             mutableState.update {
-                it.copy(catalogNotice = "At most 32 pages are supported. Saved setup was kept.")
+                it.copy(
+                    loading = false,
+                    catalogNotice = rejectedCatalogNotice
+                )
             }
             return
         }
+        rejectedCatalogNotice = ""
         mutableState.update {
             it.copy(
                 loading = false,
+                catalogNotice = "",
                 catalog = pages,
                 selectedPage = it.selectedPage.ifBlank {
                     selected
@@ -358,6 +377,19 @@ class GadgetService : Service() {
             }
             return
         }
+        val profiles = mutableState.value.profiles.filterNot {
+            it.endpoint.url == profile.endpoint.url
+        } + profile
+        if (ProfilePages.merge(profiles, mutableState.value.catalog).size > 32) {
+            mutableState.update {
+                it.copy(
+                    setupError = "At most 32 pages are supported. " +
+                        "Remove unused pages before adding setup."
+                )
+            }
+            return
+        }
+        pendingSetup = profile
         mutableState.update { it.copy(saving = true, setupError = "") }
         storage.execute {
             val result = runCatching { vault.save(profile) to vault.profiles() }
@@ -367,10 +399,12 @@ class GadgetService : Service() {
                     onSuccess = { saved ->
                         configure(profile, saved.first)
                         mutableState.update { it.copy(saving = false, profiles = saved.second) }
+                        pendingSetup = null
                         rememberActivePage()
                         ready()
                     },
                     onFailure = {
+                        pendingSetup = null
                         mutableState.update {
                             it.copy(saving = false, setupError = getString(R.string.storage_failed))
                         }

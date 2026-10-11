@@ -131,3 +131,43 @@ class PublisherTest(unittest.TestCase):
             server.shutdown()
             server.server_close()
             worker.join(2)
+
+    def test_slow_tls_headers_release_all_workers_at_absolute_deadline(self):
+        cert, key = self.root / 'cert.pem', self.root / 'key.pem'
+        subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', str(key), '-out', str(cert), '-subj', '/CN=localhost', '-days', '1'], check=True, capture_output=True)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(cert, key)
+        server = self.publisher.create_server(('127.0.0.1', 0), self.mapping, self.root / 'state', 'synthetic-only-token', context)
+        server.request_timeout = .6
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        clients, senders = [], []
+        stop = threading.Event()
+        def trickle(client):
+            try:
+                while not stop.wait(.04):
+                    client.sendall(b'x')
+            except OSError:
+                pass
+        try:
+            for _ in range(4):
+                raw = socket.create_connection(server.server_address, timeout=2)
+                client = ssl._create_unverified_context().wrap_socket(raw, server_hostname='localhost')
+                clients.append(client)
+                client.sendall(b'GET /catalog/v1 HTTP/1.0\r\nX-Slow: ')
+                sender = threading.Thread(target=trickle, args=(client,))
+                sender.start()
+                senders.append(sender)
+            time.sleep(1.1)
+            request = urllib.request.Request(f'https://127.0.0.1:{server.server_port}/catalog/v1', headers={'Authorization': 'Bearer synthetic-only-token'})
+            with urllib.request.urlopen(request, timeout=2, context=ssl._create_unverified_context()) as response:
+                self.assertEqual(200, response.status)
+        finally:
+            stop.set()
+            for sender in senders:
+                sender.join(2)
+            for client in clients:
+                client.close()
+            server.shutdown()
+            server.server_close()
+            worker.join(2)

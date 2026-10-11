@@ -186,6 +186,7 @@ fun ProfilesPage(context: Context, back: () -> Unit) {
             val deleted = profiles.single { it.endpoint.url == url }
             work {
                 vault.remove(deleted.endpoint.url)
+                CatalogRepository.get(context).setupRemoved()
                 val speech = TtsVault(context)
                 speech.save(
                     ClientSpeech.endpointId(deleted.endpoint),

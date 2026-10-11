@@ -226,13 +226,39 @@ class CatalogRepository internal constructor(
     @Synchronized fun retirePage(key: String) {
         val previous = vault.pages()
         require(previous.single { it.key == key }.status == CatalogStatus.WITHDRAWN)
-        val pages = combined(previous.filterNot { it.key == key })
+        val remaining = previous.filterNot { it.key == key }
+        retireFallbacks(remaining)
+        val pages = combined(remaining)
         vault.savePages(pages)
         mutablePages.value = pages
         invalidate()
         portraits.protect(references(pages))
         portraits.retain(references(pages))
         publish(pages, portraits)
+    }
+
+    /** Called after owner-confirmed removal from the independent phone setup vault. */
+    @Synchronized fun setupRemoved() {
+        retireFallbacks(vault.pages())
+        val pages = combined(vault.pages())
+        vault.savePages(pages)
+        mutablePages.value = pages
+        invalidate()
+        portraits.protect(references(pages))
+        portraits.retain(references(pages))
+        publish(pages, portraits)
+    }
+
+    private fun retireFallbacks(pages: List<CatalogPage>) {
+        val retained = setup.profiles().map { ClientSpeech.endpointId(it.endpoint) }.toSet() +
+            pages.filter { it.sourceId != "manual" }.mapNotNull { page ->
+                page.profile.gadgetUrl?.let { url ->
+                    ClientSpeech.endpointId(
+                        dev.quantumink.hermesgadget.protocol.Endpoint.parse(url)
+                    )
+                }
+            }
+        vault.saveFallbacks(vault.fallbacks().filter { it.profile.id in retained })
     }
 
     @Synchronized fun movePage(key: String, delta: Int) {

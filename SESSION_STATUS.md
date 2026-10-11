@@ -75,6 +75,32 @@ The maintainer authorizes advancement with open hardware gates. Do not mark Ultr
 
 Physical pairing approval was already fulfilled. Private ADB/settings/captures remain ignored; verify restoration of the temporary device settings at the end of a hardware pass. Use only the owned Hermes test AVD for local checks and exact serials. Existing unrelated AVDs remain untouched. The public demo uses synthetic data and original procedural artwork. No PR existed at the start of carousel implementation.
 
+## Current requested-review and physical-watch continuation
+
+The maintainer-requested PR #1 review of `235ba3c` identified four additional Important
+findings, all addressed with failing-then-passing regressions. Strict full checks/builds
+pass with 71 JVM tests (zero failures/errors/skips), seven publisher tests and ten owned-phone
+instrumentation tests. Owned-watch combined-capacity recovery, rejection before enrollment
+and the original three-profile swipe/draft/recording/approval checks pass. See
+[review resolutions](docs/carousel-review.md) and the
+[follow-up plan](docs/superpowers/plans/2026-10-11-carousel-review-followup.md).
+
+A physical watch pass is authorized for existing approved endpoints. The real phone received
+the matching-signature carousel build. Both existing encrypted watch identities were backed
+up and the installed APK's v2 signing certificate matches the local debug build. Full/stream/
+bounded-chunk rollback transfers repeatedly stall while the watch is awake and unlocked.
+No successful watch update or physical carousel acceptance is recorded for this pass.
+The maintainer reset Wireless debugging and supplied a new port; it currently refuses
+connection at the previous address. Verify the current full address and port before retrying.
+Private backups and helpers are in `.local/profile-carousel/physical-watch/`.
+
+The maintainer authorized a temporary watch screen timeout: original 15 seconds, confirmed
+extended to 10 minutes. Its original value is in private `watch-settings-before.json`.
+RESTORE AND VERIFY THAT VALUE when this physical pass ends. Preserve both identity ciphertexts
+and existing setup; never reset the personal app, run owned-emulator seed/reset tests on it,
+or replace it with a CI-signed APK. Live publisher deployment and new URL pairing remain
+separate approvals; battery/provider/Play gates are still open.
+
 ## Carousel implementation checkpoint — 2026-10-11
 
 Approved app/isolated catalog work is implemented on `feature/multi-box-profile-carousel`.

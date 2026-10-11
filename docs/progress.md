@@ -47,6 +47,27 @@ URLs and owner artwork remain review steps. No live service, personal artwork, c
 ACL/Serve policy or existing enrollment was changed. Physical three-box TLS relay, source
 loss/recovery, background delivery, artwork/lip sync and battery remain acceptance gates.
 
+## Requested carousel PR review follow-up — 2026-10-11
+
+The maintainer-requested review of draft PR #1 found four additional Important defects.
+Each was reproduced then fixed: oversized restored roster and combined manual-setup
+capacity; independent catalog admission/execution alongside relay and speech; an absolute
+TLS/HTTP publisher deadline; and owner-confirmed fallback-photo retirement with preserved
+saved/offline references. [Resolutions](carousel-review.md) and the
+[follow-up plan](superpowers/plans/2026-10-11-carousel-review-followup.md) record the scope.
+Strict full checks/builds pass with warnings as errors: 71 JVM tests, zero failures/errors/
+skips; seven publisher tests; ten owned-phone storage/repository instrumentation tests.
+Owned-watch overflow recovery, manual setup at capacity and the original three-page
+swipe/draft/recording/approval regression pass independently against synthetic SDK servers.
+
+The maintainer also authorized a physical watch pass and temporary screen-timeout extension.
+Existing encrypted enrollment was backed up and its installed signing certificate matched
+the local build. Large ADB transfers stalled even while awake/unlocked, so the physical
+carousel update and acceptance are pending a reachable wireless-debugging connection. The
+real phone received the matching-signature carousel build. No new endpoint pairing or live
+catalog deployment was performed. Keep device settings restoration explicit in the physical
+report; no partial transfer or emulator check counts as personal-watch acceptance.
+
 ## Repository bootstrap — 2026-10-05
 
 Prepared a public MIT repository with a README, the project brief, project-specific agent instructions, and development/secret ignores. The brief's maintainer-only section is stored locally under the ignored `.local/` directory.

@@ -1,11 +1,11 @@
 # Carousel review resolutions — 2026-10-11
 
 A fresh read-only whole-branch reviewer found eight Important issues and no Critical or
-Minor findings. The implementer reproduced and fixed them in one test-driven pass; no
-second review round is claimed. Strict build/check/lint/format with warnings as errors
-passes: 69 JVM tests, zero failures/errors/skips. The publisher passes six Python tests.
-Owned API 37 phone storage/repository instrumentation passes eight tests. Watch regressions
-below ran individually on the owned emulator with actual isolated SDK processes.
+Minor findings. The implementer reproduced and fixed them in one test-driven pass. The
+maintainer then requested an additional PR review; its four Important findings are resolved below. Strict
+build/check/lint/format with warnings as errors passes: 71 JVM tests, zero failures/errors/
+skips. The publisher passes seven Python tests. Owned API 37 phone storage/repository
+instrumentation passes ten tests. Watch regressions below ran individually on the owned emulator with actual isolated SDK processes.
 
 | Finding | Result and regression observed RED → GREEN |
 | --- | --- |
@@ -32,6 +32,23 @@ phone/watch connection can still appear as a manual card. At the combined watch 
 use the existing owner-controlled setup removal if retiring that connection too; its
 URL-scoped identity/known markers remain until explicit full reset. No automatic cleanup
 removes setup, changes a canonical URL, or rotates a pairing key.
+
+## Maintainer-requested PR review
+
+The second read-only review examined `235ba3c` and found four Important issues, with no
+Critical or Minor findings. Each defect was reproduced before its fix; no additional
+review round is claimed. The follow-up is recorded in the
+[implementation plan](superpowers/plans/2026-10-11-carousel-review-followup.md).
+
+| Finding | Resolution and RED → GREEN regression |
+| --- | --- |
+| Restored catalog plus saved setup exceeded 32 pages and left startup loading forever | Reject oversize metadata while ending startup loading and preserving an actionable notice and editable setup; validate the combined roster before creating enrollment and reserve pending setup during sync; `oversizedRestoredCatalogLeavesSavedSetupUsable`, `manualSetupCannotExceedCombinedPageCapacity` |
+| A slow catalog channel consumed a conversation/speech slot | Separate one bounded catalog slot/executor from two conversation slots; release each lease once and account for both kinds before ending the foreground service; `slowCatalogDoesNotPreventRelayAndSpeechAdmission`, `cancellationReleasesEachKindOnceAndKeepsForegroundForOtherWork` |
+| Slow HTTP headers kept all publisher workers busy indefinitely | Apply an absolute eight-second connection deadline across TLS and headers, independent of incoming bytes; all four slow TLS clients expire and an authorized request succeeds; `test_slow_tls_headers_release_all_workers_at_absolute_deadline` |
+| Confirmed setup/card removal never retired fallback records or their pictures | Retire fallbacks only when neither saved phone setup nor cached source cards reference them; remove unreferenced assets, preserve offline-source/manual references, and allow repeated replacement after restart; `confirmedSetupRemovalReclaimsFallbackCapacityAcrossRestart`, `sourceReferenceKeepsFallbackUntilConfirmedCardRetirement` |
+
+The admission checks use the production limiter and do not contact a paid speech provider.
+The watch tests use only the owned emulator and independent synthetic SDK servers.
 
 ## Decisions and remaining gates
 

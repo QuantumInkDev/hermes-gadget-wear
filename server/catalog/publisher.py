@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import re
 import ssl
+import socket
 import tempfile
 from urllib.parse import urlsplit
 import uuid
@@ -135,12 +136,13 @@ class CatalogServer(ThreadingMixIn, HTTPServer):
 
     def __init__(self, address, handler, tls_context=None):
         self.tls_context = tls_context
+        self.request_timeout = 8
         self.slots = threading.BoundedSemaphore(4)
         super().__init__(address, handler)
 
     def get_request(self):
         connection, address = super().get_request()
-        connection.settimeout(8)
+        connection.settimeout(self.request_timeout)
         return connection, address
 
     def process_request(self, request, address):
@@ -154,15 +156,36 @@ class CatalogServer(ThreadingMixIn, HTTPServer):
             raise
 
     def process_request_thread(self, request, address):
+        lock = threading.Lock()
+        connection = [request]
+        expired = threading.Event()
+
+        def expire():
+            with lock:
+                expired.set()
+                try:
+                    connection[0].shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+
+        deadline = threading.Timer(self.request_timeout, expire)
+        deadline.daemon = True
+        deadline.start()
         try:
             if self.tls_context:
-                request = self.tls_context.wrap_socket(request, server_side=True, do_handshake_on_connect=False)
-                request.settimeout(8)
+                with lock:
+                    if expired.is_set():
+                        return
+                    request = self.tls_context.wrap_socket(request, server_side=True, do_handshake_on_connect=False)
+                    connection[0] = request
+                request.settimeout(self.request_timeout)
                 request.do_handshake()
             super().process_request_thread(request, address)
         except OSError:
             self.shutdown_request(request)
         finally:
+            deadline.cancel()
+            self.shutdown_request(request)
             self.slots.release()
 
     def handle_error(self, *_):
@@ -180,7 +203,7 @@ def create_server(address, mapping: Path, state: Path, credential: str, tls_cont
 
         def setup(self):
             super().setup()
-            self.connection.settimeout(8)
+            self.connection.settimeout(self.server.request_timeout)
 
         def log_message(self, *_):
             pass  # Never log credentials, personal addresses or asset paths.

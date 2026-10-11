@@ -79,3 +79,23 @@ Physical Tile/complication placement, button mapping, comparable PCM-versus-Opus
 real-profile pets, phone BYOK/provider billing, timed unplugged battery measurements,
 reviewed optional server extensions, release signing and Play installation remain open.
 No optional patch was installed into live Hermes.
+
+## Carousel physical preparation — 2026-10-11
+
+The maintainer authorized testing the carousel on the existing paired watch and temporarily
+extending its screen timeout. The original timeout was 15 seconds; a 10-minute value was
+written and verified. Power/window queries confirmed the watch remained awake and unlocked.
+Both existing encrypted identity records were backed up before any update attempt. The
+installed APK's v2 signing block was read in small ranges; its certificate matches the local
+debug builds. A full rollback APK transfer has not completed, so no watch update is claimed.
+
+Large sync and streamed transfers stalled, including an uncompressed retry. Smaller reads
+also eventually stalled and needed transport reconnection. Partial files are ignored private
+artifacts, not usable rollback packages. A wireless-debugging off/on reset and its new
+connection port were requested. No new URL enrollment or physical carousel/media acceptance
+is inferred from this preparation. The real phone was updated with a matching-signature
+carousel/review-fix APK while preserving app data.
+
+The watch's temporary timeout must be restored to its recorded original value when this
+physical pass ends; its restoration status is tracked in SESSION_STATUS.md. Private device
+addresses, backup ciphertexts, connection diagnostics and helper scripts remain ignored.
