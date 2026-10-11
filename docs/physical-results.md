@@ -80,29 +80,42 @@ real-profile pets, phone BYOK/provider billing, timed unplugged battery measurem
 reviewed optional server extensions, release signing and Play installation remain open.
 No optional patch was installed into live Hermes.
 
-## Carousel physical preparation — 2026-10-11
+## Carousel physical pass — 2026-10-11
 
 The maintainer authorized testing the carousel on the existing paired watch and temporarily
 extending its screen timeout. The original timeout was 15 seconds; a 10-minute value was
 written and verified. Power/window queries confirmed the watch remained awake and unlocked.
 Both existing encrypted identity records were backed up before any update attempt. The
 installed APK's v2 signing block was read in small ranges; its certificate matches the local
-debug builds. A full rollback APK transfer has not completed. A subsequent preserve-data
-installation timed out; its installed hash could not be rechecked. Watch update status
-and physical carousel acceptance are unconfirmed, and the installed hash must be checked
-before another install attempt.
+debug builds. Initial full rollback transfers and a preserve-data install stalled. Partial
+files are not usable rollback packages. The installed hash was rechecked after reconnection
+and still identified the older build, before a new preserve-data install was attempted.
 
-Large sync and streamed transfers stalled, including an uncompressed retry. Smaller reads
-also eventually stalled and needed transport reconnection. Partial files are ignored private
-artifacts, not usable rollback packages. A wireless-debugging off/on reset and its new
-connection port were requested. Live routing checks then showed different watch/Mac IPv4
-subnets and no local watch-subnet route; the watch also stopped answering ping. The maintainer
-was asked to use the Mac's home Wi-Fi. An isolated watch-only ADB server did not restore a
-stable connection and was stopped; phone USB debugging remained authorized.
-No new URL enrollment or physical carousel/media acceptance
-is inferred from this preparation. The real phone was updated with a matching-signature
-carousel/review-fix APK while preserving app data.
+Earlier routing checks found different IPv4 subnets; the maintainer clarified that both
+devices used the same Wi-Fi name. After a refreshed address on the Mac's local subnet was
+supplied, ping/TCP probes succeeded but the existing ADB server still reported an unreachable
+host. A fresh isolated watch-only server established a working connection without restarting
+phone USB debugging. The cause of the earlier stalls is not established.
 
-The watch's temporary timeout must be restored to its recorded original value when this
-physical pass ends; its restoration status is tracked in SESSION_STATUS.md. Private device
-addresses, backup ciphertexts, connection diagnostics and helper scripts remain ignored.
+The review-fix APK installed successfully with app data preserved. Its on-watch SHA-256
+matches the local artifact. The phone already has its matching-signature review-fix build.
+
+| Check | Observation |
+| --- | --- |
+| Enrollment | Both existing watch identity ciphertext checksums match before and after the complete pass. No new URL or pairing was introduced. |
+| Manual phone card | The watch displays the phone's saved TLS card alongside its existing watch-only LAN card. This proves manual metadata delivery, not three-box discovery or portrait transfer. |
+| Horizontal navigation | Actual left/right input switches between the two approved profile pages. The unavailable LAN page remains browsable. |
+| Sleep/wake | A power query confirms sleep, then wake restores the selected page. Ambient artwork quality and power use are not measured. |
+| Draft retention | An initially empty TLS editor receives one owned synthetic draft. After switching to the other profile and back, the exact unsent draft is restored. |
+| TLS conversation | One explicit Send produces the exact fresh test reply through forced Phone relay with watch-owned TLS. The companion reports an active relay; server-profile voice remains selected. The initial reply scan missed it below the viewport; a subsequent scroll confirmed the exact reply without sending again. |
+| Phone permission | The relay was enabled but API 37 local-network permission was denied. The normal Disable/Enable flow requested the Android permission; granting it restored private-endpoint relay access. |
+| Restoration | Automatic mode is verified by reopening settings and uses the Phone TLS path. The original 15-second screen timeout is restored, the submitted draft is empty and phone USB debugging remains authorized. |
+
+Framework touch-scroll automation did not reliably advance the vertical list; mouse scroll
+input was used to reach controls. Manual vertical/rotary usability remains unaccepted.
+The old LAN address refuses connections while the TLS front end passes default-trust and
+WebSocket-upgrade checks; no live listener or Serve/ACL policy was changed.
+
+Live three-box catalog refresh, portrait/pet delivery, locked-phone catalog/background
+behavior, physical speech quality, radio throughput, battery and Play acceptance remain
+open. Private addresses, backup ciphertexts, screenshots and helper scripts remain ignored.

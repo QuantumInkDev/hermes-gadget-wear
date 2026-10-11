@@ -60,15 +60,19 @@ skips; seven publisher tests; ten owned-phone storage/repository instrumentation
 Owned-watch overflow recovery, manual setup at capacity and the original three-page
 swipe/draft/recording/approval regression pass independently against synthetic SDK servers.
 
-The maintainer also authorized a physical watch pass and temporary screen-timeout extension.
-Existing encrypted enrollment was backed up and its installed signing certificate matched
-the local build. Large ADB transfers stalled even while awake/unlocked, so the physical
-carousel update and acceptance are unconfirmed pending a reachable wireless-debugging
-connection. Live checks found different watch/Mac IPv4 subnets; moving the watch to the
-Mac's home Wi-Fi was requested. Check the installed APK hash before retrying installation. The
-real phone received the matching-signature carousel build. No new endpoint pairing or live
-catalog deployment was performed. Keep device settings restoration explicit in the physical
-report; no partial transfer or emulator check counts as personal-watch acceptance.
+The authorized physical pass now installed the matching-signature review-fix build on both
+personal devices. After the maintainer supplied a refreshed local debugging address, an
+isolated ADB server connected without interrupting phone USB debugging. The installed watch
+APK hash matches the local artifact; both existing identity ciphertexts remain unchanged.
+The watch received the phone's manual TLS profile card, swiped between its two approved
+profiles, retained selection through sleep/wake and restored an unsent TLS draft after a
+profile round trip. One explicit typed request received its exact real-server reply through
+Phone relay with watch-owned TLS. The phone's denied API 37 local-network permission was
+restored through the companion enable flow. Automatic transport was verified by reopening
+settings; the original 15-second watch timeout is restored and the submitted test draft is
+cleared. See the [physical report](physical-results.md). Live three-box catalog/portrait
+delivery, manual vertical/rotary usability and the remaining release matrix stay open.
+No new endpoint pairing or live catalog deployment was performed.
 
 ## Repository bootstrap — 2026-10-05
 

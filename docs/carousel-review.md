@@ -57,9 +57,10 @@ The watch tests use only the owned emulator and independent synthetic SDK server
   weaker than a separate worktree.
 - Live addresses, credentials, HTTPS/ACL and deployment remain private proposals for owner
   review. Cost if wrong: real-source availability stays unproven until approved rollout.
-- Actual paired Data/Channel exchange and locked-phone catalog delivery remain a hardware
-  gate. Seeded caches prove the carousel only. Cost if wrong: delivery defects can remain
-  undiscovered until that test.
+- The paired devices now pass manual-card metadata delivery, two-page switching, draft
+  retention and a real Phone TLS reply. Live three-box refresh, portrait transfer and
+  locked-phone catalog delivery remain hardware gates. Cost if wrong: those delivery
+  defects can remain undiscovered until their named tests.
 - Personal artwork and physical legibility require owner/small-watch review. Cost if wrong:
   actual art readability or registration may differ from synthetic fixtures.
 - Paid speech, radio throughput, lip sync and battery remain their existing physical/provider

@@ -87,30 +87,32 @@ and the original three-profile swipe/draft/recording/approval checks pass. See
 Review fixes were pushed as `556c365`; both CI runs passed Android, extensions and secrets
 jobs. PR #1 remains a draft and is linked to this thread.
 
-A physical watch pass is authorized for existing approved endpoints. The real phone received
-the matching-signature review-fix build. Both existing encrypted watch identities were backed
-up and the installed APK's v2 signing certificate matches the local debug build. Full/stream/
-bounded-chunk rollback transfers repeatedly stalled while awake/unlocked. Preserve-data
-watch install also timed out; the installed APK hash could not yet be rechecked, so update
-status and physical carousel acceptance are unconfirmed. CHECK THE INSTALLED HASH before
-repeating installation when the watch reconnects. Private backup/signature/artifact records
-and helpers are in `.local/profile-carousel/physical-watch/`.
+A physical watch pass for existing approved endpoints is complete. Both personal devices
+have the matching-signature review-fix build. After the earlier stalled transfers, a refreshed
+local debugging address and a fresh isolated watch-only ADB server restored connectivity.
+The installed hash was checked before retrying: it still identified the old build. Preserve-data
+installation then succeeded, and the new on-watch hash matches the local artifact. Both
+existing identity ciphertexts match the original checksums after the complete pass. Private
+backup/signature/artifact records and helpers are in `.local/profile-carousel/physical-watch/`.
 
-Live network checks found the watch and Mac on different IPv4 subnets, using the Mac's default
-router rather than a local watch-subnet route. The earlier watch address later stopped
-answering ping as well. The maintainer was asked to move the watch to the Mac's home Wi-Fi
-and provide its full current wireless-debugging address. Connection ports changed during
-restarts; do not keep reconnecting to stale values. A temporary watch-only ADB server was
-tried without disturbing phone USB debugging and then stopped; it did not establish a stable
-connection. Default ADB and the two owned test emulators remain available.
+The watch now displays the phone's manual TLS card and its watch-only LAN card. Actual
+horizontal input switches between the two pages; sleep/wake preserves selection. One owned
+TLS draft survives a profile round trip, and one explicit Send returns the exact real-server
+reply through forced Phone relay with watch-owned TLS. The submitted draft is verified empty.
+The phone's API 37 local-network permission had been denied despite the enabled relay; the
+companion Disable/Enable flow requested it and it is now granted. Automatic transport is
+verified by reopening watch settings and uses the Phone TLS path. The old LAN address refuses
+connections; the TLS front end passes trust/upgrade checks. No server binding or policy changed.
 
-The maintainer authorized a temporary watch screen timeout: original 15 seconds, confirmed
-extended to 10 minutes. Its original value is in private `watch-settings-before.json`.
-An attempted restoration could not connect after the port changed; restoration is pending.
-RESTORE AND VERIFY THAT VALUE when this physical pass ends. Preserve both identity ciphertexts
-and existing setup; never reset the personal app, run owned-emulator seed/reset tests on it,
-or replace it with a CI-signed APK. Live publisher deployment and new URL pairing remain
-separate approvals; battery/provider/Play gates are still open.
+The temporary 10-minute watch timeout is now restored and verified at its original 15 seconds.
+The active physical connection is recorded in private `current-connection.json`; its isolated
+ADB server is separate from the still-authorized default phone USB server. The two owned test
+emulators remain available. Do not reconnect to historical ports or reset enrollment.
+Framework vertical touch-scroll automation did not reliably advance the list; mouse input
+reached controls. Manual vertical/rotary usability, live three-box catalog/portrait delivery,
+locked-phone catalog behavior and battery/provider/Play gates remain open. Live publisher
+deployment and any new URL pairing still require their separate reviews. The cause of the
+earlier network/ADB stalls is unproven; a shared Wi-Fi name alone did not establish reachability.
 
 ## Carousel implementation checkpoint — 2026-10-11
 
