@@ -1,5 +1,14 @@
 # Progress
 
+## Approved multi-box carousel — 2026-10-11
+
+The maintainer requests horizontal swipe pages for profiles across three intermittently
+available boxes, showing profile pictures first and pets/additional animations as they
+become available. The [design proposal](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md)
+was approved alongside PRD/architecture/pet updates. Discovery uses
+read-only profile/avatar metadata while conversation pairing remains independent per
+Gadget URL. No new implementation, server deployment or feature acceptance is recorded.
+
 ## Repository bootstrap — 2026-10-05
 
 Prepared a public MIT repository with a README, the project brief, project-specific agent instructions, and development/secret ignores. The brief's maintainer-only section is stored locally under the ignored `.local/` directory.

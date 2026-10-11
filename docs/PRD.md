@@ -43,6 +43,15 @@ A two-second cancel hold requests a new session. The stock adapter may auto-conf
 - No firmware OTA installation on Android: test the shared MAC vector, but omit `caps.ota`; distribution uses Android installation/update mechanisms.
 - Do not claim that every Hermes installation has working ffmpeg or that every Ultra has a usable Opus encoder before checking them at M4.
 
+## Approved multi-box profile carousel — 2026-10-11
+
+The maintainer requests swipeable watch profiles from three independently available Hermes
+boxes, initially showing each profile's picture and later its pet with additional animations.
+The [concrete design](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md)
+specifies an automatic phone catalog, independent TLS Gadget endpoints, stable offline pages,
+portrait/pet fallbacks and safe selection. The maintainer approved app and isolated catalog implementation;
+real-box acceptance are not claimed. The multiplexed Gadget v2 gate remains separate.
+
 ## Milestone gates
 
 Follow M0–M8 from the brief. M0 delivers these design documents, runnable starter apps, a pure JVM module, reproducible wrapper/catalog, build/test/lint/format CI, and secret scanning. M1 adds wire models, framing, identity, handshake/heartbeat behavior, upstream vectors, and a JVM test using the actual SDK development server. M2 requires the maintainer's endpoint and approval plus a real hardware demo. M3–M8 retain the original measurements and release gates; unit tests alone never close them.

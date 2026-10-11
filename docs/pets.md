@@ -1,5 +1,11 @@
 # Pets: verified atlas contract and missing states
 
+Approved profile-page extension (2026-10-11): the [multi-box carousel design](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md)
+uses each profile's cached portrait until its validated pet is available, then crossfades
+to that pet. New listening/talking/sleeping poses remain a separate registered companion
+sheet. Only the selected foreground page animates; personal art and visual acceptance
+remain private, and no new animation delivery is claimed yet.
+
 ## Source and local evidence
 
 Reviewed `agent/pet/constants.py`, `store.py`, and `generate/{prompts,atlas,orchestrate}.py` at Hermes commit [79af3f6cea8067284a7ea5725078578b3f790adb](https://github.com/NousResearch/hermes-agent/tree/79af3f6cea8067284a7ea5725078578b3f790adb/agent/pet). `store.pets_dir()` uses the active Hermes home, and `resolve_active_pet` uses the configured slug then alphabetical fallback. Base metadata uses `id`, `displayName`, `description`, and `spritesheetPath`; generated sheets are normally lossless WebP, so the delivery extension must transcode to PNG without discarding alpha.

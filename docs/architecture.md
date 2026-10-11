@@ -1,5 +1,11 @@
 # Architecture
 
+Approved extension (2026-10-11): [multi-box profile carousel](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md).
+The phone merges independently refreshed read-only catalogs and synchronizes bounded
+portrait/status metadata; the watch retains separate TLS Gadget identities/connections.
+Catalog, swipe pages and ambient-safe review development are approved. No new live
+server installation or multiplexed routing is implied.
+
 ## Verified sources
 
 SDK `v0.2.0` resolves to commit `323e3303ab68981f810fc3208119cd8a22e64af0`. Read in full: [protocol](https://github.com/Adolanium/hermes-gadget-sdk/blob/323e3303ab68981f810fc3208119cd8a22e64af0/docs/protocol.md), [Hermes integration](https://github.com/Adolanium/hermes-gadget-sdk/blob/323e3303ab68981f810fc3208119cd8a22e64af0/docs/hermes-integration.md), architecture, porting, faces, and tailscale-funnel in the same snapshot. Also reviewed the Linux client, simulator transport/conversation, devserver, Python protocol helpers/tests, firmware vectors, and hub handshake/audio routes. Pet evidence is pinned separately in [pets](pets.md).

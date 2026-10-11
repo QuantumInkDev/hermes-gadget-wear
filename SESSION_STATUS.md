@@ -1,6 +1,15 @@
 # Session status
 
-Updated: 2026-10-07
+Updated: 2026-10-11
+
+New maintainer scope: swipeable watch profiles from three independently available boxes,
+with per-profile pictures transitioning to pets and additional animations. The approved
+[design](docs/superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md) covers
+automatic phone catalog aggregation, independent TLS endpoints, stable offline pages and
+ambient-safe selection/setup review. The maintainer approved app and isolated catalog development; live
+source/endpoint publication and any new pairing remain separate review steps. Personal
+source names and connection details stay ignored. Latest existing-code/docs CI `be3a2ef`
+[passed all three jobs](https://github.com/QuantumInkDev/hermes-gadget-wear/actions/runs/37576578446).
 
 Latest continuation: both personal devices were verified as Samsung Ultra models on
 Android 16/API 36 and received local matching-signature apps. Original watch enrollment

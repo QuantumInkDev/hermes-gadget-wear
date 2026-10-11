@@ -10,6 +10,7 @@ Baseline: Hermes Gadget SDK `v0.2.0`, commit `323e3303ab68981f810fc3208119cd8a22
 | Optional companion metadata and extra rows in one hatch normalization pass | Hermes Agent | Later-row registration tool implemented/tested; same-hatch generator change remains proposed |
 | Pending outbox on reconnect | Gadget SDK | [Bounded retention/deduplication proposal](pending-outbox.md); not implemented |
 | Profile discovery/select with multiplexed gateway | Gadget SDK / Hermes Agent | [V2 design proposal](profiles-v2.md) only; **DECISION** and upstream maintainer feedback before implementation |
+| Read-only watch catalog projection from host profile/avatar inventory | Hermes Agent / self-host catalog tooling | [Multi-box carousel design](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md) approved for isolated development; independent Gadget endpoints; live rollout requires review |
 
 Each SDK implementation must be a clean branch/PR series against the pinned baseline, with protocol docs, tests, extensions-off compatibility, and stock gadget coverage. Record actual branch/commit/PR links and maintainer responses here when created. A local proposal is not an upstream agreement. Never install an unreviewed extension into the maintainer's running Hermes environment as part of development.
 
