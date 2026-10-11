@@ -19,10 +19,21 @@ class CatalogDiscovery(private val fetch: (CatalogSource) -> List<CatalogProfile
     fun statuses(): Map<String, CatalogStatus> = health.toMap()
 
     @Synchronized fun invalidate() {
+        generation++
+        pending?.cancel(false)
+        pendingJob?.cancel(true)
+        pending = null
+        pendingJob = null
         snapshot = null
         refreshedAt = 0
+        health.clear()
     }
     private var pending: CompletableFuture<List<CatalogPage>>? = null
+    private var pendingJob: java.util.concurrent.Future<*>? = null
+    private var pendingConfiguration = ""
+    private var generation = 0L
+
+    @Synchronized private fun current(version: Long): Boolean = version == generation
     private var snapshot: List<CatalogPage>? = null
     private var fingerprint = ""
     private var refreshedAt = 0L
@@ -33,8 +44,11 @@ class CatalogDiscovery(private val fetch: (CatalogSource) -> List<CatalogProfile
         force: Boolean,
         changed: (List<CatalogPage>) -> Unit
     ): CompletableFuture<List<CatalogPage>> {
-        pending?.takeIf { !it.isDone }?.let { return it }
         val configuration = ProfileCatalog.encodeSources(sources)
+        pending?.takeIf { !it.isDone }?.let {
+            if (pendingConfiguration == configuration) return it
+            invalidate()
+        }
         val now = System.nanoTime()
         if (!force && fingerprint == configuration &&
             now - refreshedAt < TimeUnit.SECONDS.toNanos(60)
@@ -43,9 +57,12 @@ class CatalogDiscovery(private val fetch: (CatalogSource) -> List<CatalogProfile
         }
         val future = CompletableFuture<List<CatalogPage>>()
         pending = future
-        coordinator.execute {
+        pendingConfiguration = configuration
+        val version = generation
+        val initial = snapshot?.takeIf { fingerprint == configuration } ?: previous
+        pendingJob = coordinator.submit {
             try {
-                var pages = snapshot?.takeIf { fingerprint == configuration } ?: previous
+                var pages = initial
                 val completion =
                     ExecutorCompletionService<Pair<CatalogSource, Result<List<CatalogProfile>>>>(
                         workers
@@ -69,6 +86,7 @@ class CatalogDiscovery(private val fetch: (CatalogSource) -> List<CatalogProfile
                             )
                                 ?: break
                         val (source, result) = job.get()
+                        if (!current(version)) return@submit
                         remaining.remove(source.id)
                         val status = if (result.isSuccess) {
                             CatalogStatus.AVAILABLE
@@ -90,9 +108,10 @@ class CatalogDiscovery(private val fetch: (CatalogSource) -> List<CatalogProfile
                                 status,
                                 System.currentTimeMillis()
                             )
-                        changed(pages)
+                        if (current(version)) changed(pages)
                     }
                     for (source in remaining.values) {
+                        if (!current(version)) return@submit
                         health[source.id] = CatalogStatus.OFFLINE
                         pages =
                             CatalogRoster.merge(
@@ -102,26 +121,31 @@ class CatalogDiscovery(private val fetch: (CatalogSource) -> List<CatalogProfile
                                 CatalogStatus.OFFLINE,
                                 System.currentTimeMillis()
                             )
-                        changed(pages)
+                        if (current(version)) changed(pages)
                     }
                 } finally {
                     jobs.forEach { it.cancel(true) }
                 }
                 synchronized(this) {
+                    if (!current(version)) return@submit
                     snapshot = pages
                     fingerprint = configuration
                     refreshedAt = System.nanoTime()
                 }
                 future.complete(pages)
             } catch (failure: Exception) {
-                future.completeExceptionally(failure)
+                if (current(version)) {
+                    future.completeExceptionally(failure)
+                } else {
+                    future.cancel(false)
+                }
             }
         }
         return future
     }
     override fun close() {
+        invalidate()
         coordinator.shutdownNow()
         workers.shutdownNow()
-        synchronized(this) { pending?.cancel(true) }
     }
 }

@@ -52,6 +52,13 @@ class CatalogRepository internal constructor(private val context: CompanionAppli
         }
     }
     private var active: CompletableFuture<List<CatalogPage>>? = null
+    private var revision = 0L
+    private fun invalidate() {
+        revision++
+        active?.cancel(false)
+        active = null
+        discovery.invalidate()
+    }
 
     @Synchronized fun sources(): List<CatalogSource> = vault.sources()
 
@@ -77,6 +84,7 @@ class CatalogRepository internal constructor(private val context: CompanionAppli
                 sources + source
             }
         )
+        invalidate()
     }
 
     @Synchronized fun refresh(force: Boolean = false): CompletableFuture<List<CatalogPage>> {
@@ -85,14 +93,20 @@ class CatalogRepository internal constructor(private val context: CompanionAppli
         val old = combined(vault.pages())
         val result = CompletableFuture<List<CatalogPage>>()
         active = result
+        val version = revision
         val future = discovery.refresh(sources, old, force) { incoming ->
             synchronized(this) {
+                if (version != revision || result.isCancelled) return@refresh
                 mutableHealth.value = discovery.statuses()
                 vault.savePages(combined(incoming))
                 mutablePages.value = combined(incoming)
             }
         }
         future.whenComplete { incoming, failure ->
+            if (synchronized(this) { version != revision || result.isCancelled }) {
+                result.cancel(false)
+                return@whenComplete
+            }
             if (failure != null) {
                 mutableNotice.value = "Catalog needs attention. Cached profiles were kept."
                 result.completeExceptionally(failure)
@@ -101,6 +115,7 @@ class CatalogRepository internal constructor(private val context: CompanionAppli
                     try {
                         val saved =
                             synchronized(this) {
+                                if (version != revision || result.isCancelled) return@execute
                                 combined(incoming).also {
                                     vault.savePages(it)
                                     mutablePages.value =
@@ -128,6 +143,7 @@ class CatalogRepository internal constructor(private val context: CompanionAppli
 
     @Synchronized fun selectPhoto(profile: EndpointProfile, bytes: ByteArray) {
         val portrait = portraits.normalize(bytes)
+        invalidate()
         val previous = combined(vault.pages())
         val id = ClientSpeech.endpointId(profile.endpoint)
         val updated = previous.map { page ->
@@ -164,7 +180,7 @@ class CatalogRepository internal constructor(private val context: CompanionAppli
         pages.add(target, pages.removeAt(index))
         vault.savePages(pages)
         mutablePages.value = pages
-        discovery.invalidate()
+        invalidate()
         ProfileSync.publishCatalog(context, pages, portraits)
     }
 

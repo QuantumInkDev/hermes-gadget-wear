@@ -18,6 +18,37 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CatalogClientTest {
+    @Test fun sourceEditRejectsPendingOldConfigurationAndRefreshesTheNewOne() {
+        val source = CatalogSource("a", "Box", "https://a.example.invalid/catalog/v1", "old")
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val oldUpdates = java.util.concurrent.CopyOnWriteArrayList<List<CatalogPage>>()
+        val engine = CatalogDiscovery { current ->
+            if (current.credential == "old") {
+                entered.countDown()
+                release.await(3, TimeUnit.SECONDS)
+            }
+            listOf(CatalogProfile(current.credential, "Agent", null, null))
+        }
+        try {
+            val old = engine.refresh(listOf(source), emptyList(), true) { oldUpdates.add(it) }
+            assertTrue(entered.await(2, TimeUnit.SECONDS))
+            engine.invalidate()
+            val fresh = engine.refresh(
+                listOf(CatalogSource("a", "Box", source.url, "new")),
+                emptyList(),
+                true
+            ) {}
+            release.countDown()
+            assertEquals("new", fresh.get(4, TimeUnit.SECONDS).single().profile.id)
+            assertTrue(old.isCancelled)
+            assertTrue(oldUpdates.isEmpty())
+        } finally {
+            release.countDown()
+            engine.close()
+        }
+    }
+
     @Test fun emptySourceAuthFailureIsAttentionRatherThanAnEmptySuccessfulCatalog() {
         val source = CatalogSource("a", "Box", "https://a.example.invalid/catalog/v1", "synthetic")
         val engine = CatalogDiscovery { throw CatalogFailure(CatalogStatus.ATTENTION) }
