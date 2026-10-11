@@ -7,7 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -90,25 +89,27 @@ fun WatchScreen(
     service: GadgetService,
     connect: () -> Unit,
     startRecording: () -> Unit,
-    permissions: () -> Unit = {}
+    permissions: () -> Unit = {},
+    navigation: WatchNavigation = remember { WatchNavigation() }
 ) {
     val watch by service.state.collectAsStateWithLifecycle()
-    var route by remember { mutableStateOf("home") }
-    var editing by remember { mutableStateOf<EndpointProfile?>(null) }
-    var newProfile by remember { mutableStateOf(false) }
-    var imported by remember { mutableStateOf(false) }
+    var route by navigation.route
+    var editing by navigation.editing
+    var newProfile by navigation.newProfile
+    var imported by navigation.imported
+    fun selectActivePage() {
+        val current = service.state.value
+        val page = ProfilePages.merge(current.profiles, current.catalog).firstOrNull {
+            it.approved?.endpoint?.url == current.profile?.endpoint?.url
+        }
+        navigation.page.value = page?.key.orEmpty()
+        if (page != null) service.rememberPage(page.key)
+    }
     val textDraft = watch.draft
     val editingText = route == "text"
     DisposableEffect(editingText) { onDispose { if (editingText) service.finishTextInput() } }
     val feedback = LocalHapticFeedback.current
     var haptic by remember { mutableLongStateOf(watch.haptic) }
-    LaunchedEffect(watch.loading, watch.profile?.endpoint?.url) {
-        if (!watch.loading && watch.profile != null &&
-            watch.connection.status == ConnectionStatus.OFFLINE
-        ) {
-            connect()
-        }
-    }
     LaunchedEffect(watch.haptic) {
         if (watch.haptic != haptic) feedback.performHapticFeedback(HapticFeedbackType.LongPress)
         haptic = watch.haptic
@@ -121,6 +122,8 @@ fun WatchScreen(
             item {
                 Primary(stringResource(R.string.reset_setup), enabled = !watch.saving) {
                     service.reset()
+                    navigation.clearSetup()
+                    navigation.page.value = ""
                     route =
                         "home"
                 }
@@ -133,6 +136,7 @@ fun WatchScreen(
                 item {
                     Primary(profile.label, enabled = !watch.saving) {
                         service.selectProfile(profile.endpoint.url) {
+                            selectActivePage()
                             route = "home"
                             connect()
                         }
@@ -144,6 +148,7 @@ fun WatchScreen(
                     stringResource(R.string.add_profile),
                     enabled = !watch.saving,
                     onClick = {
+                        navigation.clearSetup()
                         editing = null
                         newProfile = true
                         imported = false
@@ -185,6 +190,7 @@ fun WatchScreen(
             watch.imports.forEach { profile ->
                 item {
                     Secondary(profile.label, onClick = {
+                        navigation.clearSetup()
                         editing = profile
                         newProfile = false
                         imported = true
@@ -205,6 +211,7 @@ fun WatchScreen(
                 Primary(stringResource(R.string.remove_profile), enabled = !watch.saving) {
                     watch.profile?.let { profile ->
                         service.removeProfile(profile.endpoint.url) {
+                            selectActivePage()
                             route = "home"
                             connect()
                         }
@@ -213,12 +220,17 @@ fun WatchScreen(
             }
             item { Secondary(stringResource(R.string.back), onClick = { route = "profiles" }) }
         }
-        watch.profile == null || route == "setup" -> SetupPage(
+        (watch.profile == null && watch.catalog.isEmpty()) || route == "setup" -> SetupPage(
             watch.copy(profile = if (newProfile) null else editing ?: watch.profile),
-            imported = imported,
+            draft = navigation.setupFor(
+                if (newProfile) null else editing ?: watch.profile,
+                imported
+            ),
             onSave = { url, label, token, local, accepted, transport ->
                 service.save(url, label, token, local, accepted, transport) {
                     route = "home"
+                    navigation.clearSetup()
+                    selectActivePage()
                     editing = null
                     newProfile = false
                     imported = false
@@ -246,25 +258,49 @@ fun WatchScreen(
             },
             back = { route = "home" }
         )
-        else -> key(watch.connection.conversation.prompt?.id) {
-            ConversationPage(
-                watch,
-                service,
-                connect,
-                startRecording,
-                settings = {
-                    service.disconnect()
-                    editing = null
-                    newProfile = false
-                    imported = false
-                    route = "setup"
-                },
-                type = { if (service.prepareTextInput()) route = "text" },
-                profiles = {
-                    service.disconnect()
-                    route = "profiles"
+        else -> ProfileCarousel(
+            watch,
+            navigation,
+            service,
+            connect,
+            review = { page ->
+                service.disconnect()
+                navigation.clearSetup()
+                editing = page.approved ?: page.discovered?.profile?.gadgetUrl?.let { url ->
+                    EndpointProfile(
+                        dev.quantumink.hermesgadget.protocol.Endpoint.parse(url),
+                        page.label,
+                        ""
+                    )
                 }
-            )
+                newProfile = editing == null
+                imported = false
+                route = "setup"
+            }
+        ) { page, pageControls ->
+            key(page.key, watch.connection.conversation.prompt?.id) {
+                ConversationPage(
+                    watch,
+                    service,
+                    connect,
+                    startRecording,
+                    settings = {
+                        service.disconnect()
+                        navigation.clearSetup()
+                        editing = null
+                        newProfile = false
+                        imported = false
+                        route = "setup"
+                    },
+                    type = { if (service.prepareTextInput()) route = "text" },
+                    profiles = {
+                        service.disconnect()
+                        route = "profiles"
+                    },
+                    page = page,
+                    pageControls = pageControls
+                )
+            }
         }
     }
 }
@@ -277,77 +313,73 @@ private fun SetupPage(
     onReset: () -> Unit,
     permissions: () -> Unit,
     profiles: () -> Unit,
-    imported: Boolean = false
+    draft: SetupDraft
 ) {
     val profile = watch.profile
-    var url by remember(profile) { mutableStateOf(profile?.endpoint?.url.orEmpty()) }
-    var label by remember(profile) { mutableStateOf(profile?.label ?: "My Hermes") }
-    var token by remember(profile) { mutableStateOf(profile?.accessToken.orEmpty()) }
-    var local by remember(profile) { mutableStateOf(profile?.endpoint?.privateNetwork ?: false) }
-    var accepted by remember(profile) {
-        mutableStateOf(!imported && (profile?.endpoint?.cleartextAccepted ?: false))
-    }
-    var showToken by remember { mutableStateOf(token.isNotEmpty()) }
-    var transport by remember(profile) {
-        mutableStateOf(profile?.transport ?: TransportPreference.AUTO)
-    }
-    val cleartext = url.trim().startsWith("ws:", ignoreCase = true)
+    val cleartext = draft.url.trim().startsWith("ws:", ignoreCase = true)
     RoundPage {
         item { Heading(stringResource(R.string.setup_title)) }
         item { Body(stringResource(R.string.setup_hint), muted = true) }
-        item { Input(stringResource(R.string.endpoint_name), label, { label = it.take(32) }) }
         item {
-            Input(stringResource(R.string.endpoint_url), url, {
-                if (it != url) accepted = false
-                url = it.take(2048)
+            Input(stringResource(R.string.endpoint_name), draft.label, {
+                draft.label =
+                    it.take(32)
+            })
+        }
+        item {
+            Input(stringResource(R.string.endpoint_url), draft.url, {
+                if (it != draft.url) draft.accepted = false
+                draft.url = it.take(2048)
             }, KeyboardType.Uri)
         }
         item {
-            Toggle(stringResource(R.string.local_network), local) {
-                local = !local
-                accepted =
+            Toggle(stringResource(R.string.local_network), draft.local) {
+                draft.local = !draft.local
+                draft.accepted =
                     false
             }
         }
         if (cleartext) {
             item { Body(stringResource(R.string.cleartext_warning)) }
             item {
-                Toggle(stringResource(R.string.cleartext_accept), accepted) {
-                    accepted =
-                        !accepted
+                Toggle(stringResource(R.string.cleartext_accept), draft.accepted) {
+                    draft.accepted =
+                        !draft.accepted
                 }
             }
         }
-        if (showToken) {
+        if (draft.showToken) {
             item {
-                Input(stringResource(R.string.access_token), token, {
-                    token = it.take(2048)
+                Input(stringResource(R.string.access_token), draft.token, {
+                    draft.token = it.take(2048)
                 }, KeyboardType.Password)
             }
         } else {
             item {
-                Secondary(stringResource(R.string.access_token), onClick = { showToken = true })
+                Secondary(stringResource(R.string.access_token), onClick = {
+                    draft.showToken = true
+                })
             }
         }
         item {
             Secondary(
                 stringResource(
-                    when (transport) {
+                    when (draft.transport) {
                         TransportPreference.AUTO -> R.string.transport_auto
                         TransportPreference.RELAY -> R.string.transport_phone
                         TransportPreference.DIRECT -> R.string.transport_direct
                     }
                 ),
                 onClick = {
-                    transport =
+                    draft.transport =
                         TransportPreference.entries[
-                            (transport.ordinal + 1) %
+                            (draft.transport.ordinal + 1) %
                                 TransportPreference.entries.size
                         ]
                 }
             )
         }
-        if (transport == TransportPreference.RELAY &&
+        if (draft.transport == TransportPreference.RELAY &&
             cleartext
         ) {
             item { Body(stringResource(R.string.relay_tls_required)) }
@@ -357,10 +389,19 @@ private fun SetupPage(
             Primary(
                 stringResource(R.string.save_connect),
                 enabled =
-                !watch.saving && url.isNotBlank() && label.isNotBlank() &&
-                    (!cleartext || (local && accepted)) &&
-                    !(transport == TransportPreference.RELAY && cleartext)
-            ) { onSave(url, label, token, local, accepted && cleartext, transport) }
+                !watch.saving && draft.url.isNotBlank() && draft.label.isNotBlank() &&
+                    (!cleartext || (draft.local && draft.accepted)) &&
+                    !(draft.transport == TransportPreference.RELAY && cleartext)
+            ) {
+                onSave(
+                    draft.url,
+                    draft.label,
+                    draft.token,
+                    draft.local,
+                    draft.accepted && cleartext,
+                    draft.transport
+                )
+            }
         }
         item { Secondary(stringResource(R.string.profiles_title), profiles) }
         item { Secondary(stringResource(R.string.permissions), permissions) }
@@ -446,7 +487,9 @@ private fun ConversationPage(
     startRecording: () -> Unit,
     settings: () -> Unit,
     type: () -> Unit,
-    profiles: () -> Unit
+    profiles: () -> Unit,
+    page: ProfilePage,
+    pageControls: @Composable () -> Unit
 ) {
     val connection = watch.connection
     val conversation = connection.conversation
@@ -471,23 +514,7 @@ private fun ConversationPage(
         service::finishRecording,
         service::cancelRecording
     )
-    val swipe = Modifier.pointerInput(prompt?.id, conversation.mode) {
-        if (prompt != null || conversation.mode == ConversationMode.LISTENING) return@pointerInput
-        var moved = 0f
-        var opened = false
-        detectHorizontalDragGestures(onDragStart = {
-            moved = 0f
-            opened = false
-        }) { change, delta ->
-            moved += delta
-            if (!opened && kotlin.math.abs(moved) > 72.dp.toPx()) {
-                opened = true
-                change.consume()
-                profiles()
-            }
-        }
-    }
-    RoundPage(gesture.then(swipe)) {
+    RoundPage(gesture) {
         if (prompt != null) {
             item { Heading(stringResource(R.string.approval)) }
             item { Body(prompt.title) }
@@ -513,30 +540,19 @@ private fun ConversationPage(
             }
         } else {
             item {
-                Row(
+                Column(
                     Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    PetView(watch, compact = true)
-                    Column(
-                        Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            watch.profile?.label.orEmpty(),
-                            color = Accent,
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 2
-                        )
-                        Text(
-                            stringResource(title),
-                            style = MaterialTheme.typography.titleMedium,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                    ProfileIdentity(page, watch.artwork[page.key], watch, true)
+                    Text(
+                        stringResource(title),
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
+            item { pageControls() }
             if (connection.status == ConnectionStatus.PAIRING) {
                 item {
                     Heading(
@@ -664,6 +680,12 @@ private fun ConversationPage(
             } else {
                 item { Secondary(stringResource(R.string.disconnect), service::disconnect) }
             }
+            item {
+                Secondary("Refresh profiles", {
+                    service.refreshCatalog()
+                }, enabled = !watch.catalogRefreshing)
+            }
+            if (watch.catalogNotice.isNotBlank()) item { Body(watch.catalogNotice, muted = true) }
             item { Secondary(stringResource(R.string.profiles_title), profiles) }
             item { Secondary(stringResource(R.string.settings), settings) }
         }
@@ -671,7 +693,7 @@ private fun ConversationPage(
 }
 
 @Composable
-private fun RoundPage(
+internal fun RoundPage(
     modifier: Modifier = Modifier,
     content: TransformingLazyColumnScope.() -> Unit
 ) {
@@ -694,7 +716,7 @@ private fun RoundPage(
 }
 
 @Composable
-private fun Heading(value: String) {
+internal fun Heading(value: String) {
     Text(
         value,
         style = MaterialTheme.typography.titleLarge,
@@ -704,7 +726,7 @@ private fun Heading(value: String) {
 }
 
 @Composable
-private fun Body(value: String, muted: Boolean = false) {
+internal fun Body(value: String, muted: Boolean = false) {
     Text(
         value,
         color = if (muted) Muted else Color(0xFFF0F3EB),
@@ -715,14 +737,14 @@ private fun Body(value: String, muted: Boolean = false) {
 }
 
 @Composable
-private fun Primary(value: String, enabled: Boolean = true, onClick: () -> Unit) {
+internal fun Primary(value: String, enabled: Boolean = true, onClick: () -> Unit) {
     Button(onClick, Modifier.fillMaxWidth(), enabled = enabled) {
         Text(value, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     }
 }
 
 @Composable
-private fun Secondary(value: String, onClick: () -> Unit, enabled: Boolean = true) {
+internal fun Secondary(value: String, onClick: () -> Unit, enabled: Boolean = true) {
     FilledTonalButton(onClick, Modifier.fillMaxWidth(), enabled = enabled) {
         Text(value, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     }

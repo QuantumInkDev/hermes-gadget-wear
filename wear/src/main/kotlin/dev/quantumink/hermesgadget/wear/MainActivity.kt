@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.map
 class MainActivity : ComponentActivity() {
     private var gadget by mutableStateOf<GadgetService?>(null)
     private var bound = false
+    private val navigation = WatchNavigation()
     private val networkPermissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { gadget?.connect() }
@@ -71,7 +72,6 @@ class MainActivity : ComponentActivity() {
                 true
             }
         )
-        if (current.state.value.profile != null && !current.state.value.loading) requestConnection()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -110,6 +110,7 @@ class MainActivity : ComponentActivity() {
                             service = service,
                             connect = ::requestConnection,
                             startRecording = ::requestRecording,
+                            navigation = navigation,
                             permissions = {
                                 startActivity(
                                     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)

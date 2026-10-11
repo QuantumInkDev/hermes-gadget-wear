@@ -308,6 +308,14 @@ class GadgetService : Service() {
         catalog.rememberPage(key)
     }
 
+    private fun rememberActivePage() {
+        val watch = mutableState.value
+        val active = ProfilePages.merge(watch.profiles, watch.catalog).singleOrNull {
+            it.approved?.endpoint?.url == watch.profile?.endpoint?.url
+        }
+        if (active != null && watch.selectedPage != active.key) rememberPage(active.key)
+    }
+
     fun hidden() {
         visible = false
         timerLauncher = null
@@ -353,6 +361,7 @@ class GadgetService : Service() {
                     onSuccess = { saved ->
                         configure(profile, saved.first)
                         mutableState.update { it.copy(saving = false, profiles = saved.second) }
+                        rememberActivePage()
                         ready()
                     },
                     onFailure = {
@@ -401,6 +410,7 @@ class GadgetService : Service() {
                     } else {
                         configure(saved.first, saved.second)
                         mutableState.update { it.copy(saving = false, profiles = profiles) }
+                        rememberActivePage()
                     }
                     ready()
                 }, {

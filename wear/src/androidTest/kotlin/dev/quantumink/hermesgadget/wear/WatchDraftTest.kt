@@ -123,7 +123,7 @@ class WatchDraftTest {
             )
             click { text(it, context.getString(R.string.send)) }
             waitUntil { service.state.value.connection.conversation.reply == "You said: $draft" }
-            scrollTo(backward = true) { text(it, "You said: $draft") }
+            scrollTo { text(it, "You said: $draft") }
             assertTrue(waitFor { text(it, "You said: $draft") } != null)
         } finally {
             bound.get()?.let { service ->
@@ -171,7 +171,9 @@ class WatchDraftTest {
         repeat(12) {
             waitFor(predicate)?.let { return it }
             val root = automation.rootInActiveWindow ?: error("Watch window missing")
-            val list = nodes(root).firstOrNull { it.isScrollable } ?: error("Watch list missing")
+            val list =
+                nodes(root).firstOrNull { it.isScrollable && it.isFocused }
+                    ?: error("Watch list missing")
             assertTrue(
                 list.performAction(
                     if (backward) {

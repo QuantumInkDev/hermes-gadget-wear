@@ -26,7 +26,7 @@ import dev.quantumink.hermesgadget.protocol.PetStates
 import kotlinx.coroutines.delay
 
 @Composable
-fun PetView(watch: WatchState, compact: Boolean = false) {
+fun PetView(watch: WatchState, compact: Boolean = false, animated: Boolean = true) {
     val conversation = watch.connection.conversation
     val mode = when {
         conversation.prompt != null -> "waiting"
@@ -45,12 +45,13 @@ fun PetView(watch: WatchState, compact: Boolean = false) {
     val frames = atlas?.rows?.get(row)
     var frame by remember(atlas, mode, row) { mutableIntStateOf(0) }
     var mouth by remember(atlas) { mutableIntStateOf(0) }
-    LaunchedEffect(watch.playbackLevel, mode) {
-        mouth = if (mode == "talking") PetStates.mouth(watch.playbackLevel, mouth) else 0
+    LaunchedEffect(watch.playbackLevel, mode, animated) {
+        mouth =
+            if (animated && mode == "talking") PetStates.mouth(watch.playbackLevel, mouth) else 0
     }
-    LaunchedEffect(atlas, mode, row) {
+    LaunchedEffect(atlas, mode, row, animated) {
         val count = frames?.size ?: 1
-        if (mode !in setOf("sleeping", "talking") && count > 1) {
+        if (animated && mode !in setOf("sleeping", "talking") && count > 1) {
             while (true) {
                 delay(((atlas?.loopMs ?: 1100) / count).toLong())
                 frame =
@@ -74,7 +75,7 @@ fun PetView(watch: WatchState, compact: Boolean = false) {
                 "${atlas?.name ?: "Sample pet"}: $mode"
         }
     ) {
-        val bob = if (mode == "talking" &&
+        val bob = if (animated && mode == "talking" &&
             row != "talking"
         ) {
             watch.playbackLevel.coerceIn(0f, 0.5f) * 6.dp.toPx()
