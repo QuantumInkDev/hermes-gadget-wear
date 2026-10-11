@@ -50,7 +50,7 @@ boxes, initially showing each profile's picture and later its pet with additiona
 The [concrete design](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md)
 specifies an automatic phone catalog, independent TLS Gadget endpoints, stable offline pages,
 portrait/pet fallbacks and safe selection. The maintainer approved app and isolated catalog implementation;
-real-box acceptance are not claimed. The multiplexed Gadget v2 gate remains separate.
+real-box acceptance is not claimed. The multiplexed Gadget v2 gate remains separate.
 
 ## Milestone gates
 

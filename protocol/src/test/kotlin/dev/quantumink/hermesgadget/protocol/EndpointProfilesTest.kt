@@ -6,6 +6,25 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class EndpointProfilesTest {
+    @Test fun expandedCatalogPreservesAllThirtyTwoDistinctProfiles() {
+        val profiles = (0 until 32).map {
+            EndpointProfile(Endpoint.parse("wss://box-$it.example.invalid/gadget"), "Agent", "")
+        }
+        val restored = EndpointProfiles.decode(EndpointProfiles.encode(profiles))
+        assertEquals(32, restored.size)
+        assertEquals(profiles.map { it.endpoint.url }, restored.map { it.endpoint.url })
+        assertThrows(IllegalArgumentException::class.java) {
+            EndpointProfiles.encode(
+                profiles +
+                    EndpointProfile(
+                        Endpoint.parse("wss://extra.example.invalid/gadget"),
+                        "Extra",
+                        ""
+                    )
+            )
+        }
+    }
+
     @Test fun canonicalUrlsAndPoliciesRoundTripWithoutKeys() {
         val first =
             EndpointProfile(
