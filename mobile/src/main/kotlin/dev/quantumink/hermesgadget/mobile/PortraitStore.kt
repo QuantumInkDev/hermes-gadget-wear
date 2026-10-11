@@ -13,6 +13,12 @@ import kotlin.math.roundToInt
 
 /** Decode/normalize on the caller's IO worker; no source metadata is written to the PNG. */
 class PortraitStore(private val directory: File) {
+    private var protected = emptySet<String>()
+
+    @Synchronized fun protect(hashes: Set<String>) {
+        protected = hashes.toSet()
+    }
+
     @Synchronized fun normalize(bytes: ByteArray): PortraitDescriptor {
         require(bytes.size in 1..8 * 1024 * 1024)
         val image = ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) {
@@ -43,7 +49,21 @@ class PortraitStore(private val directory: File) {
             "%02x".format(it)
         }
         check(directory.exists() || directory.mkdirs())
-        val file = AtomicFile(File(directory, "$hash.png"))
+        val destination = File(directory, "$hash.png")
+        if (!destination.exists()) {
+            var used = directory.listFiles().orEmpty().sumOf { it.length() }
+            val disposable = directory.listFiles().orEmpty().filter {
+                it.name.matches(Regex("[a-f0-9]{64}\\.png")) &&
+                    it.name.removeSuffix(".png") !in protected
+            }.sortedBy { it.lastModified() }
+            for (old in disposable) {
+                if (used + normalized.size <= 8 * 1024 * 1024) break
+                val size = old.length()
+                if (old.delete()) used -= size
+            }
+            require(used + normalized.size <= 8 * 1024 * 1024) { "Portrait storage is full." }
+        }
+        val file = AtomicFile(destination)
         val output = file.startWrite()
         try {
             output.write(normalized)

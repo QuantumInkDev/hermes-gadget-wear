@@ -58,6 +58,19 @@ class CatalogVault(
             ProfileCatalog.encodePages(pages).toByteArray()
         )
     }
+
+    @Synchronized fun fallbacks(): List<CatalogPage> = read("fallbacks")?.let { bytes ->
+        try {
+            ProfileCatalog.decodePages(bytes.toString(Charsets.UTF_8))
+        } finally {
+            bytes.fill(0)
+        }
+    }.orEmpty()
+
+    @Synchronized fun saveFallbacks(pages: List<CatalogPage>) {
+        write("fallbacks", ProfileCatalog.encodePages(pages).toByteArray())
+    }
+
     private fun key(): SecretKey {
         if (store.containsAlias(alias)) {
             return store.getKey(alias, null) as? SecretKey

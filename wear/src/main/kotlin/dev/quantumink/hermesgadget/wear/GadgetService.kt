@@ -215,7 +215,7 @@ class GadgetService : Service() {
                         ) {
                             configure(saved.first!!, requireNotNull(saved.second))
                         }
-                        mutableState.update { it.copy(loading = false, profiles = saved.third) }
+                        mutableState.update { it.copy(profiles = saved.third) }
                         catalog.start()
                     },
                     onFailure = {
@@ -259,7 +259,7 @@ class GadgetService : Service() {
         if (visible) catalog.refresh(force)
     }
 
-    private fun applyCatalog(
+    internal fun applyCatalog(
         pages: List<dev.quantumink.hermesgadget.protocol.CatalogPage>,
         selected: String
     ) {
@@ -270,7 +270,13 @@ class GadgetService : Service() {
             return
         }
         mutableState.update {
-            it.copy(catalog = pages, selectedPage = it.selectedPage.ifBlank { selected })
+            it.copy(
+                loading = false,
+                catalog = pages,
+                selectedPage = it.selectedPage.ifBlank {
+                    selected
+                }
+            )
         }
         if (!::vault.isInitialized) return
         storage.execute {

@@ -15,7 +15,7 @@ def main():
     parser.add_argument('--adb', required=True)
     parser.add_argument('--adb-port', default='5041')
     parser.add_argument('--serial', default='emulator-5570')
-    parser.add_argument('--test', default='dev.quantumink.hermesgadget.wear.WatchCarouselTest')
+    parser.add_argument('--test', default='dev.quantumink.hermesgadget.wear.WatchCarouselTest#threePagesSwipeWithSeparateDraftsPortraitsAndRecordingProtection')
     parser.add_argument('--reset-owned-emulator', action='store_true', required=True)
     parser.add_argument('--captures', type=Path)
     parser.add_argument('--legacy-pets', action='store_true')
@@ -77,7 +77,7 @@ def main():
             command += ['dev.quantumink.hermesgadget.test/androidx.test.runner.AndroidJUnitRunner']
             output = run(*command, timeout=180)
             print(output)
-            if 'OK (' not in output or 'FAILURES' in output or 'INSTRUMENTATION_FAILED' in output:
+            if not re.search(r'OK \([1-9][0-9]* tests?\)', output) or 'FAILURES' in output or 'INSTRUMENTATION_FAILED' in output:
                 raise RuntimeError('Carousel instrumentation did not pass')
             if args.captures:
                 args.captures.mkdir(parents=True, exist_ok=True)

@@ -21,6 +21,10 @@ versus frozen neighbor frames. Companion and legacy actual-service tests verify 
 endpoint cache isolation, state fallbacks and 6/3/6 registered rows. These tests do not prove
 physical lip sync, Bluetooth throughput or battery usage.
 
+Fresh-review regressions also verify restored selection before startup connection, a
+stationary page receiving a new portrait, and a changed manual-catalog TLS URL requiring
+review rather than reusing its old LAN connection. [Review details](../../carousel-review.md).
+
 Build both debug/test APKs first. Set the stock and optional-extension Python paths using
 the README setup commands, then run only against the owned Hermes_M2 AVD:
 
@@ -33,6 +37,7 @@ python3 tools/carousel-demo.py --adb /path/to/sdk/platform-tools/adb \
 The runner explicitly resets only that owned AVD's test app, rejects physical devices,
 starts ephemeral synthetic servers, and removes its port reversals on exit. `--pets`
 requires `HERMES_GADGET_EXTENSION_PYTHON`; omit it for stock servers, or use `--legacy-pets`
-for the original base-only pet fixture. `--test` selects another instrumentation class.
+for the original base-only pet fixture. `--test` selects another instrumentation class or `Class#method`; run the carousel methods
+individually with a fresh owned-app reset. The runner rejects zero-test results.
 New phone/watch catalog Data Layer exchange and the real three-box rollout remain hardware
 acceptance gates; this demo seeds the watch's isolated cache rather than claiming that path.

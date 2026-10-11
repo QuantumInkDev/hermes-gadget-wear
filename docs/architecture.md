@@ -215,12 +215,23 @@ checked against current primary documentation before implementation.
 The standalone publisher projects owner mappings without opening a Gadget session. Catalog
 source credentials live only in the phone's separate AES-GCM vault. HTTPS/hostname checks,
 no redirects, source-bound asset paths, 32-profile/64 KiB envelopes and bounded fanout keep
-discovery separate from enrollment. Partial responses persist independently; generation
-checks discard work invalidated by source edits. Owner order survives offline and withdrawn
-records. Catalog reachability is displayed separately from the Gadget connection status.
+discovery separate from enrollment. Partial responses persist and publish independently; generation
+checks discard work invalidated by source edits. A conflicting or oversized merged source
+update becomes Attention with its prior cards retained; healthy sources continue. Owner order
+survives offline and withdrawn records. Catalog reachability is displayed separately from the Gadget connection status.
 
-The phone publishes normalized portrait assets before the version-1 roster, and answers an
-on-demand bounded refresh channel. The watch keeps a separate encrypted roster/selection,
+The phone persists owner-selected fallbacks separately from source metadata, preserving them
+through portrait-less refreshes and restarts. Server portraits take precedence. Image ingestion
+enforces the 8 MiB limit while protecting committed fallbacks; final/failure cleanup removes
+unreferenced files. Owner-confirmed forgetting of a withdrawn catalog card recovers historical
+capacity; phone/watch endpoint setup and URL-scoped identity files remain independent.
+
+The phone publishes normalized portrait assets before the version-1 roster, then deletes
+only its own unreferenced portrait Data Items. Replacement metadata must succeed first;
+other nodes and namespaces remain untouched. Publication has a shared five-second deadline.
+The isolated direct-TLS publisher installs accepted-socket timeouts before handshaking and
+allows at most four request workers. The phone answers an on-demand bounded refresh channel. The watch restores its separate encrypted roster/selection before rendering/connection
+effects or requesting remote refresh. It keeps a
 verified atomic portrait cache and approved URL vault; metadata cannot enroll a new URL.
 Only selected and adjacent artwork is prepared on bounded workers. The settled approved
 page selects one URL-scoped conversation; recording/approval disables page changes and

@@ -88,26 +88,38 @@ class CatalogDiscovery(private val fetch: (CatalogSource) -> List<CatalogProfile
                         val (source, result) = job.get()
                         if (!current(version)) return@submit
                         remaining.remove(source.id)
-                        val status = if (result.isSuccess) {
+                        var status = if (result.isSuccess) {
                             CatalogStatus.AVAILABLE
                         } else {
                             (result.exceptionOrNull() as? CatalogFailure)?.status
                                 ?: CatalogStatus.ATTENTION
                         }
-                        health[source.id] = status
                         val incomingUrls = result.getOrNull().orEmpty().mapNotNull {
                             it.gadgetUrl
                         }.toSet()
-                        pages =
+                        val merged = runCatching {
                             CatalogRoster.merge(
                                 pages.filterNot {
-                                    it.sourceId == "manual" && it.profile.gadgetUrl in incomingUrls
+                                    it.sourceId == "manual" &&
+                                        it.profile.gadgetUrl in incomingUrls
                                 },
                                 source,
                                 result.getOrNull(),
                                 status,
                                 System.currentTimeMillis()
                             )
+                        }
+                        pages = merged.getOrElse {
+                            status = CatalogStatus.ATTENTION
+                            CatalogRoster.merge(
+                                pages,
+                                source,
+                                null,
+                                status,
+                                System.currentTimeMillis()
+                            )
+                        }
+                        health[source.id] = status
                         if (current(version)) changed(pages)
                     }
                     for (source in remaining.values) {

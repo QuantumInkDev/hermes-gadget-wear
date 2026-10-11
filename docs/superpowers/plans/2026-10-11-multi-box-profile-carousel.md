@@ -115,7 +115,7 @@
 - [x] Run before transition implementation. Expected: existing pet-only renderer lacks portrait fallback/selection freeze.
 - [x] Implement crossfade and selected-only animation; prepare original three-source demo and registered companion sheet through existing `tools/extend-pet.py` without changing base art. Prepare private live rollout mapping/checklist, with unknown Gadget URLs left unset and no deployment.
 - [x] Run `./gradlew ktlintFormat check :wear:assembleDebug :wear:assembleDebugAndroidTest :mobile:assembleDebug :mobile:assembleDebugAndroidTest --warning-mode=fail --max-workers=4`, publisher Python suite, and owned-emulator feature/regression tests. Expected: zero warnings, failures or enabled integration skips; synthetic captures prove pages/portraits/pets and ambient behavior.
-- [ ] Run fresh whole-branch review, fix important findings with failing regressions, validate staged documentation links/private-value scan/gitleaks; commit evidence and remaining real-device gates. Report APKs and prepared live rollout for review without claiming physical three-box acceptance.
+- [x] Run fresh whole-branch review, fix important findings with failing regressions, validate staged documentation links/private-value scan/gitleaks; commit evidence and remaining real-device gates. Report APKs and prepared live rollout for review without claiming physical three-box acceptance.
 
 ## Review Focus
 

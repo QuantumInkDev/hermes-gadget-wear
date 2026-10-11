@@ -74,7 +74,7 @@ fun ProfileCarousel(
         correcting,
         watch.saving,
         watch.profile?.endpoint?.url,
-        keys
+        pages
     ) {
         if (correcting || pager.isScrollInProgress) return@LaunchedEffect
         val index = pager.settledPage

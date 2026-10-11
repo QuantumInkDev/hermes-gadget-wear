@@ -38,7 +38,22 @@ class WatchCarouselTest {
     private val context get() = instrumentation.targetContext
     private val automation get() = instrumentation.uiAutomation
 
-    @Test fun threePagesSwipeWithSeparateDraftsPortraitsAndRecordingProtection() {
+    @Test fun startupRestoresUnapprovedSelectionBeforeConnecting() = runScenario(true)
+
+    @Test fun threePagesSwipeWithSeparateDraftsPortraitsAndRecordingProtection() = runScenario(
+        false
+    )
+
+    @Test fun stationaryPagePromotesRefreshedPortrait() = runScenario(false, refreshPortrait = true)
+
+    @Test fun changedManualEndpointRequiresReviewWithoutOldConnection() =
+        runScenario(false, changeEndpoint = true)
+
+    private fun runScenario(
+        unapprovedStart: Boolean,
+        refreshPortrait: Boolean = false,
+        changeEndpoint: Boolean = false
+    ) {
         val urls = listOf(
             "syntheticEndpoint",
             "syntheticSecondEndpoint",
@@ -90,10 +105,17 @@ class WatchCarouselTest {
             portraitCache.store(page.key, portrait, bytes)
             page
         }
+        val pending = CatalogPage(
+            "box",
+            "Synthetic pending box",
+            CatalogProfile("pending", "Pending agent", null, null),
+            CatalogStatus.OFFLINE,
+            1
+        )
         vault.select(urls.first())
         WatchCatalogVault(context).apply {
-            savePages(pages)
-            select(pages.first().key)
+            savePages(if (unapprovedStart) pages + pending else pages)
+            select(if (unapprovedStart) pending.key else pages.first().key)
         }
         listOf(Manifest.permission.POST_NOTIFICATIONS, Manifest.permission.RECORD_AUDIO).forEach {
             automation.grantRuntimePermission(context.packageName, it)
@@ -128,9 +150,84 @@ class WatchCarouselTest {
         try {
             assertTrue(latch.await(5, TimeUnit.SECONDS))
             val service = requireNotNull(bound.get())
+            waitUntil { !service.state.value.loading }
+            if (unapprovedStart) {
+                waitUntil { service.state.value.catalog.any { it.key == pending.key } }
+                SystemClock.sleep(1200)
+                assertEquals(pending.key, service.state.value.selectedPage)
+                assertEquals(ConnectionStatus.OFFLINE, service.state.value.connection.status)
+                waitUntil { find { it.text?.toString() == "Synthetic pending box" } != null }
+                return
+            }
             waitUntil { service.state.value.connection.status == ConnectionStatus.PAIRED }
             waitUntil { find { it.text?.toString() == "Synthetic box 1" } != null }
             waitUntil { service.state.value.artwork[pages.first().key]?.portrait != null }
+            if (refreshPortrait) {
+                val bitmap = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888).apply {
+                    eraseColor(android.graphics.Color.RED)
+                }
+                val bytes = ByteArrayOutputStream().also {
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+                }.toByteArray()
+                bitmap.recycle()
+                val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") {
+                    "%02x".format(it)
+                }
+                val descriptor = PortraitDescriptor(hash, bytes.size, "/assets/$hash.png")
+                portraitCache.store(pages.first().key, descriptor, bytes)
+                val original = pages.first()
+                val refreshed =
+                    listOf(
+                        CatalogPage(
+                            original.sourceId,
+                            original.sourceLabel,
+                            CatalogProfile(
+                                original.profile.id,
+                                original.profile.name,
+                                null,
+                                descriptor
+                            ),
+                            original.status,
+                            2
+                        )
+                    ) +
+                        pages.drop(1)
+                instrumentation.runOnMainSync { service.applyCatalog(refreshed, original.key) }
+                waitUntil {
+                    service.state.value.artwork[original.key]?.portrait?.getPixel(0, 0) ==
+                        android.graphics.Color.RED
+                }
+                assertEquals(original.key, service.state.value.selectedPage)
+                assertEquals(urls.first(), service.state.value.profile?.endpoint?.url)
+                return
+            }
+            if (changeEndpoint) {
+                val original = pages.first()
+                val changed =
+                    listOf(
+                        CatalogPage(
+                            original.sourceId,
+                            original.sourceLabel,
+                            CatalogProfile(
+                                original.profile.id,
+                                original.profile.name,
+                                "wss://unapproved.example.invalid/gadget",
+                                original.profile.portrait
+                            ),
+                            original.status,
+                            2
+                        )
+                    ) +
+                        pages.drop(1)
+                instrumentation.runOnMainSync { service.applyCatalog(changed, original.key) }
+                waitUntil { service.state.value.connection.status == ConnectionStatus.OFFLINE }
+                assertEquals(original.key, service.state.value.selectedPage)
+                waitUntil {
+                    find { it.text?.toString() == "Review connection before pairing" } !=
+                        null
+                }
+                return
+            }
             capture("01-portrait-first")
             if (pets) {
                 waitUntil { service.state.value.pet?.rows?.containsKey("talking") == true }

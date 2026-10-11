@@ -40,6 +40,10 @@ class WatchCatalogController(
             ThreadPoolExecutor.DiscardOldestPolicy()
         )
     private val refreshing = AtomicBoolean()
+    private val started = AtomicBoolean()
+    private val restored = AtomicBoolean()
+    private val requested = AtomicBoolean()
+    private val requestedForce = AtomicBoolean()
     private val artEpoch = AtomicLong()
     private val closed = AtomicBoolean()
     private val pendingMetadata = java.util.concurrent.atomic.AtomicReference<String?>()
@@ -72,14 +76,27 @@ class WatchCatalogController(
         }
     }
     fun start() {
-        Wearable.getDataClient(context).addListener(listener)
+        if (closed.get() || !started.compareAndSet(false, true)) return
         worker.execute {
-            runCatching { vault.pages() to vault.selected() }.fold({ (pages, selected) ->
-                main.post { if (!closed.get()) loaded(pages, selected) }
-            }, { main.post { if (!closed.get()) busy(false, "Saved catalog needs attention.") } })
+            val saved = runCatching { vault.pages() to vault.selected() }
+            main.post {
+                if (closed.get()) return@post
+                saved.fold({ (pages, selected) -> loaded(pages, selected) }, {
+                    loaded(emptyList(), "")
+                    busy(false, "Saved catalog needs attention.")
+                })
+                restored.set(true)
+                Wearable.getDataClient(context).addListener(listener)
+                if (requested.getAndSet(false)) refresh(requestedForce.getAndSet(false))
+            }
         }
     }
     fun refresh(force: Boolean) {
+        if (!restored.get()) {
+            requested.set(true)
+            if (force) requestedForce.set(true)
+            return
+        }
         if (closed.get() || !refreshing.compareAndSet(false, true)) return
         busy(true, "")
         worker.execute {

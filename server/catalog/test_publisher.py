@@ -1,3 +1,7 @@
+import socket
+import ssl
+import subprocess
+import time
 import hashlib
 import importlib.util
 import io
@@ -107,3 +111,23 @@ class PublisherTest(unittest.TestCase):
         with Image.open(asset) as portrait:
             self.assertEqual((171, 256), portrait.size)
             self.assertFalse(portrait.getexif())
+
+    def test_stalled_tls_handshake_does_not_block_authorized_catalog(self):
+        cert, key = self.root / 'cert.pem', self.root / 'key.pem'
+        subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', str(key), '-out', str(cert), '-subj', '/CN=localhost', '-days', '1'], check=True, capture_output=True)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(cert, key)
+        server = self.publisher.create_server(('127.0.0.1', 0), self.mapping, self.root / 'state', 'synthetic-only-token', context)
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        stalled = socket.create_connection(server.server_address, timeout=1)
+        try:
+            time.sleep(.1)
+            request = urllib.request.Request(f'https://127.0.0.1:{server.server_port}/catalog/v1', headers={'Authorization': 'Bearer synthetic-only-token'})
+            with urllib.request.urlopen(request, timeout=1, context=ssl._create_unverified_context()) as response:
+                self.assertEqual(200, response.status)
+        finally:
+            stalled.close()
+            server.shutdown()
+            server.server_close()
+            worker.join(2)

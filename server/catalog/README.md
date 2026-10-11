@@ -32,7 +32,9 @@ Authenticated `GET /catalog/v1` returns `{"version":1,"profiles":[...]}`. Each p
 record contains only `id`, `name`, nullable `gadget_url`, and optional `portrait` with `sha256`,
 `bytes`, and `/assets/<sha256>.png` path. Both routes require the same catalog-only bearer
 credential. There are no write routes, arbitrary file reads, redirects or request logs.
-Limits are 32 records and 64 KiB; errors fail closed without publishing a partial catalog.
+TLS handshakes and request reads use an eight-second accepted-socket deadline, with at
+most four concurrent request workers. A stalled unauthenticated connection cannot block
+all authorized requests. Limits are 32 records and 64 KiB; errors fail closed without publishing a partial catalog.
 
 ```sh
 python -m unittest discover -s server/catalog -p 'test_*.py' -v
@@ -40,5 +42,5 @@ python -m unittest discover -s server/catalog -p 'test_*.py' -v
 
 Tests use temporary original artwork and synthetic mappings, verify minimal projection,
 identity persistence, input preservation, portrait geometry/hash, credential enforcement,
-path confinement and absent endpoints. This is isolated software evidence, not a live
+path confinement, absent endpoints and a stalled unauthenticated TLS handshake. This is isolated software evidence, not a live
 three-box deployment or upstream approval.

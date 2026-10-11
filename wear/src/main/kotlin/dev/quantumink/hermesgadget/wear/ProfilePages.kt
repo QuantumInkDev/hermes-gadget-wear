@@ -26,7 +26,7 @@ object ProfilePages {
         val discovered = catalog.map { page ->
             val profile = page.profile.gadgetUrl?.let { known[it] }
                 ?: profiles.singleOrNull {
-                    page.sourceId == "manual" &&
+                    page.profile.gadgetUrl == null && page.sourceId == "manual" &&
                         ClientSpeech.endpointId(it.endpoint) == page.profile.id
                 }
             ProfilePage(page.key, page.profile.name, page.sourceLabel, profile, page)

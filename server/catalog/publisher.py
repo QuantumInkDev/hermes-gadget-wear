@@ -5,6 +5,8 @@ import argparse
 import hashlib
 import hmac
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
+import threading
 import io
 import json
 import os
@@ -127,9 +129,51 @@ def project(mapping_file: Path, state: Path):
     return result
 
 
-def create_server(address, mapping: Path, state: Path, credential: str):
+class CatalogServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
+    block_on_close = False
+
+    def __init__(self, address, handler, tls_context=None):
+        self.tls_context = tls_context
+        self.slots = threading.BoundedSemaphore(4)
+        super().__init__(address, handler)
+
+    def get_request(self):
+        connection, address = super().get_request()
+        connection.settimeout(8)
+        return connection, address
+
+    def process_request(self, request, address):
+        if not self.slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, address)
+        except Exception:
+            self.slots.release()
+            raise
+
+    def process_request_thread(self, request, address):
+        try:
+            if self.tls_context:
+                request = self.tls_context.wrap_socket(request, server_side=True, do_handshake_on_connect=False)
+                request.settimeout(8)
+                request.do_handshake()
+            super().process_request_thread(request, address)
+        except OSError:
+            self.shutdown_request(request)
+        finally:
+            self.slots.release()
+
+    def handle_error(self, *_):
+        pass  # No sensitive request/connection diagnostics.
+
+
+def create_server(address, mapping: Path, state: Path, credential: str, tls_context=None):
     if not 1 <= len(credential) <= 2048 or any(not 33 <= ord(c) <= 126 for c in credential):
         raise ValueError('Catalog credential must be printable without spaces')
+
+    projection_lock = threading.Lock()
 
     class Handler(BaseHTTPRequestHandler):
         protocol_version = 'HTTP/1.0'
@@ -155,13 +199,15 @@ def create_server(address, mapping: Path, state: Path, credential: str):
                 self._reply(401)
                 return
             try:
-                catalog = project(mapping, state)
+                with projection_lock:
+                    catalog = project(mapping, state)
+                    asset_data = _read(state / self.path.lstrip('/'), MAX_PORTRAIT) if self.path in {p['portrait']['path'] for p in catalog['profiles'] if 'portrait' in p} else None
                 if self.path == '/catalog/v1':
                     self._reply(200, json.dumps(catalog, separators=(',', ':')).encode())
                     return
                 allowed = {p['portrait']['path'] for p in catalog['profiles'] if 'portrait' in p}
                 if self.path in allowed:
-                    self._reply(200, _read(state / self.path.lstrip('/'), MAX_PORTRAIT), 'image/png')
+                    self._reply(200, asset_data, 'image/png')
                 else:
                     self._reply(404)
             except (ValueError, OSError, KeyError):
@@ -173,7 +219,7 @@ def create_server(address, mapping: Path, state: Path, credential: str):
         do_DELETE = do_POST
         do_PATCH = do_POST
 
-    server = HTTPServer(address, Handler)
+    server = CatalogServer(address, Handler, tls_context)
     server.timeout = 8
     return server
 
@@ -196,12 +242,12 @@ def main():
         parser.error('Specify both TLS certificate and key')
     if not args.tls_cert and args.host not in ('127.0.0.1', '::1', 'localhost'):
         parser.error('Non-loopback listeners require TLS; loopback requires an HTTPS reverse proxy')
-    server = create_server((args.host, args.port), args.mapping, args.state, _read(args.credential_file, 2049).decode().strip())
+    context = None
     if args.tls_cert:
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.minimum_version = ssl.TLSVersion.TLSv1_2
         context.load_cert_chain(args.tls_cert, args.tls_key)
-        server.socket = context.wrap_socket(server.socket, server_side=True)
+    server = create_server((args.host, args.port), args.mapping, args.state, _read(args.credential_file, 2049).decode().strip(), context)
     try:
         server.serve_forever()
     finally:

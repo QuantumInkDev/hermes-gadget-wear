@@ -81,7 +81,7 @@ Approved app/isolated catalog work is implemented on `feature/multi-box-profile-
 The [five-task plan](docs/superpowers/plans/2026-10-11-multi-box-profile-carousel.md) covers
 bounded publisher/contract, phone sources/discovery/photo/cache, watch enrollment-safe roster,
 endpoint drafts, stable pager, ambient-safe review and selected-only portrait/pet transitions.
-Strict checks and all APKs pass: 67 JVM tests, zero failures/errors/skips; five publisher tests.
+Strict checks and all APKs pass: 69 JVM tests, zero failures/errors/skips; six publisher tests.
 Owned API 37 phone vault/photo and watch cache/catalog checks passed. New swipe/Next/rotary,
 recording/approval protection, three separate identities/drafts/artworks, actual sleep/wake
 review and moving/frozen-renderer checks passed. Original draft/profile/lifecycle, companion
@@ -95,7 +95,14 @@ Data/Channel Layer path and physical three-box relay remain acceptance gates. Ex
 extension exports remain isolated. T3 device-panel boot failed twice; owned AVDs were operated
 through isolated ADB only. Preserve existing personal LAN/TLS keys and app signatures.
 
-CONTINUE HERE: finish the fresh branch review and its important fixes, then present the
-reviewable branch/APKs and private rollout package. Real catalog publication, owner artwork,
+Fresh whole-branch review is complete. All eight Important findings were fixed in one
+TDD pass with a green full suite; there were no Critical or deferred Minor findings.
+[Review resolutions](docs/carousel-review.md) records the tests and retained acceptance gates.
+Startup restores the saved card before connecting, stationary metadata reconciles artwork,
+conflicting sources remain isolated, phone-selected fallbacks survive refresh/restart,
+portrait ingestion and replicated retention are bounded, and owner-confirmed withdrawal
+retirement frees catalog capacity without removing endpoint setup or pairing keys.
+
+CONTINUE HERE: review the private rollout mappings and publication/rollback notes. Real catalog publication, owner artwork,
 new endpoint pairing and hardware acceptance are next separate review steps. Existing
 battery/speech/provider/Play gates in docs/release.md remain open.

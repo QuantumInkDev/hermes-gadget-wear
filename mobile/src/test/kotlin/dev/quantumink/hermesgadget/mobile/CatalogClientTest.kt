@@ -108,6 +108,56 @@ class CatalogClientTest {
         }
     }
 
+    @Test fun conflictingSourceDoesNotCancelHealthyDelayedUpdates() {
+        val sources = listOf("a", "b", "c").map {
+            CatalogSource(it, "Box $it", "https://$it.example.invalid/catalog/v1", "synthetic")
+        }
+        val firstSeen = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val updates = java.util.concurrent.CopyOnWriteArrayList<List<CatalogPage>>()
+        val shared = "wss://shared.example.invalid/gadget"
+        val old =
+            listOf(
+                CatalogPage(
+                    "b",
+                    "Box b",
+                    CatalogProfile("cached", "Agent", null, null),
+                    CatalogStatus.AVAILABLE,
+                    1
+                )
+            )
+        val engine = CatalogDiscovery { source ->
+            when (source.id) {
+                "a" -> listOf(CatalogProfile("fresh", "Agent", shared, null))
+                "b" -> {
+                    firstSeen.await(2, TimeUnit.SECONDS)
+                    listOf(CatalogProfile("conflict", "Agent", shared, null))
+                }
+                else -> {
+                    release.await(3, TimeUnit.SECONDS)
+                    listOf(CatalogProfile("later", "Agent", null, null))
+                }
+            }
+        }
+        try {
+            val future = engine.refresh(sources, old, true) { pages ->
+                updates.add(pages)
+                if (pages.any { it.key == "a:fresh" }) firstSeen.countDown()
+            }
+            assertTrue(firstSeen.await(2, TimeUnit.SECONDS))
+            assertTrue(!future.isDone)
+            release.countDown()
+            val result = future.get(4, TimeUnit.SECONDS)
+            assertTrue(result.any { it.key == "c:later" })
+            assertEquals(CatalogStatus.ATTENTION, result.single { it.key == "b:cached" }.status)
+            assertTrue(result.none { it.key == "b:conflict" })
+            assertEquals(CatalogStatus.ATTENTION, engine.statuses()["b"])
+        } finally {
+            release.countDown()
+            engine.close()
+        }
+    }
+
     @Test fun sourceEditRejectsPendingOldConfigurationAndRefreshesTheNewOne() {
         val source = CatalogSource("a", "Box", "https://a.example.invalid/catalog/v1", "old")
         val entered = java.util.concurrent.CountDownLatch(1)

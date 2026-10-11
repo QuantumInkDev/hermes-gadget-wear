@@ -19,32 +19,69 @@ object ProfileSync {
         CatalogRepository.get(context).refresh(true)
     }
 
-    fun publishCatalog(
+    @Synchronized fun publishCatalog(
         context: Context,
         pages: List<dev.quantumink.hermesgadget.protocol.CatalogPage>,
         portraits: PortraitStore
     ) {
         val client = Wearable.getDataClient(context)
-        val tasks = pages.mapNotNull { it.profile.portrait?.sha256 }.distinct().mapNotNull { hash ->
-            portraits.file(hash)?.let { file ->
-                val item = PutDataMapRequest.create(
-                    dev.quantumink.hermesgadget.protocol.ProfileCatalog.PORTRAIT_PATH + hash
-                )
-                item.dataMap.putAsset(
-                    "portrait",
-                    com.google.android.gms.wearable.Asset.createFromBytes(file.readBytes())
-                )
-                client.putDataItem(item.asPutDataRequest())
-            }
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        fun <T> await(task: com.google.android.gms.tasks.Task<T>): T {
+            val remaining = deadline - System.nanoTime()
+            require(remaining > 0) { "Catalog sync deadline exceeded." }
+            return Tasks.await(task, remaining, TimeUnit.NANOSECONDS)
         }
-        if (tasks.isNotEmpty()) Tasks.await(Tasks.whenAll(tasks), 5, TimeUnit.SECONDS)
-        val record = PutDataMapRequest.create(
-            dev.quantumink.hermesgadget.protocol.ProfileCatalog.DATA_PATH
+        val owner = await(Wearable.getNodeClient(context).localNode).id
+        CatalogPublication.publish(
+            pages,
+            { hash -> portraits.file(hash)?.readBytes() },
+            object : CatalogPublicationTransport {
+                override val owner = owner
+                private val assets = mutableListOf<com.google.android.gms.tasks.Task<*>>()
+                private val deletions = mutableListOf<com.google.android.gms.tasks.Task<*>>()
+                override fun portrait(hash: String, bytes: ByteArray) {
+                    val item = PutDataMapRequest.create(
+                        dev.quantumink.hermesgadget.protocol.ProfileCatalog.PORTRAIT_PATH + hash
+                    )
+                    item.dataMap.putAsset(
+                        "portrait",
+                        com.google.android.gms.wearable.Asset.createFromBytes(bytes)
+                    )
+                    assets.add(client.putDataItem(item.asPutDataRequest()))
+                }
+                override fun pages(json: String) {
+                    if (assets.isNotEmpty()) await(Tasks.whenAll(assets))
+                    val record = PutDataMapRequest.create(
+                        dev.quantumink.hermesgadget.protocol.ProfileCatalog.DATA_PATH
+                    )
+                    record.dataMap.putString("pages", json)
+                    await(client.putDataItem(record.asPutDataRequest().setUrgent()))
+                }
+                override fun items(): List<CatalogDataItem> {
+                    val buffer = await(client.dataItems)
+                    return try {
+                        buffer.mapNotNull { item ->
+                            val host = item.uri.host
+                            val path = item.uri.path
+                            if (host == null || path == null) null else CatalogDataItem(host, path)
+                        }
+                    } finally {
+                        buffer.release()
+                    }
+                }
+                override fun delete(item: CatalogDataItem) {
+                    deletions.add(
+                        client.deleteDataItems(
+                            android.net.Uri.Builder().scheme(
+                                "wear"
+                            ).authority(item.owner).path(item.path).build()
+                        )
+                    )
+                }
+                override fun finishCleanup() {
+                    if (deletions.isNotEmpty()) await(Tasks.whenAll(deletions))
+                }
+            }
         )
-        record.dataMap.putString(
-            "pages",
-            dev.quantumink.hermesgadget.protocol.ProfileCatalog.encodePages(pages)
-        )
-        Tasks.await(client.putDataItem(record.asPutDataRequest().setUrgent()), 5, TimeUnit.SECONDS)
     }
 }

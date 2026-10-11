@@ -34,6 +34,9 @@ fun CatalogPage(context: Context, back: () -> Unit) {
     var url by remember { mutableStateOf("") }
     var credential by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(true) }
+    var retiring by remember {
+        mutableStateOf<dev.quantumink.hermesgadget.protocol.CatalogPage?>(null)
+    }
     var error by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     fun work(action: () -> Unit) {
@@ -134,8 +137,31 @@ fun CatalogPage(context: Context, back: () -> Unit) {
         Button(enabled = !busy, onClick = {
             work { repository.refresh(true).get(20, java.util.concurrent.TimeUnit.SECONDS) }
         }) { Text("Refresh profiles") }
+        retiring?.let { page ->
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { retiring = null },
+                title = { Text("Forget withdrawn profile?") },
+                text = {
+                    Text(
+                        "Remove ${page.profile.name} from this phone's catalog. Saved watch setup and pairing keys remain. Existing phone setup can still appear as a manual profile."
+                    )
+                },
+                confirmButton = {
+                    Button(enabled = !busy, onClick = {
+                        retiring = null
+                        work { repository.retirePage(page.key) }
+                    }) { Text("Forget catalog card") }
+                },
+                dismissButton = { Button(onClick = { retiring = null }) { Text("Cancel") } }
+            )
+        }
         pages.forEach { page ->
             Text("${page.profile.name} · ${page.sourceLabel}")
+            if (page.status == CatalogStatus.WITHDRAWN) {
+                Button(enabled = !busy, onClick = {
+                    retiring = page
+                }) { Text("Forget withdrawn card") }
+            }
             Button(enabled = !busy && pages.firstOrNull()?.key != page.key, onClick = {
                 work { repository.movePage(page.key, -1) }
             }) { Text("Move earlier") }

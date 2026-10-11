@@ -20,15 +20,23 @@ area; cached neighbors/offline pages stay static. Activity-owned review/page mem
 ambient composition replacement. Setup capacity is 32 without changing existing key records.
 
 Validation: strict full checks/builds and both debug/instrumentation APKs passed with warnings
-as errors; 67 JVM tests (57 protocol, eight phone, two watch), zero failures/errors/skips.
-Five isolated publisher Python tests passed. Three real TLS HTTP fixtures verify credential
+as errors; 69 JVM tests (57 protocol, ten phone, two watch), zero failures/errors/skips.
+Six isolated publisher Python tests passed. Three real TLS HTTP fixtures verify credential
 scope, default-trust refusal, independent auth/offline states and stable withdrawal/return.
 Three stock SDK processes verify independent pairing/reconnect. Owned API 37 instrumentation
 passed phone vault/photo checks, watch cache/label enrollment preservation, actual swipe,
 accessible Next, vertical/rotary scrolling, recording/approval switch protection, separate
 drafts/identities, actual ambient/wake review restoration, fixed artwork placement and
 selected-only movement. Original draft/profile/lifecycle and companion/base-only pet
-regressions passed. The publisher suite is included in CI.
+regressions passed. The publisher suite is included in CI. The fresh branch review identified eight important
+orchestration/retention issues; each now has a regression observed failing then passing.
+[Review resolutions](carousel-review.md) records startup ordering, stationary artwork,
+source conflict isolation/partial publication, TLS handshake deadlines, replicated portrait
+cleanup, ingestion quotas, owner fallback persistence and confirmed withdrawn-card retirement.
+The related manual-ID changed-URL downgrade is also covered. Final phone storage/repository
+instrumentation passes 8/8; startup, stationary portrait, changed URL, companion carousel and
+original profile switching each pass on the owned watch emulator. Both local APK signatures
+verify against the existing local debug certificate.
 
 Demo note: [three-source original artwork and actual emulator captures](demo/carousel/README.md).
 The new catalog Data/Channel Layer path has not yet been exercised between real paired
