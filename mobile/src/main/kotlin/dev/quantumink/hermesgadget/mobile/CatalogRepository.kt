@@ -1,11 +1,13 @@
 package dev.quantumink.hermesgadget.mobile
 
 import android.content.Context
+import dev.quantumink.hermesgadget.protocol.CatalogOrder
 import dev.quantumink.hermesgadget.protocol.CatalogPage
 import dev.quantumink.hermesgadget.protocol.CatalogProfile
 import dev.quantumink.hermesgadget.protocol.CatalogSource
 import dev.quantumink.hermesgadget.protocol.CatalogStatus
 import dev.quantumink.hermesgadget.protocol.ClientSpeech
+import dev.quantumink.hermesgadget.protocol.Endpoint
 import dev.quantumink.hermesgadget.protocol.EndpointProfile
 import dev.quantumink.hermesgadget.protocol.PortraitDescriptor
 import dev.quantumink.hermesgadget.protocol.ProfileCatalog
@@ -77,11 +79,50 @@ class CatalogRepository internal constructor(
         discovery.invalidate()
     }
 
-    @Synchronized fun sources(): List<CatalogSource> = vault.sources()
+    @Synchronized fun sources(): List<CatalogSource> {
+        val order = sourceOrder()
+        return vault.sources().sortedBy { order.indexOf(it.id) }
+    }
 
-    @Synchronized fun savedPages(): List<CatalogPage> = combined(vault.pages()).also {
-        mutablePages.value =
-            it
+    @Synchronized fun sourceOrder(): List<String> = sourceOrder(vault.pages())
+
+    private fun sourceOrder(previous: List<CatalogPage>): List<String> {
+        val configured = vault.sources().map { it.id } + "manual"
+        val saved = vault.sourceOrder()
+        val initial = saved ?: CatalogOrder.group(previous).map { it.first().sourceId }
+        val order = (initial.filter { it in configured } + configured).distinct()
+        if (saved != order) vault.saveSourceOrder(order)
+        return order
+    }
+
+    /** Reads only normalized, hash-addressed local artwork; callers decode on an IO worker. */
+    fun portraitFile(hash: String): File? = portraits.file(hash)
+
+    /** Catalog credentials are deliberately absent from this conversation projection. */
+    @Synchronized fun profileFor(page: CatalogPage): EndpointProfile? {
+        val profiles = setup.profiles()
+        val url = page.profile.gadgetUrl
+        if (url == null) {
+            return if (page.sourceId == "manual") {
+                profiles.singleOrNull { ClientSpeech.endpointId(it.endpoint) == page.profile.id }
+            } else {
+                null
+            }
+        }
+        val endpoint = Endpoint.parse(url)
+        val saved = profiles.singleOrNull { it.endpoint.url == endpoint.url }
+        return EndpointProfile(
+            saved?.endpoint ?: endpoint,
+            page.profile.name,
+            saved?.accessToken.orEmpty()
+        )
+    }
+
+    @Synchronized fun savedPages(): List<CatalogPage> {
+        val previous = vault.pages()
+        val raw = combined(previous, false)
+        if (previous.map { it.key } != raw.map { it.key }) vault.savePages(raw)
+        return combined(raw).also { mutablePages.value = it }
     }
 
     @Synchronized fun saveSource(source: CatalogSource) {
@@ -325,11 +366,23 @@ class CatalogRepository internal constructor(
     }
 
     @Synchronized fun movePage(key: String, delta: Int) {
-        val pages = combined(vault.pages(), false).toMutableList()
-        val index = pages.indexOfFirst { it.key == key }
-        require(index >= 0)
-        val target = (index + delta).coerceIn(0, pages.lastIndex)
-        pages.add(target, pages.removeAt(index))
+        val pages = CatalogOrder.moveProfile(combined(vault.pages(), false), key, delta)
+        vault.savePages(pages)
+        val effective = combined(pages)
+        mutablePages.value = effective
+        invalidate()
+        publish(effective, portraits)
+    }
+
+    @Synchronized fun moveSource(id: String, delta: Int) {
+        val raw = combined(vault.pages(), false)
+        val order = sourceOrder(raw).toMutableList()
+        val index = order.indexOf(id)
+        require(index >= 0) { "Unknown box." }
+        val target = (index.toLong() + delta).coerceIn(0, order.lastIndex.toLong()).toInt()
+        order.add(target, order.removeAt(index))
+        vault.saveSourceOrder(order)
+        val pages = combined(raw, false)
         vault.savePages(pages)
         val effective = combined(pages)
         mutablePages.value = effective
@@ -342,7 +395,7 @@ class CatalogRepository internal constructor(
         applyOverrides: Boolean = true
     ): List<CatalogPage> {
         val overrides = vault.overrides().associateBy { it.key }
-        mutableWatchPictures.value = overrides.keys
+        val ownerPictures = mutableSetOf<String>()
         val fallbacks = vault.fallbacks().associate { it.profile.id to it.profile.portrait }
         val discovered = previous.filter { it.sourceId != "manual" }.map { page ->
             val fallback = page.profile.gadgetUrl?.let { url ->
@@ -352,6 +405,7 @@ class CatalogRepository internal constructor(
                     )
                 ]
             }
+            if (page.profile.portrait == null && fallback != null) ownerPictures += page.key
             if (applyOverrides && page.profile.portrait == null && fallback != null) {
                 CatalogPage(
                     page.sourceId,
@@ -372,6 +426,7 @@ class CatalogRepository internal constructor(
         val known = discovered.mapNotNull { it.profile.gadgetUrl }.toSet()
         val manual = setup.profiles().filter { it.endpoint.url !in known }.map { profile ->
             val id = ClientSpeech.endpointId(profile.endpoint)
+            if (fallbacks[id] != null) ownerPictures += "manual:$id"
             CatalogPage(
                 "manual",
                 "Saved on phone",
@@ -388,12 +443,17 @@ class CatalogRepository internal constructor(
             )
         }
         val order = previous.mapIndexed { index, page -> page.key to index }.toMap()
-        return (discovered + manual).map { page ->
+        mutableWatchPictures.value = overrides.keys + ownerPictures
+        val effective = (discovered + manual).map { page ->
             val portrait = overrides[page.key]?.profile?.portrait
             if (applyOverrides && portrait != null) withPortrait(page, portrait) else page
         }.sortedBy {
             order[it.key] ?: Int.MAX_VALUE
-        }.also { ProfileCatalog.encodePages(it) }
+        }
+        val sources = sourceOrder(previous)
+        return CatalogOrder.group(effective).sortedBy { group ->
+            sources.indexOf(group.first().sourceId).takeIf { it >= 0 } ?: Int.MAX_VALUE
+        }.flatten().also { ProfileCatalog.encodePages(it) }
     }
 
     private fun references(pages: List<CatalogPage>): Set<String> =

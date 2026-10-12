@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Hermes Gadget</string>
+    <string name="app_name">QuantumInk Relay Watch</string>
     <string name="setup_title">Your agent.\nOn your wrist.</string>
     <string name="setup_hint">Add the Gadget URL printed by Hermes on your server.</string>
     <string name="endpoint_name">Server name</string>

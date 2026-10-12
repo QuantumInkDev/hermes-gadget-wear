@@ -13,6 +13,12 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 class CatalogVault(
     context: Context,
@@ -50,6 +56,35 @@ class CatalogVault(
             "sources",
             ProfileCatalog.encodeSources(sources).toByteArray()
         )
+    }
+
+    /** A missing record migrates the old roster; an empty box still has an order slot. */
+    @Synchronized fun sourceOrder(): List<String>? = read("source-order")?.let { bytes ->
+        try {
+            val item = Json.parseToJsonElement(bytes.toString(Charsets.UTF_8)) as JsonObject
+            require((item["version"] as? JsonPrimitive)?.content == "1")
+            val order = (item["sources"] as JsonArray).map { (it as JsonPrimitive).content }
+            validateOrder(order)
+            order
+        } finally {
+            bytes.fill(0)
+        }
+    }
+
+    @Synchronized fun saveSourceOrder(order: List<String>) {
+        validateOrder(order)
+        write(
+            "source-order",
+            buildJsonObject {
+                put("version", 1)
+                put("sources", JsonArray(order.map(::JsonPrimitive)))
+            }.toString().toByteArray()
+        )
+    }
+
+    private fun validateOrder(order: List<String>) {
+        require(order.size <= ProfileCatalog.MAX_SOURCES + 1 && order.distinct().size == order.size)
+        require(order.all { it.matches(Regex("[A-Za-z0-9_-]{1,64}")) })
     }
 
     @Synchronized fun savePages(pages: List<CatalogPage>) {

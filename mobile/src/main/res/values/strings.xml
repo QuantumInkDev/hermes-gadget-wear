@@ -1,6 +1,6 @@
 <resources>
-    <string name="app_name">Hermes Gadget</string>
-    <string name="gadget_title">HERMES GADGET</string>
+    <string name="app_name">QuantumInk Relay</string>
+    <string name="gadget_title">QUANTUMINK RELAY</string>
     <string name="setup_title">A little closer\nto your agent.</string>
     <string name="privacy_note">No account with us. No hosted backend. No analytics.</string>
     <string name="enable_relay">Enable phone relay</string>
