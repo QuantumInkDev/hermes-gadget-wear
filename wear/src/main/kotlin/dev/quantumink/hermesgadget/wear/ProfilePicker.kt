@@ -97,6 +97,7 @@ fun ProfilePinEditor(pages: List<ProfilePage>, key: String, locked: Boolean, clo
                 .onSuccess {
                     pins = it
                     notice = "Pins saved on watch"
+                    TilePinSync.changed(context)
                 }
                 .onFailure { notice = "Could not save tile settings" }
             saving = false

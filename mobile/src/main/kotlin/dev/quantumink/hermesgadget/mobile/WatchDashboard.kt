@@ -30,11 +30,17 @@ internal fun WatchDashboard(
     enable: () -> Unit,
     disable: () -> Unit,
     associate: () -> Unit,
-    stop: () -> Unit
+    stop: () -> Unit,
+    tiles: () -> Unit = {}
 ) {
     var details by remember { mutableStateOf(false) }
     Text("Your watch", style = MaterialTheme.typography.headlineLarge)
     Text("A bridge to your Hermes boxes.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    SettingsSection {
+        Text("Profile tiles", style = MaterialTheme.typography.titleLarge)
+        Text("Choose a Focus profile and four picture shortcuts for your watch.")
+        Button(tiles, Modifier.fillMaxWidth()) { Text("Edit profile tiles") }
+    }
     SettingsSection {
         Row(
             Modifier.fillMaxWidth(),

@@ -35,5 +35,16 @@
                 <data android:scheme="wear" android:host="*" android:pathPrefix="/hermes/" />
             </intent-filter>
         </service>
+        <service android:name=".TilePinSyncService" android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/hermes/tile-pins/v1/" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.CAPABILITY_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:path="/hermes_tile_watch_v1" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

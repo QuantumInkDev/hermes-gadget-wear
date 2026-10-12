@@ -45,6 +45,7 @@ class DirectoryPresentationTest {
             var disabled = 0
             var associated = 0
             var stopped = 0
+            var tiles = 0
             val relay = mutableStateOf(false)
             ui.show(destination = "watch", scroll = true) {
                 WatchDashboard(
@@ -59,9 +60,12 @@ class DirectoryPresentationTest {
                         relay.value = false
                     },
                     { associated++ },
-                    { stopped++ }
+                    { stopped++ },
+                    { tiles++ }
                 )
             }
+            ui.click("Edit profile tiles")
+            assertEquals(1, tiles)
             ui.click("Phone relay", description = true)
             ui.await { ui.find("Enabled") != null }
             ui.click("Phone relay", description = true)

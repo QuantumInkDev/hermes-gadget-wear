@@ -133,7 +133,13 @@ class MainActivity : ComponentActivity() {
                 androidx.activity.compose.BackHandler(
                     destination !in setOf("profiles", "watch", "settings")
                 ) {
-                    navigate(if (destination == "conversation") "profiles" else "settings")
+                    navigate(
+                        when (destination) {
+                            "conversation" -> "profiles"
+                            "tiles" -> "watch"
+                            else -> "settings"
+                        }
+                    )
                 }
                 PhoneScaffold(
                     topBar = {
@@ -145,7 +151,16 @@ class MainActivity : ComponentActivity() {
                         if (WindowInsets.ime.getBottom(LocalDensity.current) ==
                             0
                         ) {
-                            PhoneNavigationBar(destination, ::navigate)
+                            PhoneNavigationBar(
+                                if (destination ==
+                                    "tiles"
+                                ) {
+                                    "watch"
+                                } else {
+                                    destination
+                                },
+                                ::navigate
+                            )
                         }
                     }
                 ) { padding ->
@@ -196,6 +211,7 @@ class MainActivity : ComponentActivity() {
                                     "appearance" -> AppearancePage(this@MainActivity) {
                                         navigate("settings")
                                     }
+                                    "tiles" -> ProfileTilesPage { navigate("watch") }
                                     "settings" -> PhoneSettingsPage(this@MainActivity, ::navigate)
                                     else -> WatchDashboard(
                                         enabled,
@@ -206,7 +222,8 @@ class MainActivity : ComponentActivity() {
                                             enabled = false
                                         },
                                         ::associateWatch,
-                                        { RelaySettings.stop() }
+                                        { RelaySettings.stop() },
+                                        { navigate("tiles") }
                                     )
                                 }
                             }
