@@ -21,9 +21,9 @@ Box directory, inline pictures and original branding are committed. The new fore
 phone client has separate per-endpoint identities, explicit Connect, TLS, draft/reply retention,
 text/PCM voice and approval controls. Two isolated stock TLS server tests pass, including
 independent identities, reconnect, chat, microphone capture and foreground shutdown; no live
-phone pairing was initiated. Final phone UI/storage regressions and strict verification are
-in progress; do not claim physical phone speech. A discovered manual-picture uniqueness
-regression is being fixed under the directory agent's scope.
+phone pairing was initiated. All 13 directory/repository regressions now pass after the keyed-picture uniqueness fix.
+The phone stock/vault acceptance rerun passes, including a fresh server response to PCM capture.
+Do not claim physical phone speech. Shared-audio carousel interaction passed in 13.874 seconds.
 
 Next: finish storage/UI integration, implement the approved GIF plan, review the whole branch,
 then preserve-data device delivery. Phone client never borrows watch keys; existing relay stays

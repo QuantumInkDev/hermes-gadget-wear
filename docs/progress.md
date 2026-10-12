@@ -413,3 +413,13 @@ DirectConnection. Two isolated stock TLS server/vault tests pass: explicit Conne
 separate identities/replies/drafts, authenticated reconnect, text, PCM capture, and shutdown
 without changing the relay setting. It does not auto-enroll live profiles. Final UI/storage
 regressions, actual phone voice observation and bounded GIF work remain in progress.
+
+
+Phone organization and original QuantumInk Relay branding are committed. The directory
+migration/reorder/empty-box/restart/override tests and prior repository tests pass: 13/13
+owned-phone tests. An observed dormant-manual/discovered-picture URL collision was fixed by
+keeping keyed picture records URL-free; encryption and artwork remain unchanged. Stock phone
+acceptance reran successfully with a fresh audio-upload response. The shared-audio watch
+carousel interaction scenario passed in 13.874 seconds. [Setup instructions](profile-setup.md)
+now cover independent phone pairing and foreground Talk/Chat. Physical phone STT/voice,
+full UI acceptance and animated-picture checks remain separate gates.

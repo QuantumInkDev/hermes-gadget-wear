@@ -141,8 +141,8 @@ other's keys, tokens, drafts, voice settings or conversations.
 
 ## Use box pictures or watch-specific pictures
 
-Imported box pictures are the default. In the phone's discovery page, open the profile's
-**Picture options**. Choose **Choose watch picture** to use the system photo picker, or
+Imported box pictures are the default. In the phone's Profiles page, open the profile's
+**Picture** control. Choose **Choose picture** to use the system photo picker, or
 **Use box picture** to return to the latest imported image. The app does not edit the box's
 original. Overrides use the box/profile identity, so identical profile IDs on different boxes
 stay separate. Choices survive refreshes, offline periods and restart, including a profile
@@ -189,3 +189,29 @@ Run a hold-to-talk check and listen to the selected profile's voice before depen
 Release acceptance still includes real phone/watch delivery, per-profile pairing and speech,
 off-network/offline recovery, locked-phone behavior, battery and publication gates in
 [release.md](release.md). Infrastructure checks alone do not complete those gates.
+
+
+## Talk or chat on the phone
+
+QuantumInk Relay opens on **Profiles**. Search box/profile names, collapse boxes, or enable
+**Reorder** and use the accessible up/down controls. Box order and the order within each box
+are saved; the watch receives that same profile order. Catalog availability describes discovery,
+not an authenticated Gadget conversation. **Watch** contains relay/association controls;
+**Settings** contains catalogs, manual watch endpoints, voice configuration and recording cues.
+
+1. On a profile row, choose **Talk/Chat** and review its canonical `wss` endpoint.
+2. Choose **Connect this phone**. Grant local-network access if Android requests it for your
+   LAN/tailnet. The phone creates its own identity only after this explicit action.
+3. Approve the phone's displayed code on that exact box/profile with the server's displayed
+   command. A watch approval does not approve the phone; no watch key is transferred.
+4. Send a short text, or hold **Hold to talk**. Release sends; drag down cancels. Screen readers
+   can use Start/Finish recording. Microphone permission is requested on recording action;
+   after granting it, hold again. Listen for start/finish/cancel cues and the profile's voice.
+5. **Stop voice**, **Cancel turn**, approval buttons and **New session** are explicit controls.
+
+Phone conversations require TLS and the phone's own tailnet connectivity. Initial phone audio
+uses server speech, including that profile's configured voice. Watch BYOK settings remain a
+separate watch feature. Foreground phone conversations close and stop audio when you leave the
+screen or lock the phone; the watch relay continues independently. Drafts and displayed replies
+survive screen rotation; reconnect explicitly after returning. Messages are never replayed on
+reconnect. A corrupted phone identity fails closed rather than silently re-pairing the watch.
