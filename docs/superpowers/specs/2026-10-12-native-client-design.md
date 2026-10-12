@@ -1,6 +1,7 @@
 # Quantum Relay for Hermes: native client design pass
 
-Status: proposed for maintainer review. This specifies the next design and tile implementation;
+Status: approved by the maintainer on 2026-10-12, including Portrait studio and Voice Q.
+This specifies the next design and tile implementation;
 it does not claim those changes are installed. Existing pairing, speech and relay software stays
 the basis of the work. The maintainer reports that current watch scrolling/controls and recording
 cues work. Owner GIF artwork and the next office trial remain separate observations.
