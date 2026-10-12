@@ -100,7 +100,7 @@ fun WatchScreen(
     var editing by navigation.editing
     var newProfile by navigation.newProfile
     var imported by navigation.imported
-    var appearanceReturn by remember { mutableStateOf("home") }
+    var appearanceReturn by navigation.appearanceReturn
     val context = LocalContext.current
     fun openAppearance() {
         appearanceReturn = route

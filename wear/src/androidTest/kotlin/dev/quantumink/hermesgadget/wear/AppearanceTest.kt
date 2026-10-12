@@ -22,13 +22,47 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class AppearanceTest {
-    @Test fun themeWrappersProvideReadableActualSemanticPairs() {
+    @Test fun productionActivityRetainsCaptureSecurityPolicyAcrossAppearanceChanges() {
         assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val activity = instrumentation.startActivitySync(
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ) as MainActivity
+        val secureFlag = android.view.WindowManager.LayoutParams.FLAG_SECURE
+        val original = activity.window.attributes.flags and secureFlag
+        // Preserve the watch activity's existing capture policy as well.
+        try {
+            Appearance.entries.forEach { mode ->
+                val rendered = CountDownLatch(1)
+                instrumentation.runOnMainSync {
+                    activity.setContent {
+                        WatchAppearance(mode) { SideEffect { rendered.countDown() } }
+                    }
+                }
+                assertTrue(rendered.await(5, TimeUnit.SECONDS))
+                instrumentation.runOnMainSync {
+                    assertEquals(original, activity.window.attributes.flags and secureFlag)
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                activity.setContent { }
+                activity.finish()
+            }
+        }
+    }
+
+    @Test fun themeWrappersProvideReadableActualSemanticPairs() {
+        assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val activity = instrumentation.startActivitySync(
+            Intent(
+                context,
+                AppearanceTestActivity::class.java
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ) as AppearanceTestActivity
         try {
             Appearance.entries.forEach { mode ->
                 val rendered = CountDownLatch(1)
@@ -75,8 +109,11 @@ class AppearanceTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val activity = instrumentation.startActivitySync(
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        ) as MainActivity
+            Intent(
+                context,
+                AppearanceTestActivity::class.java
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ) as AppearanceTestActivity
         try {
             val rendered = CountDownLatch(1)
             instrumentation.runOnMainSync {
@@ -123,11 +160,13 @@ class AppearanceTest {
         val original = preferences.mode.value
         val returned = AtomicBoolean(false)
         val activity = instrumentation.startActivitySync(
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        ) as MainActivity
+            Intent(
+                context,
+                AppearanceTestActivity::class.java
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ) as AppearanceTestActivity
         try {
             instrumentation.runOnMainSync {
-                activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
                 activity.setContent {
                     val mode by preferences.mode.collectAsStateWithLifecycle()
                     WatchAppearance(mode) {
@@ -140,8 +179,7 @@ class AppearanceTest {
                 Appearance.DARK to "Dark",
                 Appearance.MOONLIGHT to "Electronic Moonlight"
             )) {
-                val node =
-                    chooserNode((if (preferences.mode.value == option) "✓ " else "○ ") + label)
+                val node = chooserNode(label)
                 var target = node
                 while (!target.isClickable) target = requireNotNull(target.parent)
                 assertTrue(target.performAction(AccessibilityNodeInfo.ACTION_CLICK))
@@ -153,7 +191,21 @@ class AppearanceTest {
                     context.getSharedPreferences("appearance-v1", Context.MODE_PRIVATE)
                         .getString("mode", null)
                 )
-                chooserNode("✓ " + label)
+                // Android exposes Wear radio semantics as a checkable virtual View.
+                // Assert the app's actual announced state rather than a framework widget class.
+                var radio: AccessibilityNodeInfo? = chooserNode(label)
+                while (radio != null && !radio.isCheckable) radio = radio.parent
+                assertTrue("Appearance option must expose native radio selection", radio != null)
+                var selected = false
+                repeat(20) {
+                    var current: AccessibilityNodeInfo? = chooserNode(label)
+                    while (current != null && !current.isCheckable) current = current.parent
+                    @Suppress("DEPRECATION")
+                    val checked = current?.isChecked == true
+                    selected = checked || current?.isSelected == true
+                    if (!selected) android.os.SystemClock.sleep(50)
+                }
+                assertTrue("Chosen appearance must be announced selected", selected)
                 instrumentation.uiAutomation.waitForIdle(200, 3000)
                 requireNotNull(instrumentation.uiAutomation.takeScreenshot()).let { screenshot ->
                     java.io.File(context.cacheDir, "appearance-wear-${option.name}.png")
@@ -189,7 +241,8 @@ class AppearanceTest {
             val root = instrumentation.uiAutomation.rootInActiveWindow
             val all = root?.let(::nodes)?.toList().orEmpty()
             all.firstOrNull {
-                it.isVisibleToUser && it.text?.toString() == label
+                it.isVisibleToUser &&
+                    it.text?.toString()?.removePrefix("✓ ")?.removePrefix("○ ") == label
             }?.let { return it }
             all.firstOrNull { it.isScrollable }?.performAction(
                 AccessibilityNodeInfo.ACTION_SCROLL_FORWARD

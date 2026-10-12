@@ -1,15 +1,23 @@
 package dev.quantumink.hermesgadget.wear
 
 import android.content.Context
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.material3.ColorScheme
 import androidx.wear.compose.material3.LocalContentColor
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.RadioButton
+import androidx.wear.compose.material3.Text
 import dev.quantumink.hermesgadget.client.Appearance
 import dev.quantumink.hermesgadget.client.AppearancePreferences
 import dev.quantumink.hermesgadget.client.appearanceTokens
@@ -58,7 +66,7 @@ fun WatchAppearance(mode: Appearance, content: @Composable () -> Unit) {
 internal fun WatchAppearancePage(context: Context, back: () -> Unit) {
     val preferences = remember(context) { AppearancePreferences(context) }
     val mode by preferences.mode.collectAsStateWithLifecycle()
-    RoundPage {
+    RoundPage(modifier = Modifier.selectableGroup()) {
         item { Heading("Appearance") }
         Appearance.entries.forEach { option ->
             val label = when (option) {
@@ -67,9 +75,12 @@ internal fun WatchAppearancePage(context: Context, back: () -> Unit) {
                 Appearance.MOONLIGHT -> "Electronic Moonlight"
             }
             item {
-                Secondary((if (mode == option) "✓ " else "○ ") + label, {
-                    preferences.set(option)
-                })
+                RadioButton(
+                    selected = mode == option,
+                    onSelect = { preferences.set(option) },
+                    modifier = Modifier.fillMaxWidth().semantics { role = Role.RadioButton },
+                    label = { Text(label) }
+                )
             }
         }
         item { Secondary("Back", back) }

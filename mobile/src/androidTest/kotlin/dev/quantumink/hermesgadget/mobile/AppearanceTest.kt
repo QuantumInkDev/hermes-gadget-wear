@@ -26,13 +26,47 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class AppearanceTest {
-    @Test fun themeWrappersProvideReadableActualSemanticPairs() {
+    @Test fun productionActivityRetainsCaptureSecurityPolicyAcrossAppearanceChanges() {
         assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val activity = instrumentation.startActivitySync(
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ) as MainActivity
+        val secureFlag = android.view.WindowManager.LayoutParams.FLAG_SECURE
+        val original = activity.window.attributes.flags and secureFlag
+        try {
+            assertTrue(original != 0)
+            Appearance.entries.forEach { mode ->
+                val rendered = CountDownLatch(1)
+                instrumentation.runOnMainSync {
+                    activity.setContent {
+                        PhoneAppearance(mode) { SideEffect { rendered.countDown() } }
+                    }
+                }
+                assertTrue(rendered.await(5, TimeUnit.SECONDS))
+                instrumentation.runOnMainSync {
+                    assertEquals(original, activity.window.attributes.flags and secureFlag)
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync {
+                activity.setContent { }
+                activity.finish()
+            }
+        }
+    }
+
+    @Test fun themeWrappersProvideReadableActualSemanticPairs() {
+        assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val activity = instrumentation.startActivitySync(
+            Intent(
+                context,
+                AppearanceTestActivity::class.java
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ) as AppearanceTestActivity
         try {
             Appearance.entries.forEach { mode ->
                 val rendered = CountDownLatch(1)
@@ -79,8 +113,11 @@ class AppearanceTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val activity = instrumentation.startActivitySync(
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        ) as MainActivity
+            Intent(
+                context,
+                AppearanceTestActivity::class.java
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ) as AppearanceTestActivity
         try {
             Appearance.entries.forEach { mode ->
                 val rendered = CountDownLatch(1)
@@ -113,13 +150,12 @@ class AppearanceTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val activity = instrumentation.startActivitySync(
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        ) as MainActivity
+            Intent(
+                context,
+                AppearanceTestActivity::class.java
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ) as AppearanceTestActivity
         try {
-            instrumentation.runOnMainSync {
-                // This test renders public synthetic text only.
-                activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
-            }
             Appearance.entries.forEach { mode ->
                 val rendered = CountDownLatch(1)
                 var foreground = 0
@@ -172,11 +208,13 @@ class AppearanceTest {
         val original = preferences.mode.value
         val returned = AtomicBoolean(false)
         val activity = instrumentation.startActivitySync(
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        ) as MainActivity
+            Intent(
+                context,
+                AppearanceTestActivity::class.java
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ) as AppearanceTestActivity
         try {
             instrumentation.runOnMainSync {
-                activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
                 activity.setContent {
                     val mode by preferences.mode.collectAsStateWithLifecycle()
                     PhoneAppearance(mode) {

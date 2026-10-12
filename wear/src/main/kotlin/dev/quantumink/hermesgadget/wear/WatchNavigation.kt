@@ -9,6 +9,7 @@ import dev.quantumink.hermesgadget.protocol.TransportPreference
 /** Activity-owned memory survives replacement of the interactive composition by ambient. */
 class WatchNavigation {
     val route = mutableStateOf("home")
+    val appearanceReturn = mutableStateOf("home")
     val editing = mutableStateOf<EndpointProfile?>(null)
     val newProfile = mutableStateOf(false)
     val imported = mutableStateOf(false)
