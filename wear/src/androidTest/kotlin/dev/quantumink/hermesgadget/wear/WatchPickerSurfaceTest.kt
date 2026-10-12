@@ -1,0 +1,335 @@
+package dev.quantumink.hermesgadget.wear
+
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.os.IBinder
+import android.os.SystemClock
+import android.view.KeyEvent
+import android.view.accessibility.AccessibilityNodeInfo
+import androidx.activity.compose.setContent
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.test.platform.app.InstrumentationRegistry
+import dev.quantumink.hermesgadget.client.Appearance
+import dev.quantumink.hermesgadget.protocol.CatalogPage
+import dev.quantumink.hermesgadget.protocol.CatalogProfile
+import dev.quantumink.hermesgadget.protocol.CatalogStatus
+import dev.quantumink.hermesgadget.protocol.ClientSpeech
+import dev.quantumink.hermesgadget.protocol.ConnectionState
+import dev.quantumink.hermesgadget.protocol.ConnectionStatus
+import dev.quantumink.hermesgadget.protocol.ConversationMode
+import dev.quantumink.hermesgadget.protocol.ConversationState
+import dev.quantumink.hermesgadget.protocol.Endpoint
+import dev.quantumink.hermesgadget.protocol.Prompt
+import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
+import org.junit.Test
+
+/** No enrollment, connection, microphone, or personal image is involved in these surfaces. */
+class WatchPickerSurfaceTest {
+    private val instrumentation = InstrumentationRegistry.getInstrumentation()
+    private val context get() = instrumentation.targetContext
+    private val reply = "Your next step is ready. This public synthetic reply checks " +
+        "comfortable reading on a round watch."
+
+    @Test fun pickerBackRetainsMountedConversationAndLocksRejectSelection() = fixture {
+            activity,
+            service
+        ->
+        val endpoint = Endpoint.parse("wss://synthetic.example.invalid/gadget")
+        val profile = EndpointProfile(endpoint, "Profile 1", "")
+        val pages = (1..18).map {
+            CatalogPage(
+                if (it == 1) "manual" else "synthetic",
+                "Public fixture",
+                CatalogProfile(
+                    if (it ==
+                        1
+                    ) {
+                        ClientSpeech.endpointId(endpoint)
+                    } else {
+                        "id-$it"
+                    },
+                    "Profile $it",
+                    null,
+                    null
+                ),
+                CatalogStatus.AVAILABLE,
+                1
+            )
+        }
+        val navigation = WatchNavigation()
+        val watch = mutableStateOf(
+            WatchState(
+                profile = profile,
+                profiles = listOf(profile),
+                catalog = pages,
+                loading = false,
+                selectedPage = pages.first().key,
+                connection = ConnectionState(status = ConnectionStatus.PAIRED),
+                artwork = mapOf(pages.first().key to PageArtwork(portrait(), null))
+            )
+        )
+        val appearance = mutableStateOf(Appearance.DARK)
+        val scale = mutableStateOf(1f)
+        var mounts = 0
+        var disposals = 0
+        instrumentation.runOnMainSync {
+            service.rememberPage(pages.first().key)
+            activity.setContent {
+                val density = LocalDensity.current
+                CompositionLocalProvider(
+                    LocalDensity provides Density(density.density, scale.value)
+                ) {
+                    WatchAppearance(appearance.value) {
+                        ProfileCarousel(watch.value, navigation, service, connect = {
+                            error("Must not connect")
+                        }, review = {}) { page, scroll, _ ->
+                            DisposableEffect(Unit) {
+                                mounts++
+                                onDispose { disposals++ }
+                            }
+                            ConversationPage(
+                                watch.value, service,
+                                connect = {
+                                    error("Must not connect")
+                                }, startRecording = { error("Must not record") },
+                                settings = {}, type = {}, profiles = {}, appearance = {},
+                                page = page, pageScroll = scroll
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        node("Choose a profile")
+        assertEquals(1, mounts)
+        for (theme in Appearance.entries) {
+            for (font in listOf(1f, 1.3f)) {
+                instrumentation.runOnMainSync {
+                    appearance.value = theme
+                    scale.value = font
+                }
+                val scroll = navigation.scrollFor(pages.first().key)
+                instrumentation.runOnMainSync { }
+                // The native list's backward accessibility action returns to its portrait.
+                repeat(6) { scroll(backward = true) }
+                assertRoundPickerBounds()
+                capture("${theme.name}-$font-portrait")
+                click("Choose a profile")
+                capture("${theme.name}-$font-picker")
+                instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+                instrumentation.uiAutomation.waitForIdle(200, 3000)
+                SystemClock.sleep(250)
+                assertEquals(0, disposals)
+                assertEquals(1, mounts)
+                assertTrue(!activity.isFinishing)
+                instrumentation.runOnMainSync {
+                    watch.value = watch.value.copy(
+                        connection = watch.value.connection.copy(
+                            conversation = ConversationState(
+                                mode = ConversationMode.REPLY,
+                                reply = reply
+                            )
+                        )
+                    )
+                }
+                runBlocking { withContext(Dispatchers.Main) { scroll.scrollToItem(1) } }
+                instrumentation.uiAutomation.waitForIdle(200, 3000)
+                node(reply, scroll = false)
+                capture("${theme.name}-$font-reply")
+                SystemClock.sleep(400)
+                val before = scroll.anchorItemIndex to scroll.anchorItemScrollOffset
+                instrumentation.runOnMainSync { navigation.pickerOpen.value = true }
+                node("Choose a profile", scroll = false, textOnly = true)
+                instrumentation.uiAutomation.waitForIdle(200, 3000)
+                instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+                instrumentation.uiAutomation.waitForIdle(200, 3000)
+                SystemClock.sleep(250)
+                assertEquals(before, scroll.anchorItemIndex to scroll.anchorItemScrollOffset)
+                assertEquals(0, disposals)
+            }
+        }
+        val lockedStates = listOf(
+            watch.value.copy(saving = true),
+            watch.value.copy(
+                connection = watch.value.connection.copy(
+                    conversation = ConversationState(busy = true, mode = ConversationMode.THINKING)
+                )
+            ),
+            watch.value.copy(
+                connection = watch.value.connection.copy(
+                    conversation = ConversationState(mode = ConversationMode.LISTENING)
+                )
+            ),
+            watch.value.copy(
+                connection = watch.value.connection.copy(
+                    conversation = ConversationState(
+                        prompt = Prompt("fixture", "Approval", "Synthetic approval", 0, null)
+                    )
+                )
+            )
+        )
+        for (locked in lockedStates) {
+            instrumentation.runOnMainSync {
+                watch.value = locked
+                scale.value = 1f
+                navigation.pickerOpen.value = true
+            }
+            instrumentation.uiAutomation.waitForIdle(200, 3000)
+            repeat(6) { scroll(backward = true) }
+            node("Finish the current turn to change profiles")
+            var row = node("Profile 2")
+            while (!row.isCheckable) row = requireNotNull(row.parent)
+            assertTrue("Locked picker row must be disabled", !row.isEnabled)
+            row.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            instrumentation.waitForIdleSync()
+            assertEquals(pages.first().key, service.state.value.selectedPage)
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+            instrumentation.uiAutomation.waitForIdle(200, 3000)
+            SystemClock.sleep(250)
+        }
+    }
+
+    private fun fixture(test: (AppearanceTestActivity, GadgetService) -> Unit) {
+        assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
+        val activity = instrumentation.startActivitySync(
+            Intent(
+                context,
+                AppearanceTestActivity::class.java
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ) as AppearanceTestActivity
+        val bound = AtomicReference<GadgetService>()
+        val ready = CountDownLatch(1)
+        val binding = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName, binder: IBinder) {
+                bound.set((binder as GadgetService.LocalBinder).service)
+                ready.countDown()
+            }
+            override fun onServiceDisconnected(name: ComponentName) = Unit
+        }
+        assertTrue(
+            context.bindService(
+                Intent(context, GadgetService::class.java),
+                binding,
+                Context.BIND_AUTO_CREATE
+            )
+        )
+        var original = ""
+        try {
+            assertTrue(ready.await(5, TimeUnit.SECONDS))
+            repeat(50) { if (bound.get().state.value.loading) SystemClock.sleep(100) }
+            original = bound.get().state.value.selectedPage
+            test(activity, bound.get())
+        } finally {
+            instrumentation.runOnMainSync {
+                activity.setContent { }
+                bound.get()?.rememberPage(original)
+                activity.finish()
+            }
+            context.unbindService(binding)
+        }
+    }
+
+    private fun portrait(): Bitmap = Bitmap.createBitmap(160, 160, Bitmap.Config.ARGB_8888).apply {
+        val canvas = Canvas(this)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.color = 0xffccacff.toInt()
+        canvas.drawRoundRect(22f, 24f, 138f, 136f, 30f, 30f, paint)
+        paint.color = 0xff17202c.toInt()
+        canvas.drawCircle(58f, 70f, 10f, paint)
+        canvas.drawCircle(102f, 70f, 10f, paint)
+        canvas.drawRoundRect(57f, 103f, 103f, 111f, 4f, 4f, paint)
+    }
+
+    private fun nodes(): List<AccessibilityNodeInfo> {
+        fun walk(root: AccessibilityNodeInfo): Sequence<AccessibilityNodeInfo> = sequence {
+            yield(root)
+            for (index in 0 until root.childCount) root.getChild(index)?.let { yieldAll(walk(it)) }
+        }
+        return instrumentation.uiAutomation.rootInActiveWindow?.let(::walk)?.toList().orEmpty()
+    }
+
+    private fun scroll(backward: Boolean = false) {
+        nodes().firstOrNull { it.isScrollable && it.isFocused }?.performAction(
+            if (backward) {
+                AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+            } else {
+                AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+            }
+        )
+        instrumentation.waitForIdleSync()
+        SystemClock.sleep(400)
+    }
+
+    private fun node(
+        label: String,
+        scroll: Boolean = true,
+        textOnly: Boolean = false
+    ): AccessibilityNodeInfo {
+        repeat(35) {
+            nodes().firstOrNull {
+                it.isVisibleToUser &&
+                    (
+                        it.text?.toString() == label ||
+                            !textOnly && it.contentDescription?.toString() == label
+                        )
+            }?.let { return it }
+            if (scroll) scroll()
+            SystemClock.sleep(100)
+        }
+        capture("failure")
+        error("Synthetic surface missing: $label")
+    }
+
+    private fun click(label: String) {
+        var target = node(label)
+        while (!target.isClickable) target = requireNotNull(target.parent)
+        assertTrue(target.performAction(AccessibilityNodeInfo.ACTION_CLICK))
+        instrumentation.waitForIdleSync()
+        SystemClock.sleep(250)
+    }
+
+    private fun assertRoundPickerBounds() {
+        val target = node("Choose a profile", scroll = false)
+        val bounds = android.graphics.Rect().also(target::getBoundsInScreen)
+        val display = context.resources.displayMetrics
+        val minimum = 48 * display.density
+        assertTrue(bounds.width() >= minimum - 1 && bounds.height() >= minimum - 1)
+        val cx = display.widthPixels / 2f
+        val cy = display.heightPixels / 2f
+        val radius = minOf(cx, cy)
+        for (x in listOf(bounds.left, bounds.right)) {
+            for (y in listOf(bounds.top, bounds.bottom)) {
+                assertTrue((x - cx) * (x - cx) + (y - cy) * (y - cy) <= radius * radius)
+            }
+        }
+    }
+
+    private fun capture(name: String) {
+        instrumentation.waitForIdleSync()
+        SystemClock.sleep(700)
+        instrumentation.uiAutomation.waitForIdle(200, 3000)
+        val image = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+        File(context.cacheDir, "picker-$name.png").outputStream().use {
+            image.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        image.recycle()
+    }
+}

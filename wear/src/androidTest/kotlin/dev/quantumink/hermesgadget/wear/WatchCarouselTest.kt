@@ -363,10 +363,7 @@ class WatchCarouselTest {
                 instrumentation.runOnMainSync { service.applyCatalog(changed, original.key) }
                 waitUntil { service.state.value.connection.status == ConnectionStatus.OFFLINE }
                 assertEquals(original.key, service.state.value.selectedPage)
-                waitUntil {
-                    find { it.text?.toString() == "Review connection before pairing" } !=
-                        null
-                }
+                scrollTo { it.text?.toString() == "Review connection before pairing" }
                 return
             }
             capture("01-portrait-first")
@@ -429,11 +426,16 @@ class WatchCarouselTest {
             val prompt = requireNotNull(service.state.value.connection.conversation.prompt)
             instrumentation.runOnMainSync { service.answer(prompt.id, false) }
             waitUntil { service.state.value.connection.conversation.prompt == null }
-            // The reducer can clear a prompt before Compose re-enables pager gestures.
-            // Wait for the interactive portrait page, as the person using it would.
-            waitUntil {
-                find { it.text?.toString() == "Synthetic box 1" } != null
-            }
+            // The ask-only fixture does not finish its text turn when approval clears.
+            // Keep that turn locked until an explicit cancellation ends it.
+            assertTrue(service.state.value.connection.conversation.busy)
+            swipe(true)
+            assertEquals(urls.first(), service.state.value.profile?.endpoint?.url)
+            instrumentation.runOnMainSync { service.cancel() }
+            waitUntil { !service.state.value.connection.conversation.busy }
+            waitUntil { find { it.text?.toString() == "Ready" } != null }
+            instrumentation.waitForIdleSync()
+            SystemClock.sleep(350)
             swipe(true)
             waitUntil {
                 service.state.value.profile?.endpoint?.url == urls[1] &&
@@ -456,8 +458,23 @@ class WatchCarouselTest {
                 beforeRotary != afterRotary
             }
             assertEquals(urls[1], service.state.value.profile?.endpoint?.url)
-            scrollTo { it.contentDescription?.toString() == "Next profile" }
-            click { it.contentDescription?.toString() == "Next profile" }
+            val chooser = scrollTo(backward = true) {
+                it.contentDescription?.toString() == "Choose a profile"
+            }
+            var actionNode: AccessibilityNodeInfo? = chooser
+            while (actionNode != null && actionNode.actionList.none {
+                    it.label?.toString() == "Next profile"
+                }
+            ) {
+                actionNode = actionNode.parent
+            }
+            val accessibleChooser = requireNotNull(actionNode) {
+                "The native picker must expose the Next profile selection action"
+            }
+            val next = accessibleChooser.actionList.single {
+                it.label?.toString() == "Next profile"
+            }
+            assertTrue(accessibleChooser.performAction(next.id))
             waitUntil {
                 service.state.value.profile?.endpoint?.url == urls[2] &&
                     service.state.value.connection.status == ConnectionStatus.PAIRED

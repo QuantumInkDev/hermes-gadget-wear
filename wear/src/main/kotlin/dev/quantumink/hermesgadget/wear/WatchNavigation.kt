@@ -14,6 +14,7 @@ class WatchNavigation {
     val newProfile = mutableStateOf(false)
     val imported = mutableStateOf(false)
     val page = mutableStateOf("")
+    val pickerOpen = mutableStateOf(false)
     private val scrolls = LinkedHashMap<String, TransformingLazyColumnState>()
     fun scrollFor(key: String): TransformingLazyColumnState =
         scrolls.getOrPut(key) { TransformingLazyColumnState() }
@@ -22,6 +23,7 @@ class WatchNavigation {
     }
     fun clearPages() {
         scrolls.clear()
+        pickerOpen.value = false
         page.value = ""
     }
     private var setupKey: Pair<String?, Boolean>? = null

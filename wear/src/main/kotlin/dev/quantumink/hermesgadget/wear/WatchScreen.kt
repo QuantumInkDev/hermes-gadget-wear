@@ -289,7 +289,7 @@ fun WatchScreen(
                 imported = false
                 route = "setup"
             }
-        ) { page, pageScroll, pageControls ->
+        ) { page, pageScroll, _ ->
             key(page.key, watch.connection.conversation.prompt?.id) {
                 ConversationPage(
                     watch,
@@ -311,8 +311,7 @@ fun WatchScreen(
                     },
                     appearance = ::openAppearance,
                     page = page,
-                    pageScroll = pageScroll,
-                    pageControls = pageControls
+                    pageScroll = pageScroll
                 )
             }
         }
@@ -501,7 +500,7 @@ private fun TextPage(
 }
 
 @Composable
-private fun ConversationPage(
+internal fun ConversationPage(
     watch: WatchState,
     service: GadgetService,
     connect: () -> Unit,
@@ -511,8 +510,7 @@ private fun ConversationPage(
     profiles: () -> Unit,
     appearance: () -> Unit,
     page: ProfilePage,
-    pageScroll: TransformingLazyColumnState,
-    pageControls: @Composable () -> Unit
+    pageScroll: TransformingLazyColumnState
 ) {
     val connection = watch.connection
     val conversation = connection.conversation
@@ -580,7 +578,6 @@ private fun ConversationPage(
                     )
                 }
             }
-            item { pageControls() }
             if (connection.status == ConnectionStatus.PAIRING) {
                 item {
                     Heading(
