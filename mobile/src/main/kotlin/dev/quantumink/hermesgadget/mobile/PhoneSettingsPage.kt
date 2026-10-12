@@ -19,9 +19,9 @@ fun PhoneSettingsPage(context: Context, navigate: (String) -> Unit) {
     Button({ CuePreferences.set(context, !soundCues) }) {
         Text("Recording sound cues: " + if (soundCues) "on" else "off")
     }
-    Text("About QuantumInk Relay", style = MaterialTheme.typography.titleMedium)
+    Text("About Quantum Relay for Hermes", style = MaterialTheme.typography.titleMedium)
     Text(
-        "Independent QuantumInk companion for Hermes Gadget SDK v0.2.0. " +
+        "Quantum Relay for Hermes is an independent QuantumInk companion for Gadget SDK v0.2.0. " +
             "Not affiliated with or endorsed by Nous Research. " +
             "Hermes and Nous Research names and marks belong to their owners. " +
             "The orbit/speech icon is original QuantumInk artwork."

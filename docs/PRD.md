@@ -63,7 +63,7 @@ also covers the generic publication setup instructions and private live rollout 
 ## Milestone gates
 
 The maintainer approved the [client-usability follow-up](superpowers/specs/2026-10-12-client-usability-design.md)
-on 2026-10-12: QuantumInk Relay branding with an original icon, usable watch scrolling and
+on 2026-10-12: Quantum Relay for Hermes branding with an original icon, usable watch scrolling and
 recording cues, phone profiles grouped/sorted by box with inline effective pictures, and
 independently paired foreground phone text/voice conversations. Phone chat requires TLS;
 it does not borrow watch keys or change the opaque relay. Animated watch-picture overrides

@@ -36,3 +36,11 @@ Final physical watch delivery verifies the installed APK hash, matching certific
 also verifies its APK hash/certificate and unchanged 39 protected files (36 portrait PNGs)
 and two preference files. Installation alone does not close the speech, cue or animation
 power gates; owner phone UI observation is pending.
+
+Owner UI follow-up, 2026-10-12: top text lacked an explicit foreground on the custom dark
+Scaffold container. A native contrast probe failed at 1.15:1 before correction and passes at
+14.05:1 with shared onSurface content. The box presentation uses connected panels and full-row
+accessible headers; independent expansion and existing ordering/pictures pass six scoped
+phone tests. The owner selected Quantum Relay for Hermes as the phone/watch title.
+[Scaffold API](https://developer.android.com/reference/kotlin/androidx/compose/material3/package-summary#Scaffold(androidx.compose.ui.Modifier,kotlin.Function0,kotlin.Function0,kotlin.Function0,kotlin.Function0,androidx.compose.material3.FabPosition,androidx.compose.ui.graphics.Color,androidx.compose.ui.graphics.Color,androidx.compose.foundation.layout.WindowInsets,kotlin.Function1))
+explains the fallback to LocalContentColor for a container outside the theme palette.

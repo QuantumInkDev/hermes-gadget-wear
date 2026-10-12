@@ -101,7 +101,8 @@ create duplicate submissions, cross-profile responses or hidden capture.
 
 ## Branding for review
 
-Proposed family name: **QuantumInk Relay**, with **QuantumInk Relay Watch** for the wearable.
+Maintainer-selected family title: **Quantum Relay for Hermes**, for both phone and watch.
+This supersedes the earlier QuantumInk Relay proposal.
 The repository/package IDs and matching phone/watch signing relationship do not change.
 Use an original orbit/speech icon, readable in adaptive, round and monochrome launcher
 masks. The concept combines a communication bubble with three connected points; it does
@@ -139,3 +140,14 @@ separate and retain their optional live server-extension gate.
   Compare owner watch identity/picture hashes before and after any device installation.
 - Real phone/watch speech, radio behavior, battery and publication checks remain separate
   from emulator or typed-message results. Do not silently enroll all live phone profiles.
+
+## Owner UI refinement after installation — 2026-10-12
+
+The maintainer confirms the three box groups, portraits and Talk/Chat are visible, then requests
+clearer grouping/collapse, readable top text and the title Quantum Relay for Hermes. Box headers
+are full-width tappable panels with a machine icon, name, profile count, catalog status and an
+animated chevron. Expanded profile cards share a contiguous box background. Search and Reorder
+force relevant sections open and leave collapse disabled, so a tap cannot appear to do nothing.
+Sorting arrows remain confined to Reorder. Existing stable keys, owner order and collapse state
+are retained. The phone shell explicitly supplies onSurface foreground for its dark background.
+These are authorized refinements of the approved design, not a new pairing/deployment decision.

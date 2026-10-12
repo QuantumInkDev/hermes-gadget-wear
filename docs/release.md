@@ -52,7 +52,7 @@ Use the [physical-device runbook](device-testing.md) to record the device gates 
 
 ## Draft listing
 
-Phone name: QuantumInk Relay. Watch name: QuantumInk Relay Watch.
+Phone and watch name: Quantum Relay for Hermes.
 Short description: Talk to your own Hermes agent from your phone or Wear OS watch.
 
 Hold the watch screen to speak, read a streamed reply, hear your profile's voice and answer

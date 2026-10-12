@@ -2,6 +2,20 @@
 
 ## Client usability follow-up — 2026-10-12
 
+The owner confirmed all three phone box groups, pictures and Talk/Chat are present, then requested
+clearer collapse/grouping, top-text contrast and the title **Quantum Relay for Hermes**.
+Box headers now have a full-row action, machine icon, count, catalog status and chevron;
+expanded profile cards sit within their box panel. Reorder arrows are mode-specific, and
+search explains why matching sections remain open. Stable keys and saved order are retained.
+
+The contrast regression reproduced a 1.15:1 inherited black foreground on the custom dark
+Scaffold background. The shared phone shell explicitly provides onSurface, measuring 14.05:1.
+Six owned-phone presentation/order tests pass: contrast, independent accessible expansion and
+four existing directory-order/picture regressions. Strict full checks and both app/instrumentation
+builds pass with warnings as errors; JVM reports still total 105 with zero failures/errors/skips.
+Physical refinement delivery is in progress; owner speech/GIF power gates remain open.
+
+
 The maintainer approved the [phone/watch follow-up design](superpowers/specs/2026-10-12-client-usability-design.md),
 including QuantumInk Relay branding, recording cues, grouped/custom-ordered phone profiles,
 independent foreground phone conversations and bounded GIF overrides. The approved software

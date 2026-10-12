@@ -1,6 +1,12 @@
 # Session status
 
-Current follow-up, 2026-10-12: approved QuantumInk Relay client usability and bounded GIF
+Owner phone UI follow-up: three groups/portraits/Talk/Chat are visible. Clearer full-width box
+headers and connected panels, explicit dark foreground (native contrast 1.15→14.05:1), and
+the requested Quantum Relay for Hermes title are implemented. Six scoped presentation/order
+checks and strict full build/all APKs pass. Physical refinement install is next; current
+installed data preserves the earlier 39 protected phone files/36 PNGs and two preferences.
+
+Current follow-up, 2026-10-12: approved Quantum Relay for Hermes client usability and bounded GIF
 software is implemented and verified. Watch scrolling retains per-page position and uses
 accessible compact arrows. Phone Profiles/Watch/Settings, grouped/searchable/custom-ordered
 box directory, inline pictures, original icons and independently paired foreground Talk/Chat

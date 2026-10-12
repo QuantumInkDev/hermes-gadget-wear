@@ -104,7 +104,8 @@ fun AmbientPet(
     }
     Canvas(
         Modifier.fillMaxSize().background(Color.Black).semantics {
-            contentDescription = "QuantumInk Relay ambient profile. Wake the watch to interact."
+            contentDescription =
+                "Quantum Relay for Hermes ambient profile. Wake the watch to interact."
         }
     ) {
         val native = drawContext.canvas.nativeCanvas

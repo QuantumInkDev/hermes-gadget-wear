@@ -1,8 +1,11 @@
-# Hermes Gadget for Wear OS
+# Quantum Relay for Hermes
 
-A Wear OS watch app and Android phone companion for talking to your own Hermes agent,
+A Wear OS watch app and Android phone client for talking to your own Hermes agent,
 answering approval prompts, and seeing your profile's pet on your wrist. There is no
 project-hosted conversation backend, account, analytics or advertising.
+
+The phone groups profiles by box with custom ordering and inline portraits, and offers
+independently paired foreground Talk/Chat. Watch-specific PNG/GIF choices retain the box art.
 
 **Status:** M0/M1 are complete; the core M2 real-Hermes Ultra conversation passed.
 M3–M7 software and emulator checks are recorded in [progress](docs/progress.md).

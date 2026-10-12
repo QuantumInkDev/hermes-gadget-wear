@@ -121,12 +121,12 @@ actual phone; host-side checks and access-policy propagation alone are insuffici
 
 ## Add the sources and pair on the watch
 
-1. On the phone, open **QuantumInk Relay → Settings → Boxes and discovery**. Enter the box
+1. On the phone, open **Quantum Relay for Hermes → Settings → Boxes and discovery**. Enter the box
    name, full HTTPS URL ending in `/catalog/v1`, and its catalog-only credential. Save and
    refresh. Repeat for each box. Keep the phone's tailnet VPN connected when using tailnet URLs.
 2. Enable relay and grant the requested local-network/nearby/background companion permissions.
    Use **Allow background relay** for the Android companion association. See [relay setup](self-host.md#enable-phone-relay).
-3. Open QuantumInk Relay Watch and swipe to a discovered profile. Review its proposed
+3. Open Quantum Relay for Hermes and swipe to a discovered profile. Review its proposed
    connection URL. Select **Automatic** or **Phone relay** for private tailnet `wss` access.
    The phone forwards watch-owned TLS; it does not receive the pairing key.
 4. Save/connect on the watch. Approve the displayed code on the **correct box and profile**,
@@ -212,7 +212,8 @@ off-network/offline recovery, locked-phone behavior, battery and publication gat
 
 ## Talk or chat on the phone
 
-QuantumInk Relay opens on **Profiles**. Search box/profile names, collapse boxes, or enable
+Quantum Relay for Hermes opens on **Profiles**. Tap a full-width box header to expand or collapse its profiles. The header shows the box name,
+profile count and catalog status; expanded profiles sit inside that box panel. Search names, or enable
 **Reorder** and use the accessible up/down controls. Box order and the order within each box
 are saved; the watch receives that same profile order. Catalog availability describes discovery,
 not an authenticated Gadget conversation. **Watch** contains relay/association controls;

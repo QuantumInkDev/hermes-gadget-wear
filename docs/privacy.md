@@ -1,6 +1,6 @@
 # Privacy policy draft
 
-QuantumInk Relay and QuantumInk Relay Watch are clients for a Hermes server that you choose. The project
+Quantum Relay for Hermes on phone and watch is a client for a Hermes server that you choose. The project
 operates no conversation backend, accounts, advertising or analytics service. This draft
 matches the current app; the publisher must add its identity, contact and effective date
 and host the final policy at a public URL before Play submission.

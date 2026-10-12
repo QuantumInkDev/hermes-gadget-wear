@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -162,12 +163,19 @@ fun DirectoryPage(
     LazyColumn(
         modifier = modifier.fillMaxSize().imePadding(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(0.dp)
     ) {
         item(key = "directory-controls") {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Your profiles", style = MaterialTheme.typography.headlineSmall)
                 Text("Choose a profile to talk or chat. Phone pairing is separate from your watch.")
+                if (!reorder && query.isBlank()) {
+                    Text(
+                        "Tap a box header to show or hide its profiles.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it.take(64) },
@@ -184,7 +192,9 @@ fun DirectoryPage(
                         reorder = !reorder
                     }) { Text(if (reorder) "Done reordering" else "Reorder") }
                 }
-                if (query.isNotBlank()) Text("Clear search to reorder your directory.")
+                if (query.isNotBlank()) {
+                    Text("Search results stay expanded. Clear search to collapse boxes or reorder.")
+                }
                 if (reorder) {
                     Text(
                         "Move boxes and profiles with the arrows. This order also appears on your watch."
@@ -222,72 +232,78 @@ fun DirectoryPage(
             }
             val isCollapsed = id in collapsed && !reorder && query.isBlank()
             val sourceIndex = ids.indexOf(id)
+            val boxMatches = label.contains(query.trim(), ignoreCase = true)
+            val shownProfiles = group.filter {
+                query.isBlank() || boxMatches ||
+                    it.profile.name.contains(query.trim(), ignoreCase = true)
+            }
             item(key = "source:$id") {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Column(Modifier.fillMaxWidth().padding(8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(
-                                modifier = Modifier.weight(1f).semantics {
-                                    contentDescription =
-                                        "${if (isCollapsed) "Expand" else "Collapse"} $label, " +
-                                        "${group.size} profiles"
-                                },
-                                enabled = !reorder,
-                                onClick = {
-                                    collapsed =
-                                        if (id in collapsed) collapsed - id else collapsed + id
-                                }
-                            ) { Text("${if (isCollapsed) "▸" else "▾"} $label · ${group.size}") }
-                            if (reorder) {
-                                OrderArrow("Move $label earlier", "↑", !busy && sourceIndex > 0) {
-                                    work { repository.moveSource(id, -1) }
-                                }
-                                OrderArrow(
-                                    "Move $label later",
-                                    "↓",
-                                    !busy && sourceIndex < ids.lastIndex
-                                ) {
-                                    work { repository.moveSource(id, 1) }
-                                }
+                DirectoryBoxHeader(
+                    label = label,
+                    count = if (query.isNotBlank() && shownProfiles.size != group.size) {
+                        "${shownProfiles.size} of ${group.size} profiles"
+                    } else {
+                        "${group.size} " + if (group.size == 1) "profile" else "profiles"
+                    },
+                    status = catalogStatus(
+                        health[id] ?: group.firstOrNull()?.status,
+                        id == "manual"
+                    ),
+                    expanded = !isCollapsed,
+                    hasContents = !isCollapsed && shownProfiles.isNotEmpty(),
+                    canToggle = !reorder && query.isBlank(),
+                    onToggle = {
+                        collapsed = if (id in collapsed) collapsed - id else collapsed + id
+                    },
+                    modifier = Modifier.padding(top = 16.dp),
+                    orderControls = {
+                        if (reorder) {
+                            OrderArrow("Move $label earlier", "↑", !busy && sourceIndex > 0) {
+                                work { repository.moveSource(id, -1) }
                             }
-                        }
-                        if (group.isEmpty()) {
-                            Text(
-                                catalogStatus(health[id], manual = id == "manual"),
-                                Modifier.padding(8.dp)
-                            )
-                            Text("No cached profiles yet.", Modifier.padding(horizontal = 8.dp))
+                            OrderArrow(
+                                "Move $label later",
+                                "↓",
+                                !busy && sourceIndex < ids.lastIndex
+                            ) { work { repository.moveSource(id, 1) } }
                         }
                     }
-                }
+                )
             }
             if (!isCollapsed) {
-                val boxMatches = label.contains(query.trim(), ignoreCase = true)
-                items(
-                    group.filter {
-                        query.isBlank() || boxMatches ||
-                            it.profile.name.contains(query.trim(), ignoreCase = true)
-                    },
-                    key = { it.key }
-                ) { page ->
+                items(shownProfiles, key = { it.key }) { page ->
                     val index = group.indexOfFirst { it.key == page.key }
-                    DirectoryCard(
-                        page = page,
-                        repository = repository,
-                        chosenPicture = page.key in watchPictures,
-                        profile = profiles[page.key],
-                        busy = busy,
-                        reorder = reorder,
-                        canMoveUp = index > 0,
-                        canMoveDown = index < group.lastIndex,
-                        onTalk = { onTalk(page) },
-                        onPicture = { pictureKey = page.key },
-                        onDetails = { detailKey = page.key },
-                        onMove = { delta -> work { repository.movePage(page.key, delta) } }
-                    )
+                    val last = page.key == shownProfiles.lastOrNull()?.key
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        shape = RoundedCornerShape(
+                            bottomStart = if (last) 16.dp else 0.dp,
+                            bottomEnd = if (last) 16.dp else 0.dp
+                        )
+                    ) {
+                        Box(
+                            Modifier.fillMaxWidth().padding(
+                                start = 12.dp,
+                                end = 12.dp,
+                                bottom = if (last) 12.dp else 8.dp
+                            )
+                        ) {
+                            DirectoryCard(
+                                page = page,
+                                repository = repository,
+                                chosenPicture = page.key in watchPictures,
+                                profile = profiles[page.key],
+                                busy = busy,
+                                reorder = reorder,
+                                canMoveUp = index > 0,
+                                canMoveDown = index < group.lastIndex,
+                                onTalk = { onTalk(page) },
+                                onPicture = { pictureKey = page.key },
+                                onDetails = { detailKey = page.key },
+                                onMove = { delta -> work { repository.movePage(page.key, delta) } }
+                            )
+                        }
+                    }
                 }
             }
         }

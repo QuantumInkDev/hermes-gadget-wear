@@ -136,8 +136,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     navigate(if (destination == "conversation") "profiles" else "settings")
                 }
-                androidx.compose.material3.Scaffold(
-                    containerColor = Color(0xFF11170F),
+                PhoneScaffold(
                     bottomBar = {
                         androidx.compose.material3.NavigationBar {
                             listOf(
