@@ -228,7 +228,10 @@ fun ProfileCarousel(
     if (navigation.pickerOpen.value) {
         ProfilePicker(
             pages,
-            pages[pager.settledPage].key,
+            // A refreshed catalog can precede the pager's position reconciliation.
+            keys.firstOrNull {
+                it == watch.selectedPage.ifBlank { navigation.page.value }
+            }.orEmpty(),
             locked,
             select = { key -> if (select(key)) navigation.pickerOpen.value = false },
             close = { navigation.pickerOpen.value = false }

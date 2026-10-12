@@ -9,7 +9,9 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.os.IBinder
 import android.os.SystemClock
+import android.view.InputDevice
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
@@ -163,6 +165,16 @@ class WatchPickerSurfaceTest {
                 instrumentation.uiAutomation.waitForIdle(200, 3000)
                 SystemClock.sleep(250)
                 assertEquals(before, scroll.anchorItemIndex to scroll.anchorItemScrollOffset)
+                repeat(3) {
+                    rotaryPulse(-0.5f)
+                    SystemClock.sleep(80)
+                }
+                instrumentation.uiAutomation.waitForIdle(200, 3000)
+                assertTrue(
+                    "Rotary focus must return to the mounted conversation after picker dismissal",
+                    before != (scroll.anchorItemIndex to scroll.anchorItemScrollOffset)
+                )
+                assertEquals(pages.first().key, service.state.value.selectedPage)
                 assertEquals(0, disposals)
             }
         }
@@ -256,6 +268,28 @@ class WatchPickerSurfaceTest {
         canvas.drawCircle(58f, 70f, 10f, paint)
         canvas.drawCircle(102f, 70f, 10f, paint)
         canvas.drawRoundRect(57f, 103f, 103f, 111f, 4f, 4f, paint)
+    }
+
+    private fun rotaryPulse(delta: Float) {
+        val source = InputDevice.SOURCE_ROTARY_ENCODER
+        val device = InputDevice.getDeviceIds().map { InputDevice.getDevice(it) }.filterNotNull()
+            .first { it.sources and source == source }
+        val now = SystemClock.uptimeMillis()
+        val properties = MotionEvent.PointerProperties().apply { id = 0 }
+        val coordinates = MotionEvent.PointerCoords().apply {
+            x = context.resources.displayMetrics.widthPixels / 2f
+            y = context.resources.displayMetrics.heightPixels / 2f
+            setAxisValue(MotionEvent.AXIS_SCROLL, delta)
+        }
+        val event = MotionEvent.obtain(
+            now, now, MotionEvent.ACTION_SCROLL, 1, arrayOf(properties), arrayOf(coordinates),
+            0, 0, 1f, 1f, device.id, 0, source, 0
+        )
+        try {
+            assertTrue(instrumentation.uiAutomation.injectInputEvent(event, true))
+        } finally {
+            event.recycle()
+        }
     }
 
     private fun nodes(): List<AccessibilityNodeInfo> {

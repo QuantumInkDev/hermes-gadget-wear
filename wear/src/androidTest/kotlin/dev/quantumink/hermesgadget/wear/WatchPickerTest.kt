@@ -32,7 +32,11 @@ class WatchPickerTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
 
-    @Test fun eighteenProfilesSelectExactStableKeyAtLargeType() {
+    @Test fun eighteenProfilesSelectExactStableKeyAtLargeType() = pickerScenario(shrink = false)
+
+    @Test fun openPickerRetainsSurvivingKeyWhenCatalogShrinks() = pickerScenario(shrink = true)
+
+    private fun pickerScenario(shrink: Boolean) {
         assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
         val pages = (1..18).map {
             CatalogPage(
@@ -110,6 +114,24 @@ class WatchPickerTest {
             node("Profile 17 of 18", scroll = false)
             click("Choose a profile")
             assertTrue(nodes().none { it.text?.toString()?.startsWith("Pin ") == true })
+            if (shrink) {
+                instrumentation.runOnMainSync { catalog.value = listOf(pages.first(), pages[16]) }
+                instrumentation.waitForIdleSync()
+                var selected = node("Profile 17")
+                while (!selected.isCheckable) selected = requireNotNull(selected.parent)
+                @Suppress("DEPRECATION") // The Boolean accessor supports older Wear API levels.
+                val checked = selected.isChecked
+                assertTrue("The surviving stable key stays checked", checked)
+                assertEquals(pages[16].key, service.state.value.selectedPage)
+                click("Profile 1")
+                node("Profile 1 of 2", scroll = false)
+                assertEquals(pages.first().key, service.state.value.selectedPage)
+                click("Choose a profile")
+                click("Profile 17")
+                node("Profile 2 of 2", scroll = false)
+                assertEquals(pages[16].key, service.state.value.selectedPage)
+                return
+            }
             instrumentation.runOnMainSync { catalog.value = pages.reversed() }
             click("Profile 2")
             repeat(50) {
