@@ -8,8 +8,11 @@ icon resources are committed (c3381bd); strict full checks/build, 107 JVM tests 
 regression and forbidden production-activity capture-test flag changes; fix 838351c
 addresses both and native selected radio semantics. Fourteen affected native tests,
 strict affected checks/build and release-host exclusion checks pass. Scoped re-review
-is running.
-Tasks 2–7 remain pending; no redesigned physical build is installed yet. The approved
+is clean.
+Task 2 portrait directory/native navigation is committed (0696683), with scoped review
+running. Nineteen native/13 JVM checks pass, with actual320dp/font1.8 menu/details/scroll
+rendering and emulator settings restored. Tasks 3–7 remain pending.
+No redesigned physical build is installed yet. The approved
 [design](docs/superpowers/specs/2026-10-12-native-client-design.md),
 [plan](docs/superpowers/plans/2026-10-12-native-client-design.md) and native receipts
 are the continuation map. SDD recovery ledger: .superpowers/sdd/2026-10-12-native-client-design/progress.md.

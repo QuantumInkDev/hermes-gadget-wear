@@ -519,3 +519,12 @@ fallback and a muted-media hint are added to the approved Task 3 presentation wo
 Demo note: owned native theme chooser screenshots and actual contrast/persistence checks
 pass. Physical devices retain the previous preserving debug build; no server extension,
 power helper, release signature, merge or Play publication was performed.
+
+
+Native directory checkpoint — 2026-10-12: Task1 review findings are resolved in838351c,
+with14 affected native tests, strict affected checks and debug-only host release exclusion.
+Scoped re-review is clean. Task2 portrait rows, box groups, accessible options and native
+brand/navigation are committed0696683. Nineteen native and13 mobile JVM checks pass; the
+final directory rerun passes11 cases. Actual320dp/font1.8 native menu/details/vertical
+reachability checks pass with system settings restored. Scoped review is running; physical
+devices retain their prior debug build and later native conversation/watch/tile tasks remain.
