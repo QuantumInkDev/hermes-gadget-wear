@@ -13,7 +13,10 @@ Scaffold background. The shared phone shell explicitly provides onSurface, measu
 Six owned-phone presentation/order tests pass: contrast, independent accessible expansion and
 four existing directory-order/picture regressions. Strict full checks and both app/instrumentation
 builds pass with warnings as errors; JVM reports still total 105 with zero failures/errors/skips.
-Physical refinement delivery is in progress; owner speech/GIF power gates remain open.
+Refinement `b724231` is installed on both actual devices after certificate/hash checks and
+backups. Phone protected files/preferences (42, including 36 PNGs) and all watch identity/
+portrait hashes (19/18) are unchanged. Original watch timeout is restored. Owner refinement
+UI and speech/GIF power observations remain open.
 
 
 The maintainer approved the [phone/watch follow-up design](superpowers/specs/2026-10-12-client-usability-design.md),

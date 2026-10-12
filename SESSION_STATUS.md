@@ -3,8 +3,13 @@
 Owner phone UI follow-up: three groups/portraits/Talk/Chat are visible. Clearer full-width box
 headers and connected panels, explicit dark foreground (native contrast 1.15→14.05:1), and
 the requested Quantum Relay for Hermes title are implemented. Six scoped presentation/order
-checks and strict full build/all APKs pass. Physical refinement install is next; current
-installed data preserves the earlier 39 protected phone files/36 PNGs and two preferences.
+checks and strict full build/all APKs pass. Refinement b724231 is installed on both devices:
+phone APK/certificate and all 42 protected app files/preferences (36 PNGs) are verified;
+watch APK/certificate and all 19 identity ciphertexts/18 portraits are verified. The original
+watch timeout is restored. Owner refinement UI observation is pending. Private receipts are
+in .local/client-usability/phone-accordion/ and watch-title/. For large watch APK backup,
+compressed adb pull succeeded after exec-out streaming timed out; use remote sha256sum
+for post-install hash verification. The failed backup made no installation change.
 
 Current follow-up, 2026-10-12: approved Quantum Relay for Hermes client usability and bounded GIF
 software is implemented and verified. Watch scrolling retains per-page position and uses
