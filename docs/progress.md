@@ -1,5 +1,27 @@
 # Progress
 
+## Native design exploration and resumed phone setup — 2026-10-12
+
+The maintainer reports that the current watch scrolling/controls and recording cues work.
+This closes the hands-on functional observation, not measured audio contamination or battery
+acceptance. GIF artwork is being prepared by the maintainer; the next off-network trial is
+planned separately.
+
+Authorized phone setup began through its existing Talk/Chat screen. The displayed M5 Max
+endpoint matched the reviewed private mapping and the normal stock pairing approval CLI
+succeeded. The phone disconnected before Ready/reply verification; that and GPU/ARM phone
+pairing remain open. Existing phone app files were backed up privately before beginning.
+No device identity was copied and no live microphone test was initiated.
+
+Native phone/Wear, tile launch and adaptive-icon guidance was researched. The maintainer's
+actual Electronic Moonlight palette was found in Cursor. The [proposed design](superpowers/specs/2026-10-12-native-client-design.md)
+defines three themes, an original geometric mark, a compact phone directory/conversation,
+swipe-first watch navigation with a direct picker and one/four-profile tiles. The [interactive
+preview](design/native-client-preview.html) uses original synthetic portraits; the owner's
+ignored preview substitutes existing round portraits. Prototype rendering/interaction checks
+are design evidence, not native app or physical tile acceptance. Implementation awaits review
+of the concrete design.
+
 ## Client usability follow-up — 2026-10-12
 
 The owner confirmed all three phone box groups, pictures and Talk/Chat are present, then requested

@@ -1,5 +1,19 @@
 # Session status
 
+Resumed native design pass, 2026-10-12: the maintainer confirms current watch scrolling,
+controls and recording cues work. GIF artwork is owner-led; the next office trial is planned
+separately. Phone Talk/Chat setup is authorized. Its normal M5 Max pairing CLI approval
+succeeded after verifying the existing endpoint on the phone, but USB disappeared before
+Ready/reply verification. GPU/ARM phone enrollment is not started. A private phone app-file
+backup was saved first; no watch identity was reused. The resumed ADB check sees no device.
+
+The [native design proposal](docs/superpowers/specs/2026-10-12-native-client-design.md) and
+[interactive synthetic preview](docs/design/native-client-preview.html) are prepared for
+review: original mark exploration, three themes using verified Electronic Moonlight palette
+inputs, compact phone surfaces, swipe-first watch navigation/picker and one/four-profile tiles.
+No native redesign/tile implementation or new installation is claimed yet. Personal-portrait
+preview and physical pairing receipts stay in .local/native-design/.
+
 Owner phone UI follow-up: three groups/portraits/Talk/Chat are visible. Clearer full-width box
 headers and connected panels, explicit dark foreground (native contrast 1.15→14.05:1), and
 the requested Quantum Relay for Hermes title are implemented. Six scoped presentation/order
@@ -56,8 +70,7 @@ launched remotely; the maintainer's phone UI observation now passes. Phone clien
 no bulk live enrollment or real-device microphone test was initiated. All three GitHub CI jobs
 for code cea12b5 and docs de620f4 passed before this delivery note.
 
-Ready to pause; no further physical-device work is planned until resuming.
-Next: owner phone pairing/speech/cue checks, GIF battery/rendering
+Work resumed. Next: native design review, remaining phone pairing/speech checks, GIF battery/rendering
 and office trial. Owner manages Mac awake state; no power helper is installed. Existing live
 18-profile cellular relay and three-profile watch speech evidence below remains historical;
 it does not establish the new phone client or GIF power gates. Keep PR #1 draft; no merge,
