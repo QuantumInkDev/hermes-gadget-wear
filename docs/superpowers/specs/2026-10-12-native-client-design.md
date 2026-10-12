@@ -93,7 +93,12 @@ larger fonts wrap correctly; reorganizing never silently changes the watch selec
 The conversation screen has a profile toolbar and portrait, visible text conversation and a
 comfortable bottom composer. Talk/Chat is foreground only, with independent phone TLS pairing.
 Show a prominent hold-to-talk control, clear listening/thinking/speaking states and explicit
-Cancel/Stop voice. Typed drafts, reply text and approval prompts keep their current isolation
+Cancel/Stop voice. The maintainer also requested live waveforms on 2026-10-12: capture
+levels drive the waveform while holding to talk; actual reply playback levels drive the
+speaking waveform. Hide/reset meters on stop, cancel, background or profile change. Respect
+reduced motion/power saver with static level indicators and never store samples for animation.
+When media volume is zero, show a concise muted-audio hint; never change volume automatically.
+Server speech keeps the profile’s configured voice, including ElevenLabs. Typed drafts, reply text and approval prompts keep their current isolation
 and guards. Endpoint review and pairing instructions remain reachable, but connection setup
 does not occupy the normal conversation's reading area. The keyboard, system Back, background
 and lock lifecycle still terminate phone audio/socket work according to the approved client.

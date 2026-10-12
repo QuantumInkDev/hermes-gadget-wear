@@ -505,12 +505,16 @@ appearance preferences, native phone/Wear adapters and original icon assets are 
 regressions were reproduced before correction. Task-scoped review is running; complete
 native phone/watch layouts and tiles are subsequent tasks, not current physical evidence.
 
-Authorized physical phone enrollment paired twelve M5 Max and two Win 11 ARM profiles
-through normal reviewed stock approvals. Both default profiles returned fresh typed markers;
-the other twelve had enrollment-only checks. Four GPU profiles await the owner waking that
-box. Existing identity/art/preference hashes are unchanged; catalog pages refreshed and new
+Authorized physical phone enrollment paired eighteen profiles through normal reviewed
+stock approvals: twelve M5 Max, four GPU 5090 and two Win 11 ARM. All three default
+profiles returned fresh typed markers; the other fifteen had enrollment-only checks.
+GPU enrollment passed after the owner woke the box. Existing identity/art/preference hashes are unchanged; catalog pages refreshed and new
 independent phone identities were added. Original five-minute timeout is restored. Real
 phone speech/voice remains owner observation; prior watch speech is not substituted.
+The owner sees phone transcripts/tools/replies but expects ElevenLabs voice; a read-only
+audio probe found speaker media volume 0/15. Owner asked to raise media volume and retry.
+Real capture/playback waveforms with bounded levels, lifecycle guards, reduced-motion
+fallback and a muted-media hint are added to the approved Task 3 presentation work.
 
 Demo note: owned native theme chooser screenshots and actual contrast/persistence checks
 pass. Physical devices retain the previous preserving debug build; no server extension,

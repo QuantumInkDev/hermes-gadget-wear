@@ -80,9 +80,9 @@
 
 ## Task 3: Native foreground conversation, relay dashboard and settings
 
-**Files:** Modify `mobile/.../ConversationPage.kt`, `MainActivity.kt`, `PhoneSettingsPage.kt`, `SpeechSettingsPage.kt`, `ProfilesPage.kt`, `CatalogPage.kt`; create focused `WatchDashboard.kt` and `ConversationControls.kt`. Extend `PhoneConversationTest.kt`, `DirectoryPresentationTest.kt` and native presentation fixtures.
+**Files:** Modify `mobile/.../ConversationPage.kt`, `MainActivity.kt`, `PhoneSettingsPage.kt`, `SpeechSettingsPage.kt`, `ProfilesPage.kt`, `CatalogPage.kt`; create focused `WatchDashboard.kt`, `ConversationControls.kt` and `AudioWaveform.kt`; modify `PhoneConversation.kt` only for guarded playback-level/mute presentation state. Existing PCM recording levels already come from ConversationState.level. Extend `PhoneConversationTest.kt`, `DirectoryPresentationTest.kt` and native presentation fixtures.
 
-**Interfaces:** Preserve `ConversationPage(model, page, connect, record, back, modifier)`, PhoneConversation methods/state and foreground lifecycle. `WatchDashboard` consumes enabled/status and existing enable/disable/associate/stop callbacks; it does not own or replace the relay controller. Task 6 adds tile configuration to this dashboard. Appearance chooser from Task 1 remains reachable.
+**Interfaces:** Preserve `ConversationPage(model, page, connect, record, back, modifier)`, PhoneConversation methods/state and foreground lifecycle. Extend guarded presentation state with bounded real capture/playback levels for the owner-requested waveforms. Existing PCM ConversationState.level and PcmPlayback onLevel callbacks are the source; no new audio session/controller or stored recording is introduced. `WatchDashboard` consumes enabled/status and existing enable/disable/associate/stop callbacks; it does not own or replace the relay controller. Task 6 adds tile configuration to this dashboard. Appearance chooser from Task 1 remains reachable.
 
 - [ ] First cover actual composer/send, permission/review/pairing visibility, listening/cancel/Stop voice through playback, and Back/background/lock termination. Reuse controlled TLS server/playback fixtures for concurrency; show native content at keyboard/large-font sizes.
   ```kotlin
@@ -97,6 +97,7 @@
   // Native UI delegates Connect/record/finish/cancel/send/answer/stop directly to existing callbacks.
   // No new network, microphone or lifecycle controller is introduced for presentation.
   ```
+- [ ] Add real level-driven capture and response waveforms, guarded by session/playback versions; reset on cancel/stop/end/background/profile change. Reduced motion and power saver show static meters. Cover stale callbacks, real nonzero PCM envelope, lifecycle reset and media-muted hint in focused tests. Preserve the profile’s existing server speech voice. Owner reported silence; read-only physical evidence found STREAM_MUSIC speaker volume 0/15, so verify with owner after raising volume before inferring a TTS defect. Never alter media volume automatically.
 - [ ] Run actual phone TLS/playback cases and native theme/inset/permission presentations, then strict mobile checks/build. Commit Task 3 and identify remaining tile dashboard work as Task 6, without showing unfinished controls to users.
 
 ## Task 4: Swipe-first watch portrait, page indicator and profile picker

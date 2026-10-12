@@ -4,17 +4,24 @@ Native redesign approved, 2026-10-12: implement Portrait Studio and original Voi
 Light/Dark/Electronic Moonlight, the swipe-first watch picker without Previous/Next,
 and one/four-profile tiles. Task 1 shared appearance preferences/adapters and original
 icon resources are committed (c3381bd); strict full checks/build, 107 JVM tests and
-11 owned-emulator appearance tests pass. Task-scoped independent review is running.
+11 initial owned-emulator appearance tests pass. Review found an ambient return-state
+regression and forbidden production-activity capture-test flag changes; fix 838351c
+addresses both and native selected radio semantics. Fourteen affected native tests,
+strict affected checks/build and release-host exclusion checks pass. Scoped re-review
+is running.
 Tasks 2–7 remain pending; no redesigned physical build is installed yet. The approved
 [design](docs/superpowers/specs/2026-10-12-native-client-design.md),
 [plan](docs/superpowers/plans/2026-10-12-native-client-design.md) and native receipts
 are the continuation map. SDD recovery ledger: .superpowers/sdd/2026-10-12-native-client-design/progress.md.
 
-Authorized phone Talk/Chat setup now has 14 independently paired profiles: twelve M5 Max
-and two Win 11 ARM. Fresh typed replies passed on both default profiles; the other
-twelve were enrolled without reply probes. Four GPU profiles remain pending: the
-maintainer reports that box is off/asleep and will wake it. Spoken phone acceptance
-remains owner observation. App-file backups verify all preexisting identities, pictures
+Authorized phone Talk/Chat setup now has 18 independently paired profiles: twelve M5 Max,
+four GPU 5090 and two Win 11 ARM. Fresh typed replies passed on all three default
+profiles; the other fifteen were enrolled without reply probes. After waking the
+GPU, its normal phone enrollment/reply passed. The maintainer sees phone transcript,
+tool calls and replies but expects the configured ElevenLabs voice. A read-only
+probe found speaker media volume 0/15; owner asked to raise it and retest before
+inferring a TTS defect. Real capture/playback waveforms and a muted-media hint were
+requested and added to Task 3. Spoken phone acceptance remains owner observation. App-file backups verify all preexisting identities, pictures
 and preferences unchanged; only refreshed catalog pages changed and new independent
 phone identity/known files were added. Five-minute phone timeout is restored. Private
 receipts stay in .local/native-design/phone-live/. No watch key was reused.
