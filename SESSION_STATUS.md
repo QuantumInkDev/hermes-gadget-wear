@@ -1,4 +1,4 @@
-<!-- Current continuation: 2026-10-12 safe dog-walk checkpoint. Native Tasks 1–5 reviewed; Task 6 implemented at 5aa0d3b but review requires a concurrent local/phone pin-edit fix. Resume original Task 6 implementer for fix round 1, then scoped re-review before Task 7. All 18 owner GIF imports and stable watch assignments verified; selected-watch motion confirmed. Both timeouts restored; no physical operation or child task running. New native builds await final review/delivery. Recovery ledger: .superpowers/sdd/2026-10-12-native-client-design/progress.md. -->
+<!-- Current continuation: 2026-10-12 native Tasks 1–6 reviewed. Task8 owner-requested portrait Hold-to-talk/rings/light haptics and bounded foreground screen lease begins before Task7 final gates. Historical away replies generated on M5 but receipt unverified; see ignored diagnostics. Watch temporary600000ms timeout needs restoration to15000. No new native physical build installed. Recovery ledger: .superpowers/sdd/2026-10-12-native-client-design/progress.md. -->
 # Session status
 
 Native redesign approved, 2026-10-12: Portrait Studio, original Voice Q,

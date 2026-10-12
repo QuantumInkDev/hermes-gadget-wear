@@ -130,6 +130,39 @@ have clear text and short motion, with reduced-motion fallback. Replies and extr
 available by vertical scrolling; moving state never remounts the scrollable conversation.
 State transitions do not consume a tap, start the microphone or clear a draft accidentally.
 
+## Watch follow-up after the away-from-home trial
+
+The maintainer requested this focused follow-up on 2026-10-12: the visible portrait is
+the primary Hold to talk surface. A brief tap does not start recording; a sustained hold
+starts capture through the existing foreground permission/controller path, release sends,
+and a downward drag cancels. Preserve horizontal profile swipes, vertical scrolling, page
+selection locks, stable keys and current scroll positions. Keep an accessible named
+Start/Finish action and a concise Hold to talk / Release to send hint beside the portrait;
+the user must not scroll past the picture to reach recording. Cover both static and GIF
+portraits and the pet fallback; artwork alone never initiates recording.
+
+While capture actually runs, draw three restrained concentric accent rings flowing outward
+around the portrait. Use actual capture state, not touch-down, as the animation source.
+Stop them on release, cancel, failure, permission rejection, background, ambient or profile
+change. Reduced motion and power saver show a static recording outline/level indicator.
+Keep the existing portrait size/clock spacing and circle-safe layout.
+
+Watch recording start and successful finish use one very light haptic tick each, joined to
+actual recorder start/release and accepted recording outcome. Retain cancellation semantics
+and the optional sound-cue setting. Choose supported low-intensity primitives or a short
+capability-aware fallback; respect system haptic settings and do not change phone cues.
+Physical haptic strength and microphone contamination require owner observation.
+
+The owner also reported transcripts/tool calls without visible replies during the walk.
+Server logs show two M5 Max turns generated replies; watch logs show repeated short screen
+sleep cycles, but do not establish receipt of those frames. Diagnose and reproduce before
+claiming that cause fixed. Keep the screen awake only while the foreground conversation is
+capturing, processing or playing a reply, bounded to two minutes per foreground turn and
+released on completion, failure, background or ambient. Do not alter global screen settings,
+use a wake lock or force the screen on from the background. Preserve the existing bounded
+socket idle policy and make an unfinished-turn timeout visible. Final hardware speech,
+relay and sleep/reply acceptance remain explicit gates.
+
 ## Profile tiles: one and four
 
 Provide two selectable tile entries: Focus (one pinned profile) and Pinned profiles (up to four,

@@ -159,6 +159,55 @@
   ```
 - [ ] Run synchronization fixtures and native composer interactions with actual static pictures, then strict both-client checks/builds. Commit Task 6, with any transport/environment limitation explicit rather than marked passed.
 
+## Task 8: Portrait Hold to talk, recording feedback and bounded reply visibility
+
+Execute this maintainer-requested follow-up after Task 6 review and before Task 7 final
+acceptance. The task number preserves existing review/receipt identities.
+
+**Files:** Modify Wear `WatchScreen.kt`, `ProfileCarousel.kt`, `MainActivity.kt`,
+`GadgetService.kt` only where required; add focused Wear recording portrait and foreground
+screen-policy helpers/tests. A small configurable haptic policy may extend shared client
+`RecordingCues.kt`, with its existing phone behavior retained. Add native tests using the
+existing non-exported synthetic host and actual MainActivity/stock localhost server fixtures.
+
+**Interfaces:** Consume existing start/finish/cancel callbacks, actual ConversationMode/capture
+state, generation-safe RecordingFeedback and existing GIF/pet rendering. Preserve Gadget
+protocol, pairing, media codecs, pager ownership, app signatures and pin APIs.
+
+- [ ] First reproduce the requested missing portrait action and the foreground screen-sleep
+  risk with meaningful failing native tests. Read the verified content-free private server/
+  watch lifecycle summary in `.local/native-design/away-reply-diagnostics/`; it establishes
+  generated replies and short sleeps, not frame receipt or a proved network root cause.
+- [ ] Make the portrait/artwork itself the discoverable hold target: sustained hold starts,
+  release sends, downward drag cancels once. Short taps and pre-hold horizontal/vertical drags
+  never record. Preserve normal swipes, per-page scroll, selection locks, prompt actions,
+  permission denial, unavailable/offline states and pointer cancellation/disposal. Keep real
+  accessible Start/Finish semantics and an immediate concise hint without duplicate captures.
+- [ ] Draw three concentric accent rings flowing outward only while actual recording is
+  active. Keep existing160dp portrait/top spacing. The rings fit the round safe area and never
+  cover clock/labels/controls. Reduced motion/power saver use a static outline/level cue;
+  stopped/background/ambient/unselected pages have no continuous ring animation. Verify static,
+  GIF and pet branches and all three appearances.
+- [ ] Add a watch-only verylight haptic tick at actual capture start and successful recorder
+  release/accepted finish, one per token. Use supported TICK primitive at0.15 scale; otherwise
+  use an8ms amplitude32 pulse only with amplitude control, otherwise a supported EFFECT_TICK
+  or a6ms default fallback. Respect system haptic enablement. Do not create a repeating haptic,
+  change reply/prompt haptics, sound preference or phone cues, or falsely tick success after
+  rejected/short/canceled/stale capture. Retain the joined RecordingFeedback outcome guards.
+- [ ] Implement foreground-only FLAG_KEEP_SCREEN_ON while LISTENING, busy processing,
+  speechPending or speaking, with a120000ms monotonic cap per user-started conversation.
+  Clear on completion/failure/hidden/ambient/disposal/cap; do not reset the deadline for status
+  or meter updates. No wake lock, global setting change or background screen wake. Existing
+  socket idle limits stay unchanged; timeout during unfinished work shows a concise recoverable
+  notice rather than silently looking Ready. Cover actual window flag transitions and a delayed
+  stock reply longer than the15second device default; do not claim the historical issue fixed
+  without receipt/physical proof.
+- [ ] Run focused JVM/native RED→GREEN gesture, ring/lifecycle, haptic token/outcome and screen
+  lease cases plus existing carousel vertical/horizontal/aborted/refresh regressions. Run strict
+  affected builds/lint/format once. Produce synthetic native visual receipts in ignored local
+  artifacts for final Task7; public captures never contain owner portraits/endpoints. Self-review,
+  scoped commit and full report, then independent task review. Root owns live devices/docs.
+
 ## Task 7: Whole-branch review, native visual acceptance and preserving delivery
 
 **Files:** Tests/captures under `docs/demo/native-clients/` use synthetic original art only; original store assets under `docs/store-assets/voice-q/`; update `docs/PRD.md`, `docs/architecture.md`, `docs/profile-setup.md`, `docs/release.md`, `docs/progress.md`, `SESSION_STATUS.md`. Private device backups/owner art/receipts stay `.local/native-design/`.
@@ -170,7 +219,6 @@
 - [ ] Dispatch one broad whole-branch review on the most capable configured model with full spec/ledger/diff evidence; resolve findings in one fix wave and scoped re-review. Per-task review does not replace this gate.
 - [ ] Compare existing device certificates, back up APK/data and store protected-file hashes; install with preserving updates only. Verify APK hash and unchanged existing identities/portraits/preferences except the explicitly changed appearance/pins and normal new phone identities. Never bypass a signature mismatch.
 - [ ] Import the maintainer’s supplied eighteen bounded watch-256 GIFs through normal native picture selection; verify independent descriptors/caches on phone/watch and static ambient/tile/reduced-motion fallbacks. Personal assets and receipts remain ignored; originals are unchanged and no app cache is seeded.
-- [ ] Import the supplied eighteen validated watch-256 GIFs through the normal phone picture picker, matching each to its stable profile. Preserve the source originals and private art boundaries; verify saved decoded frames, phone-to-watch delivery and static ambient/tile/reduced-motion fallbacks when hardware is available. Keep only exact unavailable hardware gates open.
 - [ ] Through normal UI, choose the maintainer's preferred Moonlight appearance and configure Focus/four pins when devices are available. Verify physical tile addition and each portrait launch on the watch; request owner speech/visual observations. Restore temporary timeout settings after testing. Keep owner GIF/office and quantitative battery/audio gates distinct.
 - [ ] Record verified checks/demo notes and review results, update draft PR, run public secret/private-value scans, commit/push only authorized public files. Do not merge or publish a release. If hardware is unavailable, continue software work and leave only its exact hardware gates open.
 
@@ -178,6 +226,8 @@
 
 Tasks 1–3 cover brand/themes and every phone destination. Task 4 covers the watch navigation
 and layout while preserving its interaction. Task 5 covers tile storage/static resources/launch;
-Task 6 covers complete phone pin configuration and revision synchronization. Task 7 verifies
+Task 6 covers complete phone pin configuration and revision synchronization. Task 8 covers
+the owner-requested portrait recording/rings/light haptics and bounded reply visibility.
+Task 7 verifies
 native/physical delivery and updates the current-state documentation. Prototype artifact work
 is complete and is not repeated as native validation.
