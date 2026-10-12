@@ -433,7 +433,10 @@ class WatchCarouselTest {
             assertEquals(urls.first(), service.state.value.profile?.endpoint?.url)
             instrumentation.runOnMainSync { service.cancel() }
             waitUntil { !service.state.value.connection.conversation.busy }
-            waitUntil { find { it.text?.toString() == "Ready" } != null }
+            waitUntil {
+                find { it.contentDescription?.toString()?.contains("Start recording") == true } !=
+                    null
+            }
             instrumentation.waitForIdleSync()
             SystemClock.sleep(350)
             swipe(true)

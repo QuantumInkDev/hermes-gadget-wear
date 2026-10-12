@@ -21,8 +21,8 @@
     <string name="listening">Listening</string>
     <string name="thinking">Thinking</string>
     <string name="reply">Reply</string>
-    <string name="hold_talk">Hold to speak</string>
-    <string name="release_send">Release to send\nSwipe down to discard</string>
+    <string name="hold_talk">Hold to talk</string>
+    <string name="release_send">Release to send</string>
     <string name="type_message">Type a message</string>
     <string name="message">Message</string>
     <string name="send">Send</string>

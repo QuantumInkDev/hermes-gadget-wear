@@ -28,6 +28,7 @@ import dev.quantumink.hermesgadget.protocol.ConnectionObserver
 import dev.quantumink.hermesgadget.protocol.ConnectionState
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
 import dev.quantumink.hermesgadget.protocol.ConversationEffect
+import dev.quantumink.hermesgadget.protocol.ConversationMode
 import dev.quantumink.hermesgadget.protocol.ConversationState
 import dev.quantumink.hermesgadget.protocol.DeviceIdentity
 import dev.quantumink.hermesgadget.protocol.DirectConnection
@@ -75,6 +76,9 @@ data class WatchState(
     val transportNotice: String = "",
     val pet: PetAtlas? = null,
     val petCue: String = "",
+    val captureActive: Boolean = false,
+    val screenTurnStarted: Long? = null,
+    val screenNotice: String = "",
     val speaking: Boolean = false,
     val speechPending: Boolean = false,
     val playbackLevel: Float = 0f,
@@ -119,6 +123,8 @@ class GadgetService : Service() {
     private lateinit var capture: PcmCapture
     private lateinit var recordingCues: RecordingCues
     private var recordingFeedback: RecordingFeedback? = null
+
+    @Volatile private var captureToken: String? = null
     private lateinit var playback: PcmPlayback
 
     @Volatile private var connection: DirectConnection? = null
@@ -149,7 +155,7 @@ class GadgetService : Service() {
         super.onCreate()
         capture = PcmCapture(this)
         CuePreferences.initialize(this)
-        recordingCues = RecordingCues(this)
+        recordingCues = RecordingCues(this, watchLightHaptics = true)
         petCache = PetCache(this)
         catalog = WatchCatalogController(
             this,
@@ -357,8 +363,7 @@ class GadgetService : Service() {
         timerLauncher = null
         brightness?.invoke(null)
         brightness = null
-        capture.stop()
-        connection?.cancelRecording()
+        cancelRecording()
         if (!foreground && !textEditing) disconnect()
     }
 
@@ -609,6 +614,8 @@ class GadgetService : Service() {
     fun disconnect() {
         epoch.incrementAndGet()
         recordingFeedback?.invalidate()
+        captureToken = null
+        mutableState.update { it.copy(captureActive = false) }
         selectionEpoch.incrementAndGet()
         mutableState.update {
             it.copy(
@@ -636,6 +643,7 @@ class GadgetService : Service() {
             mutableState.value.connection.conversation.prompt == null && active != null &&
             beginForeground(false)
         ) {
+            beginScreenTurn()
             active.text(value).whenComplete { accepted, failure ->
                 main.post {
                     releaseIdleForeground()
@@ -668,6 +676,18 @@ class GadgetService : Service() {
             if (destroyed || !foreground) return@postDelayed
             val watch = mutableState.value
             if (!watch.connection.conversation.busy && !watch.speaking && !watch.speechPending) {
+                mutableState.update {
+                    it.copy(
+                        screenTurnStarted = null,
+                        screenNotice = if (it.screenNotice ==
+                            SCREEN_LIMIT_NOTICE
+                        ) {
+                            ""
+                        } else {
+                            it.screenNotice
+                        }
+                    )
+                }
                 endForeground()
                 if (!visible) disconnect()
             }
@@ -686,14 +706,46 @@ class GadgetService : Service() {
             connection?.report(getString(R.string.microphone_permission_needed))
             return
         }
-        if (beginForeground(true)) connection?.startRecording()
+        if (mutableState.value.connection.conversation.mode ==
+            ConversationMode.LISTENING
+        ) {
+            return
+        }
+        if (beginForeground(true)) {
+            beginScreenTurn()
+            connection?.startRecording()
+        }
+    }
+
+    private fun beginScreenTurn() {
+        mutableState.update {
+            it.copy(screenTurnStarted = android.os.SystemClock.elapsedRealtime(), screenNotice = "")
+        }
+    }
+
+    fun screenLeaseExpired(started: Long?) {
+        mutableState.update {
+            if (started != null && it.screenTurnStarted == started &&
+                it.conversationInProgress && it.screenNotice.isEmpty()
+            ) {
+                it.copy(
+                    screenNotice = SCREEN_LIMIT_NOTICE
+                )
+            } else {
+                it
+            }
+        }
     }
 
     fun finishRecording() {
         if (!capture.finish()) connection?.finishRecording()
     }
     fun cancelRecording() {
-        capture.stop()
+        synchronized(mediaLock) {
+            captureToken = null
+            mutableState.update { it.copy(captureActive = false) }
+            capture.stop()
+        }
         connection?.cancelRecording()
     }
     fun cancel(newSession: Boolean = false) {
@@ -766,6 +818,8 @@ class GadgetService : Service() {
         savedIdentity = identity
         val version = epoch.incrementAndGet()
         recordingFeedback?.invalidate()
+        captureToken = null
+        mutableState.update { it.copy(captureActive = false) }
         val feedback = RecordingFeedback { finished ->
             if (version == epoch.get() && visible) {
                 recordingCues.play(if (finished) Cue.FINISH else Cue.CANCEL)
@@ -853,7 +907,29 @@ class GadgetService : Service() {
                         petCue("waving", version)
                     }
                     mutableState.update {
-                        if (version == epoch.get()) it.copy(connection = state) else it
+                        if (version == epoch.get()) {
+                            val interrupted = it.connection.conversation.busy &&
+                                state.status in
+                                setOf(
+                                    ConnectionStatus.OFFLINE,
+                                    ConnectionStatus.ERROR,
+                                    ConnectionStatus.RETRYING
+                                )
+                            it.copy(
+                                connection = state,
+                                screenNotice = if (interrupted) {
+                                    "Connection ended before the reply completed. Reconnect and try again."
+                                } else if (state.conversation.reply !=
+                                    it.connection.conversation.reply
+                                ) {
+                                    ""
+                                } else {
+                                    it.screenNotice
+                                }
+                            )
+                        } else {
+                            it
+                        }
                     }
                     if (TransportPolicy.canFallBack(profile.transport, path, state)) {
                         main.post {
@@ -940,6 +1016,7 @@ class GadgetService : Service() {
                                 } else {
                                     val current = connection ?: return
                                     feedback.begin(effect.token)
+                                    captureToken = effect.token
                                     capture.start(
                                         { bytes ->
                                             if (effect.format ==
@@ -967,15 +1044,27 @@ class GadgetService : Service() {
                                             }
                                         },
                                         onStarted = {
-                                            if (version == epoch.get() &&
-                                                visible
-                                            ) {
-                                                recordingCues.play(Cue.START)
+                                            synchronized(mediaLock) {
+                                                if (version == epoch.get() && visible &&
+                                                    captureToken == effect.token &&
+                                                    !mutableState.value.captureActive
+                                                ) {
+                                                    mutableState.update {
+                                                        it.copy(captureActive = true)
+                                                    }
+                                                    recordingCues.play(Cue.START)
+                                                }
                                             }
                                         },
                                         onStopped = {
                                             synchronized(mediaLock) {
                                                 if (version == epoch.get()) {
+                                                    if (captureToken == effect.token) {
+                                                        captureToken = null
+                                                        mutableState.update {
+                                                            it.copy(captureActive = false)
+                                                        }
+                                                    }
                                                     feedback.stopped(effect.token)
                                                 }
                                             }
@@ -986,6 +1075,8 @@ class GadgetService : Service() {
                             is ConversationEffect.RecordingOutcome ->
                                 feedback.outcome(effect.token, effect.finished)
                             ConversationEffect.CaptureStop -> {
+                                captureToken = null
+                                mutableState.update { it.copy(captureActive = false) }
                                 capture.stop()
                                 main.post {
                                     if (version == epoch.get() &&
@@ -1199,6 +1290,8 @@ class GadgetService : Service() {
         selectionEpoch.incrementAndGet()
         epoch.incrementAndGet()
         recordingFeedback?.invalidate()
+        captureToken = null
+        mutableState.update { it.copy(captureActive = false) }
         speech?.close()
         speech = null
         textEditing = false

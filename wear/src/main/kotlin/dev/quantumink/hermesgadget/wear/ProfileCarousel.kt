@@ -2,6 +2,8 @@ package dev.quantumink.hermesgadget.wear
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -20,6 +23,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
@@ -249,7 +256,9 @@ fun ProfileIdentity(
     page: ProfilePage,
     artwork: PageArtwork?,
     watch: WatchState,
-    selected: Boolean
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    recordingHint: String = ""
 ) {
     Column(
         Modifier.fillMaxWidth(),
@@ -257,25 +266,74 @@ fun ProfileIdentity(
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         val pet = if (selected) watch.pet ?: artwork?.pet else artwork?.pet
-        Crossfade(
-            targetState = pet,
-            modifier = Modifier.requiredSize(160.dp, 168.dp),
-            animationSpec = tween(220),
-            label = "profile artwork"
-        ) { shown ->
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                if (shown == null && artwork?.portrait != null) {
-                    AnimatedPortrait(
-                        artwork.animation,
-                        artwork.portrait,
-                        "${page.label} profile picture",
-                        selected && page.status == CatalogStatus.AVAILABLE,
-                        Modifier.size(160.dp)
+        Box(Modifier.requiredSize(160.dp, 168.dp).then(modifier)) {
+            Crossfade(
+                targetState = pet,
+                modifier = Modifier.requiredSize(160.dp, 168.dp),
+                animationSpec = tween(220),
+                label = "profile artwork"
+            ) { shown ->
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    if (shown == null && artwork?.portrait != null) {
+                        AnimatedPortrait(
+                            artwork.animation,
+                            artwork.portrait,
+                            "${page.label} profile picture",
+                            selected && page.status == CatalogStatus.AVAILABLE,
+                            Modifier.size(160.dp)
+                        )
+                    } else {
+                        PetView(
+                            watch.copy(pet = shown),
+                            animated = selected && page.status == CatalogStatus.AVAILABLE
+                        )
+                    }
+                }
+            }
+            RecordingRings(watch.captureActive, selected, watch.connection.conversation.level)
+            if (recordingHint.isNotEmpty()) {
+                val ink = MaterialTheme.colorScheme.onSurface
+                Canvas(
+                    Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp)
+                        .size(
+                            28.dp
+                        ).background(MaterialTheme.colorScheme.surfaceContainer, CircleShape)
+                        .semantics { contentDescription = recordingHint }
+                ) {
+                    val unit = size.width / 28f
+                    val stroke = Stroke(1.5f * unit)
+                    drawRoundRect(
+                        ink,
+                        Offset(11f * unit, 5f * unit),
+                        Size(6f * unit, 11f * unit),
+                        CornerRadius(3f * unit),
+                        style = stroke
                     )
-                } else {
-                    PetView(
-                        watch.copy(pet = shown),
-                        animated = selected && page.status == CatalogStatus.AVAILABLE
+                    drawArc(
+                        ink,
+                        0f,
+                        180f,
+                        false,
+                        Offset(8f * unit, 8f * unit),
+                        Size(
+                            12f * unit,
+                            12f * unit
+                        ),
+                        style = stroke
+                    )
+                    drawLine(
+                        ink,
+                        Offset(14f * unit, 20f * unit),
+                        Offset(14f * unit, 24f * unit),
+                        strokeWidth =
+                        1.5f * unit
+                    )
+                    drawLine(
+                        ink,
+                        Offset(10f * unit, 24f * unit),
+                        Offset(18f * unit, 24f * unit),
+                        strokeWidth =
+                        1.5f * unit
                     )
                 }
             }

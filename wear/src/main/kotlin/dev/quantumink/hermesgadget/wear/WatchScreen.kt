@@ -1,12 +1,10 @@
 package dev.quantumink.hermesgadget.wear
 
 import android.graphics.Bitmap
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,9 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -529,15 +525,8 @@ internal fun ConversationPage(
         ConnectionStatus.OFFLINE -> R.string.offline
         ConnectionStatus.ERROR -> R.string.connection_error
     }
-    val gesture = Modifier.voiceGesture(
-        paired && prompt == null,
-        startRecording,
-        service::finishRecording,
-        service::cancelRecording
-    )
     val promptScroll = remember(prompt?.id) { TransformingLazyColumnState() }
     RoundPage(
-        gesture,
         topPadding = if (prompt == null) 28.dp else 40.dp,
         state = if (prompt == null) pageScroll else promptScroll
     ) {
@@ -570,14 +559,56 @@ internal fun ConversationPage(
                     Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    ProfileIdentity(page, watch.artwork[page.key], watch, true)
+                    ProfileIdentity(
+                        page,
+                        watch.artwork[page.key],
+                        watch,
+                        true,
+                        modifier = Modifier.recordingPortrait(
+                            paired &&
+                                page.status ==
+                                dev.quantumink.hermesgadget.protocol.CatalogStatus.AVAILABLE &&
+                                (
+                                    !conversation.busy ||
+                                        conversation.mode == ConversationMode.LISTENING
+                                    ),
+                            conversation.mode == ConversationMode.LISTENING,
+                            startRecording,
+                            service::finishRecording,
+                            service::cancelRecording
+                        ),
+                        recordingHint = if (paired &&
+                            page.status ==
+                            dev.quantumink.hermesgadget.protocol.CatalogStatus.AVAILABLE
+                        ) {
+                            if (conversation.mode ==
+                                ConversationMode.LISTENING
+                            ) {
+                                stringResource(R.string.release_send)
+                            } else if (!conversation.busy) {
+                                stringResource(R.string.hold_talk)
+                            } else {
+                                ""
+                            }
+                        } else {
+                            ""
+                        }
+                    )
                     Text(
-                        stringResource(title),
+                        when {
+                            watch.screenNotice.isNotEmpty() -> "Check conversation"
+                            paired && conversation.mode == ConversationMode.LISTENING -> {
+                                stringResource(R.string.release_send)
+                            }
+                            paired && !conversation.busy -> stringResource(R.string.hold_talk)
+                            else -> stringResource(title)
+                        },
                         style = MaterialTheme.typography.titleMedium,
                         textAlign = TextAlign.Center
                     )
                 }
             }
+            if (watch.screenNotice.isNotEmpty()) item { Body(watch.screenNotice) }
             if (connection.status == ConnectionStatus.PAIRING) {
                 item {
                     Heading(
@@ -593,42 +624,6 @@ internal fun ConversationPage(
                     }
                 }
             } else if (paired) {
-                if (conversation.mode in
-                    setOf(ConversationMode.READY, ConversationMode.LISTENING)
-                ) {
-                    item {
-                        val listening = conversation.mode == ConversationMode.LISTENING
-                        val actionLabel = stringResource(
-                            if (listening) {
-                                R.string.finish_recording
-                            } else {
-                                R.string.start_recording
-                            }
-                        )
-                        Row(
-                            Modifier.fillMaxWidth().semantics {
-                                role = Role.Button
-                                contentDescription = actionLabel
-                                onClick(actionLabel) {
-                                    if (listening) service.finishRecording() else startRecording()
-                                    true
-                                }
-                            },
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            VoiceMark(conversation.level, listening)
-                            Text(
-                                stringResource(
-                                    if (listening) R.string.release_send else R.string.hold_talk
-                                ),
-                                Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 2
-                            )
-                        }
-                    }
-                }
                 if (conversation.status.isNotEmpty()) {
                     item {
                         Body(conversation.status, muted = true)
@@ -852,54 +847,6 @@ private fun Input(
             minLines = 1, maxLines = if (singleLine) 1 else 4,
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
         )
-    }
-}
-
-@Composable
-private fun VoiceMark(level: Float, listening: Boolean) {
-    val accent = MaterialTheme.colorScheme.primary
-    Canvas(Modifier.size(48.dp)) {
-        drawCircle(accent.copy(alpha = 0.18f), style = Stroke(3.dp.toPx()))
-        drawCircle(
-            accent,
-            radius =
-            size.minDimension * (0.15f + if (listening) level * 0.24f else 0f)
-        )
-    }
-}
-
-private fun Modifier.voiceGesture(
-    enabled: Boolean,
-    start: () -> Unit,
-    finish: () -> Unit,
-    cancel: () -> Unit
-): Modifier = pointerInput(enabled) {
-    if (!enabled) return@pointerInput
-    val distance = 40.dp.toPx()
-    awaitEachGesture {
-        val down = awaitFirstDown()
-        val held = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
-        start()
-        var completed = false
-        var discarded = false
-        try {
-            while (true) {
-                val event = awaitPointerEvent(PointerEventPass.Initial)
-                val change = event.changes.firstOrNull { it.id == held.id } ?: break
-                if (!change.pressed) {
-                    if (!discarded) finish()
-                    completed = true
-                    break
-                }
-                if (!discarded && change.position.y - down.position.y > distance) {
-                    cancel()
-                    discarded = true
-                }
-                change.consume()
-            }
-        } finally {
-            if (!completed) cancel()
-        }
     }
 }
 

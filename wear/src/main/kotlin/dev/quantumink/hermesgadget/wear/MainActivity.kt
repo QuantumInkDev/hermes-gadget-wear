@@ -28,6 +28,8 @@ import androidx.wear.compose.foundation.AmbientTickEffect
 import androidx.wear.compose.foundation.LocalAmbientModeManager
 import androidx.wear.compose.foundation.rememberAmbientModeManager
 import dev.quantumink.hermesgadget.client.AppearancePreferences
+import dev.quantumink.hermesgadget.protocol.ConnectionStatus
+import dev.quantumink.hermesgadget.protocol.ConversationMode
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -101,6 +103,12 @@ class MainActivity : ComponentActivity() {
                     }
                     val service = gadget
                     val watch = service?.state?.collectAsStateWithLifecycle()?.value
+                    KeepConversationVisible(
+                        window,
+                        watch?.screenTurnStarted,
+                        watch?.conversationInProgress == true,
+                        ambient != null
+                    ) { service?.screenLeaseExpired(watch?.screenTurnStarted) }
                     LaunchedEffect(service, watch, tileLaunch.pendingKey) {
                         if (service != null && watch != null) reconcileTile(service)
                     }
@@ -228,6 +236,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         gadget?.hidden()
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.attributes = window.attributes.apply {
             screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
         }
