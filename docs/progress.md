@@ -15,8 +15,9 @@ four existing directory-order/picture regressions. Strict full checks and both a
 builds pass with warnings as errors; JVM reports still total 105 with zero failures/errors/skips.
 Refinement `b724231` is installed on both actual devices after certificate/hash checks and
 backups. Phone protected files/preferences (42, including 36 PNGs) and all watch identity/
-portrait hashes (19/18) are unchanged. Original watch timeout is restored. Owner refinement
-UI and speech/GIF power observations remain open.
+portrait hashes (19/18) are unchanged. Original watch timeout is restored. The maintainer
+reopened the physical phone app and confirms the box headers are clearer to expand/collapse
+and the top text is readable. Phone speech/cues and GIF power observations remain open.
 
 
 The maintainer approved the [phone/watch follow-up design](superpowers/specs/2026-10-12-client-usability-design.md),
@@ -50,7 +51,7 @@ watch battery cost remain physical observation gates. The final watch build is i
 matching certificate and APK hash, all 19 identity ciphertexts and 18 portrait hashes unchanged,
 and its original timeout restored. The final phone app is also installed with matching
 certificate and verified APK hash. All 39 protected app files, including 36 portrait PNGs,
-and both preferences remain unchanged. Owner phone UI/speech observations are pending;
+and both preferences remain unchanged. Owner phone UI observation passes; speech remains pending;
 no live phone pairing or physical microphone test was initiated. GitHub Android, extensions
 and secrets checks passed for code `cea12b5` and delivery docs `de620f4`.
 

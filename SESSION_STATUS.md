@@ -6,7 +6,8 @@ the requested Quantum Relay for Hermes title are implemented. Six scoped present
 checks and strict full build/all APKs pass. Refinement b724231 is installed on both devices:
 phone APK/certificate and all 42 protected app files/preferences (36 PNGs) are verified;
 watch APK/certificate and all 19 identity ciphertexts/18 portraits are verified. The original
-watch timeout is restored. Owner refinement UI observation is pending. Private receipts are
+watch timeout is restored. The maintainer reopened the physical phone app and confirms the
+box headers are clearer to expand/collapse and the top text is readable. Private receipts are
 in .local/client-usability/phone-accordion/ and watch-title/. For large watch APK backup,
 compressed adb pull succeeded after exec-out streaming timed out; use remote sha256sum
 for post-install hash verification. The failed backup made no installation change.
@@ -51,11 +52,12 @@ Receipts and the active private USB connection are under .local/client-usability
 the watch’s refreshed connection is recorded in its existing private session config. The phone
 was attached to an existing isolated ADB server, not the resetting shared default server.
 No app data was cleared, identity seeded or signature bypassed. The phone activity was not
-launched remotely; owner UI observation is requested. Phone client pairing remains explicit;
+launched remotely; the maintainer's phone UI observation now passes. Phone client pairing remains explicit;
 no bulk live enrollment or real-device microphone test was initiated. All three GitHub CI jobs
 for code cea12b5 and docs de620f4 passed before this delivery note.
 
-Next: owner phone UI/speech/cue checks, GIF battery/rendering
+Ready to pause; no further physical-device work is planned until resuming.
+Next: owner phone pairing/speech/cue checks, GIF battery/rendering
 and office trial. Owner manages Mac awake state; no power helper is installed. Existing live
 18-profile cellular relay and three-profile watch speech evidence below remains historical;
 it does not establish the new phone client or GIF power gates. Keep PR #1 draft; no merge,
