@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.quantumink.hermesgadget.client.AnimationCache
 import dev.quantumink.hermesgadget.protocol.CatalogPage
 import dev.quantumink.hermesgadget.protocol.CatalogProfile
 import dev.quantumink.hermesgadget.protocol.CatalogSource
@@ -26,7 +27,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class CatalogDirectoryRepositoryTest {
     @Test fun interleavedMigrationLocalMovesAndManualOrderSurviveRefreshAndRestart() {
-        fixture { context, vault, setup, portraits ->
+        fixture { context, vault, setup, portraits, animations ->
             vault.saveSources(listOf(source("a"), source("b"), source("c")))
             val manual = listOf("one", "two").map {
                 EndpointProfile(Endpoint.parse("wss://$it.example.invalid/gadget"), "Duplicate", "")
@@ -63,6 +64,7 @@ class CatalogDirectoryRepositoryTest {
                     vault,
                     setup,
                     portraits,
+                    animations = animations,
                     fetchProfiles = fetch,
                     publish = {
                             pages,
@@ -114,6 +116,7 @@ class CatalogDirectoryRepositoryTest {
                         vault,
                         setup,
                         portraits,
+                        animations = animations,
                         fetchProfiles = fetch,
                         publish = {
                                 pages,
@@ -149,17 +152,36 @@ class CatalogDirectoryRepositoryTest {
     }
 
     @Test fun reorderedEmptyBoxRetainsSlotUntilItsFirstProfilesArrive() {
-        fixture { context, vault, setup, portraits ->
+        fixture { context, vault, setup, portraits, animations ->
             vault.saveSources(listOf(source("a"), source("b"), source("c")))
             vault.savePages(listOf(page("a", "same"), page("b", "same")))
             var repository =
-                CatalogRepository(context, vault, setup, portraits, publish = { _, _ -> })
+                CatalogRepository(
+                    context,
+                    vault,
+                    setup,
+                    portraits,
+                    animations = animations,
+                    publish = {
+                            _,
+                            _
+                        ->
+                    }
+                )
             repository.moveSource("c", -3)
             repository.close()
             repository =
-                CatalogRepository(context, vault, setup, portraits, fetchProfiles = {
-                    listOf(CatalogProfile("same", "Duplicate", null, null))
-                }, publish = { _, _ -> })
+                CatalogRepository(
+                    context,
+                    vault,
+                    setup,
+                    portraits,
+                    animations = animations,
+                    fetchProfiles = {
+                        listOf(CatalogProfile("same", "Duplicate", null, null))
+                    },
+                    publish = { _, _ -> }
+                )
             try {
                 assertEquals(listOf("c", "a", "b", "manual"), repository.sourceOrder())
                 assertEquals(listOf("c", "a", "b"), repository.sources().map { it.id })
@@ -177,7 +199,7 @@ class CatalogDirectoryRepositoryTest {
     }
 
     @Test fun manualFallbackAndExplicitOverrideKeepCorrectPicturesAfterGroupingAndRefresh() {
-        fixture { context, vault, setup, portraits ->
+        fixture { context, vault, setup, portraits, animations ->
             val profile =
                 EndpointProfile(Endpoint.parse("wss://a.example.invalid/gadget"), "Agent", "")
             setup.save(profile)
@@ -187,6 +209,7 @@ class CatalogDirectoryRepositoryTest {
                 vault,
                 setup,
                 portraits,
+                animations = animations,
                 fetchProfiles = { source ->
                     listOf(
                         CatalogProfile(
@@ -266,7 +289,7 @@ class CatalogDirectoryRepositoryTest {
     }
 
     @Test fun conversationProjectionUsesOnlyExactSavedGadgetCredentialAndLegacyManualId() {
-        fixture { context, vault, setup, portraits ->
+        fixture { context, vault, setup, portraits, animations ->
             vault.saveSources(listOf(source("a")))
             setup.save(
                 EndpointProfile(
@@ -287,7 +310,18 @@ class CatalogDirectoryRepositoryTest {
                 )
             setup.save(legacy)
             val repository =
-                CatalogRepository(context, vault, setup, portraits, publish = { _, _ -> })
+                CatalogRepository(
+                    context,
+                    vault,
+                    setup,
+                    portraits,
+                    animations = animations,
+                    publish = {
+                            _,
+                            _
+                        ->
+                    }
+                )
             try {
                 val matching =
                     CatalogPage(
@@ -342,7 +376,9 @@ class CatalogDirectoryRepositoryTest {
         1
     )
 
-    private fun fixture(block: (Context, CatalogVault, ProfileVault, PortraitStore) -> Unit) {
+    private fun fixture(
+        block: (Context, CatalogVault, ProfileVault, PortraitStore, AnimationCache) -> Unit
+    ) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val id = UUID.randomUUID().toString()
         val directory = File(context.cacheDir, "directory-$id")
@@ -352,7 +388,8 @@ class CatalogDirectoryRepositoryTest {
                 context,
                 CatalogVault(context, File(directory, "vault"), aliases[0]),
                 ProfileVault(context, File(directory, "setup"), aliases[1]),
-                PortraitStore(File(directory, "portraits"))
+                PortraitStore(File(directory, "portraits")),
+                AnimationCache(File(directory, "animations"))
             )
         } finally {
             directory.deleteRecursively()

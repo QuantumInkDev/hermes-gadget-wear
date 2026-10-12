@@ -7,6 +7,7 @@ import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.Wearable
 import dev.quantumink.hermesgadget.protocol.CatalogPage
+import dev.quantumink.hermesgadget.protocol.PortraitDescriptor
 import dev.quantumink.hermesgadget.protocol.ProfileCatalog
 import java.io.File
 import java.util.concurrent.ArrayBlockingQueue
@@ -25,9 +26,17 @@ class WatchCatalogController(
     private val busy: (Boolean, String) -> Unit,
     private val artwork: (Map<String, PageArtwork>) -> Unit
 ) : AutoCloseable {
+    private val promotion = Any()
     private val main = Handler(Looper.getMainLooper())
     private val vault = WatchCatalogVault(context)
     private val portraits = PortraitCache(File(context.filesDir, "portrait-cache"))
+    private val animations = dev.quantumink.hermesgadget.client.AnimationCache(
+        File(context.filesDir, "animation-cache")
+    )
+    private val animationIndex = AnimationIndex(File(context.filesDir, "animation-index"))
+
+    @Volatile private var animationMetadata =
+        emptyMap<String, dev.quantumink.hermesgadget.protocol.AnimationDescriptor>()
     private val remote = WatchCatalog(context)
     private val worker = Executors.newSingleThreadExecutor()
     private val artWorker =
@@ -54,6 +63,8 @@ class WatchCatalogController(
     @Volatile private var node: String? = null
 
     @Volatile private var previews: List<ProfilePage> = emptyList()
+    private var catalogKeys = emptySet<String>()
+    private var catalogPortraits = emptyMap<String, PortraitDescriptor?>()
     private val listener = DataClient.OnDataChangedListener { events ->
         for (event in events) {
             val item = event.dataItem
@@ -72,13 +83,32 @@ class WatchCatalogController(
                 }
             } else if (item.uri.path?.startsWith(ProfileCatalog.PORTRAIT_PATH) == true) {
                 prepare(previews)
+            } else if (item.uri.path ==
+                dev.quantumink.hermesgadget.protocol.PortraitAnimations.DATA_PATH ||
+                item.uri.path?.startsWith(
+                    dev.quantumink.hermesgadget.protocol.PortraitAnimations.ASSET_PATH
+                ) ==
+                true
+            ) {
+                prepare(previews)
             }
         }
     }
     fun start() {
         if (closed.get() || !started.compareAndSet(false, true)) return
         worker.execute {
+            animationMetadata = runCatching { animationIndex.read() }.getOrDefault(emptyMap())
             val saved = runCatching { vault.pages() to vault.selected() }
+            saved.onSuccess { (pages, _) ->
+                synchronized(promotion) {
+                    if (!closed.get()) {
+                        catalogKeys = pages.map { it.key }.toSet()
+                        catalogPortraits = pages.associate { it.key to it.profile.portrait }
+                        runCatching { portraits.retain(catalogKeys) }
+                        artEpoch.incrementAndGet()
+                    }
+                }
+            }
             main.post {
                 if (closed.get()) return@post
                 saved.fold({ (pages, selected) -> loaded(pages, selected) }, {
@@ -136,11 +166,16 @@ class WatchCatalogController(
         }
     }
     private fun accept(pages: List<CatalogPage>) {
-        if (closed.get()) return
-        require(allowed(pages)) { "Catalog exceeds the page limit." }
-        vault.savePages(pages)
-        runCatching { portraits.retain(pages.map { it.key }.toSet()) }
-        val selected = vault.selected()
+        val selected = synchronized(promotion) {
+            if (closed.get()) return
+            require(allowed(pages)) { "Catalog exceeds the page limit." }
+            vault.savePages(pages)
+            catalogKeys = pages.map { it.key }.toSet()
+            catalogPortraits = pages.associate { it.key to it.profile.portrait }
+            artEpoch.incrementAndGet()
+            runCatching { portraits.retain(catalogKeys) }
+            vault.selected()
+        }
         main.post { if (!closed.get()) loaded(pages, selected) }
     }
     fun rememberPage(key: String) {
@@ -157,11 +192,26 @@ class WatchCatalogController(
         }
     }
     fun prepare(pages: List<ProfilePage>) {
-        if (closed.get()) return
-        previews = pages.take(3)
-        val request = artEpoch.incrementAndGet()
-        val selected = previews
+        val (request, selected) = synchronized(promotion) {
+            if (closed.get()) return
+            previews = pages.take(3)
+            artEpoch.incrementAndGet() to previews
+        }
         artWorker.execute {
+            node?.let { phone ->
+                runCatching {
+                    val records = remote.animations(phone).orEmpty()
+                    synchronized(promotion) {
+                        if (!closed.get() && request == artEpoch.get()) {
+                            val current = records.filterKeys { it in catalogKeys }
+                            animationIndex.save(current)
+                            animationMetadata = current
+                            animations.retain(current.values.map { it.sha256 }.toSet())
+                        }
+                    }
+                }
+            }
+            animations.protect(animationMetadata.values.map { it.sha256 }.toSet())
             val result = selected.associate { page ->
                 val descriptor = page.portrait
                 if (descriptor != null &&
@@ -171,10 +221,41 @@ class WatchCatalogController(
                 ) {
                     node?.let { phone ->
                         runCatching {
-                            remote.portrait(phone, descriptor)?.let {
-                                portraits.store(page.key, descriptor, it)
+                            val admission = synchronized(promotion) {
+                                if (!closed.get() && request == artEpoch.get() &&
+                                    catalogPortraits[page.key] == descriptor
+                                ) {
+                                    portraits.admission(page.key)
+                                } else {
+                                    null
+                                }
+                            }
+                            if (admission != null) {
+                                portraits.fetchAndStore(page.key, descriptor, admission) {
+                                    remote.portrait(phone, descriptor)
+                                }
                             }
                         }
+                    }
+                }
+                val animation = animationMetadata[page.key]?.takeIf {
+                    it.fallbackSha256 == descriptor?.sha256 &&
+                        runCatching { portraits.currentHash(page.key) }.getOrNull() ==
+                        it.fallbackSha256
+                }?.let { metadata ->
+                    animations.file(metadata) ?: node?.let { phone ->
+                        runCatching {
+                            val bytes = remote.animation(phone, metadata)
+                            synchronized(promotion) {
+                                if (bytes != null && !closed.get() && request == artEpoch.get() &&
+                                    page.key in catalogKeys &&
+                                    animationMetadata[page.key] == metadata
+                                ) {
+                                    animations.store(metadata, bytes)
+                                }
+                                animations.file(metadata)
+                            }
+                        }.getOrNull()
                     }
                 }
                 page.key to
@@ -182,20 +263,42 @@ class WatchCatalogController(
                         portraits.load(page.key),
                         page.approved?.let {
                             runCatching { pets.load(it.endpoint.url) }.getOrNull()
-                        }
+                        },
+                        animation
                     )
             }
             main.post { if (!closed.get() && request == artEpoch.get()) artwork(result) }
         }
     }
     fun reset() {
+        synchronized(promotion) {
+            catalogKeys = emptySet()
+            catalogPortraits = emptyMap()
+            previews = emptyList()
+            animationMetadata = emptyMap()
+            artEpoch.incrementAndGet()
+            portraits.invalidateRequests()
+        }
         worker.execute {
-            vault.reset()
-            portraits.reset()
+            synchronized(promotion) {
+                artEpoch.incrementAndGet()
+                catalogKeys = emptySet()
+                catalogPortraits = emptyMap()
+                previews = emptyList()
+                animationMetadata = emptyMap()
+                vault.reset()
+                portraits.reset()
+                animationIndex.reset()
+                animations.reset()
+            }
         }
     }
     override fun close() {
-        closed.set(true)
+        synchronized(promotion) {
+            closed.set(true)
+            artEpoch.incrementAndGet()
+            portraits.invalidateRequests()
+        }
         Wearable.getDataClient(context).removeListener(listener)
         worker.shutdownNow()
         artWorker.shutdownNow()

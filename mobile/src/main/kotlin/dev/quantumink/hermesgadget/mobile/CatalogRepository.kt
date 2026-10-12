@@ -23,6 +23,10 @@ class CatalogRepository internal constructor(
     private val setup: ProfileVault = ProfileVault(context),
     private val portraits: PortraitStore =
         PortraitStore(File(context.filesDir, "catalog-portraits")),
+    private val animations: dev.quantumink.hermesgadget.client.AnimationCache =
+        dev.quantumink.hermesgadget.client.AnimationCache(
+            File(context.filesDir, "catalog-animations")
+        ),
     private val client: CatalogClient = CatalogClient(),
     private val fetchProfiles: (CatalogSource) -> List<CatalogProfile> = client::fetch,
     private val fetchPortrait: (
@@ -33,7 +37,9 @@ class CatalogRepository internal constructor(
     private val publish: (
         List<CatalogPage>,
         PortraitStore
-    ) -> Unit = { pages, store -> ProfileSync.publishCatalog(context, pages, store) }
+    ) -> Unit = { pages, store ->
+        ProfileSync.publishCatalog(context, pages, store, vault.animations(), animations)
+    }
 ) : AutoCloseable {
     private val sync = Executors.newSingleThreadExecutor()
     private val mutablePages = MutableStateFlow<List<CatalogPage>>(emptyList())
@@ -165,7 +171,7 @@ class CatalogRepository internal constructor(
                 sync.execute {
                     synchronized(this) {
                         if (version == revision && !result.isCancelled) {
-                            runCatching { publish(saved, portraits) }.onFailure {
+                            runCatching { publishCurrent(saved) }.onFailure {
                                 mutableNotice.value =
                                     "Sync needs attention. Cached profiles were kept."
                             }
@@ -195,7 +201,7 @@ class CatalogRepository internal constructor(
                             mutablePages.value = saved
                             portraits.protect(references(saved))
                             portraits.retain(references(saved))
-                            publish(saved, portraits)
+                            publishCurrent(saved)
                             mutableNotice.value =
                                 if (discovery.statuses().values.any {
                                         it == CatalogStatus.ATTENTION
@@ -270,23 +276,46 @@ class CatalogRepository internal constructor(
                 withPortrait(it, portrait)
             }
         )
+        vault.saveAnimations(vault.animations().filterKeys { it !in keys && it != "manual:$id" })
         vault.savePages(raw)
         val updated = combined(raw)
         mutablePages.value = updated
         portraits.protect(references(updated))
         portraits.retain(references(updated))
-        publish(updated, portraits)
+        publishCurrent(updated)
     }
 
     @Synchronized fun selectWatchPhoto(key: String, bytes: ByteArray) {
         val raw = combined(vault.pages(), false)
         val page = raw.single { it.key == key }
         portraits.protect(references(raw))
-        val portrait = portraits.normalize(bytes)
+        val previousAnimations = vault.animations()
+        animations.protect(previousAnimations.values.map { it.sha256 }.toSet())
+        val gif = if (bytes.size >= 6 &&
+            bytes.copyOfRange(0, 3).toString(Charsets.US_ASCII) == "GIF"
+        ) {
+            dev.quantumink.hermesgadget.protocol.GifPortrait.normalize(bytes)
+        } else {
+            null
+        }
+        val portrait = portraits.normalize(
+            gif?.let { dev.quantumink.hermesgadget.client.GifDecoder.firstFrame(it.bytes) } ?: bytes
+        )
+        val animation = gif?.let {
+            dev.quantumink.hermesgadget.protocol.AnimationDescriptor(
+                dev.quantumink.hermesgadget.client.AnimationCache.sha256(it.bytes),
+                it.bytes.size,
+                portrait.sha256
+            ).also { descriptor -> animations.stage(descriptor, it.bytes) }
+        }
         vault.saveOverrides(
             vault.overrides().filterNot {
                 it.key == key
             } + withPortrait(page, portrait)
+        )
+        vault.saveAnimations(
+            previousAnimations - key +
+                (animation?.let { mapOf(key to it) } ?: emptyMap())
         )
         invalidate()
         publishPictures(raw)
@@ -300,6 +329,7 @@ class CatalogRepository internal constructor(
         } ?: page.profile.id.takeIf { page.sourceId == "manual" }
         vault.saveFallbacks(vault.fallbacks().filterNot { it.profile.id == fallbackId })
         vault.saveOverrides(vault.overrides().filterNot { it.key == key })
+        vault.saveAnimations(vault.animations() - key)
         vault.savePages(raw)
         invalidate()
         publishPictures(raw)
@@ -310,7 +340,12 @@ class CatalogRepository internal constructor(
         mutablePages.value = effective
         portraits.protect(references(raw))
         portraits.retain(references(raw))
-        publish(effective, portraits)
+        publishCurrent(effective)
+    }
+
+    private fun publishCurrent(pages: List<CatalogPage>) {
+        publish(pages, portraits)
+        animations.retain(vault.animations().values.map { it.sha256 }.toSet())
     }
 
     private fun withPortrait(page: CatalogPage, portrait: PortraitDescriptor): CatalogPage =
@@ -327,6 +362,7 @@ class CatalogRepository internal constructor(
         require(previous.single { it.key == key }.status == CatalogStatus.WITHDRAWN)
         val remaining = previous.filterNot { it.key == key }
         vault.saveOverrides(vault.overrides().filterNot { it.key == key })
+        vault.saveAnimations(vault.animations() - key)
         retireFallbacks(remaining)
         val raw = combined(remaining, false)
         vault.savePages(raw)
@@ -335,7 +371,7 @@ class CatalogRepository internal constructor(
         invalidate()
         portraits.protect(references(pages))
         portraits.retain(references(pages))
-        publish(pages, portraits)
+        publishCurrent(pages)
     }
 
     /** Called after owner-confirmed removal from the independent phone setup vault. */
@@ -344,13 +380,14 @@ class CatalogRepository internal constructor(
         val raw = combined(vault.pages(), false)
         val retained = raw.map { it.key }.toSet()
         vault.saveOverrides(vault.overrides().filter { it.key in retained })
+        vault.saveAnimations(vault.animations().filterKeys { it in retained })
         vault.savePages(raw)
         val pages = combined(raw)
         mutablePages.value = pages
         invalidate()
         portraits.protect(references(pages))
         portraits.retain(references(pages))
-        publish(pages, portraits)
+        publishCurrent(pages)
     }
 
     private fun retireFallbacks(pages: List<CatalogPage>) {
@@ -371,7 +408,7 @@ class CatalogRepository internal constructor(
         val effective = combined(pages)
         mutablePages.value = effective
         invalidate()
-        publish(effective, portraits)
+        publishCurrent(effective)
     }
 
     @Synchronized fun moveSource(id: String, delta: Int) {
@@ -387,7 +424,7 @@ class CatalogRepository internal constructor(
         val effective = combined(pages)
         mutablePages.value = effective
         invalidate()
-        publish(effective, portraits)
+        publishCurrent(effective)
     }
 
     private fun combined(

@@ -3,6 +3,7 @@ package dev.quantumink.hermesgadget.mobile
 import android.graphics.Bitmap
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.quantumink.hermesgadget.client.AnimationCache
 import dev.quantumink.hermesgadget.protocol.CatalogPage
 import dev.quantumink.hermesgadget.protocol.CatalogProfile
 import dev.quantumink.hermesgadget.protocol.CatalogSource
@@ -26,7 +27,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class CatalogRepositoryTest {
     @Test fun explicitWatchPictureOverridesChangingBoxImageBeforeSetupAndAcrossRestart() {
-        fixture { context, vault, setup, portraits ->
+        fixture { context, vault, setup, portraits, animations ->
             vault.saveSources(
                 listOf(
                     CatalogSource("a", "Box", "https://a.example.invalid/catalog/v1", "synthetic")
@@ -41,6 +42,7 @@ class CatalogRepositoryTest {
                 vault,
                 setup,
                 portraits,
+                animations = animations,
                 fetchProfiles = fetch,
                 publish = { _, _ -> }
             )
@@ -65,6 +67,7 @@ class CatalogRepositoryTest {
                     vault,
                     setup,
                     portraits,
+                    animations = animations,
                     fetchProfiles = fetch,
                     publish = { _, _ -> }
                 )
@@ -91,7 +94,7 @@ class CatalogRepositoryTest {
     }
 
     @Test fun duplicateProfileIdsOnDifferentBoxesKeepSeparateWatchPictures() {
-        fixture { context, vault, setup, portraits ->
+        fixture { context, vault, setup, portraits, animations ->
             val box = portraits.normalize(photo(1))
             vault.savePages(
                 listOf("a", "b").map { source ->
@@ -105,7 +108,18 @@ class CatalogRepositoryTest {
                 }
             )
             val repository =
-                CatalogRepository(context, vault, setup, portraits, publish = { _, _ -> })
+                CatalogRepository(
+                    context,
+                    vault,
+                    setup,
+                    portraits,
+                    animations = animations,
+                    publish = {
+                            _,
+                            _
+                        ->
+                    }
+                )
             try {
                 repository.selectWatchPhoto("a:p", photo(2))
                 val pages = repository.savedPages().associateBy { it.key }
@@ -143,7 +157,7 @@ class CatalogRepositoryTest {
     }
 
     @Test fun phoneSetupPhotoTakesPriorityOverExistingBoxPortraitWithoutChangingEndpoint() {
-        fixture { context, vault, setup, portraits ->
+        fixture { context, vault, setup, portraits, animations ->
             val endpoint = Endpoint.parse("wss://agent.example.invalid/gadget")
             val profile = EndpointProfile(endpoint, "Agent", "syntheticSavedToken")
             setup.save(profile)
@@ -160,7 +174,18 @@ class CatalogRepositoryTest {
                 )
             )
             val repository =
-                CatalogRepository(context, vault, setup, portraits, publish = { _, _ -> })
+                CatalogRepository(
+                    context,
+                    vault,
+                    setup,
+                    portraits,
+                    animations = animations,
+                    publish = {
+                            _,
+                            _
+                        ->
+                    }
+                )
             try {
                 repository.selectPhoto(profile, photo(2))
                 org.junit.Assert.assertNotEquals(
@@ -194,9 +219,20 @@ class CatalogRepositoryTest {
     }
 
     @Test fun confirmedSetupRemovalReclaimsFallbackCapacityAcrossRestart() {
-        fixture { context, vault, setup, portraits ->
+        fixture { context, vault, setup, portraits, animations ->
             var repository =
-                CatalogRepository(context, vault, setup, portraits, publish = { _, _ -> })
+                CatalogRepository(
+                    context,
+                    vault,
+                    setup,
+                    portraits,
+                    animations = animations,
+                    publish = {
+                            _,
+                            _
+                        ->
+                    }
+                )
             try {
                 repeat(33) { index ->
                     val profile =
@@ -223,7 +259,18 @@ class CatalogRepositoryTest {
                     )
                     repository.close()
                     repository =
-                        CatalogRepository(context, vault, setup, portraits, publish = { _, _ -> })
+                        CatalogRepository(
+                            context,
+                            vault,
+                            setup,
+                            portraits,
+                            animations = animations,
+                            publish = {
+                                    _,
+                                    _
+                                ->
+                            }
+                        )
                 }
             } finally {
                 repository.close()
@@ -232,7 +279,7 @@ class CatalogRepositoryTest {
     }
 
     @Test fun sourceReferenceKeepsFallbackUntilConfirmedCardRetirement() {
-        fixture { context, vault, setup, portraits ->
+        fixture { context, vault, setup, portraits, animations ->
             val profile =
                 EndpointProfile(Endpoint.parse("wss://agent.example.invalid/gadget"), "Agent", "")
             setup.save(profile)
@@ -248,7 +295,18 @@ class CatalogRepositoryTest {
                 )
             )
             val repository =
-                CatalogRepository(context, vault, setup, portraits, publish = { _, _ -> })
+                CatalogRepository(
+                    context,
+                    vault,
+                    setup,
+                    portraits,
+                    animations = animations,
+                    publish = {
+                            _,
+                            _
+                        ->
+                    }
+                )
             try {
                 repository.selectPhoto(profile, photo(1))
                 val chosen = requireNotNull(repository.savedPages().single().profile.portrait)
@@ -315,7 +373,7 @@ class CatalogRepositoryTest {
     }
 
     @Test fun ownerFallbackSurvivesPortraitlessRefreshAndRestart() {
-        fixture { context, vault, setup, portraits ->
+        fixture { context, vault, setup, portraits, animations ->
             val endpoint = Endpoint.parse("wss://synthetic.example.invalid/gadget")
             val profile = EndpointProfile(endpoint, "Agent", "")
             setup.save(profile)
@@ -336,6 +394,7 @@ class CatalogRepositoryTest {
                     vault,
                     setup,
                     portraits,
+                    animations = animations,
                     fetchProfiles = fetch,
                     publish = {
                             _,
@@ -383,6 +442,7 @@ class CatalogRepositoryTest {
                         vault,
                         setup,
                         portraits,
+                        animations = animations,
                         fetchProfiles = fetch,
                         publish = {
                                 _,
@@ -403,7 +463,7 @@ class CatalogRepositoryTest {
     }
 
     @Test fun healthyPartialRosterReachesPublicationBeforeSlowBoxFinishes() {
-        fixture { context, vault, setup, portraits ->
+        fixture { context, vault, setup, portraits, animations ->
             vault.saveSources(
                 listOf("a", "b").map {
                     CatalogSource(
@@ -417,12 +477,20 @@ class CatalogRepositoryTest {
             val release = CountDownLatch(1)
             val published = CountDownLatch(1)
             val repository =
-                CatalogRepository(context, vault, setup, portraits, fetchProfiles = { source ->
-                    if (source.id == "b") release.await(3, TimeUnit.SECONDS)
-                    listOf(CatalogProfile("p", "Agent", null, null))
-                }, publish = { pages, _ ->
-                    if (pages.any { it.sourceId == "a" }) published.countDown()
-                })
+                CatalogRepository(
+                    context,
+                    vault,
+                    setup,
+                    portraits,
+                    animations = animations,
+                    fetchProfiles = { source ->
+                        if (source.id == "b") release.await(3, TimeUnit.SECONDS)
+                        listOf(CatalogProfile("p", "Agent", null, null))
+                    },
+                    publish = { pages, _ ->
+                        if (pages.any { it.sourceId == "a" }) published.countDown()
+                    }
+                )
             try {
                 val result = repository.refresh(true)
                 assertTrue(published.await(1, TimeUnit.SECONDS))
@@ -437,7 +505,7 @@ class CatalogRepositoryTest {
     }
 
     @Test fun corruptSourceImageKeepsLastCommittedPortraitDuringCleanup() {
-        fixture { context, vault, setup, portraits ->
+        fixture { context, vault, setup, portraits, animations ->
             val source =
                 CatalogSource("a", "Box", "https://a.example.invalid/catalog/v1", "synthetic")
             vault.saveSources(listOf(source))
@@ -466,6 +534,7 @@ class CatalogRepositoryTest {
                 vault,
                 setup,
                 portraits,
+                animations = animations,
                 fetchProfiles = { listOf(CatalogProfile("p", "Agent", null, invalid)) },
                 fetchPortrait = { _, _, _ -> byteArrayOf(1, 2, 3) },
                 publish = { _, _ -> }
@@ -481,7 +550,7 @@ class CatalogRepositoryTest {
     }
 
     @Test fun confirmedRetirementFreesHistoricalCapacityWithoutChangingSetup() {
-        fixture { context, vault, setup, portraits ->
+        fixture { context, vault, setup, portraits, animations ->
             val endpoint = Endpoint.parse("wss://retained.example.invalid/gadget")
             setup.save(EndpointProfile(endpoint, "Agent", "syntheticSavedToken"))
             val source =
@@ -514,6 +583,7 @@ class CatalogRepositoryTest {
                 vault,
                 setup,
                 portraits,
+                animations = animations,
                 fetchProfiles = { listOf(CatalogProfile("new", "Replacement", null, null)) },
                 publish = { _, _ -> }
             )
@@ -532,7 +602,13 @@ class CatalogRepositoryTest {
     }
 
     private fun fixture(
-        block: (android.content.Context, CatalogVault, ProfileVault, PortraitStore) -> Unit
+        block: (
+            android.content.Context,
+            CatalogVault,
+            ProfileVault,
+            PortraitStore,
+            AnimationCache
+        ) -> Unit
     ) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val id = UUID.randomUUID().toString()
@@ -543,7 +619,8 @@ class CatalogRepositoryTest {
                 context,
                 CatalogVault(context, File(directory, "vault"), aliases[0]),
                 ProfileVault(context, File(directory, "setup"), aliases[1]),
-                PortraitStore(File(directory, "portraits"))
+                PortraitStore(File(directory, "portraits")),
+                AnimationCache(File(directory, "animations"))
             )
         } finally {
             directory.deleteRecursively()

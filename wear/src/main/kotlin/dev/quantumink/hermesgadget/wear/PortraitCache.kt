@@ -13,6 +13,38 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /** Only a verified transfer changes a page's last good fallback portrait. */
 class PortraitCache(private val directory: File) {
+    private var roster: Set<String>? = null
+    private var epoch = 0L
+    private var accepting = true
+
+    private fun admitted(page: String): Boolean =
+        accepting && (roster == null || page in roster.orEmpty())
+
+    /** Capture admission before remote IO; promotion rechecks it under the retirement lock. */
+    @Synchronized fun admission(page: String): Long? = if (admitted(page)) epoch else null
+
+    fun fetchAndStore(
+        page: String,
+        descriptor: PortraitDescriptor,
+        admission: Long? = null,
+        fetch: () -> ByteArray?
+    ): Boolean {
+        val request = synchronized(this) {
+            if (!admitted(page) || (admission != null && admission != epoch)) return false
+            epoch
+        }
+        val bytes = fetch() ?: return false
+        return synchronized(this) {
+            if (request != epoch || !admitted(page)) return false
+            store(page, descriptor, bytes)
+            true
+        }
+    }
+
+    @Synchronized fun invalidateRequests() {
+        epoch++
+        accepting = false
+    }
     private fun hash(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") {
             "%02x".format(it)
@@ -62,9 +94,10 @@ class PortraitCache(private val directory: File) {
 
     @Synchronized fun store(page: String, descriptor: PortraitDescriptor, bytes: ByteArray) {
         require(page.matches(Regex("[A-Za-z0-9_-]{1,64}:[A-Za-z0-9_-]{1,64}")))
+        require(admitted(page)) { "Portrait page has been retired." }
         require(bytes.size == descriptor.bytes && hash(bytes) == descriptor.sha256)
         bitmap(bytes).recycle()
-        val index = index().toMutableMap()
+        val index = index().filterKeys { roster == null || it in roster.orEmpty() }.toMutableMap()
         require(page in index || index.size < 32)
         write(File(directory, descriptor.sha256 + ".png"), bytes)
         index[page] = descriptor.sha256
@@ -76,12 +109,20 @@ class PortraitCache(private val directory: File) {
                 }
             ).toString().toByteArray()
         )
-        retain(index.keys)
+        trim(index.keys)
     }
 
-    @Synchronized fun currentHash(page: String): String? = index()[page]
+    @Synchronized fun currentHash(page: String): String? = if (admitted(
+            page
+        )
+    ) {
+        index()[page]
+    } else {
+        null
+    }
 
     @Synchronized fun load(page: String): Bitmap? = runCatching {
+        if (!admitted(page)) return null
         val id = index()[page] ?: return null
         val file = File(directory, "$id.png")
         require(file.length() in 1..ProfileCatalog.MAX_PORTRAIT_BYTES)
@@ -91,6 +132,17 @@ class PortraitCache(private val directory: File) {
     }.getOrNull()
 
     @Synchronized fun retain(pages: Set<String>) {
+        require(
+            pages.size <= 32 &&
+                pages.all { it.matches(Regex("[A-Za-z0-9_-]{1,64}:[A-Za-z0-9_-]{1,64}")) }
+        )
+        epoch++
+        accepting = true
+        roster = pages.toSet()
+        trim(pages)
+    }
+
+    private fun trim(pages: Set<String>) {
         val index = index().filterKeys { it in pages }
         write(
             File(directory, "index"),
@@ -121,6 +173,8 @@ class PortraitCache(private val directory: File) {
     }
 
     @Synchronized fun reset() {
+        epoch++
+        roster = emptySet()
         if (directory.exists()) check(directory.deleteRecursively())
     }
 }
