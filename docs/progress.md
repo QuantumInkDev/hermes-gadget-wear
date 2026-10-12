@@ -1,5 +1,14 @@
 # Progress
 
+## Phone text contrast correction — 2026-10-11
+
+The maintainer reported black text over the dark companion background. The shared activity
+now uses a Material Surface with an explicit light content color, so profile, discovery and
+speech instructions inherit readable text. Strict checks and the phone APK build passed;
+the JVM reports contain 71 tests with zero failures/errors/skips. The matching-signature
+update preserved existing app storage, and the maintainer confirmed the text is readable
+on the physical phone. Portrait selection and live watch setup continue below.
+
 ## Portrait overrides and authorized live setup — 2026-10-11
 
 The maintainer requested a private export of all portraits and an exact regeneration prompt,

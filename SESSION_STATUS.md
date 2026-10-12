@@ -1,5 +1,15 @@
 # Session status
 
+Physical setup is ongoing: all three catalog sources are entered on the authorized phone,
+all 18 round picture overrides were selected through the native picker and verified in
+portrait storage, and the watch received the actual 19-page catalog/approved-profile roster.
+Two new profile approvals have been observed Ready over Phone relay with watch TLS; the
+remaining enrollment and fresh cellular/background test are in progress. The shared phone
+Surface text-color fix passes strict checks and is installed with the matching local signature;
+the maintainer confirms readability. The watch timeout is temporarily extended for setup;
+restore it to the recorded baseline before handback. Current private receipts and device
+addresses are in `.local/profile-carousel/round-portraits/` and `physical-watch/`.
+
 ## Current continuation — portraits and live setup, 2026-10-11
 
 The maintainer requested all original portraits in one private folder, a precise round-image

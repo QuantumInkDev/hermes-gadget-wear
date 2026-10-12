@@ -12,7 +12,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.getValue
@@ -81,64 +81,77 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 val status by RelaySettings.status.collectAsStateWithLifecycle()
-                Column(
-                    Modifier.fillMaxSize().background(Color(0xFF11170F))
-                        .verticalScroll(
-                            rememberScrollState()
-                        ).padding(horizontal = 28.dp, vertical = 64.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = Color(0xFF11170F),
+                    contentColor = MaterialTheme.colorScheme.onSurface
                 ) {
-                    if (profilesPage) {
-                        ProfilesPage(this@MainActivity) { profilesPage = false }
-                    } else if (speechPage) {
-                        SpeechSettingsPage(this@MainActivity) { speechPage = false }
-                    } else {
-                        Button({ profilesPage = true }) {
-                            Text(stringResource(R.string.profiles_title))
-                        }
-                        Button({
-                            speechPage = true
-                        }) { Text(stringResource(R.string.speech_title)) }
-                        Text(
-                            stringResource(R.string.gadget_title),
-                            color = Color(0xFFB6ED93),
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                        Text(
-                            stringResource(R.string.setup_title),
-                            color = Color(0xFFF0F3EB),
-                            style = MaterialTheme.typography.headlineLarge
-                        )
-                        Text(stringResource(R.string.relay_tls_hint), color = Color(0xFFBEC7B7))
-                        Text(stringResource(R.string.relay_vpn_hint), color = Color(0xFFBEC7B7))
-                        Button(onClick = {
-                            if (enabled) {
-                                RelaySettings.setEnabled(this@MainActivity, false)
-                                enabled = false
-                            } else {
-                                requestRelay()
+                    Column(
+                        Modifier.fillMaxSize()
+                            .verticalScroll(
+                                rememberScrollState()
+                            ).padding(horizontal = 28.dp, vertical = 64.dp),
+                        verticalArrangement = Arrangement.spacedBy(24.dp)
+                    ) {
+                        if (profilesPage) {
+                            ProfilesPage(this@MainActivity) { profilesPage = false }
+                        } else if (speechPage) {
+                            SpeechSettingsPage(this@MainActivity) { speechPage = false }
+                        } else {
+                            Button({ profilesPage = true }) {
+                                Text(stringResource(R.string.profiles_title))
                             }
-                        }) {
+                            Button({
+                                speechPage = true
+                            }) { Text(stringResource(R.string.speech_title)) }
                             Text(
-                                stringResource(
-                                    if (enabled) R.string.disable_relay else R.string.enable_relay
-                                )
+                                stringResource(R.string.gadget_title),
+                                color = Color(0xFFB6ED93),
+                                style = MaterialTheme.typography.labelLarge
                             )
+                            Text(
+                                stringResource(R.string.setup_title),
+                                color = Color(0xFFF0F3EB),
+                                style = MaterialTheme.typography.headlineLarge
+                            )
+                            Text(stringResource(R.string.relay_tls_hint), color = Color(0xFFBEC7B7))
+                            Text(stringResource(R.string.relay_vpn_hint), color = Color(0xFFBEC7B7))
+                            Button(onClick = {
+                                if (enabled) {
+                                    RelaySettings.setEnabled(this@MainActivity, false)
+                                    enabled = false
+                                } else {
+                                    requestRelay()
+                                }
+                            }) {
+                                Text(
+                                    stringResource(
+                                        if (enabled) {
+                                            R.string.disable_relay
+                                        } else {
+                                            R.string.enable_relay
+                                        }
+                                    )
+                                )
+                            }
+                            Button(onClick = ::associateWatch) {
+                                Text(stringResource(R.string.associate_watch))
+                            }
+                            Text(
+                                stringResource(R.string.association_hint),
+                                color = Color(0xFFBEC7B7)
+                            )
+                            Button(onClick = {
+                                RelaySettings.stop()
+                            }) { Text(stringResource(R.string.stop_relay)) }
+                            Text(
+                                status.ifBlank {
+                                    getString(R.string.relay_idle)
+                                },
+                                color = Color(0xFFB6ED93)
+                            )
+                            Text(stringResource(R.string.privacy_note), color = Color(0xFFBEC7B7))
                         }
-                        Button(onClick = ::associateWatch) {
-                            Text(stringResource(R.string.associate_watch))
-                        }
-                        Text(stringResource(R.string.association_hint), color = Color(0xFFBEC7B7))
-                        Button(onClick = {
-                            RelaySettings.stop()
-                        }) { Text(stringResource(R.string.stop_relay)) }
-                        Text(
-                            status.ifBlank {
-                                getString(R.string.relay_idle)
-                            },
-                            color = Color(0xFFB6ED93)
-                        )
-                        Text(stringResource(R.string.privacy_note), color = Color(0xFFBEC7B7))
                     }
                 }
             }

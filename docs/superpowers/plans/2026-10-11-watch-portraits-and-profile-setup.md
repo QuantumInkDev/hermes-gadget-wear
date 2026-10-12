@@ -27,3 +27,7 @@ outside this change.
 5. Run strict checks, relevant owned-device tests and secret/private-value checks. Preserve
    personal installation signatures and identities if updating/testing the devices. Record
    what passed and what still needs a device/user/server prerequisite.
+6. During physical setup, fix the reported dark text on the phone's dark background by
+   providing the shared Material content color at the activity surface. Build and install
+   the update with the same signing certificate, preserving catalog choices and identities,
+   then continue portrait selection, watch enrollment and cellular relay verification.
