@@ -1,24 +1,27 @@
-<!-- Current continuation: 2026-10-12 native Tasks 1–5 reviewed; Task 6 phone tile editor/sync next. All 18 owner GIF imports and stable watch assignments verified; selected-watch motion confirmed. Timeouts restored. Owner may be walking with devices; new native builds await final review/delivery. Recovery ledger: .superpowers/sdd/2026-10-12-native-client-design/progress.md. -->
+<!-- Current continuation: 2026-10-12 safe dog-walk checkpoint. Native Tasks 1–5 reviewed; Task 6 implemented at 5aa0d3b but review requires a concurrent local/phone pin-edit fix. Resume original Task 6 implementer for fix round 1, then scoped re-review before Task 7. All 18 owner GIF imports and stable watch assignments verified; selected-watch motion confirmed. Both timeouts restored; no physical operation or child task running. New native builds await final review/delivery. Recovery ledger: .superpowers/sdd/2026-10-12-native-client-design/progress.md. -->
 # Session status
 
-Native redesign approved, 2026-10-12: implement Portrait Studio and original Voice Q,
-Light/Dark/Electronic Moonlight, the swipe-first watch picker without Previous/Next,
-and one/four-profile tiles. Task 1 shared appearance preferences/adapters and original
-icon resources are committed (c3381bd); strict full checks/build, 107 JVM tests and
-11 initial owned-emulator appearance tests pass. Review found an ambient return-state
-regression and forbidden production-activity capture-test flag changes; fix 838351c
-addresses both and native selected radio semantics. Fourteen affected native tests,
-strict affected checks/build and release-host exclusion checks pass. Scoped re-review
-is clean.
-Task 2 portrait directory/native navigation is committed (0696683), with scoped review
-clean. Nineteen native/13 JVM checks pass, with actual320dp/font1.8 menu/details/scroll
-rendering and emulator settings restored. Task 3 phone conversations/settings/dashboard and real audio waveforms are committed
-(f8de6c3); strict mobile checks, 13 JVM, five stock TLS/playback, five presentation,
-eight directory and seven appearance cases pass. Actual320dp/font1.8 keyboard/Send
-checks pass; settings restored. Scoped review is running. Tasks 4–7 remain pending.
-No redesigned physical build is installed yet. Eighteen supplied bounded GIFs are
-validated/matched/staged in .local/native-design/animated-portraits/. Native phone
-picker import is in progress; original files remain unchanged. The approved
+Native redesign approved, 2026-10-12: Portrait Studio, original Voice Q,
+Light/Dark/Electronic Moonlight, swipe-first watch picker without Previous/Next,
+and one/four-profile tiles. Tasks 1–5 are implemented with clean scoped reviews,
+including theme persistence, native phone directory/conversations, real capture/playback
+waveforms, watch picker, durable static tiles and guarded profile launches.
+
+Task 6 phone tile composer/synchronization is committed at 5aa0d3b. Twenty-two affected
+JVM tests, five native cases across all three themes and strict affected checks pass.
+Review found an Important lost-update path: an already-open watch pin editor can restore
+stale untouched fields after a phone edit. Resume /root/native_phone_tile_sync for fix
+round 1 using task-6-review.md, then run a fresh scoped re-review. Task 6 is not complete.
+Actual associated Data Layer delivery is also unverified: the owned emulator returned
+Wearable.API API_UNAVAILABLE. Task 7 final whole-branch checks/review, native artifacts
+and preserving physical delivery remain pending.
+
+Safe dog-walk checkpoint: no physical operation or child task is running. All eighteen
+normal owner GIF assignments match every source frame and the correct watch profile
+keys; selected-watch motion is verified. Phone timeout is restored to five minutes and
+watch timeout to its original fifteen seconds. Personal receipts are ignored under
+.local/native-design/. Physical devices retain b724231; the new native redesign and
+tiles are not installed. Walk observations apply to that existing build. The approved
 [design](docs/superpowers/specs/2026-10-12-native-client-design.md),
 [plan](docs/superpowers/plans/2026-10-12-native-client-design.md) and native receipts
 are the continuation map. SDD recovery ledger: .superpowers/sdd/2026-10-12-native-client-design/progress.md.

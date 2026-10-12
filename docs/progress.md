@@ -569,3 +569,17 @@ launches and recording/approval/busy deferral. Review found an unavailable-route
 regression; d44e968 fixes it with actual Light/Dark sleep/wake output coverage. Strict
 Wear checks and scoped re-review pass. Phone pin configuration/synchronization and final
 whole-branch review/delivery are next. Physical tile addition, taps and battery remain open.
+
+
+Safe dog-walk checkpoint — 2026-10-12: all eighteen owner GIF assignments and stable
+watch profile mappings are verified, selected-watch motion is visible, and both original
+screen timeouts are restored. No physical operation or child task remains running.
+Physical devices retain b724231, so walk observations exercise the existing GIF/relay
+build; redesigned layouts and tiles await delivery.
+
+Task 6 native phone tile configuration/sync is implemented at 5aa0d3b, with twenty-two
+affected JVM tests, five native cases and strict affected checks passing. Scoped review
+requires a fix for stale watch editor fields overwriting accepted phone edits. Resume
+the original implementer for fix round 1 and a fresh scoped re-review before Task 7.
+Actual associated Data Layer delivery remains open after the owned-emulator API_UNAVAILABLE
+probe. No final native physical, battery or release acceptance is claimed.
