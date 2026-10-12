@@ -225,7 +225,11 @@ fun ProfileCarousel(
             Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp)
         )
     }
-    if (navigation.pickerOpen.value) {
+    if (navigation.pickerOpen.value && navigation.pinKey.value != null) {
+        ProfilePinEditor(pages, requireNotNull(navigation.pinKey.value), locked) {
+            navigation.pinKey.value = null
+        }
+    } else if (navigation.pickerOpen.value) {
         ProfilePicker(
             pages,
             // A refreshed catalog can precede the pager's position reconciliation.
@@ -234,7 +238,8 @@ fun ProfileCarousel(
             }.orEmpty(),
             locked,
             select = { key -> if (select(key)) navigation.pickerOpen.value = false },
-            close = { navigation.pickerOpen.value = false }
+            close = { navigation.pickerOpen.value = false },
+            pin = { navigation.pinKey.value = it }
         )
     }
 }

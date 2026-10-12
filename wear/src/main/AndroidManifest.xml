@@ -37,10 +37,16 @@
             android:exported="false"
             android:foregroundServiceType="microphone|mediaPlayback" />
         <service android:name=".GadgetTileService" android:label="@string/tile_name"
-            android:icon="@drawable/ic_gadget" android:exported="true"
+            android:icon="@drawable/quantumink_relay_monochrome" android:exported="true"
             android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
             <intent-filter><action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" /></intent-filter>
             <meta-data android:name="androidx.wear.tiles.PREVIEW" android:resource="@drawable/tile_preview" />
+        </service>
+        <service android:name=".PinnedProfilesTileService" android:label="@string/pinned_profiles_tile_name"
+            android:icon="@drawable/quantumink_relay_monochrome" android:exported="true"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter><action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" /></intent-filter>
+            <meta-data android:name="androidx.wear.tiles.PREVIEW" android:resource="@drawable/pinned_profiles_tile_preview" />
         </service>
         <service android:name=".GadgetComplication" android:label="@string/complication_name"
             android:icon="@drawable/ic_complication" android:exported="true"

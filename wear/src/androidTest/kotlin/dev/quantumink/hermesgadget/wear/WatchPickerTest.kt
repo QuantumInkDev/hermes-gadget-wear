@@ -113,7 +113,7 @@ class WatchPickerTest {
             assertEquals(pages[16].key, service.state.value.selectedPage)
             node("Profile 17 of 18", scroll = false)
             click("Choose a profile")
-            assertTrue(nodes().none { it.text?.toString()?.startsWith("Pin ") == true })
+            assertTrue(nodes().any { it.text?.toString()?.startsWith("Pin ") == true })
             if (shrink) {
                 instrumentation.runOnMainSync { catalog.value = listOf(pages.first(), pages[16]) }
                 instrumentation.waitForIdleSync()
@@ -173,21 +173,47 @@ class WatchPickerTest {
     }
 
     private fun node(label: String, scroll: Boolean = true): AccessibilityNodeInfo {
-        repeat(35) {
+        repeat(70) {
             val all = nodes()
             all.firstOrNull {
                 it.isVisibleToUser &&
                     (it.text?.toString() == label || it.contentDescription?.toString() == label)
             }?.let { return it }
-            if (scroll) {
-                all.firstOrNull {
-                    it.isScrollable && it.isFocused
-                }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
-            }
+            if (scroll) scrollPicker()
             instrumentation.waitForIdleSync()
             SystemClock.sleep(100)
         }
         error("Watch picker control missing: $label")
+    }
+
+    private fun scrollPicker() {
+        // A full accessibility page jump can skip a transformed row between pin controls.
+        // Small native touch steps prove every row is physically reachable at large type.
+        val display = context.resources.displayMetrics
+        val start = SystemClock.uptimeMillis()
+        for (step in 0..8) {
+            val action = when (step) {
+                0 -> MotionEvent.ACTION_DOWN
+                8 -> MotionEvent.ACTION_UP
+                else -> MotionEvent.ACTION_MOVE
+            }
+            if (step == 8) SystemClock.sleep(150)
+            val event = MotionEvent.obtain(
+                start,
+                SystemClock.uptimeMillis(),
+                action,
+                display.widthPixels * 0.5f,
+                display.heightPixels * (0.7f - minOf(step, 7) * 0.035f),
+                0
+            )
+            event.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+            try {
+                assertTrue(instrumentation.uiAutomation.injectInputEvent(event, true))
+            } finally {
+                event.recycle()
+            }
+            SystemClock.sleep(40)
+        }
     }
 
     private fun tapRoundPicker() {

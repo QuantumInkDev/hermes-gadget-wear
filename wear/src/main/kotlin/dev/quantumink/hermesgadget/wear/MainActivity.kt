@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
     private var gadget by mutableStateOf<GadgetService?>(null)
     private var bound = false
     private val navigation = WatchNavigation()
+    private val tileLaunch = TileProfileLaunch()
     private val networkPermissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { gadget?.connect() }
@@ -76,6 +77,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val launchIntent = savedInstanceState?.getString("pendingTileKey")?.let {
+            Intent().putExtra(TileProfileLaunch.EXTRA_PAGE_KEY, it)
+        } ?: intent
+        tileLaunch.receive(launchIntent)
+        intent.removeExtra(TileProfileLaunch.EXTRA_PAGE_KEY)
         setContent {
             val ambientManager = rememberAmbientModeManager()
             CompositionLocalProvider(LocalAmbientModeManager provides ambientManager) {
@@ -94,8 +100,30 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     val service = gadget
-                    if (service == null) {
+                    val watch = service?.state?.collectAsStateWithLifecycle()?.value
+                    LaunchedEffect(service, watch, tileLaunch.pendingKey) {
+                        if (service != null && watch != null) reconcileTile(service)
+                    }
+                    if (service == null ||
+                        (tileLaunch.pendingKey != null && !tileLaunch.deferred)
+                    ) {
                         WaitingScreen()
+                    } else if (tileLaunch.unavailable) {
+                        RoundPage {
+                            item { Heading("Profile unavailable") }
+                            item {
+                                Body(
+                                    "This tile's profile was removed or is not in the local roster."
+                                )
+                            }
+                            item {
+                                Secondary("Choose a profile", {
+                                    tileLaunch.clear()
+                                    navigation.route.value = "home"
+                                    navigation.pickerOpen.value = true
+                                })
+                            }
+                        }
                     } else if (ambient != null) {
                         val pictures = remember(service) {
                             service.state.map { watch ->
@@ -125,6 +153,23 @@ class MainActivity : ComponentActivity() {
                             artwork.second
                         )
                     } else {
+                        if (tileLaunch.notice.isNotEmpty()) {
+                            androidx.compose.ui.window.Dialog(
+                                onDismissRequest = tileLaunch::dismissNotice
+                            ) {
+                                RoundPage {
+                                    item { Heading("Profile waiting") }
+                                    item { Body(tileLaunch.notice) }
+                                    item {
+                                        Secondary(
+                                            "Continue current turn",
+                                            tileLaunch::dismissNotice
+                                        )
+                                    }
+                                    item { Secondary("Cancel switch", tileLaunch::clear) }
+                                }
+                            }
+                        }
                         WatchScreen(
                             service = service,
                             connect = ::requestConnection,
@@ -141,6 +186,30 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    private fun reconcileTile(service: GadgetService) {
+        tileLaunch.reconcile(service.state.value) { key ->
+            service.rememberPage(key)
+            navigation.page.value = key
+            navigation.route.value = "home"
+            navigation.pickerOpen.value = false
+            navigation.pinKey.value = null
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        tileLaunch.receive(intent)
+        intent.removeExtra(TileProfileLaunch.EXTRA_PAGE_KEY)
+        setIntent(intent)
+        gadget?.let(::reconcileTile)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        val pending = tileLaunch.pendingKey ?: if (tileLaunch.unavailable) "" else null
+        pending?.let { outState.putString("pendingTileKey", it) }
+        super.onSaveInstanceState(outState)
     }
 
     override fun onStart() {

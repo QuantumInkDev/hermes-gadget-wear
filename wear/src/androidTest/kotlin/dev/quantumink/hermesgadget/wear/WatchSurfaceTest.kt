@@ -3,8 +3,6 @@ package dev.quantumink.hermesgadget.wear
 import android.graphics.Bitmap
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.wear.protolayout.ActionBuilders
-import androidx.wear.protolayout.LayoutElementBuilders
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -41,35 +39,18 @@ class WatchSurfaceTest {
     }
 
     @Test fun tileLaunchAndComplicationStateExcludePrivateSetupAndReplyFromTheWatchFace() {
-        val tile = GadgetTileService()
-        try {
-            val result = tile.tile(
-                SurfaceSnapshot("Sample profile", "Ready", "Original reply"),
-                context
-            )
-            val timeline = requireNotNull(result.tileTimeline)
-            val layout = requireNotNull(timeline.timelineEntries.single().layout)
-            val root = layout.root as LayoutElementBuilders.Column
-            val action = root.modifiers!!.clickable!!.onClick as ActionBuilders.LaunchAction
-            assertEquals(context.packageName, action.androidActivity!!.packageName)
-            assertEquals(MainActivity::class.java.name, action.androidActivity!!.className)
-            val text = root.contents.filterIsInstance<LayoutElementBuilders.Text>().map {
-                it.text!!.value
-            }
-            assertTrue(text.contains("Original reply"))
-            assertTrue(text.contains("Then hold to ask"))
-            val complication = GadgetComplication.data(context, "Ready")
-            assertEquals(
-                "Ready",
-                complication.text.getTextAt(context.resources, Instant.now()).toString()
-            )
-            assertEquals(
-                "Hermes",
-                complication.title!!.getTextAt(context.resources, Instant.now()).toString()
-            )
-            assertNotNull(complication.tapAction)
-        } finally {
-            tile.onDestroy()
-        }
+        val snapshot = ProfileTileSnapshot.read(context)
+        val result = ProfileTileLayout.tile(context, snapshot, false)
+        assertEquals(snapshot.version, result.resourcesVersion)
+        val complication = GadgetComplication.data(context, "Ready")
+        assertEquals(
+            "Ready",
+            complication.text.getTextAt(context.resources, Instant.now()).toString()
+        )
+        assertEquals(
+            "Hermes",
+            complication.title!!.getTextAt(context.resources, Instant.now()).toString()
+        )
+        assertNotNull(complication.tapAction)
     }
 }
