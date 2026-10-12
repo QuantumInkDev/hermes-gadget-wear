@@ -1,6 +1,7 @@
 # Animated watch-picture overrides
 
-Status: approved final stage of the client-usability follow-up, 2026-10-12; not implemented.
+Status: implemented and software-verified final stage, 2026-10-12. Physical animation
+power/quality acceptance remains open; see [progress](../../progress.md).
 
 ## Contract
 

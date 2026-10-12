@@ -14,8 +14,10 @@ import dev.quantumink.hermesgadget.protocol.ConversationState
 import dev.quantumink.hermesgadget.protocol.DirectConnection
 import dev.quantumink.hermesgadget.protocol.EndpointProfile
 import dev.quantumink.hermesgadget.protocol.Protocol
+import dev.quantumink.hermesgadget.protocol.RecordingFeedback
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -24,6 +26,8 @@ import kotlinx.serialization.json.put
 import okhttp3.OkHttpClient
 
 data class PhoneConversationState(
+    val sessionVersion: Long = 0,
+    val playbackVersion: Long = 0,
     val profile: EndpointProfile? = null,
     val page: dev.quantumink.hermesgadget.protocol.CatalogPage? = null,
     val connection: ConnectionState = ConnectionState(),
@@ -40,16 +44,22 @@ data class PhoneConversationState(
 class PhoneConversation @JvmOverloads constructor(
     application: Application,
     private val vault: ConversationVault = ConversationVault(application),
-    private val httpClient: OkHttpClient? = null
+    private val httpClient: OkHttpClient? = null,
+    private val playbackFactory: (android.content.Context, () -> Unit, () -> Unit) -> PcmPlayback =
+        { context, interrupted, finished ->
+            PcmPlayback(context, onInterrupted = interrupted, onFinished = finished)
+        }
 ) : AndroidViewModel(application) {
     private class Saved(var draft: String = "", var reply: String = "")
     private val saved = LinkedHashMap<String, Saved>()
     private val mutable = MutableStateFlow(PhoneConversationState())
     val state = mutable.asStateFlow()
     private var epoch = 0L
+    private var playbackVersion = 0L
     private var connection: DirectConnection? = null
     private var capture: PcmCapture? = null
     private var playback: PcmPlayback? = null
+    private var recordingFeedback: RecordingFeedback? = null
     private val cues = RecordingCues(application)
 
     @Synchronized fun open(
@@ -60,6 +70,7 @@ class PhoneConversation @JvmOverloads constructor(
         if (profile.endpoint.url !in saved && saved.size >= 32) saved.remove(saved.keys.first())
         val previous = saved.getOrPut(profile.endpoint.url) { Saved() }
         mutable.value = PhoneConversationState(
+            sessionVersion = epoch,
             profile = profile,
             page = page,
             draft = previous.draft,
@@ -72,7 +83,7 @@ class PhoneConversation @JvmOverloads constructor(
         val profile = mutable.value.profile ?: return
         val bounded = value.take(8192)
         saved.getValue(profile.endpoint.url).draft = bounded
-        mutable.value = mutable.value.copy(draft = bounded)
+        mutable.update { it.copy(draft = bounded) }
     }
 
     /** Called only by the reviewed endpoint's Connect control. No discovery enrollment. */
@@ -100,27 +111,19 @@ class PhoneConversation @JvmOverloads constructor(
         val version = ++epoch
         val microphone = PcmCapture(getApplication())
         capture = microphone
-        val speaker = PcmPlayback(
-            getApplication(),
-            onInterrupted = {
-                synchronized(this) {
-                    if (active(version)) connection?.report("Playback interrupted.")
-                }
-            },
-            onFinished = {
-                synchronized(this) {
-                    if (active(version)) mutable.value = mutable.value.copy(speaking = false)
-                }
+        val feedback = RecordingFeedback { finished ->
+            synchronized(this) {
+                if (active(version)) cues.play(if (finished) Cue.FINISH else Cue.CANCEL)
             }
-        )
-        playback = speaker
+        }
+        recordingFeedback = feedback
         val observer = object : ConnectionObserver {
             override fun stateChanged(state: ConnectionState) =
                 synchronized(this@PhoneConversation) {
                     if (active(version)) {
                         saved.getValue(profile.endpoint.url).reply =
                             state.conversation.reply.take(32768)
-                        mutable.value = mutable.value.copy(connection = state)
+                        mutable.update { it.copy(connection = state) }
                     }
                 }
             override fun effect(effect: ConversationEffect, generation: Long) =
@@ -128,54 +131,72 @@ class PhoneConversation @JvmOverloads constructor(
                     if (!active(version)) return@synchronized
                     val socket = connection ?: return@synchronized
                     when (effect) {
-                        is ConversationEffect.CaptureStart -> microphone.start(
-                            onFrame = { bytes ->
-                                synchronized(this@PhoneConversation) {
-                                    if (active(version)) socket.captured(effect.token, bytes)
-                                }
-                            },
-                            onFailure = {
-                                synchronized(this@PhoneConversation) {
-                                    if (active(
-                                            version
-                                        )
-                                    ) {
-                                        socket.captureFailed(
-                                            effect.token,
-                                            "Microphone unavailable."
-                                        )
+                        is ConversationEffect.CaptureStart -> {
+                            feedback.begin(effect.token)
+                            microphone.start(
+                                onFrame = { bytes ->
+                                    synchronized(this@PhoneConversation) {
+                                        if (active(version)) socket.captured(effect.token, bytes)
+                                    }
+                                },
+                                onFailure = {
+                                    synchronized(this@PhoneConversation) {
+                                        if (active(
+                                                version
+                                            )
+                                        ) {
+                                            socket.captureFailed(
+                                                effect.token,
+                                                "Microphone unavailable."
+                                            )
+                                        }
+                                    }
+                                },
+                                onStarted = {
+                                    synchronized(this@PhoneConversation) {
+                                        if (active(version)) cues.play(Cue.START)
+                                    }
+                                },
+                                onStopped = {
+                                    synchronized(this@PhoneConversation) {
+                                        if (active(version)) feedback.stopped(effect.token)
+                                    }
+                                },
+                                onFinished = {
+                                    synchronized(this@PhoneConversation) {
+                                        if (active(version)) socket.finishRecording(effect.token)
                                     }
                                 }
-                            },
-                            onStarted = {
-                                synchronized(this@PhoneConversation) {
-                                    if (active(version)) cues.play(Cue.START)
-                                }
-                            },
-                            onStopped = { finished ->
-                                synchronized(this@PhoneConversation) {
-                                    if (active(
-                                            version
-                                        )
-                                    ) {
-                                        cues.play(if (finished) Cue.FINISH else Cue.CANCEL)
-                                    }
-                                }
-                            },
-                            onFinished = {
-                                synchronized(this@PhoneConversation) {
-                                    if (active(version)) socket.finishRecording(effect.token)
-                                }
-                            }
-                        )
+                            )
+                        }
+                        is ConversationEffect.RecordingOutcome ->
+                            feedback.outcome(effect.token, effect.finished)
                         ConversationEffect.CaptureStop -> microphone.stop()
                         is ConversationEffect.PlaybackStart -> {
-                            mutable.value = mutable.value.copy(speaking = true)
+                            playback?.stop()
+                            val stream = ++playbackVersion
+                            val speaker = playbackFactory(
+                                getApplication(),
+                                { socket.report("Playback interrupted.") },
+                                {
+                                    mutable.update { current ->
+                                        if (current.sessionVersion == version && current.visible &&
+                                            current.playbackVersion == stream
+                                        ) {
+                                            current.copy(speaking = false)
+                                        } else {
+                                            current
+                                        }
+                                    }
+                                }
+                            )
+                            playback = speaker
+                            mutable.update { it.copy(speaking = true, playbackVersion = stream) }
                             speaker.start(effect.rate, effect.opusHeader)
                         }
-                        is ConversationEffect.PlaybackData -> speaker.offer(effect.bytes)
-                        ConversationEffect.PlaybackFinish -> speaker.finish()
-                        ConversationEffect.PlaybackStop -> speaker.stop()
+                        is ConversationEffect.PlaybackData -> playback?.offer(effect.bytes)
+                        ConversationEffect.PlaybackFinish -> playback?.finish()
+                        ConversationEffect.PlaybackStop -> playback?.stop()
                         else -> Unit // No watch actions or optional client TTS are advertised.
                     }
                 }
@@ -213,7 +234,7 @@ class PhoneConversation @JvmOverloads constructor(
             httpClient = httpClient,
             previousReply = saved.getValue(profile.endpoint.url).reply
         )
-        mutable.value = mutable.value.copy(error = "")
+        mutable.update { it.copy(error = "", sessionVersion = version) }
         connection?.connect()
     }
 
@@ -228,7 +249,7 @@ class PhoneConversation @JvmOverloads constructor(
         }
         val version = epoch
         val text = current.draft
-        mutable.value = current.copy(sending = true, error = "")
+        mutable.update { it.copy(sending = true, error = "") }
         socket.text(text).whenComplete { accepted, failure ->
             synchronized(this) {
                 if (active(version)) {
@@ -237,16 +258,18 @@ class PhoneConversation @JvmOverloads constructor(
                     ) {
                         draft("")
                     }
-                    mutable.value = mutable.value.copy(
-                        sending = false,
-                        error = if (accepted == true &&
-                            failure == null
-                        ) {
-                            ""
-                        } else {
-                            "Message was not sent. Draft retained."
-                        }
-                    )
+                    mutable.update {
+                        it.copy(
+                            sending = false,
+                            error = if (accepted == true &&
+                                failure == null
+                            ) {
+                                ""
+                            } else {
+                                "Message was not sent. Draft retained."
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -278,11 +301,13 @@ class PhoneConversation @JvmOverloads constructor(
     }
 
     @Synchronized fun notice(value: String) {
-        if (mutable.value.visible) mutable.value = mutable.value.copy(error = value.take(256))
+        if (mutable.value.visible) mutable.update { it.copy(error = value.take(256)) }
     }
 
     @Synchronized fun hide() {
         ++epoch // Invalidate observers before stopping adapters or closing the socket.
+        recordingFeedback?.invalidate()
+        recordingFeedback = null
         capture?.stop()
         playback?.stop()
         connection?.close()
@@ -292,6 +317,7 @@ class PhoneConversation @JvmOverloads constructor(
         val current = mutable.value
         val reply = current.profile?.let { saved[it.endpoint.url]?.reply }.orEmpty()
         mutable.value = current.copy(
+            sessionVersion = epoch,
             visible = false,
             sending = false,
             speaking = false,

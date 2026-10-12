@@ -319,7 +319,8 @@ class PcmPlayback(
 
     @Synchronized
     fun stop() {
-        active?.let(::stop)
+        val playback = active ?: return
+        stop(playback)
         active = null
         onLevel(0f)
         onFinished()

@@ -52,8 +52,8 @@ Use the [physical-device runbook](device-testing.md) to record the device gates 
 
 ## Draft listing
 
-Name: Hermes Gadget
-Short description: Talk to your own Hermes agent from your Wear OS watch.
+Phone name: QuantumInk Relay. Watch name: QuantumInk Relay Watch.
+Short description: Talk to your own Hermes agent from your phone or Wear OS watch.
 
 Hold the watch screen to speak, read a streamed reply, hear your profile's voice and answer
 approval prompts. Connect to the Hermes Gadget server you configure, directly or through
@@ -61,11 +61,21 @@ an Android phone on your own Tailscale tailnet. Save independently paired profil
 their optional pets. A Tile and complication open the conversation, with a quiet ambient
 outline between interactions. Optional ElevenLabs phone voice uses your own key and billing.
 
+The phone also offers independently paired foreground Talk/Chat with each profile's server
+voice. Box groups, custom ordering and inline portraits are local controls. Optional watch
+GIF portrait overrides have bounded loops and a static fallback; state-driven pets remain
+a separate optional feature. The original orbit/speech app icon does not use the Nous mascot.
+
 Requires a compatible self-hosted Hermes Gadget server. No project account, hosted agent,
 analytics or advertising. New pets, Opus and client voice require compatible optional server
 extensions. Messages pushed while disconnected are lost with today's stock server, except
 pending prompts that are re-sent. This app is an independent MIT project; do not imply
 endorsement by upstream, Samsung, Google, Tailscale or ElevenLabs.
+
+The [community SDK's license and trademark notice](https://github.com/Adolanium/hermes-gadget-sdk#affiliation-and-trademarks)
+do not establish blanket permission
+from Nous Research to use its marks or mascot. Verify publication naming and rights before
+upload; the original app identity and factual compatibility text are the approved direction.
 
 ## Primary references
 

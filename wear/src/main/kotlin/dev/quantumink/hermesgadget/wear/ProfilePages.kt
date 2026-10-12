@@ -18,7 +18,7 @@ class ProfilePage(
     override fun toString(): String = "ProfilePage(redacted)"
 }
 
-class PageArtwork(val portrait: Bitmap?, val pet: PetAtlas?)
+class PageArtwork(val portrait: Bitmap?, val pet: PetAtlas?, val animation: java.io.File? = null)
 
 object ProfilePages {
     fun merge(profiles: List<EndpointProfile>, catalog: List<CatalogPage>): List<ProfilePage> {

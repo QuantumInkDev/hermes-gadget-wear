@@ -27,7 +27,143 @@ import org.junit.Test
 
 /** Requires two isolated stock TLS servers and owned-emulator reverse ports. */
 class PhoneConversationTest {
-    @Test fun independentlyPairsChatsRecordsAndClosesWithoutChangingRelay() {
+    @Test fun independentlyPairsChatsRecordsAndClosesWithoutChangingRelay() = fixture {
+            model,
+            profiles,
+            vault,
+            directory
+        ->
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val relay = RelaySettings.enabled(context)
+        model.open(profiles[0])
+        assertFalse(directory.exists()) // Review alone cannot generate enrollment.
+        model.draft("retained draft one")
+        model.connect()
+        await { model.state.value.connection.status == ConnectionStatus.PAIRED }
+        val one = vault.identity(profiles[0].endpoint).deviceId
+        model.draft("phone first unique marker")
+        model.send()
+        model.send()
+        await {
+            model.state.value.connection.conversation.reply.contains(
+                "phone first unique marker"
+            )
+        }
+        assertEquals("", model.state.value.draft)
+        model.draft("keep first draft")
+        model.open(profiles[1])
+        assertEquals("", model.state.value.draft)
+        assertEquals("", model.state.value.connection.conversation.reply)
+        model.connect()
+        await { model.state.value.connection.status == ConnectionStatus.PAIRED }
+        assertNotEquals(one, vault.identity(profiles[1].endpoint).deviceId)
+        model.draft("phone second unique marker")
+        model.send()
+        await {
+            model.state.value.connection.conversation.reply.contains(
+                "phone second unique marker"
+            )
+        }
+        assertFalse(
+            model.state.value.connection.conversation.reply.contains(
+                "phone first unique marker"
+            )
+        )
+        model.startRecording()
+        await { model.state.value.connection.conversation.mode == ConversationMode.LISTENING }
+        Thread.sleep(900)
+        model.finishRecording()
+        await { model.state.value.connection.conversation.mode != ConversationMode.LISTENING }
+        await { model.state.value.connection.conversation.reply.startsWith("I heard ") }
+        await { model.state.value.speaking }
+        model.stopPlayback()
+        assertFalse(model.state.value.speaking)
+        model.hide()
+        assertFalse(model.state.value.visible)
+        assertFalse(model.state.value.speaking)
+        assertEquals(ConnectionStatus.OFFLINE, model.state.value.connection.status)
+        assertEquals(relay, RelaySettings.enabled(context))
+        model.open(profiles[0])
+        assertEquals("keep first draft", model.state.value.draft)
+        assertTrue(
+            model.state.value.connection.conversation.reply.contains(
+                "phone first unique marker"
+            )
+        )
+        model.connect()
+        await { model.state.value.connection.status == ConnectionStatus.PAIRED }
+        assertEquals(one, vault.identity(profiles[0].endpoint).deviceId)
+        model.startRecording()
+        await { model.state.value.connection.conversation.mode == ConversationMode.LISTENING }
+        model.hide()
+        Thread.sleep(250)
+        assertEquals(ConnectionStatus.OFFLINE, model.state.value.connection.status)
+        assertEquals(relay, RelaySettings.enabled(context))
+    }
+
+    @Test fun completionCanOverlapHideWithoutLockInversion() {
+        val entered = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val blocked = java.util.concurrent.atomic.AtomicBoolean(false)
+        val once = java.util.concurrent.atomic.AtomicBoolean(false)
+        fixture(factory = { context, interrupted, finished ->
+            dev.quantumink.hermesgadget.client.PcmPlayback(
+                context,
+                onInterrupted = interrupted,
+                onFinished = {
+                    if (Thread.currentThread().name == "gadget-speaker" &&
+                        once.compareAndSet(false, true)
+                    ) {
+                        entered.countDown()
+                        assertTrue(release.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                    }
+                    finished()
+                }
+            )
+        }, skipHide = { blocked.get() }) { model, profiles, _, _ ->
+            model.open(profiles[0])
+            model.connect()
+            await { model.state.value.connection.status == ConnectionStatus.PAIRED }
+            model.startRecording()
+            await { model.state.value.connection.conversation.mode == ConversationMode.LISTENING }
+            Thread.sleep(900)
+            model.finishRecording()
+            assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            val hide = Thread({ model.hide() }, "fixture-phone-hide").apply {
+                isDaemon = true
+                start()
+            }
+            val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(2)
+            while (hide.state != Thread.State.BLOCKED && hide.isAlive &&
+                System.nanoTime() < deadline
+            ) {
+                Thread.sleep(10)
+            }
+            try {
+                assertEquals(Thread.State.BLOCKED, hide.state)
+                release.countDown()
+                hide.join(1500)
+                blocked.set(hide.isAlive)
+                assertFalse("Playback completion and hide deadlocked", hide.isAlive)
+                assertFalse(model.state.value.visible)
+            } finally {
+                release.countDown()
+                blocked.set(hide.isAlive)
+            }
+        }
+    }
+
+    private fun fixture(
+        factory: (
+            (
+                android.content.Context,
+                () -> Unit,
+                () -> Unit
+            ) -> dev.quantumink.hermesgadget.client.PcmPlayback
+        )? = null,
+        skipHide: () -> Boolean = { false },
+        body: (PhoneConversation, List<EndpointProfile>, ConversationVault, File) -> Unit
+    ) {
         assumeTrue(Build.MODEL.startsWith("sdk_"))
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val arguments = InstrumentationRegistry.getArguments()
@@ -62,8 +198,11 @@ class PhoneConversationTest {
         val directory = File(context.cacheDir, "phone-session-" + UUID.randomUUID())
         val alias = "test.phone.session." + UUID.randomUUID()
         val vault = ConversationVault(context, directory, alias)
-        val model = PhoneConversation(context.applicationContext as Application, vault, client)
-        val relay = RelaySettings.enabled(context)
+        val model = if (factory == null) {
+            PhoneConversation(context.applicationContext as Application, vault, client)
+        } else {
+            PhoneConversation(context.applicationContext as Application, vault, client, factory)
+        }
         val profiles = (1..2).map { index ->
             EndpointProfile(
                 Endpoint.parse(
@@ -75,69 +214,9 @@ class PhoneConversationTest {
             )
         }
         try {
-            model.open(profiles[0])
-            assertFalse(directory.exists()) // Review alone cannot generate enrollment.
-            model.draft("retained draft one")
-            model.connect()
-            await { model.state.value.connection.status == ConnectionStatus.PAIRED }
-            val one = vault.identity(profiles[0].endpoint).deviceId
-            model.draft("phone first unique marker")
-            model.send()
-            model.send()
-            await {
-                model.state.value.connection.conversation.reply.contains(
-                    "phone first unique marker"
-                )
-            }
-            assertEquals("", model.state.value.draft)
-            model.draft("keep first draft")
-            model.open(profiles[1])
-            assertEquals("", model.state.value.draft)
-            assertEquals("", model.state.value.connection.conversation.reply)
-            model.connect()
-            await { model.state.value.connection.status == ConnectionStatus.PAIRED }
-            assertNotEquals(one, vault.identity(profiles[1].endpoint).deviceId)
-            model.draft("phone second unique marker")
-            model.send()
-            await {
-                model.state.value.connection.conversation.reply.contains(
-                    "phone second unique marker"
-                )
-            }
-            assertFalse(
-                model.state.value.connection.conversation.reply.contains(
-                    "phone first unique marker"
-                )
-            )
-            model.startRecording()
-            await { model.state.value.connection.conversation.mode == ConversationMode.LISTENING }
-            Thread.sleep(400)
-            model.finishRecording()
-            await { model.state.value.connection.conversation.mode != ConversationMode.LISTENING }
-            await { model.state.value.connection.conversation.reply.startsWith("I heard ") }
-            model.hide()
-            assertFalse(model.state.value.visible)
-            assertFalse(model.state.value.speaking)
-            assertEquals(ConnectionStatus.OFFLINE, model.state.value.connection.status)
-            assertEquals(relay, RelaySettings.enabled(context))
-            model.open(profiles[0])
-            assertEquals("keep first draft", model.state.value.draft)
-            assertTrue(
-                model.state.value.connection.conversation.reply.contains(
-                    "phone first unique marker"
-                )
-            )
-            model.connect()
-            await { model.state.value.connection.status == ConnectionStatus.PAIRED }
-            assertEquals(one, vault.identity(profiles[0].endpoint).deviceId)
-            model.startRecording()
-            await { model.state.value.connection.conversation.mode == ConversationMode.LISTENING }
-            model.hide()
-            Thread.sleep(250)
-            assertEquals(ConnectionStatus.OFFLINE, model.state.value.connection.status)
-            assertEquals(relay, RelaySettings.enabled(context))
+            body(model, profiles, vault, directory)
         } finally {
-            model.hide()
+            if (!skipHide()) model.hide()
             directory.deleteRecursively()
             KeyStore.getInstance("AndroidKeyStore").apply {
                 load(null)

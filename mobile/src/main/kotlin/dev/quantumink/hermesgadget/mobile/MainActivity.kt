@@ -34,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.quantumink.hermesgadget.client.CuePreferences
+import dev.quantumink.hermesgadget.client.R as ClientR
 
 class MainActivity : ComponentActivity() {
     private val catalogNetwork = object : android.net.ConnectivityManager.NetworkCallback() {
@@ -148,7 +149,7 @@ class MainActivity : ComponentActivity() {
                                     NavigationBarItem(
                                         selected = destination == route,
                                         onClick = { navigate(route) },
-                                        icon = { Text(label.take(1)) },
+                                        icon = { NavigationIcon(route) },
                                         label = { Text(label) }
                                     )
                                 }
@@ -333,4 +334,14 @@ class MainActivity : ComponentActivity() {
             }
         }.onFailure { RelaySettings.report(getString(R.string.association_unavailable)) }
     }
+}
+
+@androidx.compose.runtime.Composable
+private fun NavigationIcon(route: String) {
+    val resource = when (route) {
+        "profiles" -> ClientR.drawable.ic_nav_profiles
+        "watch" -> ClientR.drawable.ic_nav_watch
+        else -> ClientR.drawable.ic_nav_settings
+    }
+    androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(resource), null)
 }

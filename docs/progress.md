@@ -4,8 +4,33 @@
 
 The maintainer approved the [phone/watch follow-up design](superpowers/specs/2026-10-12-client-usability-design.md),
 including QuantumInk Relay branding, recording cues, grouped/custom-ordered phone profiles,
-independent foreground phone conversations and bounded GIF overrides. Those later stages
-remain in progress; approval is not implementation evidence.
+independent foreground phone conversations and bounded GIF overrides. The approved software
+is implemented. Strict checks, lint/format and all debug/instrumentation APK builds pass with
+warnings as errors; JVM reports contain 105 tests and zero failures/errors/skips.
+
+The phone groups/searches profiles by box, persists custom box/profile order, displays effective
+pictures inline and provides separate Profiles/Watch/Settings navigation with an original icon.
+Phone Talk/Chat creates independent TLS identities only after explicit reviewed Connect.
+Three owned-phone stock TLS/vault tests pass: fresh text/PCM responses, reconnect, separate
+endpoints/drafts, speaking/Stop state and controlled playback completion overlapping exit.
+Leaving the conversation stops its socket/audio while preserving relay settings. Nineteen
+phone directory/repository/storage tests pass, including full GIF capacity and retained vaults.
+
+Bounded GIF overrides import through the native picker, normalize a first-frame PNG and
+replicate optional hash/length/fallback-bound metadata/assets alongside the unchanged v1 roster.
+One pending import survives failed publication/restart without evicting the published GIF.
+Fourteen owned-Wear tests pass: actual frame changes on selected/unapproved cards,
+static/reduced-motion/pet behavior, ambient monochrome fallback, retirement/admission races,
+recording boundaries, codecs and existing surfaces. Exact-frame checks sample source-pixel
+interiors rather than the enlarged checkerboard's blended boundary.
+
+Fresh Astra whole-branch review found six Important issues and one ambient contract mismatch.
+All seven were corrected and regraded clean; [review resolutions](client-usability-review.md)
+record failing-then-passing cases and the reviewer’s read-only limits. Recording cues now join
+recorder shutdown with the accepted protocol outcome, covering short release, automatic limit
+completion and rejected sends. Actual phone speech, cue audibility/contamination and animated
+watch battery cost remain physical observation gates. Current physical delivery awaits ADB
+availability; the earlier preserve-data scroll installation below predates final GIF support.
 
 The reported watch scroll reset was reproduced: the pager's progress flag replaced its
 active vertical list with a static preview during nested scrolling. The settled conversation

@@ -48,6 +48,9 @@ android {
     buildFeatures {
         compose = true
     }
+    sourceSets.getByName(
+        "androidTest"
+    ).assets.directories.add(rootProject.file("protocol/src/test/resources/gif").path)
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

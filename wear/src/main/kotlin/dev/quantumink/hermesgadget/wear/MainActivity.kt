@@ -95,25 +95,32 @@ class MainActivity : ComponentActivity() {
                     if (service == null) {
                         WaitingScreen()
                     } else if (ambient != null) {
-                        val pets = remember(service) {
+                        val pictures = remember(service) {
                             service.state.map { watch ->
                                 val page = ProfilePages.merge(watch.profiles, watch.catalog)
                                     .singleOrNull { it.key == watch.selectedPage }
-                                if (page?.approved?.endpoint?.url == watch.profile?.endpoint?.url &&
+                                val artwork = page?.let { watch.artwork[it.key] }
+                                val pet = if (page?.approved?.endpoint?.url ==
+                                    watch.profile?.endpoint?.url &&
                                     page?.approved != null
                                 ) {
-                                    watch.pet ?: watch.artwork[page.key]?.pet
+                                    watch.pet ?: artwork?.pet
                                 } else {
-                                    page?.let { watch.artwork[it.key]?.pet }
+                                    artwork?.pet
                                 }
+                                pet to artwork?.portrait
                             }.distinctUntilChanged()
                         }
-                        val pet by pets.collectAsStateWithLifecycle(initialValue = null)
+                        val artwork by pictures.collectAsStateWithLifecycle(
+                            initialValue =
+                            null to null
+                        )
                         AmbientPet(
-                            pet,
+                            artwork.first,
                             minute,
                             ambient.isLowBitAmbientSupported,
-                            ambient.isBurnInProtectionRequired
+                            ambient.isBurnInProtectionRequired,
+                            artwork.second
                         )
                     } else {
                         WatchScreen(

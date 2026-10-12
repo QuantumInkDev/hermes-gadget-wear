@@ -34,6 +34,7 @@ import dev.quantumink.hermesgadget.protocol.DirectConnection
 import dev.quantumink.hermesgadget.protocol.Endpoint
 import dev.quantumink.hermesgadget.protocol.PetEffect
 import dev.quantumink.hermesgadget.protocol.PetManifest
+import dev.quantumink.hermesgadget.protocol.RecordingFeedback
 import dev.quantumink.hermesgadget.protocol.TransportPath
 import dev.quantumink.hermesgadget.protocol.TransportPolicy
 import dev.quantumink.hermesgadget.protocol.TransportPreference
@@ -117,6 +118,7 @@ class GadgetService : Service() {
     private lateinit var vault: IdentityVault
     private lateinit var capture: PcmCapture
     private lateinit var recordingCues: RecordingCues
+    private var recordingFeedback: RecordingFeedback? = null
     private lateinit var playback: PcmPlayback
 
     @Volatile private var connection: DirectConnection? = null
@@ -606,6 +608,7 @@ class GadgetService : Service() {
 
     fun disconnect() {
         epoch.incrementAndGet()
+        recordingFeedback?.invalidate()
         selectionEpoch.incrementAndGet()
         mutableState.update {
             it.copy(
@@ -762,6 +765,13 @@ class GadgetService : Service() {
         val path = if (pipe == null) TransportPath.DIRECT else TransportPath.RELAY
         savedIdentity = identity
         val version = epoch.incrementAndGet()
+        recordingFeedback?.invalidate()
+        val feedback = RecordingFeedback { finished ->
+            if (version == epoch.get() && visible) {
+                recordingCues.play(if (finished) Cue.FINISH else Cue.CANCEL)
+            }
+        }
+        recordingFeedback = feedback
         val actions = availableActions()
         advertisedActions = actions
         val sameEndpoint = mutableState.value.profile?.endpoint?.url == profile.endpoint.url
@@ -929,6 +939,7 @@ class GadgetService : Service() {
                                     connection?.cancelRecording()
                                 } else {
                                     val current = connection ?: return
+                                    feedback.begin(effect.token)
                                     capture.start(
                                         { bytes ->
                                             if (effect.format ==
@@ -962,18 +973,18 @@ class GadgetService : Service() {
                                                 recordingCues.play(Cue.START)
                                             }
                                         },
-                                        onStopped = { finished ->
-                                            if (version == epoch.get() &&
-                                                visible
-                                            ) {
-                                                recordingCues.play(
-                                                    if (finished) Cue.FINISH else Cue.CANCEL
-                                                )
+                                        onStopped = {
+                                            synchronized(mediaLock) {
+                                                if (version == epoch.get()) {
+                                                    feedback.stopped(effect.token)
+                                                }
                                             }
                                         }
                                     )
                                 }
                             }
+                            is ConversationEffect.RecordingOutcome ->
+                                feedback.outcome(effect.token, effect.finished)
                             ConversationEffect.CaptureStop -> {
                                 capture.stop()
                                 main.post {
@@ -1187,6 +1198,7 @@ class GadgetService : Service() {
     private fun closeConnection() {
         selectionEpoch.incrementAndGet()
         epoch.incrementAndGet()
+        recordingFeedback?.invalidate()
         speech?.close()
         speech = null
         textEditing = false

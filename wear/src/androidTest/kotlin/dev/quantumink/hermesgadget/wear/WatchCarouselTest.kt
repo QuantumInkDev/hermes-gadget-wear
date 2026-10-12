@@ -630,6 +630,10 @@ class WatchCarouselTest {
             SystemClock.sleep(20)
             event(MotionEvent.ACTION_MOVE, 350f - 230f * i / 12)
         }
+        // Stop the drag before release. A fast release legitimately flings past Type;
+        // this regression measures stationary controls rather than kinetic scrolling.
+        SystemClock.sleep(150)
+        event(MotionEvent.ACTION_MOVE, 120f)
         event(MotionEvent.ACTION_UP, 120f)
     }
     private fun rotaryPulse(delta: Float) {

@@ -32,9 +32,9 @@ instrumentation runner uses UiAutomation. This is a tooling limitation, not an a
 **Interfaces:** Produce `WatchNavigation.scrollFor(key: String): TransformingLazyColumnState`;
 pass it through the carousel conversation callback and `RoundPage(state = ...)`.
 
-- [ ] Add `verticalTouchScrollKeepsControlsReachable`; run against existing code and observe unreachable Type control.
-- [ ] Keep `val selected = index == pager.settledPage` during nested gestures. Use Wear foundation `HorizontalPager`/`rememberPagerState` so its focus hierarchy directs rotary input to the active list.
-- [ ] Add cancelled-drag, return-page and metadata-refresh checks at a lower control. Save each stable page's state in the activity-owned navigation map:
+- [x] Add `verticalTouchScrollKeepsControlsReachable`; run against existing code and observe unreachable Type control.
+- [x] Keep `val selected = index == pager.settledPage` during nested gestures. Retain the existing Compose foundation pager with Wear hierarchicalFocusGroup for rotary focus; the Wear wrapper failed the post-approval scenario.
+- [x] Add cancelled-drag, return-page and metadata-refresh checks at a lower control. Save each stable page's state in the activity-owned navigation map:
 
 ```kotlin
 private val scrolls = LinkedHashMap<String, TransformingLazyColumnState>()
@@ -43,21 +43,21 @@ fun scrollFor(key: String): TransformingLazyColumnState =
 fun retainScrolls(keys: Set<String>) { scrolls.keys.retainAll(keys) }
 ```
 
-- [ ] Render arrows in a centered row; counter between; semantics descriptions Previous profile / Next profile. Disable at first/last page and while recording/prompt/saving. Approval lists get a separate prompt-keyed state.
-- [ ] Run the touch regression plus full synthetic three-page recording/approval/rotary scenario. Expected: both `OK (1 test)`; then strict checks.
-- [ ] Commit this task and record physical installation evidence if a watch is reachable.
+- [x] Render arrows in a centered row; counter between; semantics descriptions Previous profile / Next profile. Disable at first/last page and while recording/prompt/saving. Approval lists get a separate prompt-keyed state.
+- [x] Run the touch regression plus full synthetic three-page recording/approval/rotary scenario. Expected: both `OK (1 test)`; then strict checks.
+- [x] Commit this task and record physical installation evidence if a watch is reachable.
 
 ### Task 2: Shared Android audio and recording cues
 
 **Files:** create `client/build.gradle.kts`, `client/.../RecordingCues.kt`; move `wear/.../PcmAudio.kt` and `OpusCodec.kt` into client namespace; update imports in service/codec tests, module dependencies and root check.
 **Interfaces:** shared `PcmCapture`, `PcmPlayback`, `OpusSupport`; capture `onStarted: () -> Unit`, `onStopped: (Boolean) -> Unit` callbacks. `RecordingCues.play(kind: Cue)` runs on the capture worker, with `Cue.START`, `FINISH`, `CANCEL`; sound-enabled preference is explicit.
 
-- [ ] Add owned-device capture-boundary instrumentation: successful initialized recorder calls start once before frames; finishing/cancel stops before end cue; denied permission calls no success cue.
-- [ ] Move the existing proven adapters, retaining bounded queues, drain, audio focus and optional Opus. Initial phone capability advertises PCM only.
-- [ ] Play start cue after AudioRecord starts; discard queued samples through cue completion before forwarding frames. Play end/cancel after AudioRecord shutdown and before sending finish to the protocol. Use notification-volume tones, silent/DND checks and short haptics; no cue on failed start.
-- [ ] Add enabled switches in both apps; synchronize only this nonsecret preference through a bounded versioned Data Layer path. Sound disabled keeps visible Listening and existing haptics.
-- [ ] Run shared capture boundary checks and existing codec fixtures, then strict checks. Expected: no frame precedes readiness, stop precedes cue, no stale callback after profile switch.
-- [ ] Commit adapters and cues with observed/owner-only audio gates separated.
+- [x] Add owned-device capture-boundary instrumentation: successful initialized recorder calls start once before frames; finishing/cancel stops before end cue; denied permission calls no success cue.
+- [x] Move the existing proven adapters, retaining bounded queues, drain, audio focus and optional Opus. Initial phone capability advertises PCM only.
+- [x] Play start cue after AudioRecord starts; discard queued samples through cue completion before forwarding frames. Choose end/cancel from the accepted protocol outcome after AudioRecord shutdown; do not infer success from a release gesture. Use notification-volume tones, silent/DND checks and short haptics; no cue on failed start.
+- [x] Add enabled switches in both apps; synchronize only this nonsecret preference through a bounded versioned Data Layer path. Sound disabled keeps visible Listening and existing haptics.
+- [x] Run shared capture boundary checks and existing codec fixtures, then strict checks. Expected: no frame precedes readiness, stop precedes cue, no stale callback after profile switch.
+- [x] Commit adapters and cues with observed/owner-only audio gates separated.
 
 ### Task 3: Phone organization, inline portraits and brand
 
@@ -66,8 +66,8 @@ fun retainScrolls(keys: Set<String>) { scrolls.keys.retainAll(keys) }
 `CatalogOrder.moveProfile(pages,key,delta)` changes order only within its source;
 `CatalogOrder.moveSource(pages,id,delta)` moves a whole group. Repository persists and publishes this flattened order, and exposes hash-addressed portrait file lookup.
 
-- [ ] Write JVM ordering tests with interleaved sources and duplicate names; instrument restart/refresh/offline preservation. Expected ordering literals are independent of the implementation.
-- [ ] Group pages while retaining source/profile stable keys and old within-source order. For a profile move:
+- [x] Write JVM ordering tests with interleaved sources and duplicate names; instrument restart/refresh/offline preservation. Expected ordering literals are independent of the implementation.
+- [x] Group pages while retaining source/profile stable keys and old within-source order. For a profile move:
 
 ```kotlin
 val groups = group(pages).map { it.toMutableList() }
@@ -78,24 +78,24 @@ source.add(target, source.removeAt(index))
 return groups.flatten()
 ```
 
-- [ ] Render lazy, collapsible box groups with search and explicit reorder mode. Each profile includes effective portrait, name, box/status, Talk/Chat, Picture, endpoint detail. Use the normal native photo picker and existing override APIs. Move source editor and advanced manual endpoint setup under Settings.
-- [ ] Use Profiles / Watch / Settings navigation with safe insets and keyboard padding. Watch owns existing relay/association controls. Preserve FLAG_SECURE and existing service behavior.
-- [ ] Use QuantumInk Relay / QuantumInk Relay Watch labels, original orbit/speech adaptive + round + monochrome icon, and About compatibility/independence/third-party attribution.
-- [ ] Verify owned-phone rendering, order, normal picker and existing setup/voice flows; strict checks. Expected: effective image is inline and custom order persists after a source failure/return.
-- [ ] Commit phone directory/branding.
+- [x] Render lazy, collapsible box groups with search and explicit reorder mode. Each profile includes effective portrait, name, box/status, Talk/Chat, Picture, endpoint detail. Use the normal native photo picker and existing override APIs. Move source editor and advanced manual endpoint setup under Settings.
+- [x] Use Profiles / Watch / Settings navigation with safe insets and keyboard padding. Watch owns existing relay/association controls. Preserve FLAG_SECURE and existing service behavior.
+- [x] Use QuantumInk Relay / QuantumInk Relay Watch labels, original orbit/speech adaptive + round + monochrome icon, and About compatibility/independence/third-party attribution.
+- [x] Verify owned-phone rendering, order, normal picker and existing setup/voice flows; strict checks. Expected: effective image is inline and custom order persists after a source failure/return.
+- [x] Commit phone directory/branding.
 
 ### Task 4: Independent phone text/voice conversations
 
 **Files:** create `mobile/.../ConversationVault.kt`, `PhoneConversation.kt`, `ConversationPage.kt`, `PhoneConversationTest.kt`; modify activity lifecycle and microphone permission.
 **Interfaces:** `ConversationVault.identity(endpoint, create)` uses its own Keystore alias/directory; `PhoneConversation` is an AndroidViewModel retaining bounded per-endpoint draft/response state through rotation; `open(profile)`, `send()`, `startRecording()`, `finishRecording()`, `cancelRecording()`, `answer(id,yes)`, `hide()` and `close()` drive DirectConnection with shared audio.
 
-- [ ] Add synthetic stock-server tests: first phone pairing, authenticated reconnect, fresh text marker, distinct second identity/response, stale observer rejection and foreground shutdown. Vault corruption must fail closed rather than rotate an identity. Existing watch records are never accessed.
-- [ ] Create identity only after endpoint review and explicit Connect. Reuse manual Gadget token only for that exact canonical URL; never use source credentials. Construct `DirectConnection(endpoint, identity, observer, accessToken, availableActions = emptySet())` with actual phone PCM capabilities.
-- [ ] Serialize session replacement with an epoch. Every observer/audio callback compares its captured epoch before publishing or sending. `hide()` increments epoch, stops capture/playback and closes only the phone connection. It leaves RelayService untouched.
-- [ ] Render profile header, connection/pairing state, transcript/cumulative reply, approval controls, bounded composer, hold/tap recording, cancel/reset-session and playback Stop. Preserve rejected text drafts, clear only accepted sends, prevent duplicates while submission is pending, and show TLS/permission/network failures.
-- [ ] Request RECORD_AUDIO only after recording action; request local-network permission only after Connect where needed. No microphone starts following a permission dialog unless the visible selected conversation still matches the request.
-- [ ] Run owned-phone integration, audio boundary and existing relay/phone-storage checks, then strict checks. Expected: text/voice frames use the correct independently paired endpoint, audio is stopped on hide, and watch relay remains enabled.
-- [ ] Commit and document foreground behavior, phone-specific pairing instructions and physical speech gates.
+- [x] Add synthetic stock-server tests: first phone pairing, authenticated reconnect, fresh text marker, distinct second identity/response, stale observer rejection and foreground shutdown. Vault corruption must fail closed rather than rotate an identity. Existing watch records are never accessed.
+- [x] Create identity only after endpoint review and explicit Connect. Reuse manual Gadget token only for that exact canonical URL; never use source credentials. Construct `DirectConnection(endpoint, identity, observer, accessToken, availableActions = emptySet())` with actual phone PCM capabilities.
+- [x] Serialize session replacement with an epoch. Every observer/audio callback compares its captured epoch before publishing or sending. `hide()` increments epoch, stops capture/playback and closes only the phone connection. It leaves RelayService untouched.
+- [x] Render profile header, connection/pairing state, transcript/cumulative reply, approval controls, bounded composer, hold/tap recording, cancel/reset-session and playback Stop. Preserve rejected text drafts, clear only accepted sends, prevent duplicates while submission is pending, and show TLS/permission/network failures.
+- [x] Request RECORD_AUDIO only after recording action; request local-network permission only after Connect where needed. No microphone starts following a permission dialog unless the visible selected conversation still matches the request.
+- [x] Run owned-phone integration, audio boundary and existing relay/phone-storage checks, then strict checks. Expected: text/voice frames use the correct independently paired endpoint, audio is stopped on hide, and watch relay remains enabled.
+- [x] Commit and document foreground behavior, phone-specific pairing instructions and physical speech gates.
 
 ## Review focus
 

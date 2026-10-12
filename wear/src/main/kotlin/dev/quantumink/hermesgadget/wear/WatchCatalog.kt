@@ -86,4 +86,56 @@ class WatchCatalog(private val context: Context) {
             response.release()
         }
     }
+
+    fun animations(
+        node: String
+    ): Map<String, dev.quantumink.hermesgadget.protocol.AnimationDescriptor>? {
+        val uri = Uri.Builder().scheme("wear").authority(node)
+            .path(dev.quantumink.hermesgadget.protocol.PortraitAnimations.DATA_PATH).build()
+        val item = Tasks.await(data.getDataItem(uri), 5, TimeUnit.SECONDS) ?: return null
+        require(
+            requireNotNull(item.data).size <=
+                dev.quantumink.hermesgadget.protocol.PortraitAnimations.MAX_BYTES + 512
+        )
+        val json =
+            DataMapItem.fromDataItem(item).dataMap.getString("animations")
+                ?: error("Missing animation metadata")
+        return dev.quantumink.hermesgadget.protocol.PortraitAnimations.decode(json)
+    }
+
+    fun animation(
+        node: String,
+        descriptor: dev.quantumink.hermesgadget.protocol.AnimationDescriptor
+    ): ByteArray? {
+        val uri = Uri.Builder().scheme("wear").authority(node)
+            .path(
+                dev.quantumink.hermesgadget.protocol.PortraitAnimations.ASSET_PATH +
+                    descriptor.sha256
+            ).build()
+        val item = Tasks.await(data.getDataItem(uri), 5, TimeUnit.SECONDS) ?: return null
+        require(requireNotNull(item.data).size <= 1024)
+        val asset = DataMapItem.fromDataItem(item).dataMap.getAsset("animation") ?: return null
+        val response = Tasks.await(data.getFdForAsset(asset), 5, TimeUnit.SECONDS)
+        try {
+            return response.inputStream.use { input ->
+                val output = java.io.ByteArrayOutputStream()
+                val buffer = ByteArray(8192)
+                while (output.size() <= descriptor.bytes) {
+                    val count = input.read(
+                        buffer,
+                        0,
+                        minOf(
+                            buffer.size,
+                            descriptor.bytes + 1 - output.size()
+                        )
+                    )
+                    if (count < 0) break
+                    output.write(buffer, 0, count)
+                }
+                output.toByteArray().also { require(it.size == descriptor.bytes) }
+            }
+        } finally {
+            response.release()
+        }
+    }
 }

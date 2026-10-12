@@ -22,7 +22,10 @@ object ProfileSync {
     @Synchronized fun publishCatalog(
         context: Context,
         pages: List<dev.quantumink.hermesgadget.protocol.CatalogPage>,
-        portraits: PortraitStore
+        portraits: PortraitStore,
+        animations: Map<String, dev.quantumink.hermesgadget.protocol.AnimationDescriptor> =
+            emptyMap(),
+        animationCache: dev.quantumink.hermesgadget.client.AnimationCache? = null
     ) {
         val client = Wearable.getDataClient(context)
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
@@ -83,5 +86,67 @@ object ProfileSync {
                 }
             }
         )
+        if (animationCache != null) {
+            AnimationPublication.publish(
+                pages,
+                animations,
+                {
+                    animationCache.file(it)?.readBytes()
+                },
+                object : AnimationPublicationTransport {
+                    override val owner = owner
+                    private val assets = mutableListOf<com.google.android.gms.tasks.Task<*>>()
+                    private val deletions = mutableListOf<com.google.android.gms.tasks.Task<*>>()
+                    override fun asset(hash: String, bytes: ByteArray) {
+                        val item = PutDataMapRequest.create(
+                            dev.quantumink.hermesgadget.protocol.PortraitAnimations.ASSET_PATH +
+                                hash
+                        )
+                        item.dataMap.putAsset(
+                            "animation",
+                            com.google.android.gms.wearable.Asset.createFromBytes(bytes)
+                        )
+                        assets.add(client.putDataItem(item.asPutDataRequest()))
+                    }
+                    override fun manifest(json: String) {
+                        if (assets.isNotEmpty()) await(Tasks.whenAll(assets))
+                        val item = PutDataMapRequest.create(
+                            dev.quantumink.hermesgadget.protocol.PortraitAnimations.DATA_PATH
+                        )
+                        item.dataMap.putString("animations", json)
+                        await(client.putDataItem(item.asPutDataRequest().setUrgent()))
+                    }
+                    override fun items(): List<CatalogDataItem> {
+                        val buffer = await(client.dataItems)
+                        return try {
+                            buffer.mapNotNull { item ->
+                                val host = item.uri.host
+                                val path = item.uri.path
+                                if (host == null ||
+                                    path == null
+                                ) {
+                                    null
+                                } else {
+                                    CatalogDataItem(host, path)
+                                }
+                            }
+                        } finally {
+                            buffer.release()
+                        }
+                    }
+                    override fun delete(item: CatalogDataItem) {
+                        deletions.add(
+                            client.deleteDataItems(
+                                android.net.Uri.Builder().scheme("wear")
+                                    .authority(item.owner).path(item.path).build()
+                            )
+                        )
+                    }
+                    override fun finishCleanup() {
+                        if (deletions.isNotEmpty()) await(Tasks.whenAll(deletions))
+                    }
+                }
+            )
+        }
     }
 }

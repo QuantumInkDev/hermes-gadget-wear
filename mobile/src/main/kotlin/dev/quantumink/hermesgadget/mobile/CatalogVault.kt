@@ -4,6 +4,7 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.AtomicFile
+import dev.quantumink.hermesgadget.protocol.AnimationDescriptor
 import dev.quantumink.hermesgadget.protocol.CatalogPage
 import dev.quantumink.hermesgadget.protocol.CatalogProfile
 import dev.quantumink.hermesgadget.protocol.CatalogSource
@@ -128,6 +129,25 @@ class CatalogVault(
             )
         }
         write("watch-pictures", ProfileCatalog.encodePages(pictures).toByteArray())
+    }
+
+    @Synchronized fun animations(): Map<String, AnimationDescriptor> = read(
+        "watch-animations"
+    )?.let { bytes ->
+        try {
+            dev.quantumink.hermesgadget.protocol.PortraitAnimations.decode(
+                bytes.toString(Charsets.UTF_8)
+            )
+        } finally {
+            bytes.fill(0)
+        }
+    }.orEmpty()
+
+    @Synchronized fun saveAnimations(animations: Map<String, AnimationDescriptor>) {
+        write(
+            "watch-animations",
+            dev.quantumink.hermesgadget.protocol.PortraitAnimations.encode(animations).toByteArray()
+        )
     }
 
     private fun key(): SecretKey {

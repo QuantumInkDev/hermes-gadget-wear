@@ -121,12 +121,12 @@ actual phone; host-side checks and access-policy propagation alone are insuffici
 
 ## Add the sources and pair on the watch
 
-1. On the phone, open **Hermes Gadget → Profiles → Boxes and discovery**. Enter the box
+1. On the phone, open **QuantumInk Relay → Settings → Boxes and discovery**. Enter the box
    name, full HTTPS URL ending in `/catalog/v1`, and its catalog-only credential. Save and
    refresh. Repeat for each box. Keep the phone's tailnet VPN connected when using tailnet URLs.
 2. Enable relay and grant the requested local-network/nearby/background companion permissions.
    Use **Allow background relay** for the Android companion association. See [relay setup](self-host.md#enable-phone-relay).
-3. Open Hermes Gadget on the watch and swipe to a discovered profile. Review its proposed
+3. Open QuantumInk Relay Watch and swipe to a discovered profile. Review its proposed
    connection URL. Select **Automatic** or **Phone relay** for private tailnet `wss` access.
    The phone forwards watch-owned TLS; it does not receive the pairing key.
 4. Save/connect on the watch. Approve the displayed code on the **correct box and profile**,
@@ -154,6 +154,25 @@ transparent corners, a centered circle and no embedded labels. Suggested geometr
 circle diameter 236 px, critical face/headgear within diameter 176 px. Keep a 1024×1024 master
 on a 4× pixel grid if using pixel art. The app renders names separately. Test at actual watch
 size rather than judging only the full-size master.
+
+An animated watch override uses the same **Picture → Choose picture** picker. Export a GIF
+with a canvas at most **256×256**, encoded size at most **256 KiB**, at most **120 frames**
+and a loop at most **10 seconds**. Delays below 50 ms are clamped, so check the loop duration
+after that adjustment. The total canvas pixels across frames must be at most **2,097,152**:
+at 256×256 that permits 32 frames. Keep transparent corners and important features inside
+the circle. The app strips extra GIF metadata, validates frame data and saves a PNG first
+frame for compatibility and paused display.
+
+Only the selected available foreground watch page animates. Neighbor pages, reduced-motion
+and battery-saver modes use the PNG; ambient mode uses a dim monochrome static representation.
+A validated pet takes priority. The phone shows the static portrait inline. **Use box picture**
+removes the local animation override and restores the latest box portrait. GIFs are portrait
+loops, not state-driven pets or speech mouth animations.
+
+If picture synchronization fails, the phone keeps the pending selection and the published
+animation until a retry succeeds. One pending GIF is allowed in addition to the settled
+32-asset/8-MiB cache. Sync that picture before importing another distinct GIF. Refresh/retry
+from the app; do not reset pairing or erase app storage to resolve a picture transfer.
 
 ## Before leaving the home network
 

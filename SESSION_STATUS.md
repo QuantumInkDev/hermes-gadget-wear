@@ -1,35 +1,46 @@
 # Session status
 
-Current follow-up, 2026-10-12: the maintainer approved
-[client usability](docs/superpowers/specs/2026-10-12-client-usability-design.md) and
-[bounded animated overrides](docs/superpowers/specs/2026-10-12-animated-picture-design.md).
-Family name is QuantumInk Relay, with an original orbit/speech icon. Execute the
-[client plan](docs/superpowers/plans/2026-10-12-client-usability.md) without another generic
-approval loop. Watch touch scrolling, per-page position and compact accessible arrows are
-implemented; strict checks and both owned-emulator interaction scenarios pass. The preserve-data
-physical update also passed: scrolling stayed in place and Server settings opened. All 19 watch
-identity ciphertexts and 18 portrait hashes matched before/after installation; original timeout
-was restored. Receipts stay private in `.local/client-usability/`.
+Current follow-up, 2026-10-12: approved QuantumInk Relay client usability and bounded GIF
+software is implemented and verified. Watch scrolling retains per-page position and uses
+accessible compact arrows. Phone Profiles/Watch/Settings, grouped/searchable/custom-ordered
+box directory, inline pictures, original icons and independently paired foreground Talk/Chat
+are implemented. Phone requires reviewed explicit Connect and TLS; no watch identities are used.
 
-Shared Android recording/codec adapters and actual start/finish/cancel cues are implemented.
-Six owned-Wear audio/codec tests pass, including denied permission and replacement-callback
-regressions; the latter fails without the generation guard. Strict checks passed before the
-new replacement test, which also passes in its current build. Actual cue audibility/speech
-quality remains an owner observation gate. Sound respects silent/DND/notification volume.
+GIF overrides retain the v1 PNG roster plus an optional hash/length/fallback-bound animation
+manifest. Limits: 256×256, 256 KiB, 120 frames, ten seconds and 2,097,152 frame-canvas pixels.
+Selected available foreground pages animate, including unapproved cards. Previews, reduced
+motion, power saver and ambient use static fallback; validated pets keep priority. One durable
+pending GIF survives publication failure/restart beside the settled 32-file/8-MiB cache.
+Retired portrait requests cannot re-enter the cache after a roster change/reset.
 
-Box directory, inline pictures and original branding are committed. The new foreground-only
-phone client has separate per-endpoint identities, explicit Connect, TLS, draft/reply retention,
-text/PCM voice and approval controls. Two isolated stock TLS server tests pass, including
-independent identities, reconnect, chat, microphone capture and foreground shutdown; no live
-phone pairing was initiated. All 13 directory/repository regressions now pass after the keyed-picture uniqueness fix.
-The phone stock/vault acceptance rerun passes, including a fresh server response to PCM capture.
-Do not claim physical phone speech. Shared-audio carousel interaction passed in 13.874 seconds.
+Strict full checks/lints/format and all debug/instrumentation APKs passed with warnings as
+errors. JVM: 105 tests, zero failures/errors/skips (90 protocol, 13 mobile, two Wear).
+Owned-device acceptance: 19 phone storage/directory tests, three stock TLS/vault/playback
+checks, 14 Wear animation/ambient/cache/capture/codec/surface tests, plus the complete
+three-profile carousel and vertical touch/return/refresh/aborted-drag scenarios. The final
+stationary scroll gesture stops before release so ordinary fling motion is not called a reset.
+GIF pixel sampling uses original checkerboard pixel interiors, avoiding blended boundaries.
 
-Next: finish storage/UI integration, implement the approved GIF plan, review the whole branch,
-then preserve-data device delivery. Phone client never borrows watch keys; existing relay stays
-independent. Live phone speech and animation power remain physical gates. Earlier results below
-do not establish the new phone/GIF features. Execution ledgers remain ignored under `.superpowers/`.
+Fresh Astra review found six Important defects and one ambient mismatch; all seven were
+corrected and the source regrade is clean. See docs/client-usability-review.md. Playback
+completion uses atomic guarded updates without the session monitor; Stop voice remains
+available during playback. Recording feedback joins recorder release with accepted protocol
+outcomes, including short capture, automatic limit, rejected sends and stale tokens.
+Private verification receipts are in .local/client-usability/.
 
+The earlier physical watch scroll build preserved all 19 identity ciphertexts and 18 portrait
+hashes. The final GIF/review build has not been delivered: neither personal device is currently
+visible on its saved ADB server. A request for phone USB debugging and the watch's current
+Wireless debugging IP:connection port is pending. Never clear data, uninstall, seed identities
+or bypass signatures. Compare local/installed signing certificates, backup and recheck those
+19/18 hashes, then install -r when devices return. Phone client pairing remains explicit;
+no bulk live enrollment or real-device microphone test was initiated.
+
+Next: preserve-data final device delivery, owner phone speech/cue checks, GIF battery/rendering
+and office trial. Owner manages Mac awake state; no power helper is installed. Existing live
+18-profile cellular relay and three-profile watch speech evidence below remains historical;
+it does not establish the new phone client or GIF power gates. Keep PR #1 draft; no merge,
+release signing, Play upload or optional live server extension is authorized.
 
 Updated: 2026-10-12. The authorized live profile/portrait setup and typed cellular relay
 checks are complete. All three sources are on the phone; all 18 supplied round picture

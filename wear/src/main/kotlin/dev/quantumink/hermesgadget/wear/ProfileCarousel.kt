@@ -139,7 +139,7 @@ fun ProfileCarousel(
                             page,
                             watch.artwork[page.key],
                             watch.copy(pet = null),
-                            false
+                            selected
                         )
                     }
                     item {
@@ -207,9 +207,11 @@ fun ProfileIdentity(
         ) { shown ->
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 if (shown == null && artwork?.portrait != null) {
-                    Image(
-                        remember(artwork.portrait) { artwork.portrait.asImageBitmap() },
+                    AnimatedPortrait(
+                        artwork.animation,
+                        artwork.portrait,
                         "${page.label} profile picture",
+                        selected && page.status == CatalogStatus.AVAILABLE,
                         Modifier.size(160.dp)
                     )
                 } else {

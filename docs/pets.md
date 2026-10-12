@@ -117,8 +117,9 @@ Each stable page chooses its validated endpoint pet, last good cached portrait, 
 original neutral robot. The portrait can be the imported box image or an explicit per-profile
 watch override selected on the phone. An override survives box refreshes without changing
 the box's original image; a validated endpoint pet still takes priority over either portrait.
-Portraits and pets occupy a fixed 96×104 dp area; a 220 ms crossfade
-keeps the identity text in place. Only the selected available foreground page animates;
+Portraits occupy 160×160 dp inside a fixed 160×168 dp frame; pets retain a centered
+96×104 dp canvas. A 220 ms crossfade keeps the identity text in place.
+Only the selected available foreground page animates;
 neighbor previews and offline/ambient remain static. Existing wave/work/jump/error cues,
 legacy fallback and amplitude mouth hysteresis are retained. Ambient chooses the selected
 page's pet, including a neutral outline for an unapproved card, rather than a previous
@@ -131,3 +132,18 @@ placement through arrival and compares actual moving/frozen rendered frames. Act
 base-only and companion delivery tests pass; the three-page test checks endpoint artwork
 isolation and real synthetic listening. [Captures and reproduction](demo/carousel/README.md).
 These are synthetic software checks; owner artwork, physical lip sync and power remain open.
+
+## Watch GIF overrides — 2026-10-12
+
+A user-selected GIF is an optional portrait loop, independent of endpoint pet delivery.
+It has a static normalized PNG fallback in the original version-1 roster. The extra manifest
+binds the animation and fallback hashes to the stable box/profile key. Import limits are
+256×256, 256 KiB, 120 frames, ten seconds per loop after clamping short delays to 50 ms,
+and 2,097,152 full-canvas pixels across frames. See [picture setup](profile-setup.md).
+
+Only the selected available foreground page runs the loop, including a reviewed catalog
+card before endpoint enrollment. Neighbor previews, reduced motion and power saver use
+the PNG. Ambient receives that static portrait and displays a dim grayscale circle, or a
+64×64 sparse black/white rendition for low-bit displays, under the existing minute shift.
+A pet idle outline retains priority. No GIF decoding or animation occurs in ambient mode.
+These rendering rules do not establish physical watch battery cost or lip-sync quality.

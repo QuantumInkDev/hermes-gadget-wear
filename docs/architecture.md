@@ -277,3 +277,29 @@ frames are forwarded. Recorder release precedes stop/finish callbacks; capture g
 connection epochs reject replaced-session callbacks. MediaCodec Opus remains the watch path;
 the initial phone path advertises PCM only. A bounded versioned Data Layer item replicates
 only the sound-enabled preference and timestamp, never endpoint or enrollment material.
+
+## Animated portrait overrides and recording outcomes
+
+GIF overrides retain the existing version-1 PNG roster. A separate optional
+`/hermes/animations/v1` manifest binds stable page keys to GIF hash, exact encoded length
+and PNG fallback hash; assets use `/hermes/animation-assets/v1/`. The protocol parser validates
+LZW pixels and bounded frame/timing data before Android decoding. Phone override metadata
+uses a new encrypted record without changing existing aliases or encryption AAD. Asset
+publication precedes manifest publication; failed publication keeps the prior GIF protected.
+One durable pending import, at most 256 KiB, is separate from the settled 32-file/8-MiB cache.
+After successful publication, unreferenced assets retire and the pending import is promoted.
+
+Watch cache admission is checked atomically with roster retirement/reset. Network fetches
+remain outside that lock; an expired admission cannot repopulate a retired page. The watch
+prepares selected/adjacent artwork, validates hash/length/fallback association, and decodes
+animation off the UI thread. Only the selected available resumed page runs an
+AnimatedImageDrawable. Reduced motion, power saver, previews and ambient retain static
+fallbacks. Endpoint pets remain higher priority than a portrait override.
+
+Recording feedback waits for both recorder shutdown and the token's accepted protocol outcome.
+Short captures, rejected sends and cancellation use cancellation feedback; the automatic
+recording limit uses completion feedback only after an accepted finish. Tokens and connection
+epochs suppress obsolete callbacks. Phone playback uses a player per stream and atomic,
+epoch/stream-guarded completion updates, so stopping/leaving a conversation does not acquire
+the session monitor from the playback monitor. Neither phone conversation teardown nor
+portrait import touches the independent watch relay or watch pairing records.
