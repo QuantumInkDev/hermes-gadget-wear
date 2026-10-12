@@ -59,11 +59,11 @@ watch rendering. This does not modify a live box or its published portrait.
 - [x] Run strict build/lint/format/JVM checks and the existing carousel, phone and relay regressions.
 - [x] Obtain a fresh whole-branch review; fix important findings and record resolutions.
 - [x] Update progress, setup/export instructions, release gates and SESSION_STATUS.
-- [ ] Deliver preserve-data physical updates when ADB is available; compare installed certificates,
-  enrollment ciphertexts and portrait hashes.
+- [x] Deliver preserve-data physical updates; both installed APK hashes and signing certificates
+  are verified, with watch enrollment/portraits and phone protected files/preferences unchanged.
 - [ ] Measure physical GIF battery and phone STT/voice quality with owner observation.
 
 Software verification: 105 JVM tests, 19 phone storage/directory, three phone stock TLS/vault/playback,
 14 Wear render/cache/audio/surface checks and both carousel interactions pass. Review corrections
-are recorded in docs/client-usability-review.md. Final physical delivery and owner audio/power
-checks remain pending ADB/observation.
+are recorded in docs/client-usability-review.md. Final physical delivery is verified; owner UI/audio/power
+checks remain pending observation.

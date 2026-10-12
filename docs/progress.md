@@ -31,8 +31,11 @@ recorder shutdown with the accepted protocol outcome, covering short release, au
 completion and rejected sends. Actual phone speech, cue audibility/contamination and animated
 watch battery cost remain physical observation gates. The final watch build is installed with
 matching certificate and APK hash, all 19 identity ciphertexts and 18 portrait hashes unchanged,
-and its original timeout restored. Phone installation awaits USB ADB; no live phone pairing
-or physical microphone test was initiated.
+and its original timeout restored. The final phone app is also installed with matching
+certificate and verified APK hash. All 39 protected app files, including 36 portrait PNGs,
+and both preferences remain unchanged. Owner phone UI/speech observations are pending;
+no live phone pairing or physical microphone test was initiated. GitHub Android, extensions
+and secrets checks passed for code `cea12b5` and delivery docs `de620f4`.
 
 The reported watch scroll reset was reproduced: the pager's progress flag replaced its
 active vertical list with a static preview during nested scrolling. The settled conversation

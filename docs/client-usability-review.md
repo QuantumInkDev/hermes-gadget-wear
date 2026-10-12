@@ -32,5 +32,7 @@ Physical phone STT/voice, cue audibility/contamination and GIF battery cost rema
 gates. They are not inferred bugs or established by synthetic input and source review.
 
 Final physical watch delivery verifies the installed APK hash, matching certificate and unchanged
-19 enrollment ciphertexts/18 portraits; original timeout is restored. Phone delivery awaits USB
-ADB. Installation alone does not close the speech, cue or animation power gates.
+19 enrollment ciphertexts/18 portraits; original timeout is restored. Final phone delivery
+also verifies its APK hash/certificate and unchanged 39 protected files (36 portrait PNGs)
+and two preference files. Installation alone does not close the speech, cue or animation
+power gates; owner phone UI observation is pending.
