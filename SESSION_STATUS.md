@@ -1,18 +1,23 @@
 # Session status
 
-Resumed native design pass, 2026-10-12: the maintainer confirms current watch scrolling,
-controls and recording cues work. GIF artwork is owner-led; the next office trial is planned
-separately. Phone Talk/Chat setup is authorized. Its normal M5 Max pairing CLI approval
-succeeded after verifying the existing endpoint on the phone, but USB disappeared before
-Ready/reply verification. GPU/ARM phone enrollment is not started. A private phone app-file
-backup was saved first; no watch identity was reused. The resumed ADB check sees no device.
+Native redesign approved, 2026-10-12: implement Portrait Studio and original Voice Q,
+Light/Dark/Electronic Moonlight, the swipe-first watch picker without Previous/Next,
+and one/four-profile tiles. Task 1 shared appearance preferences/adapters and original
+icon resources are committed (c3381bd); strict full checks/build, 107 JVM tests and
+11 owned-emulator appearance tests pass. Task-scoped independent review is running.
+Tasks 2–7 remain pending; no redesigned physical build is installed yet. The approved
+[design](docs/superpowers/specs/2026-10-12-native-client-design.md),
+[plan](docs/superpowers/plans/2026-10-12-native-client-design.md) and native receipts
+are the continuation map. SDD recovery ledger: .superpowers/sdd/2026-10-12-native-client-design/progress.md.
 
-The [native design proposal](docs/superpowers/specs/2026-10-12-native-client-design.md) and
-[interactive synthetic preview](docs/design/native-client-preview.html) are prepared for
-review: original mark exploration, three themes using verified Electronic Moonlight palette
-inputs, compact phone surfaces, swipe-first watch navigation/picker and one/four-profile tiles.
-No native redesign/tile implementation or new installation is claimed yet. Personal-portrait
-preview and physical pairing receipts stay in .local/native-design/.
+Authorized phone Talk/Chat setup now has 14 independently paired profiles: twelve M5 Max
+and two Win 11 ARM. Fresh typed replies passed on both default profiles; the other
+twelve were enrolled without reply probes. Four GPU profiles remain pending: the
+maintainer reports that box is off/asleep and will wake it. Spoken phone acceptance
+remains owner observation. App-file backups verify all preexisting identities, pictures
+and preferences unchanged; only refreshed catalog pages changed and new independent
+phone identity/known files were added. Five-minute phone timeout is restored. Private
+receipts stay in .local/native-design/phone-live/. No watch key was reused.
 
 Owner phone UI follow-up: three groups/portraits/Talk/Chat are visible. Clearer full-width box
 headers and connected panels, explicit dark foreground (native contrast 1.15→14.05:1), and
@@ -70,8 +75,8 @@ launched remotely; the maintainer's phone UI observation now passes. Phone clien
 no bulk live enrollment or real-device microphone test was initiated. All three GitHub CI jobs
 for code cea12b5 and docs de620f4 passed before this delivery note.
 
-Work resumed. Next: native design review, remaining phone pairing/speech checks, GIF battery/rendering
-and office trial. Owner manages Mac awake state; no power helper is installed. Existing live
+Work resumed. Next: approved native implementation/reviews, remaining GPU phone pairing/speech
+checks, GIF battery/rendering and office trial. Owner manages Mac awake state; no power helper is installed. Existing live
 18-profile cellular relay and three-profile watch speech evidence below remains historical;
 it does not establish the new phone client or GIF power gates. Keep PR #1 draft; no merge,
 release signing, Play upload or optional live server extension is authorized.

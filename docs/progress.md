@@ -493,3 +493,25 @@ acceptance reran successfully with a fresh audio-upload response. The shared-aud
 carousel interaction scenario passed in 13.874 seconds. [Setup instructions](profile-setup.md)
 now cover independent phone pairing and foreground Talk/Chat. Physical phone STT/voice,
 full UI acceptance and animated-picture checks remain separate gates.
+
+
+## Approved native appearance checkpoint — 2026-10-12
+
+The maintainer approved Portrait Studio, original Voice Q, three independent appearances,
+the watch picker without Previous/Next and one/four-profile tiles. Shared tokens, durable
+appearance preferences, native phone/Wear adapters and original icon assets are committed
+(c3381bd). Strict full check/lint/build passes with warnings as errors: 107 JVM tests and
+11 owned-emulator appearance checks pass. Actual Light Scaffold/time/system-bar contrast
+regressions were reproduced before correction. Task-scoped review is running; complete
+native phone/watch layouts and tiles are subsequent tasks, not current physical evidence.
+
+Authorized physical phone enrollment paired twelve M5 Max and two Win 11 ARM profiles
+through normal reviewed stock approvals. Both default profiles returned fresh typed markers;
+the other twelve had enrollment-only checks. Four GPU profiles await the owner waking that
+box. Existing identity/art/preference hashes are unchanged; catalog pages refreshed and new
+independent phone identities were added. Original five-minute timeout is restored. Real
+phone speech/voice remains owner observation; prior watch speech is not substituted.
+
+Demo note: owned native theme chooser screenshots and actual contrast/persistence checks
+pass. Physical devices retain the previous preserving debug build; no server extension,
+power helper, release signature, merge or Play publication was performed.
