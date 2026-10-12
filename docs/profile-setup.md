@@ -155,6 +155,24 @@ circle diameter 236 px, critical face/headgear within diameter 176 px. Keep a 10
 on a 4× pixel grid if using pixel art. The app renders names separately. Test at actual watch
 size rather than judging only the full-size master.
 
+## Before leaving the home network
+
+Keep the phone's tailnet VPN connected, Hermes relay enabled, and its association with the
+watch active. Use the saved `wss` profile in Automatic or Phone relay mode. With phone Wi-Fi
+off, test one short request on each box you plan to use; confirm **Phone relay · watch TLS**,
+the actual reply, then a fresh connection after locking the phone. Restore Wi-Fi afterward.
+
+Each box must remain powered on, awake and connected to its tailnet. A locked desktop can
+continue serving; sleeping, signed-out or powered-off hosts can be unavailable. Owner-login
+Windows jobs require that owner's logged-in session. Check plugged-in sleep settings and
+laptop lid behavior explicitly; app installation does not keep a server awake. Plan to use
+an available box when another is away or asleep. Cached pages and pictures remain browsable.
+
+Pair once per endpoint before departure. The catalog credential, Gadget pairing and model/
+speech provider credentials are separate. A paired page can still return a provider auth or
+rate-limit error; resolve that on the correct box/profile rather than resetting watch keys.
+Run a hold-to-talk check and listen to the selected profile's voice before depending on it.
+
 ## Understand setup and connection messages
 
 | Message or symptom | Meaning and next step |

@@ -59,6 +59,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
@@ -514,7 +515,7 @@ private fun ConversationPage(
         service::finishRecording,
         service::cancelRecording
     )
-    RoundPage(gesture) {
+    RoundPage(gesture, topPadding = if (prompt == null) 28.dp else 40.dp) {
         if (prompt != null) {
             item { Heading(stringResource(R.string.approval)) }
             item { Body(prompt.title) }
@@ -695,6 +696,7 @@ private fun ConversationPage(
 @Composable
 internal fun RoundPage(
     modifier: Modifier = Modifier,
+    topPadding: Dp = 40.dp,
     content: TransformingLazyColumnScope.() -> Unit
 ) {
     val state = rememberTransformingLazyColumnState()
@@ -702,7 +704,12 @@ internal fun RoundPage(
         ScreenScaffold(
             state,
             modifier = modifier,
-            contentPadding = PaddingValues(horizontal = 36.dp, vertical = 40.dp)
+            contentPadding = PaddingValues(
+                start = 36.dp,
+                top = topPadding,
+                end = 36.dp,
+                bottom = 40.dp
+            )
         ) { padding ->
             TransformingLazyColumn(
                 state = state,

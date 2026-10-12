@@ -1,14 +1,54 @@
 # Session status
 
-Physical setup is ongoing: all three catalog sources are entered on the authorized phone,
-all 18 round picture overrides were selected through the native picker and verified in
-portrait storage, and the watch received the actual 19-page catalog/approved-profile roster.
-Two new profile approvals have been observed Ready over Phone relay with watch TLS; the
-remaining enrollment and fresh cellular/background test are in progress. The shared phone
-Surface text-color fix passes strict checks and is installed with the matching local signature;
-the maintainer confirms readability. The watch timeout is temporarily extended for setup;
-restore it to the recorded baseline before handback. Current private receipts and device
-addresses are in `.local/profile-carousel/round-portraits/` and `physical-watch/`.
+Updated: 2026-10-12. The authorized live profile/portrait setup and typed cellular relay
+checks are complete. All three sources are on the phone; all 18 supplied round picture
+overrides were chosen through the native picker and verified in both actual device caches.
+The watch has 19 pages: 18 discovered TLS profiles and its retained original LAN page.
+All 17 new endpoints completed normal watch review and their correct stock CLI approval.
+All 19 identity ciphertexts are unchanged through the final app updates, including both
+original identities. No app data was cleared and no identity or portrait cache was seeded.
+
+All 18 profiles returned fresh markers with the phone keyguard showing, Wi-Fi disabled,
+validated cellular/Tailscale and USB debugging only: 12, four and two profiles per box.
+A fresh cold startup also passed with no prior phone relay foreground service. Every
+observed conversation used Phone relay with watch TLS. The earlier provider rate-limit
+response was followed by successful fresh replies; an earlier connection timeout was not
+reproduced in the resumed cold check. These typed checks do not prove audible speech quality
+or an isolated Bluetooth radio path. The legacy LAN endpoint is outside the 18 TLS passes.
+
+A controlled outage of only the owned Mac catalog job retained the selected page, 19-page
+order and portrait; refreshing after its return removed the offline badge. The phone stayed
+locked on cellular, portrait references stayed identical, and the exact owned job and Serve
+configuration were restored. The first immediate startup probe was early; the repeated
+check waited for HTTP readiness and passed. This is catalog outage/recovery, not a whole-box
+power-cycle test. The maintainer will manage the Mac's awake state; no AC helper was installed.
+
+Portraits are now twice their original display diameter: 160 dp, measuring 340 by 340 pixels
+on this Ultra. Portrait pages use 28 dp top padding instead of 40 dp. The final measured
+bounds are [70,69,410,409], 25 pixels higher, with the portrait center at y=239 on a 480-pixel
+screen. The full circle and clock were visually checked. Pet canvas sizing remains as before.
+The final installed watch APK matches the local build and retains the matching phone signature.
+
+Phone Wi-Fi is restored to enabled, phone screen timeout to 300000 ms and watch timeout to
+15000 ms. The existing root TLS page is selected; its saved Automatic preference was verified
+through normal settings. All 18 actual portrait hashes and 19 identity ciphertexts were
+rechecked after the final installation. No test worker remains active.
+
+Strict full checks, both debug/instrumentation builds and unsigned release bundles passed
+with warnings as errors; JVM reports contain 71 tests and zero failures/errors/skips.
+Debug relay failure diagnostics include only exception class, errno, elapsed time and
+foreground/network-blocked flags; no private messages, keys, URLs or identifiers are logged.
+Private receipts, APK/vault backups and screenshots are in
+`.local/profile-carousel/round-portraits/` and `physical-watch/`; diagnostics are in
+`.local/network-probe/`. Use `cellular-turns.json`, `catalog-outage-result.json`,
+`centered-portrait-install.json` and `final-restoration.json` for exact continuation evidence.
+
+Next: the maintainer's fresh hold-to-talk/transcript/audible-voice check on one profile from
+each box was requested. Keep physical speech, radio interruption/throughput, unplugged battery,
+live optional pet/Opus/client-voice extensions, signing/privacy and Play acceptance separate
+from these passes. Do not install optional SDK extensions on live hosts without their review.
+Use [the setup guide](docs/profile-setup.md), [physical report](docs/physical-results.md) and
+[release gates](docs/release.md). Earlier dated snapshots below are historical.
 
 ## Current continuation — portraits and live setup, 2026-10-11
 
@@ -39,10 +79,9 @@ warnings as errors; 71 JVM tests and 12 owned API 37 phone vault/portrait/reposi
 pass. Native phone UI discovery and picture controls were exercised against the live local
 catalog. Original portrait pack and exact 1024-master/256-runtime prompt are in ignored storage.
 
-Continue with real phone source entry, watch metadata/portrait delivery and per-profile URL
-review/pairing. The watch is online through its recorded isolated ADB server; the reconnected
-phone currently reports unauthorized and needs the owner's USB debugging approval. Preserve
-both original watch identities and local signatures. [Publication setup](docs/profile-setup.md)
+The phone is authorized and all three sources, 18 portraits and 17 new per-profile approvals
+are now installed as recorded above. Earlier pending source-entry and authorization notes
+are superseded. Preserve both original watch identities and local signatures. [Publication setup](docs/profile-setup.md)
 documents box/profile prerequisites and diagnostics. Real speech, locked-phone catalog,
 source loss/return, battery and signing/Play gates remain open; keep using [release](docs/release.md).
 

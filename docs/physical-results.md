@@ -1,5 +1,37 @@
 # Physical-device results
 
+## Round portraits and live profile setup — 2026-10-12
+
+This continuation follows the maintainer's approved live setup and supplied round images.
+Personal images, endpoint details, registry records, screenshots and receipts stay ignored.
+
+| Check | Observation |
+| --- | --- |
+| Source entry | Three actual HTTPS sources were entered on the physical phone; the watch received a 19-page roster containing 18 discovered profiles and the retained LAN page. |
+| Round image selection | All 18 supplied 256 by 256 RGBA images were chosen through the native photo picker. Actual normalized phone PNGs retain the circular alpha shape and match the staged art; all 18 hashes are present in the real watch cache. |
+| Pairing | All 17 new endpoints completed normal on-watch review and exact profile-specific CLI approval. Each reached Ready on Phone relay with watch TLS. The existing root endpoint also reached Ready; no original identity was rotated. |
+| Larger portraits | The requested change doubles the image from 80 to 160 dp. Bounds on the 480-pixel, 340-dpi Ultra are 340 by 340 pixels. The follow-up top-padding change from 40 to 28 dp raises it 25 pixels to bounds [70,69,410,409], with center y=239. Visual inspection shows the complete circle and clock; names and controls remain below in the scrollable page. |
+| Preserving installation | Watch/phone certificates match. The watch's installed updated APK hash matches the local build, all 19 identity ciphertexts match before/after, and both original ciphertexts match their initial baseline. A complete prior APK and encrypted vault backup are private. |
+| Phone cellular reachability | A selected read-only diagnostic using existing phone configuration passed authenticated default-trust HTTPS for all three catalogs on validated cellular/Tailscale, Wi-Fi off and USB debugging only. It did not pair, reset or send a conversation. The normal test APK was restored afterward. |
+| Provider recovery | A previously rate-limited profile returned a fresh exact marker on the same cellular TLS path after the pause. The prior rate-limit response was a server-model failure, not successful conversation acceptance. |
+| Cold background startup | With the phone keyguard showing, Wi-Fi off, validated cellular/VPN and no active phone relay foreground service, watch app startup opened a fresh relay and returned its exact marker through watch-owned TLS. |
+| Per-profile requests | All 18 profiles returned fresh markers through Phone relay with watch TLS on validated cellular/VPN, Wi-Fi off and USB debugging only. The phone keyguard remained showing for each: 12, four and two per source. No automatic input replay was used. |
+| Catalog outage/return | Stopping only the owned Mac catalog job produced the cached-offline badge while retaining selected page 1/19 and its portrait. After HTTP readiness and refresh, the badge disappeared. The phone stayed locked on cellular; the exact job/routes and portrait index were restored. This did not power off the box or interrupt its Gadget gateway. |
+| Restoration | Phone Wi-Fi is enabled; phone and watch timeouts are restored to 300000 and 15000 ms. Normal watch settings verify the root TLS profile is Automatic. All 19 identity ciphertexts and 18 picture hashes remain intact after the final update. |
+
+Earlier automation missed replies arriving beneath the portrait; the helper now sweeps the
+body and transport footer until the fresh response is observed. One earlier cold connection
+timeout remains recorded and was not reproduced by the successful resumed cold test. Debug
+builds can record exception class, errno, elapsed time and foreground/network-blocked flags;
+URLs, headers, keys, device IDs, exception messages and conversation text are excluded.
+
+Whole-box power transitions, fresh speech across all three boxes, live optional pet/Opus
+extensions, radio-path/throughput, battery and Play acceptance remain open. The maintainer
+will manage the Mac's awake state; the proposed AC-only power helper was not installed.
+
+
+## Earlier baseline — 2026-10-06–07
+
 Recorded 2026-10-06–07 on a Samsung Galaxy Watch Ultra and Galaxy S25 Ultra, both
 Android 16 / API 36. Device addresses, names, keys and raw captures remain in ignored
 maintainer storage. These results supplement the [acceptance runbook](device-testing.md).

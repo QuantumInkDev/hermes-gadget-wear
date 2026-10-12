@@ -243,5 +243,13 @@ page selects one URL-scoped conversation; recording/approval disables page chang
 prior epoch guards reject old callbacks. Memory-only drafts are bounded per URL. Navigation
 and unfinished setup fields are activity-owned above ambient replacement. The selected
 foreground pet crossfades in a fixed area, while ambient uses its static monochrome outline.
-There are no new periodic idle/ambient discovery timers. Real paired-device catalog transfer
-and live three-box publication remain acceptance gates; see the [demo](demo/carousel/README.md).
+Portraits use a 160 dp square inside a fixed 160 by 168 dp artwork frame, doubling their
+original 80 dp diameter. The frame keeps that size through the round page's text gutters;
+names and controls remain below it in the scrollable page. Pets retain their existing
+96 by 104 dp canvas centered in that frame. Portrait conversation/discovery pages use 28 dp
+top padding to center the enlarged circle beneath the clock; approval/setup screens keep
+their existing 40 dp top padding.
+There are no new periodic idle/ambient discovery timers. Real paired-device portrait/catalog transfer, per-profile cellular TLS replies and controlled
+catalog outage/return are recorded in [physical results](physical-results.md). Whole-box power
+transitions, physical speech/pets, radio and battery acceptance remain separate from the
+[synthetic demo](demo/carousel/README.md).

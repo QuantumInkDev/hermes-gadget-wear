@@ -1,5 +1,11 @@
 # Watch portraits and live profile setup
 
+Execution resumed by the maintainer on 2026-10-12 after the prior rate-limit pause.
+Portrait delivery and new-profile pairing are complete. All 18 profiles pass fresh locked-
+phone cellular TLS replies; the cold-start and catalog outage/return checks pass. The doubled,
+raised portraits are installed and visually verified. Fresh owner speech, whole-box power,
+battery and release gates remain. See `SESSION_STATUS.md` for exact continuation evidence.
+
 Status: the maintainer requested a portrait export/regeneration prompt, explicit watch-specific
 picture overrides, and setup of missing profile connections with publication instructions.
 This instruction authorizes the reviewed live catalog rollout and preparation/configuration
@@ -31,3 +37,19 @@ outside this change.
    providing the shared Material content color at the activity surface. Build and install
    the update with the same signing certificate, preserving catalog choices and identities,
    then continue portrait selection, watch enrollment and cellular relay verification.
+7. If fresh cellular/background connections fail, distinguish the phone's actual network
+   access from relay startup. Use a read-only diagnostic with the existing app identity;
+   preserve its storage. Add debug-only failure type, elapsed-time and blocked-network
+   diagnostics without logging URLs, headers, keys, device IDs or conversation content.
+   Correct only a demonstrated defect and repeat the real-device check before claiming readiness.
+
+8. The maintainer requested circular portraits twice as large on 2026-10-12. Increase the
+   portrait from 80 dp to 160 dp with a fitting artwork frame. Preserve pet priority and
+   the existing pet canvas size. Build and install with matching signatures, verify the
+   actual round watch layout, and preserve all profile identities and picture overrides.
+
+9. After relay testing, apply the maintainer's 2026-10-12 request to move the enlarged
+   portrait closer to the clock. Use 28 dp top padding on portrait conversation/discovery
+   pages instead of 40 dp, leaving other setup/approval screens at their existing spacing.
+   Verify the image remains 160 dp, its center approaches the round display center, and
+   the clock/circle/name remain readable on the actual watch after a preserving update.

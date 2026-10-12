@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -119,7 +120,7 @@ fun ProfileCarousel(
         ) {
             conversation(page, controls)
         } else if (selected) {
-            RoundPage {
+            RoundPage(topPadding = 28.dp) {
                 item {
                     ProfileIdentity(page, watch.artwork[page.key], watch.copy(pet = null), false)
                 }
@@ -179,7 +180,7 @@ fun ProfileIdentity(
         val pet = if (selected) watch.pet ?: artwork?.pet else artwork?.pet
         Crossfade(
             targetState = pet,
-            modifier = Modifier.size(96.dp, 104.dp),
+            modifier = Modifier.requiredSize(160.dp, 168.dp),
             animationSpec = tween(220),
             label = "profile artwork"
         ) { shown ->
@@ -188,7 +189,7 @@ fun ProfileIdentity(
                     Image(
                         remember(artwork.portrait) { artwork.portrait.asImageBitmap() },
                         "${page.label} profile picture",
-                        Modifier.size(80.dp)
+                        Modifier.size(160.dp)
                     )
                 } else {
                     PetView(

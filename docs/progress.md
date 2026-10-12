@@ -1,5 +1,38 @@
 # Progress
 
+## Larger watch portraits and live device setup — 2026-10-12
+
+The maintainer requested circular portraits twice as large. Portraits now render at 160 dp
+instead of 80 dp, within a 160 by 168 dp fixed artwork frame. The Ultra accessibility bounds
+measure 340 by 340 pixels and the actual screenshot shows the whole round portrait. The
+follow-up placement request reduces portrait-page top padding from 40 to 28 dp: measured
+bounds move upward 25 pixels, centering the image at y=239 on the 480-pixel display. Names
+and controls remain below it in the scrollable page; pet rendering retains its existing canvas.
+Strict full checks and both debug builds pass with warnings as errors: 71 JVM tests, no
+failures/errors/skips. The matching-signature watch update preserves all 19 identity
+ciphertexts; its installed APK hash matches the local build. Personal art/screenshots are ignored.
+
+All three sources were entered through the physical phone UI. All 18 supplied round
+256 by 256 PNGs were chosen through the native picker, then verified against the actual
+normalized phone cache and watch content hashes. All 17 new endpoints were reviewed on the
+watch, approved through their correct profile-specific stock CLI, and observed Ready on
+Phone relay with watch TLS. The existing root endpoint also reached Ready; the original two
+identity ciphertexts remain unchanged. No identity or portrait cache was seeded.
+
+A read-only phone diagnostic passed authenticated default-trust HTTPS to all three catalogs
+on validated cellular/Tailscale with Wi-Fi off and USB debugging only. A profile that returned
+a provider rate-limit error before the pause now returned its fresh exact marker. A second
+fresh reply passed with the phone keyguard showing and no relay foreground service before
+watch app startup. All 18 profiles returned fresh markers with the phone keyguard showing on the same cellular
+TLS path: 12, four and two per source. A controlled outage of the owned Mac catalog job
+retained the selected page, 19-page order and portrait; refresh after return restored source
+availability. The exact job/routes and picture references were preserved. This exercises
+catalog failure rather than whole-box power loss. Phone Wi-Fi and both original screen
+timeouts are restored; root Automatic is verified. See [physical results](physical-results.md).
+Do not infer physical speech, radio throughput, battery,
+live optional pets/Opus, signing or Play acceptance from typed replies.
+
+
 ## Phone text contrast correction — 2026-10-11
 
 The maintainer reported black text over the dark companion background. The shared activity
@@ -41,10 +74,11 @@ start at login and continue while locked. All personal values, art, logs and rol
 remain ignored. [Setup guide](profile-setup.md) explains what users need once per box and
 once per profile, managed settings, TLS/access, catalogs, pictures and independent pairing.
 
-Demo note: software/native UI and real server transport checks passed. Actual phone source
-entry and watch portrait delivery await the reconnected phone's USB debugging authorization.
-New endpoints still require normal watch review and profile-specific approval. Locked-phone
-catalog delivery, source loss/return, physical speech/pets, battery and publication gates remain open.
+Demo note: source entry, all 18 round overrides and real watch delivery now pass, as recorded
+in the 2026-10-12 continuation above. All 17 new endpoints completed normal watch review and
+profile-specific approval. Fresh locked-phone cellular conversation startup also passed.
+Controlled catalog outage/return now passes. Whole-box power transitions, physical
+speech/pets, battery and publication gates remain open.
 
 ## Approved multi-box carousel — 2026-10-11
 

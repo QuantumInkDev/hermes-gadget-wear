@@ -62,6 +62,25 @@ class RelayStopReceiver : BroadcastReceiver() {
 
 /** The Play Services listener receives only same-package/same-signature wearable channels. */
 class RelayService : WearableListenerService() {
+    @Volatile private var debugNetworkBlocked: Boolean? = null
+    private val debugNetwork = object : android.net.ConnectivityManager.NetworkCallback() {
+        override fun onBlockedStatusChanged(network: android.net.Network, blocked: Boolean) {
+            debugNetworkBlocked = blocked
+        }
+    }
+    private val debugEnabled: Boolean
+        get() = applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+
+    private fun debugFailure(stage: String, failure: Exception, started: Long) {
+        if (!debugEnabled) return
+        val errno = (failure.cause as? android.system.ErrnoException)?.errno
+        android.util.Log.d(
+            "HermesRelay",
+            "$stage: ${failure.javaClass.simpleName}; errno=$errno; " +
+                "elapsedMs=${android.os.SystemClock.elapsedRealtime() - started}; " +
+                "foreground=${foreground.get()}; networkBlocked=$debugNetworkBlocked"
+        )
+    }
     private val speechApi = ElevenLabsApi()
     private val speechCalls = ConcurrentHashMap<ChannelClient.Channel, okhttp3.Call>()
     private val capacity = RelayCapacity()
@@ -76,6 +95,10 @@ class RelayService : WearableListenerService() {
 
     override fun onCreate() {
         super.onCreate()
+        if (debugEnabled) {
+            getSystemService(android.net.ConnectivityManager::class.java)
+                .registerDefaultNetworkCallback(debugNetwork)
+        }
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(
                 "relay",
@@ -91,6 +114,7 @@ class RelayService : WearableListenerService() {
     }
 
     override fun onChannelOpened(channel: ChannelClient.Channel) {
+        val started = android.os.SystemClock.elapsedRealtime()
         val client = Wearable.getChannelClient(this)
         val catalog =
             channel.path == dev.quantumink.hermesgadget.protocol.ProfileCatalog.REFRESH_PATH
@@ -204,7 +228,8 @@ class RelayService : WearableListenerService() {
                             getString(R.string.relay_active)
                         )
                     }
-                } catch (_: Exception) {
+                } catch (failure: Exception) {
+                    debugFailure(if (catalog) "catalog" else "channel", failure, started)
                     RelaySettings.report(getString(R.string.relay_failed))
                     release()
                 } finally {
@@ -269,12 +294,17 @@ class RelayService : WearableListenerService() {
             foreground.set(true)
         }
         true
-    } catch (_: Exception) {
+    } catch (failure: Exception) {
+        debugFailure("foreground", failure, android.os.SystemClock.elapsedRealtime())
         RelaySettings.report(getString(R.string.relay_background_denied))
         false
     }
 
     override fun onDestroy() {
+        if (debugEnabled) {
+            getSystemService(android.net.ConnectivityManager::class.java)
+                .unregisterNetworkCallback(debugNetwork)
+        }
         owned.values.toList().forEach { it() }
         pumps.values.forEach { it.close() }
         workers.shutdownNow()
