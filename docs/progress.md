@@ -542,3 +542,11 @@ The supplied eighteen watch-256 GIFs are validated and matched to their profiles
 256x256, eight frames, six seconds, transparent corners and maximum47,528 bytes. Native
 picker import/delivery is in progress; personal files/receipts stay ignored and originals
 unchanged. No redesigned physical installation or final GIF acceptance is claimed yet.
+
+
+Native watch picker checkpoint — 2026-10-12: Tasks 1–3 have clean scoped reviews.
+Task 4 removes visual Previous/Next controls and adds the stable-key picker and bounded
+page indicator. Review found a catalog-shrink crash; a failing native regression reproduced
+it before correction in 3a75fd5. All three affected native tests and strict Wear checks pass,
+including actual rotary input after dismissal. Scoped re-review is clean. Tile implementation,
+final whole-branch review and preserving physical native delivery remain in progress.

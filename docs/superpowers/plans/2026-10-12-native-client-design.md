@@ -14,7 +14,7 @@
 ## Global Constraints
 
 - Keep protocol free of Android imports and preserve stock Hermes Gadget SDK v0.2.0 wire behavior.
-- Existing app/package IDs and matching signing identity remain unchanged. No uninstall, clear-data, identity copying, vault seeding or screenshot-security bypass.
+- Existing app/package IDs and matching signing identity remain unchanged. No uninstall, clear-data, identity copying or vault seeding of physical/personal installs, and no screenshot-security bypass. The existing guarded synthetic-only carousel harness may reset only the verified owned Hermes_M2 emulator and create localhost fixture state; it must exclude physical devices.
 - Never commit personal endpoints, tailnet details, credentials, signing keys or personal art; maintainer material stays in ignored `.local/`.
 - Light, Dark and Electronic Moonlight persist independently on phone/watch; existing installs default to Dark. Explicit palettes are not overridden by wallpaper colors.
 - Normal text contrast targets 4.5:1; large text/essential boundaries target 3:1. Phone background/surface/main text/secondary/accent/on-accent values are exactly the approved spec table.
@@ -170,6 +170,7 @@
 - [ ] Dispatch one broad whole-branch review on the most capable configured model with full spec/ledger/diff evidence; resolve findings in one fix wave and scoped re-review. Per-task review does not replace this gate.
 - [ ] Compare existing device certificates, back up APK/data and store protected-file hashes; install with preserving updates only. Verify APK hash and unchanged existing identities/portraits/preferences except the explicitly changed appearance/pins and normal new phone identities. Never bypass a signature mismatch.
 - [ ] Import the maintainer’s supplied eighteen bounded watch-256 GIFs through normal native picture selection; verify independent descriptors/caches on phone/watch and static ambient/tile/reduced-motion fallbacks. Personal assets and receipts remain ignored; originals are unchanged and no app cache is seeded.
+- [ ] Import the supplied eighteen validated watch-256 GIFs through the normal phone picture picker, matching each to its stable profile. Preserve the source originals and private art boundaries; verify saved decoded frames, phone-to-watch delivery and static ambient/tile/reduced-motion fallbacks when hardware is available. Keep only exact unavailable hardware gates open.
 - [ ] Through normal UI, choose the maintainer's preferred Moonlight appearance and configure Focus/four pins when devices are available. Verify physical tile addition and each portrait launch on the watch; request owner speech/visual observations. Restore temporary timeout settings after testing. Keep owner GIF/office and quantitative battery/audio gates distinct.
 - [ ] Record verified checks/demo notes and review results, update draft PR, run public secret/private-value scans, commit/push only authorized public files. Do not merge or publish a release. If hardware is unavailable, continue software work and leave only its exact hardware gates open.
 

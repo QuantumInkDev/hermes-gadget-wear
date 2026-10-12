@@ -1,3 +1,4 @@
+<!-- Current continuation: 2026-10-12 native Tasks 1–4 reviewed; Task 5 tiles next. Physical GIF picker imports in progress, no successful import claimed yet. Follow .superpowers/sdd/2026-10-12-native-client-design/progress.md. -->
 # Session status
 
 Native redesign approved, 2026-10-12: implement Portrait Studio and original Voice Q,
