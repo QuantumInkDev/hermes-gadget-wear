@@ -222,6 +222,10 @@ class CatalogDirectoryRepositoryTest {
                     "a:p" in repository.watchPictures.value
                 )
                 repository.selectWatchPhoto("a:p", photo(2))
+                assertEquals(
+                    setOf("manual:${ClientSpeech.endpointId(profile.endpoint)}", "a:p"),
+                    vault.overrides().map { it.key }.toSet()
+                )
                 val chosen = repository.savedPages().single {
                     it.key == "a:p"
                 }.profile.portrait?.sha256

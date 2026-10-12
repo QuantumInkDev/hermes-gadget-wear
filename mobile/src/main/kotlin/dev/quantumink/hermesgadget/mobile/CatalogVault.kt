@@ -5,6 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.AtomicFile
 import dev.quantumink.hermesgadget.protocol.CatalogPage
+import dev.quantumink.hermesgadget.protocol.CatalogProfile
 import dev.quantumink.hermesgadget.protocol.CatalogSource
 import dev.quantumink.hermesgadget.protocol.ProfileCatalog
 import java.io.File
@@ -115,7 +116,18 @@ class CatalogVault(
     }.orEmpty()
 
     @Synchronized fun saveOverrides(pages: List<CatalogPage>) {
-        write("watch-pictures", ProfileCatalog.encodePages(pages).toByteArray())
+        // Overrides are keyed artwork, not an endpoint roster. A dormant manual picture may
+        // share the endpoint of a discovered page without replacing either picture choice.
+        val pictures = pages.map { page ->
+            CatalogPage(
+                page.sourceId,
+                page.sourceLabel,
+                CatalogProfile(page.profile.id, page.profile.name, null, page.profile.portrait),
+                page.status,
+                page.checkedAt
+            )
+        }
+        write("watch-pictures", ProfileCatalog.encodePages(pictures).toByteArray())
     }
 
     private fun key(): SecretKey {
