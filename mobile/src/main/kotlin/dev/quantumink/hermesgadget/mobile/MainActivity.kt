@@ -14,26 +14,24 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.quantumink.hermesgadget.client.AppearancePreferences
-import dev.quantumink.hermesgadget.client.CuePreferences
 
 class MainActivity : ComponentActivity() {
     private val catalogNetwork = object : android.net.ConnectivityManager.NetworkCallback() {
@@ -140,12 +138,22 @@ class MainActivity : ComponentActivity() {
                 PhoneScaffold(
                     topBar = {
                         androidx.compose.foundation.layout.Box(Modifier.statusBarsPadding()) {
-                            PhoneBrandHeader()
+                            if (destination != "conversation") PhoneBrandHeader()
                         }
                     },
-                    bottomBar = { PhoneNavigationBar(destination, ::navigate) }
+                    bottomBar = {
+                        if (WindowInsets.ime.getBottom(LocalDensity.current) ==
+                            0
+                        ) {
+                            PhoneNavigationBar(destination, ::navigate)
+                        }
+                    }
                 ) { padding ->
-                    Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
+                    Column(
+                        Modifier.fillMaxSize().padding(
+                            padding
+                        ).consumeWindowInsets(padding).imePadding()
+                    ) {
                         when (destination) {
                             "profiles" -> DirectoryPage(
                                 this@MainActivity,
@@ -189,42 +197,17 @@ class MainActivity : ComponentActivity() {
                                         navigate("settings")
                                     }
                                     "settings" -> PhoneSettingsPage(this@MainActivity, ::navigate)
-                                    else -> {
-                                        Text(
-                                            "Watch relay",
-                                            style = MaterialTheme.typography.headlineMedium
-                                        )
-                                        Text(stringResource(R.string.relay_tls_hint))
-                                        Text(stringResource(R.string.relay_vpn_hint))
-                                        Button({
-                                            if (enabled) {
-                                                RelaySettings.setEnabled(this@MainActivity, false)
-                                                enabled =
-                                                    false
-                                            } else {
-                                                requestRelay()
-                                            }
-                                        }) {
-                                            Text(
-                                                stringResource(
-                                                    if (enabled) {
-                                                        R.string.disable_relay
-                                                    } else {
-                                                        R.string.enable_relay
-                                                    }
-                                                )
-                                            )
-                                        }
-                                        Button(::associateWatch) {
-                                            Text(stringResource(R.string.associate_watch))
-                                        }
-                                        Text(stringResource(R.string.association_hint))
-                                        Button({
-                                            RelaySettings.stop()
-                                        }) { Text(stringResource(R.string.stop_relay)) }
-                                        Text(status.ifBlank { getString(R.string.relay_idle) })
-                                        Text(stringResource(R.string.privacy_note))
-                                    }
+                                    else -> WatchDashboard(
+                                        enabled,
+                                        status,
+                                        ::requestRelay,
+                                        {
+                                            RelaySettings.setEnabled(this@MainActivity, false)
+                                            enabled = false
+                                        },
+                                        ::associateWatch,
+                                        { RelaySettings.stop() }
+                                    )
                                 }
                             }
                         }

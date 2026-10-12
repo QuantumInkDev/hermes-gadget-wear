@@ -29,6 +29,49 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class DirectoryPresentationTest {
+    @Test fun settingsLinksAndWatchRelayControlsDelegateToTheirExistingOwners() {
+        assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
+        NativePhoneFixture().use { ui ->
+            val routes = mutableListOf<String>()
+            ui.show(destination = "settings", scroll = true) {
+                PhoneSettingsPage(ui.context, routes::add)
+            }
+            ui.click("Appearance")
+            ui.click("Boxes and discovery")
+            ui.click("Manual watch endpoints")
+            ui.click("Watch speech providers")
+            assertEquals(listOf("appearance", "boxes", "manual", "speech"), routes)
+            var enabled = 0
+            var disabled = 0
+            var associated = 0
+            var stopped = 0
+            val relay = mutableStateOf(false)
+            ui.show(destination = "watch", scroll = true) {
+                WatchDashboard(
+                    relay.value,
+                    "Synthetic relay idle",
+                    {
+                        enabled++
+                        relay.value = true
+                    },
+                    {
+                        disabled++
+                        relay.value = false
+                    },
+                    { associated++ },
+                    { stopped++ }
+                )
+            }
+            ui.click("Phone relay", description = true)
+            ui.await { ui.find("Enabled") != null }
+            ui.click("Phone relay", description = true)
+            ui.await { ui.find("Disabled") != null }
+            ui.click("Allow background relay")
+            ui.click("Disconnect")
+            assertEquals(listOf(1, 1, 1, 1), listOf(enabled, disabled, associated, stopped))
+        }
+    }
+
     @Test fun fullRowOpensTheExactProfileAndOverflowKeepsPictureResetAndDetails() {
         directoryFixture { fixture ->
             fixture.show()
@@ -40,6 +83,7 @@ class DirectoryPresentationTest {
             fixture.awaitText("Choose picture")
             fixture.clickText("Use box picture")
             fixture.await { "a:alpha" !in fixture.repository.watchPictures.value }
+            fixture.await { fixture.findText("Picture for Alpha") == null }
             fixture.clickDescription("Options for Alpha")
             fixture.clickText("Endpoint details")
             fixture.awaitText("wss://alpha.example.invalid/gadget")
@@ -508,7 +552,11 @@ private class DirectoryFixture : AutoCloseable {
         click(requireNotNull(findText(text)))
     }
     fun clickDescription(text: String) {
-        awaitDescription(text)
+        await {
+            var node = findDescription(text)
+            while (node != null && !node.isClickable) node = node.parent
+            node?.isEnabled == true
+        }
         click(requireNotNull(findDescription(text)))
     }
     private fun click(target: AccessibilityNodeInfo) {

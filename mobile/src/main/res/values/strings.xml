@@ -1,8 +1,6 @@
 <resources>
     <string name="app_name">Quantum Relay for Hermes</string>
     <string name="privacy_note">No account with us. No hosted backend. No analytics.</string>
-    <string name="enable_relay">Enable phone relay</string>
-    <string name="disable_relay">Disable phone relay</string>
     <string name="relay_channel">Watch relay</string>
     <string name="relay_idle">Ready for your watch</string>
     <string name="relay_active">Relaying watch conversation</string>
@@ -18,7 +16,6 @@
     <string name="association_cancelled">Association cancelled. Background relay may be blocked.</string>
     <string name="association_unavailable">Companion association is unavailable. Open this app before connecting from the watch.</string>
     <string name="local_permission_needed">Nearby network permission is required for private endpoints.</string>
-    <string name="speech_title">Voice and ElevenLabs key</string>
     <string name="speech_disclosure">Server voice is the default. BYOK sends final reply text to this phone and ElevenLabs, and may use paid credits. Keys stay encrypted on this phone. Choose BYOK per server, then reconnect the watch over Phone or Automatic with wss. Direct connections use server voice. Blank key fields keep the stored key; use Delete to remove it.</string>
     <string name="speech_shared_key">Shared API key</string>
     <string name="speech_shared_voice">Shared voice ID (optional)</string>
@@ -43,16 +40,12 @@
     <string name="speech_key_missing">No key is stored for this selection.</string>
     <string name="speech_quota_unknown">Key accepted. Quota was not reported.</string>
     <string name="speech_quota">Key accepted. Reported remaining characters: %1$d.</string>
-    <string name="profiles_title">Hermes profiles</string>
     <string name="profile_sync_disclosure">Save up to eight endpoints and send setup to your paired watch. URLs, names and optional access tokens are shared with the watch; pairing and ElevenLabs keys are excluded. The watch asks you to review each import. Removing phone setup also removes its phone voice key, but does not delete watch setup or server enrollment.</string>
     <string name="profile_name">Profile name</string>
     <string name="profile_url">Gadget WebSocket URL</string>
     <string name="profile_token">Optional access token</string>
-    <string name="profile_private">Mark as LAN / tailnet</string>
-    <string name="profile_private_on">LAN / tailnet selected</string>
     <string name="profile_cleartext_warning">Cleartext exposes pairing keys, audio and replies to the local network. Public endpoints and phone relay require wss. The watch must accept this warning separately.</string>
     <string name="profile_accept">Accept cleartext for this endpoint</string>
-    <string name="profile_accepted">Cleartext warning accepted</string>
     <string name="profile_save_sync">Save and send setup</string>
     <string name="profile_resync">Send saved setup again</string>
     <string name="profile_delete">Remove phone profile and its voice key</string>

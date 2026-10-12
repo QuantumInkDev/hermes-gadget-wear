@@ -34,6 +34,8 @@ data class PhoneConversationState(
     val draft: String = "",
     val sending: Boolean = false,
     val speaking: Boolean = false,
+    val playbackLevel: Float = 0f,
+    val mediaMuted: Boolean = false,
     val visible: Boolean = false,
     val error: String = ""
 ) {
@@ -45,9 +47,19 @@ class PhoneConversation @JvmOverloads constructor(
     application: Application,
     private val vault: ConversationVault = ConversationVault(application),
     private val httpClient: OkHttpClient? = null,
-    private val playbackFactory: (android.content.Context, () -> Unit, () -> Unit) -> PcmPlayback =
-        { context, interrupted, finished ->
-            PcmPlayback(context, onInterrupted = interrupted, onFinished = finished)
+    private val playbackFactory: (
+        android.content.Context,
+        () -> Unit,
+        (Float) -> Unit,
+        () -> Unit
+    ) -> PcmPlayback =
+        { context, interrupted, level, finished ->
+            PcmPlayback(
+                context,
+                onInterrupted = interrupted,
+                onLevel = level,
+                onFinished = finished
+            )
         }
 ) : AndroidViewModel(application) {
     private class Saved(var draft: String = "", var reply: String = "")
@@ -75,6 +87,7 @@ class PhoneConversation @JvmOverloads constructor(
             page = page,
             draft = previous.draft,
             visible = true,
+            mediaMuted = mediaMuted(),
             connection = ConnectionState(conversation = ConversationState(reply = previous.reply))
         )
     }
@@ -178,12 +191,32 @@ class PhoneConversation @JvmOverloads constructor(
                             val speaker = playbackFactory(
                                 getApplication(),
                                 { socket.report("Playback interrupted.") },
+                                { level ->
+                                    mutable.update { current ->
+                                        if (current.sessionVersion == version && current.visible &&
+                                            current.playbackVersion == stream && current.speaking
+                                        ) {
+                                            current.copy(
+                                                playbackLevel = if (level.isFinite()) {
+                                                    level.coerceIn(
+                                                        0f,
+                                                        1f
+                                                    )
+                                                } else {
+                                                    0f
+                                                }
+                                            )
+                                        } else {
+                                            current
+                                        }
+                                    }
+                                },
                                 {
                                     mutable.update { current ->
                                         if (current.sessionVersion == version && current.visible &&
                                             current.playbackVersion == stream
                                         ) {
-                                            current.copy(speaking = false)
+                                            current.copy(speaking = false, playbackLevel = 0f)
                                         } else {
                                             current
                                         }
@@ -191,7 +224,14 @@ class PhoneConversation @JvmOverloads constructor(
                                 }
                             )
                             playback = speaker
-                            mutable.update { it.copy(speaking = true, playbackVersion = stream) }
+                            mutable.update {
+                                it.copy(
+                                    speaking = true,
+                                    playbackVersion = stream,
+                                    playbackLevel = 0f,
+                                    mediaMuted = mediaMuted()
+                                )
+                            }
                             speaker.start(effect.rate, effect.opusHeader)
                         }
                         is ConversationEffect.PlaybackData -> playback?.offer(effect.bytes)
@@ -321,9 +361,23 @@ class PhoneConversation @JvmOverloads constructor(
             visible = false,
             sending = false,
             speaking = false,
+            playbackLevel = 0f,
             connection = ConnectionState(conversation = ConversationState(reply = reply))
         )
     }
+    fun refreshMediaVolume() {
+        val muted = mediaMuted()
+        mutable.update { if (it.visible) it.copy(mediaMuted = muted) else it }
+    }
+
+    private fun mediaMuted(): Boolean {
+        val manager = getApplication<Application>().getSystemService(
+            android.media.AudioManager::class.java
+        )
+        return manager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC) == 0 ||
+            manager.isStreamMute(android.media.AudioManager.STREAM_MUSIC)
+    }
+
     private fun active(version: Long): Boolean = epoch == version && mutable.value.visible
     override fun onCleared() {
         hide()

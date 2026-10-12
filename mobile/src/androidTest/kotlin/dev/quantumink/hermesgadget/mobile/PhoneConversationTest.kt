@@ -106,10 +106,11 @@ class PhoneConversationTest {
         val release = java.util.concurrent.CountDownLatch(1)
         val blocked = java.util.concurrent.atomic.AtomicBoolean(false)
         val once = java.util.concurrent.atomic.AtomicBoolean(false)
-        fixture(factory = { context, interrupted, finished ->
+        fixture(factory = { context, interrupted, level, finished ->
             dev.quantumink.hermesgadget.client.PcmPlayback(
                 context,
                 onInterrupted = interrupted,
+                onLevel = level,
                 onFinished = {
                     if (Thread.currentThread().name == "gadget-speaker" &&
                         once.compareAndSet(false, true)
@@ -153,11 +154,156 @@ class PhoneConversationTest {
         }
     }
 
+    @Test fun realPcmLevelsAreBoundedAndOldStreamsCannotAnimateANewSession() {
+        val callbacks = java.util.concurrent.CopyOnWriteArrayList<(Float) -> Unit>()
+        val completions = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
+        val peaks = java.util.concurrent.CopyOnWriteArrayList<Float>()
+        val displayed = java.util.concurrent.CopyOnWriteArrayList<Float>()
+        val reference = java.util.concurrent.atomic.AtomicReference<PhoneConversation>()
+        fixture(factory = { context, interrupted, level, finished ->
+            callbacks.add(level)
+            completions.add(finished)
+            dev.quantumink.hermesgadget.client.PcmPlayback(
+                context,
+                onInterrupted = interrupted,
+                onLevel = { value ->
+                    peaks.add(value)
+                    level(value)
+                    reference.get()?.let { displayed.add(it.state.value.playbackLevel) }
+                },
+                onFinished = finished
+            )
+        }) { model, profiles, _, _ ->
+            reference.set(model)
+            model.open(profiles[0])
+            model.connect()
+            await { model.state.value.connection.status == ConnectionStatus.PAIRED }
+            model.draft("Synthetic nonzero PCM tone")
+            model.send()
+            await { peaks.any { it > 0f } }
+            assertTrue(peaks.all { it in 0f..1f })
+            assertTrue("Real PCM must reach presentation state", displayed.any { it > 0f })
+            await { !model.state.value.speaking }
+            assertEquals(0f, model.state.value.playbackLevel)
+            val old = callbacks.first()
+            model.open(profiles[1])
+            old(.9f)
+            completions[0]()
+            assertEquals(0f, model.state.value.playbackLevel)
+            assertFalse(model.state.value.speaking)
+            model.connect()
+            await { model.state.value.connection.status == ConnectionStatus.PAIRED }
+            model.draft("Second synthetic tone")
+            model.send()
+            await { model.state.value.speaking }
+            val version = model.state.value.playbackVersion
+            old(.9f)
+            assertTrue(model.state.value.playbackLevel < .9f)
+            completions[0]()
+            assertEquals(version, model.state.value.playbackVersion)
+            assertTrue(model.state.value.speaking)
+            model.stopPlayback()
+            callbacks.last()(1f)
+            assertFalse(model.state.value.speaking)
+            assertEquals(0f, model.state.value.playbackLevel)
+            model.hide()
+            callbacks.last()(1f)
+            assertEquals(0f, model.state.value.playbackLevel)
+            assertEquals(0f, model.state.value.connection.conversation.level)
+            val manager = InstrumentationRegistry.getInstrumentation().targetContext
+                .getSystemService(android.media.AudioManager::class.java)
+            model.open(profiles[0])
+            assertEquals(
+                manager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC) == 0 ||
+                    manager.isStreamMute(android.media.AudioManager.STREAM_MUSIC),
+                model.state.value.mediaMuted
+            )
+        }
+    }
+
+    @Test fun nativeComposerTalkCancelStopAndBackUseTheForegroundSession() = fixture {
+            model,
+            profiles,
+            _,
+            _
+        ->
+        NativePhoneFixture().use { ui ->
+            model.open(profiles[0])
+            model.connect()
+            await { model.state.value.connection.status == ConnectionStatus.PAIRED }
+            ui.show(back = model::hide) { modifier ->
+                ConversationPage(
+                    model,
+                    null,
+                    model::connect,
+                    model::startRecording,
+                    model::hide,
+                    modifier
+                )
+            }
+            ui.enter("Native composer marker")
+            ui.click("Send message", description = true)
+            await {
+                model.state.value.connection.conversation.reply.contains("Native composer marker")
+            }
+            await { model.state.value.draft.isEmpty() }
+            ui.instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+            await { !model.state.value.speaking }
+            ui.await { ui.find("Hold to talk") != null }
+            val talkBounds = android.graphics.Rect().also {
+                requireNotNull(ui.find("Hold to talk")).getBoundsInScreen(it)
+            }
+            val dragDistance = 80f * ui.context.resources.displayMetrics.density
+            val downAt = android.os.SystemClock.uptimeMillis()
+            fun touch(action: Int, y: Float) {
+                val event = android.view.MotionEvent.obtain(
+                    downAt,
+                    android.os.SystemClock.uptimeMillis(),
+                    action,
+                    talkBounds.exactCenterX(),
+                    y,
+                    0
+                ).apply {
+                    source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+                }
+                try {
+                    assertTrue(ui.instrumentation.uiAutomation.injectInputEvent(event, true))
+                } finally {
+                    event.recycle()
+                }
+            }
+            touch(android.view.MotionEvent.ACTION_DOWN, talkBounds.exactCenterY())
+            await { model.state.value.connection.conversation.mode == ConversationMode.LISTENING }
+            touch(android.view.MotionEvent.ACTION_MOVE, talkBounds.exactCenterY() + dragDistance)
+            touch(android.view.MotionEvent.ACTION_UP, talkBounds.exactCenterY() + dragDistance)
+            await { model.state.value.connection.conversation.mode != ConversationMode.LISTENING }
+            ui.click("Hold to talk")
+            await { model.state.value.connection.conversation.mode == ConversationMode.LISTENING }
+            ui.click("Cancel recording")
+            await { model.state.value.connection.conversation.mode != ConversationMode.LISTENING }
+            assertEquals(0f, model.state.value.connection.conversation.level)
+            ui.click("Hold to talk")
+            await { model.state.value.connection.conversation.mode == ConversationMode.LISTENING }
+            Thread.sleep(1500)
+            ui.click("Listening · release to send")
+            await { model.state.value.speaking }
+            ui.click("Stop voice")
+            assertFalse(model.state.value.speaking)
+            assertEquals(0f, model.state.value.playbackLevel)
+            model.draft("Back retains this draft")
+            ui.instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+            await { !model.state.value.visible }
+            model.open(profiles[0])
+            assertEquals("Back retains this draft", model.state.value.draft)
+        }
+    }
+
     private fun fixture(
         factory: (
             (
                 android.content.Context,
                 () -> Unit,
+                (Float) -> Unit,
                 () -> Unit
             ) -> dev.quantumink.hermesgadget.client.PcmPlayback
         )? = null,
