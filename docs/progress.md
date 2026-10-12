@@ -550,3 +550,22 @@ page indicator. Review found a catalog-shrink crash; a failing native regression
 it before correction in 3a75fd5. All three affected native tests and strict Wear checks pass,
 including actual rotary input after dismissal. Scoped re-review is clean. Tile implementation,
 final whole-branch review and preserving physical native delivery remain in progress.
+
+
+Personal GIF verification — 2026-10-12: the maintainer completed the normal phone
+picture assignments. All eighteen saved GIFs match every decoded source frame, and
+the watch animation index associates each correct hash with its stable profile key.
+The selected watch portrait shows visible motion; nearby artwork is fetched in bounded
+groups of three. Existing identity/configuration bytes are preserved, temporary picker
+copies removed, and both original screen timeouts restored. Personal art and captures
+remain ignored. This verifies the prior installed build; native redesign delivery and
+quantitative GIF battery measurements remain separate gates.
+
+
+Profile tile checkpoint — 2026-10-12: eadcf42 adds bounded durable CAS pins, static
+Focus/four-profile providers, local pin editing and stable-key cold/warm launch routing.
+Six affected JVM and eighteen distinct native checks pass, including real activity/service
+launches and recording/approval/busy deferral. Review found an unavailable-route ambient
+regression; d44e968 fixes it with actual Light/Dark sleep/wake output coverage. Strict
+Wear checks and scoped re-review pass. Phone pin configuration/synchronization and final
+whole-branch review/delivery are next. Physical tile addition, taps and battery remain open.
