@@ -28,15 +28,18 @@ available during playback. Recording feedback joins recorder release with accept
 outcomes, including short capture, automatic limit, rejected sends and stale tokens.
 Private verification receipts are in .local/client-usability/.
 
-The earlier physical watch scroll build preserved all 19 identity ciphertexts and 18 portrait
-hashes. The final GIF/review build has not been delivered: neither personal device is currently
-visible on its saved ADB server. A request for phone USB debugging and the watch's current
-Wireless debugging IP:connection port is pending. Never clear data, uninstall, seed identities
-or bypass signatures. Compare local/installed signing certificates, backup and recheck those
-19/18 hashes, then install -r when devices return. Phone client pairing remains explicit;
+The final watch build cea12b5 is installed after a matching-certificate check and app-file/APK
+backup. Its installed APK hash matches the tested artifact; all 19 identity ciphertexts and
+18 portrait hashes match before/after. Original screen timeout is restored. The initial ADB
+status probe incorrectly expected tab separators; splitting whitespace found the isolated
+watch connection correctly. Private receipts are under .local/client-usability/watch-final/.
+The phone remains absent from USB ADB; its final APK and signing/hash manifest are staged in
+.local/client-usability/delivery/. Both local APK signatures match. Reconnect/authorize USB,
+compare installed certificate and backup phone storage before install -r. Never clear data,
+uninstall, seed identities or bypass signatures. Phone client pairing remains explicit;
 no bulk live enrollment or real-device microphone test was initiated.
 
-Next: preserve-data final device delivery, owner phone speech/cue checks, GIF battery/rendering
+Next: preserve-data phone delivery, owner phone speech/cue checks, GIF battery/rendering
 and office trial. Owner manages Mac awake state; no power helper is installed. Existing live
 18-profile cellular relay and three-profile watch speech evidence below remains historical;
 it does not establish the new phone client or GIF power gates. Keep PR #1 draft; no merge,

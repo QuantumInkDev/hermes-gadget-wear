@@ -29,8 +29,10 @@ All seven were corrected and regraded clean; [review resolutions](client-usabili
 record failing-then-passing cases and the reviewer’s read-only limits. Recording cues now join
 recorder shutdown with the accepted protocol outcome, covering short release, automatic limit
 completion and rejected sends. Actual phone speech, cue audibility/contamination and animated
-watch battery cost remain physical observation gates. Current physical delivery awaits ADB
-availability; the earlier preserve-data scroll installation below predates final GIF support.
+watch battery cost remain physical observation gates. The final watch build is installed with
+matching certificate and APK hash, all 19 identity ciphertexts and 18 portrait hashes unchanged,
+and its original timeout restored. Phone installation awaits USB ADB; no live phone pairing
+or physical microphone test was initiated.
 
 The reported watch scroll reset was reproduced: the pager's progress flag replaced its
 active vertical list with a static preview during nested scrolling. The settled conversation

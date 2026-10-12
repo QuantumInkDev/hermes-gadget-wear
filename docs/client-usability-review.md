@@ -30,3 +30,7 @@ fixture corrections, not production workarounds.
 
 Physical phone STT/voice, cue audibility/contamination and GIF battery cost remain observation
 gates. They are not inferred bugs or established by synthetic input and source review.
+
+Final physical watch delivery verifies the installed APK hash, matching certificate and unchanged
+19 enrollment ciphertexts/18 portraits; original timeout is restored. Phone delivery awaits USB
+ADB. Installation alone does not close the speech, cue or animation power gates.
