@@ -185,7 +185,11 @@ protocol, pairing, media codecs, pager ownership, app signatures and pin APIs.
   accessible Start/Finish semantics and an immediate concise hint without duplicate captures.
 - [ ] Draw three concentric accent rings flowing outward only while actual recording is
   active. Keep existing160dp portrait/top spacing. The rings fit the round safe area and never
-  cover clock/labels/controls. Reduced motion/power saver use a static outline/level cue;
+  cover clock/labels/controls. Keep160dp art/top; rings extend81→88dp into surrounding
+  space without moving the original168dp frame or its labels. Reuse the existing Ready/status
+  line for Hold/Release, plus a compact visible mic affordance and native Start/Finish
+  semantics; do not insert a new pre-label text row or weaken existing source-readiness
+  assertions. Reduced motion/power saver use a static outline/level cue;
   stopped/background/ambient/unselected pages have no continuous ring animation. Verify static,
   GIF and pet branches and all three appearances.
 - [ ] Add a watch-only verylight haptic tick at actual capture start and successful recorder

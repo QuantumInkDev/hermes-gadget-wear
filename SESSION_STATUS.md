@@ -1,4 +1,4 @@
-<!-- Current continuation: 2026-10-12 native Tasks 1–6 reviewed. Task8 owner-requested portrait Hold-to-talk/rings/light haptics and bounded foreground screen lease begins before Task7 final gates. Historical away replies generated on M5 but receipt unverified; see ignored diagnostics. Watch temporary600000ms timeout needs restoration to15000. No new native physical build installed. Recovery ledger: .superpowers/sdd/2026-10-12-native-client-design/progress.md. -->
+<!-- Current continuation: 2026-10-12 native Tasks 1–6 and 8 reviewed. Task7 final native artifacts, whole-branch review and preserving delivery remain. Full strict check passed116JVM; physical devices retainb724231. Temporary watch timeout and phone debugging grant restored. Recovery ledger: .superpowers/sdd/2026-10-12-native-client-design/progress.md. -->
 # Session status
 
 Native redesign approved, 2026-10-12: Portrait Studio, original Voice Q,
@@ -9,14 +9,25 @@ waveforms, watch picker, durable static tiles and guarded profile launches.
 
 Task 6 phone tile composer/synchronization is committed at 5aa0d3b. Twenty-two affected
 JVM tests, five native cases across all three themes and strict affected checks pass.
-Review found an Important lost-update path: an already-open watch pin editor can restore
-stale untouched fields after a phone edit. Resume /root/native_phone_tile_sync for fix
-round 1 using task-6-review.md, then run a fresh scoped re-review. Task 6 is not complete.
-Actual associated Data Layer delivery is also unverified: the owned emulator returned
-Wearable.API API_UNAVAILABLE. Task 7 final whole-branch checks/review, native artifacts
-and preserving physical delivery remain pending.
+Review found a stale local watch editor could overwrite untouched fields after a phone
+edit. Fix 416389a uses atomic field mutations; both overwrite directions reproduced RED,
+then eight affected native cases and nine JVM cases/strict Wear checks passed. Fresh
+scoped re-review is clean; Task 6 is complete. Actual associated Data Layer delivery remains
+unverified after the owned emulator returned Wearable.API API_UNAVAILABLE.
 
-Safe dog-walk checkpoint: no physical operation or child task is running. All eighteen
+The owner walk on the prior b724231 build showed transcripts/tool calls without observed
+replies. M5 server logs establish two generated replies; watch power events establish short
+sleep cycles, including sleep before final text/audio send. Frame receipt is unproved.
+Task 8 is implemented at 328d769 with a clean scoped review: portrait Hold to talk, outward
+recording rings, very light actual-start/finish haptics and a bounded foreground screen-on
+lease. Ten affected JVM and thirteen distinct native cases pass; the real activity retained
+a delayed twenty-second stock reply past its fifteen-second system timeout. Actual OS power
+saver is a documented emulator capability skip, not a pass. The full strict check passed
+116 JVM tests with zero failures/errors/skips; both debug and instrumentation APKs built. Task 7 final whole-branch checks/review, native artifacts
+and preserving physical delivery follow. Temporary watch timeout and phone debugging grant were restored and verified; receipts
+are recorded privately; physical devices still run b724231.
+
+Earlier safe dog-walk checkpoint: no physical operation or child task was running. All eighteen
 normal owner GIF assignments match every source frame and the correct watch profile
 keys; selected-watch motion is verified. Phone timeout is restored to five minutes and
 watch timeout to its original fifteen seconds. Personal receipts are ignored under

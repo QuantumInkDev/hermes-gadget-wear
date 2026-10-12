@@ -137,7 +137,8 @@ the primary Hold to talk surface. A brief tap does not start recording; a sustai
 starts capture through the existing foreground permission/controller path, release sends,
 and a downward drag cancels. Preserve horizontal profile swipes, vertical scrolling, page
 selection locks, stable keys and current scroll positions. Keep an accessible named
-Start/Finish action and a concise Hold to talk / Release to send hint beside the portrait;
+Start/Finish action, a compact visible mic affordance on the portrait, and Hold to talk /
+Release to send in the existing status line without inserting a new pre-label text row;
 the user must not scroll past the picture to reach recording. Cover both static and GIF
 portraits and the pet fallback; artwork alone never initiates recording.
 
@@ -145,7 +146,8 @@ While capture actually runs, draw three restrained concentric accent rings flowi
 around the portrait. Use actual capture state, not touch-down, as the animation source.
 Stop them on release, cancel, failure, permission rejection, background, ambient or profile
 change. Reduced motion and power saver show a static recording outline/level indicator.
-Keep the existing portrait size/clock spacing and circle-safe layout.
+Keep the existing portrait size/clock spacing and circle-safe layout. Rings extend just
+beyond the160dp artwork without moving its original frame/name/source positions.
 
 Watch recording start and successful finish use one very light haptic tick each, joined to
 actual recorder start/release and accepted recording outcome. Retain cancellation semantics
