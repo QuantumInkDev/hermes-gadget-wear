@@ -2,6 +2,12 @@
 
 ## Larger watch portraits and live device setup — 2026-10-12
 
+The maintainer reports that the fresh hold-to-talk check passed on one profile from each
+of the three boxes: visible transcript, answer and the profile's spoken voice. This is a
+functional speech pass by maintainer report. Network/lock conditions, quantitative latency,
+STT/codec quality, lip sync and battery were not separately measured. CI for code commit
+`628de74` passed all Android, extensions and secret checks.
+
 The maintainer requested circular portraits twice as large. Portraits now render at 160 dp
 instead of 80 dp, within a 160 by 168 dp fixed artwork frame. The Ultra accessibility bounds
 measure 340 by 340 pixels and the actual screenshot shows the whole round portrait. The

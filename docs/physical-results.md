@@ -15,6 +15,7 @@ Personal images, endpoint details, registry records, screenshots and receipts st
 | Phone cellular reachability | A selected read-only diagnostic using existing phone configuration passed authenticated default-trust HTTPS for all three catalogs on validated cellular/Tailscale, Wi-Fi off and USB debugging only. It did not pair, reset or send a conversation. The normal test APK was restored afterward. |
 | Provider recovery | A previously rate-limited profile returned a fresh exact marker on the same cellular TLS path after the pause. The prior rate-limit response was a server-model failure, not successful conversation acceptance. |
 | Cold background startup | With the phone keyguard showing, Wi-Fi off, validated cellular/VPN and no active phone relay foreground service, watch app startup opened a fresh relay and returned its exact marker through watch-owned TLS. |
+| Three-box speech demo | The maintainer reports all three requested hold-to-talk checks passed: transcript, answer and audible profile voice on one profile per box. This is owner-observed functional evidence; the speech network/lock conditions and quantitative quality/latency were not separately recorded. |
 | Per-profile requests | All 18 profiles returned fresh markers through Phone relay with watch TLS on validated cellular/VPN, Wi-Fi off and USB debugging only. The phone keyguard remained showing for each: 12, four and two per source. No automatic input replay was used. |
 | Catalog outage/return | Stopping only the owned Mac catalog job produced the cached-offline badge while retaining selected page 1/19 and its portrait. After HTTP readiness and refresh, the badge disappeared. The phone stayed locked on cellular; the exact job/routes and portrait index were restored. This did not power off the box or interrupt its Gadget gateway. |
 | Restoration | Phone Wi-Fi is enabled; phone and watch timeouts are restored to 300000 and 15000 ms. Normal watch settings verify the root TLS profile is Automatic. All 19 identity ciphertexts and 18 picture hashes remain intact after the final update. |
@@ -25,8 +26,8 @@ timeout remains recorded and was not reproduced by the successful resumed cold t
 builds can record exception class, errno, elapsed time and foreground/network-blocked flags;
 URLs, headers, keys, device IDs, exception messages and conversation text are excluded.
 
-Whole-box power transitions, fresh speech across all three boxes, live optional pet/Opus
-extensions, radio-path/throughput, battery and Play acceptance remain open. The maintainer
+Whole-box power transitions, measured speech/codec quality, live optional pet/Opus
+extensions, radio-path/interruption/throughput, battery and Play acceptance remain open. The maintainer
 will manage the Mac's awake state; the proposed AC-only power helper was not installed.
 
 

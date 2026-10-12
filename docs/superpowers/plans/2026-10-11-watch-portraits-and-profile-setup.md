@@ -3,7 +3,8 @@
 Execution resumed by the maintainer on 2026-10-12 after the prior rate-limit pause.
 Portrait delivery and new-profile pairing are complete. All 18 profiles pass fresh locked-
 phone cellular TLS replies; the cold-start and catalog outage/return checks pass. The doubled,
-raised portraits are installed and visually verified. Fresh owner speech, whole-box power,
+raised portraits are installed and visually verified. The maintainer reports functional
+speech/voice passed on one profile from each box. Measured speech quality, whole-box power,
 battery and release gates remain. See `SESSION_STATUS.md` for exact continuation evidence.
 
 Status: the maintainer requested a portrait export/regeneration prompt, explicit watch-specific

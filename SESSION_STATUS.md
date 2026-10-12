@@ -43,10 +43,16 @@ Private receipts, APK/vault backups and screenshots are in
 `.local/network-probe/`. Use `cellular-turns.json`, `catalog-outage-result.json`,
 `centered-portrait-install.json` and `final-restoration.json` for exact continuation evidence.
 
-Next: the maintainer's fresh hold-to-talk/transcript/audible-voice check on one profile from
-each box was requested. Keep physical speech, radio interruption/throughput, unplugged battery,
-live optional pet/Opus/client-voice extensions, signing/privacy and Play acceptance separate
-from these passes. Do not install optional SDK extensions on live hosts without their review.
+The maintainer now reports that all three requested hold-to-talk checks passed: visible
+transcript, answer and audible profile voice on one profile from each box. This closes the
+fresh functional speech demo by maintainer report, recorded privately in
+`speech-report-2026-10-12.json`; the speech network/lock conditions were not separately
+reported. CI for code commit `628de74` passed Android, extensions and secrets.
+
+Next: the office trial, whole-box power transitions, measured speech/codec quality, radio
+interruption/throughput, unplugged battery, live optional pet/Opus/client-voice extensions
+and signing/privacy/Play acceptance. Keep these measurements separate from the functional
+voice report. Do not install optional SDK extensions on live hosts without their review.
 Use [the setup guide](docs/profile-setup.md), [physical report](docs/physical-results.md) and
 [release gates](docs/release.md). Earlier dated snapshots below are historical.
 
