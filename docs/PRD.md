@@ -62,6 +62,14 @@ also covers the generic publication setup instructions and private live rollout 
 
 ## Milestone gates
 
+The maintainer approved the [client-usability follow-up](superpowers/specs/2026-10-12-client-usability-design.md)
+on 2026-10-12: QuantumInk Relay branding with an original icon, usable watch scrolling and
+recording cues, phone profiles grouped/sorted by box with inline effective pictures, and
+independently paired foreground phone text/voice conversations. Phone chat requires TLS;
+it does not borrow watch keys or change the opaque relay. Animated watch-picture overrides
+are an approved final stage with [explicit limits and PNG fallbacks](superpowers/specs/2026-10-12-animated-picture-design.md).
+These are requirements; implementation and physical acceptance are recorded separately.
+
 Follow M0–M8 from the brief. M0 delivers these design documents, runnable starter apps, a pure JVM module, reproducible wrapper/catalog, build/test/lint/format CI, and secret scanning. M1 adds wire models, framing, identity, handshake/heartbeat behavior, upstream vectors, and a JVM test using the actual SDK development server. M2 requires the maintainer's endpoint and approval plus a real hardware demo. M3–M8 retain the original measurements and release gates; unit tests alone never close them.
 
 Every milestone records exact checks and a short demo in [progress](progress.md). Claims of success must distinguish local tests, CI, emulator, real Hermes, and physical watch evidence.

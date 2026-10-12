@@ -3,6 +3,7 @@ package dev.quantumink.hermesgadget.wear
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
 import dev.quantumink.hermesgadget.protocol.TransportPreference
 
 /** Activity-owned memory survives replacement of the interactive composition by ambient. */
@@ -12,6 +13,16 @@ class WatchNavigation {
     val newProfile = mutableStateOf(false)
     val imported = mutableStateOf(false)
     val page = mutableStateOf("")
+    private val scrolls = LinkedHashMap<String, TransformingLazyColumnState>()
+    fun scrollFor(key: String): TransformingLazyColumnState =
+        scrolls.getOrPut(key) { TransformingLazyColumnState() }
+    fun retainScrolls(keys: Set<String>) {
+        scrolls.keys.retainAll(keys)
+    }
+    fun clearPages() {
+        scrolls.clear()
+        page.value = ""
+    }
     private var setupKey: Pair<String?, Boolean>? = null
     private var setup: SetupDraft? = null
     fun setupFor(profile: EndpointProfile?, imported: Boolean): SetupDraft {

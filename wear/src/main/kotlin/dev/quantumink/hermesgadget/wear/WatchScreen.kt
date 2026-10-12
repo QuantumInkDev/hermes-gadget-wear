@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope
+import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.Button
@@ -124,7 +125,7 @@ fun WatchScreen(
                 Primary(stringResource(R.string.reset_setup), enabled = !watch.saving) {
                     service.reset()
                     navigation.clearSetup()
-                    navigation.page.value = ""
+                    navigation.clearPages()
                     route =
                         "home"
                 }
@@ -278,7 +279,7 @@ fun WatchScreen(
                 imported = false
                 route = "setup"
             }
-        ) { page, pageControls ->
+        ) { page, pageScroll, pageControls ->
             key(page.key, watch.connection.conversation.prompt?.id) {
                 ConversationPage(
                     watch,
@@ -299,6 +300,7 @@ fun WatchScreen(
                         route = "profiles"
                     },
                     page = page,
+                    pageScroll = pageScroll,
                     pageControls = pageControls
                 )
             }
@@ -490,6 +492,7 @@ private fun ConversationPage(
     type: () -> Unit,
     profiles: () -> Unit,
     page: ProfilePage,
+    pageScroll: TransformingLazyColumnState,
     pageControls: @Composable () -> Unit
 ) {
     val connection = watch.connection
@@ -515,7 +518,12 @@ private fun ConversationPage(
         service::finishRecording,
         service::cancelRecording
     )
-    RoundPage(gesture, topPadding = if (prompt == null) 28.dp else 40.dp) {
+    val promptScroll = remember(prompt?.id) { TransformingLazyColumnState() }
+    RoundPage(
+        gesture,
+        topPadding = if (prompt == null) 28.dp else 40.dp,
+        state = if (prompt == null) pageScroll else promptScroll
+    ) {
         if (prompt != null) {
             item { Heading(stringResource(R.string.approval)) }
             item { Body(prompt.title) }
@@ -697,9 +705,9 @@ private fun ConversationPage(
 internal fun RoundPage(
     modifier: Modifier = Modifier,
     topPadding: Dp = 40.dp,
+    state: TransformingLazyColumnState = rememberTransformingLazyColumnState(),
     content: TransformingLazyColumnScope.() -> Unit
 ) {
-    val state = rememberTransformingLazyColumnState()
     AppScaffold(containerColor = Color.Black) {
         ScreenScaffold(
             state,

@@ -1,5 +1,24 @@
 # Progress
 
+## Client usability follow-up — 2026-10-12
+
+The maintainer approved the [phone/watch follow-up design](superpowers/specs/2026-10-12-client-usability-design.md),
+including QuantumInk Relay branding, recording cues, grouped/custom-ordered phone profiles,
+independent foreground phone conversations and bounded GIF overrides. Those later stages
+remain in progress; approval is not implementation evidence.
+
+The reported watch scroll reset was reproduced: the pager's progress flag replaced its
+active vertical list with a static preview during nested scrolling. The settled conversation
+now stays mounted, with activity-owned list state per stable profile and explicit Wear focus
+groups. Compact 48 dp chevrons flank the page count instead of truncated word buttons.
+Prompt lists use independent state. Strict checks and debug/instrumentation builds pass;
+both owned-emulator scenarios pass: touch scrolling/control interaction, cancelled drag,
+profile return and metadata refresh; and three-profile draft isolation, recording/approval
+locks, rotary input, arrows and ambient/setup recovery. Tests wait for visible UI changes
+after reducer events and rotary input rather than relying on fixed render delays. The Wear
+pager-wrapper experiment was removed after a post-approval gesture regression; the existing
+foundation pager uses the documented custom Wear focus hierarchy. Physical update follows.
+
 ## Larger watch portraits and live device setup — 2026-10-12
 
 The maintainer reports that the fresh hold-to-talk check passed on one profile from each

@@ -253,3 +253,19 @@ There are no new periodic idle/ambient discovery timers. Real paired-device port
 catalog outage/return are recorded in [physical results](physical-results.md). Whole-box power
 transitions, physical speech/pets, radio and battery acceptance remain separate from the
 [synthetic demo](demo/carousel/README.md).
+
+## Approved independent phone client — 2026-10-12
+
+The [follow-up design](superpowers/specs/2026-10-12-client-usability-design.md) adds a
+phone-owned DirectConnection session beside the opaque watch relay. A separate Android
+Keystore vault namespaces phone Gadget identities by canonical endpoint; catalog credentials
+and watch identities never enter it. Shared Android PCM/Opus adapters move out of the watch
+module into a small Android client library, leaving the protocol module pure JVM.
+
+The phone's retained conversation model owns a single current socket and epoch-guards its
+callbacks. Leaving/locking the foreground conversation closes that socket and stops its
+audio while leaving RelayService alone. The directory groups stable source/profile keys
+and persists owner sorting in the catalog vault, publishing the same flattened order to
+the watch. Portrait lookup uses the existing effective, hash-addressed local cache.
+Watch page list state is activity-owned and keyed by stable page; prompt lists are separate.
+These are approved component boundaries; passing implementation evidence belongs in progress.

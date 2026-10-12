@@ -1,5 +1,20 @@
 # Session status
 
+Current follow-up, 2026-10-12: the maintainer approved
+[client usability](docs/superpowers/specs/2026-10-12-client-usability-design.md) and
+[bounded animated overrides](docs/superpowers/specs/2026-10-12-animated-picture-design.md).
+Family name is QuantumInk Relay, with an original orbit/speech icon. Execute the
+[client plan](docs/superpowers/plans/2026-10-12-client-usability.md) without another generic
+approval loop. Watch touch scrolling, per-page position and compact accessible arrows are
+implemented; strict checks and both owned-emulator interaction scenarios pass. Preserve
+the `.local/client-usability/` backup of 19 watch identity ciphertexts and 18 portrait hashes
+around physical updates. Next stages are shared recording cues, phone organization/inline
+pictures/branding, independently paired foreground phone text/voice, then GIF overrides.
+Phone client requires TLS and never borrows watch keys; existing relay stays independent.
+Live phone speech and animation power remain physical gates. Earlier results below remain
+valid; they do not establish the new phone/GIF features. The execution ledger is ignored in
+`.superpowers/sdd/2026-10-12-client-usability/progress.md`.
+
 Updated: 2026-10-12. The authorized live profile/portrait setup and typed cellular relay
 checks are complete. All three sources are on the phone; all 18 supplied round picture
 overrides were chosen through the native picker and verified in both actual device caches.
