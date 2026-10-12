@@ -528,3 +528,17 @@ brand/navigation are committed0696683. Nineteen native and13 mobile JVM checks p
 final directory rerun passes11 cases. Actual320dp/font1.8 native menu/details/vertical
 reachability checks pass with system settings restored. Scoped review is running; physical
 devices retain their prior debug build and later native conversation/watch/tile tasks remain.
+
+
+Native phone conversation checkpoint — 2026-10-12: f8de6c3 implements compact profile
+toolbar, connection details, reading/composer/voice controls, actual capture/playback
+waveforms, muted-media hint and grouped relay/settings/setup. Strict mobile checks
+pass; 13 JVM, five actual stock TLS/playback, five presentation, eight directory and
+seven appearance cases pass. Actual320dp/font1.8 all-theme keyboard/Send checks pass
+with settings restored. Scoped review is running. Owner confirms prior installed phone
+voice works after raising media volume; no server TTS/provider change was made.
+
+The supplied eighteen watch-256 GIFs are validated and matched to their profiles:
+256x256, eight frames, six seconds, transparent corners and maximum47,528 bytes. Native
+picker import/delivery is in progress; personal files/receipts stay ignored and originals
+unchanged. No redesigned physical installation or final GIF acceptance is claimed yet.

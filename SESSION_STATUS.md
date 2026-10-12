@@ -10,9 +10,14 @@ addresses both and native selected radio semantics. Fourteen affected native tes
 strict affected checks/build and release-host exclusion checks pass. Scoped re-review
 is clean.
 Task 2 portrait directory/native navigation is committed (0696683), with scoped review
-running. Nineteen native/13 JVM checks pass, with actual320dp/font1.8 menu/details/scroll
-rendering and emulator settings restored. Tasks 3–7 remain pending.
-No redesigned physical build is installed yet. The approved
+clean. Nineteen native/13 JVM checks pass, with actual320dp/font1.8 menu/details/scroll
+rendering and emulator settings restored. Task 3 phone conversations/settings/dashboard and real audio waveforms are committed
+(f8de6c3); strict mobile checks, 13 JVM, five stock TLS/playback, five presentation,
+eight directory and seven appearance cases pass. Actual320dp/font1.8 keyboard/Send
+checks pass; settings restored. Scoped review is running. Tasks 4–7 remain pending.
+No redesigned physical build is installed yet. Eighteen supplied bounded GIFs are
+validated/matched/staged in .local/native-design/animated-portraits/. Native phone
+picker import is in progress; original files remain unchanged. The approved
 [design](docs/superpowers/specs/2026-10-12-native-client-design.md),
 [plan](docs/superpowers/plans/2026-10-12-native-client-design.md) and native receipts
 are the continuation map. SDD recovery ledger: .superpowers/sdd/2026-10-12-native-client-design/progress.md.
@@ -22,9 +27,10 @@ four GPU 5090 and two Win 11 ARM. Fresh typed replies passed on all three defaul
 profiles; the other fifteen were enrolled without reply probes. After waking the
 GPU, its normal phone enrollment/reply passed. The maintainer sees phone transcript,
 tool calls and replies but expects the configured ElevenLabs voice. A read-only
-probe found speaker media volume 0/15; owner asked to raise it and retest before
-inferring a TTS defect. Real capture/playback waveforms and a muted-media hint were
-requested and added to Task 3. Spoken phone acceptance remains owner observation. App-file backups verify all preexisting identities, pictures
+probe found speaker media volume 0/15. The maintainer now confirms voice works after
+raising volume; no TTS/provider change is needed. Real capture/playback waveforms and
+a muted-media hint were requested and added to Task 3. This confirms the previous
+installed phone build, not future native speech acceptance or an all-profile matrix. App-file backups verify all preexisting identities, pictures
 and preferences unchanged; only refreshed catalog pages changed and new independent
 phone identity/known files were added. Five-minute phone timeout is restored. Private
 receipts stay in .local/native-design/phone-live/. No watch key was reused.
