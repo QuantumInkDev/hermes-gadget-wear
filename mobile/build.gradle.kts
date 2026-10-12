@@ -61,6 +61,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":client"))
     implementation(project(":protocol"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
@@ -78,4 +79,5 @@ dependencies {
     testImplementation(libs.okhttp.tls)
     androidTestImplementation(libs.android.test.runner)
     androidTestImplementation(libs.android.test.junit)
+    androidTestImplementation(libs.okhttp.tls)
 }

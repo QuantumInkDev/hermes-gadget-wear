@@ -269,3 +269,11 @@ and persists owner sorting in the catalog vault, publishing the same flattened o
 the watch. Portrait lookup uses the existing effective, hash-addressed local cache.
 Watch page list state is activity-owned and keyed by stable page; prompt lists are separate.
 These are approved component boundaries; passing implementation evidence belongs in progress.
+
+
+Recording cue implementation lives in the shared Android `client` module. Capture readiness
+is reported after AudioRecord starts; buffered samples spanning the cue are discarded before
+frames are forwarded. Recorder release precedes stop/finish callbacks; capture generation and
+connection epochs reject replaced-session callbacks. MediaCodec Opus remains the watch path;
+the initial phone path advertises PCM only. A bounded versioned Data Layer item replicates
+only the sound-enabled preference and timestamp, never endpoint or enrollment material.

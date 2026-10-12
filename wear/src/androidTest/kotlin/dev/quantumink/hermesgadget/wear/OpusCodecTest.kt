@@ -3,6 +3,8 @@ package dev.quantumink.hermesgadget.wear
 import android.os.Bundle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.quantumink.hermesgadget.client.OpusDecoder
+import dev.quantumink.hermesgadget.client.OpusEncoder
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Base64

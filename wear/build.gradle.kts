@@ -61,6 +61,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":client"))
     implementation(project(":protocol"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

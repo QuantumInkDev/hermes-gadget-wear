@@ -1,4 +1,4 @@
-package dev.quantumink.hermesgadget.wear
+package dev.quantumink.hermesgadget.client
 
 import android.media.MediaCodec
 import android.media.MediaCodecList

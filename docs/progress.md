@@ -391,3 +391,25 @@ Maintainer voice demo — 2026-10-06: the maintainer reports that the physical w
 | M8: Tile, complication, ambient, battery, internal testing | Software/emulator and unsigned bundles verified; Ultra battery/signing/Play gates open |
 
 Next: execute the real-device and publisher checklist in [release preparation](release.md). Keep untested hardware gates open and record each new physical observation separately. Relay TLS and direct cleartext decisions are resolved. Multiplexed gateway v2 remains proposal-only pending decision and upstream feedback.
+
+
+## Recording cues and independent phone client checkpoint — 2026-10-12
+
+Shared `client` Android adapters replace the watch-only PCM/MediaCodec classes; protocol stays
+Android-free. Recording starts before the readiness cue, queued cue-time audio is discarded,
+and finish/cancel cues follow recorder release. Permission failure emits no success cue.
+Sound follows notification volume, silent/DND policy and the explicit synchronized preference;
+short haptics remain available. Old capture completion cannot publish after replacement.
+
+Six owned-Wear capture/codec tests pass. Replacement regression first failed with the guard
+removed, then passed with it restored. Strict check/lint/build passes with warnings as errors;
+physical cue audibility, tone contamination and speech quality remain owner observation gates.
+The watch scroll/control update was installed with matching certificates and preserve-data
+hash checks: 19 identities and 18 portrait files unchanged, scrolling stable, Server settings
+reachable, original timeout restored. Private backups/receipts are in `.local/client-usability/`.
+
+Phone client integration uses a new encrypted phone identity namespace and foreground-only
+DirectConnection. Two isolated stock TLS server/vault tests pass: explicit Connect pairing,
+separate identities/replies/drafts, authenticated reconnect, text, PCM capture, and shutdown
+without changing the relay setting. It does not auto-enroll live profiles. Final UI/storage
+regressions, actual phone voice observation and bounded GIF work remain in progress.

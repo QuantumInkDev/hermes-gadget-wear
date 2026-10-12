@@ -18,6 +18,12 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.VibratorManager
 import android.provider.AlarmClock
+import dev.quantumink.hermesgadget.client.Cue
+import dev.quantumink.hermesgadget.client.CuePreferences
+import dev.quantumink.hermesgadget.client.OpusSupport
+import dev.quantumink.hermesgadget.client.PcmCapture
+import dev.quantumink.hermesgadget.client.PcmPlayback
+import dev.quantumink.hermesgadget.client.RecordingCues
 import dev.quantumink.hermesgadget.protocol.ConnectionObserver
 import dev.quantumink.hermesgadget.protocol.ConnectionState
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
@@ -110,6 +116,7 @@ class GadgetService : Service() {
     @Volatile private var petManifest: PetManifest? = null
     private lateinit var vault: IdentityVault
     private lateinit var capture: PcmCapture
+    private lateinit var recordingCues: RecordingCues
     private lateinit var playback: PcmPlayback
 
     @Volatile private var connection: DirectConnection? = null
@@ -139,6 +146,8 @@ class GadgetService : Service() {
     override fun onCreate() {
         super.onCreate()
         capture = PcmCapture(this)
+        CuePreferences.initialize(this)
+        recordingCues = RecordingCues(this)
         petCache = PetCache(this)
         catalog = WatchCatalogController(
             this,
@@ -939,7 +948,29 @@ class GadgetService : Service() {
                                         format = effect.format,
                                         onHeader = { current.codecHeader(effect.token, it) },
                                         onLevel = { current.captureLevel(effect.token, it) },
-                                        onFinished = { current.finishRecording(effect.token) }
+                                        onFinished = {
+                                            if (version ==
+                                                epoch.get()
+                                            ) {
+                                                current.finishRecording(effect.token)
+                                            }
+                                        },
+                                        onStarted = {
+                                            if (version == epoch.get() &&
+                                                visible
+                                            ) {
+                                                recordingCues.play(Cue.START)
+                                            }
+                                        },
+                                        onStopped = { finished ->
+                                            if (version == epoch.get() &&
+                                                visible
+                                            ) {
+                                                recordingCues.play(
+                                                    if (finished) Cue.FINISH else Cue.CANCEL
+                                                )
+                                            }
+                                        }
                                     )
                                 }
                             }
@@ -969,8 +1000,19 @@ class GadgetService : Service() {
                             is ConversationEffect.Action -> main.post {
                                 if (version == epoch.get()) executeAction(effect, generation)
                             }
-                            is ConversationEffect.Haptic -> mutableState.update {
-                                if (version == epoch.get()) it.copy(haptic = it.haptic + 1) else it
+                            is ConversationEffect.Haptic -> if (effect !=
+                                ConversationEffect.Haptic.LISTEN_START &&
+                                effect != ConversationEffect.Haptic.LISTEN_END
+                            ) {
+                                mutableState.update {
+                                    if (version ==
+                                        epoch.get()
+                                    ) {
+                                        it.copy(haptic = it.haptic + 1)
+                                    } else {
+                                        it
+                                    }
+                                }
                             }
                             else -> Unit
                         }

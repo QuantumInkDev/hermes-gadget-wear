@@ -6,14 +6,30 @@ Current follow-up, 2026-10-12: the maintainer approved
 Family name is QuantumInk Relay, with an original orbit/speech icon. Execute the
 [client plan](docs/superpowers/plans/2026-10-12-client-usability.md) without another generic
 approval loop. Watch touch scrolling, per-page position and compact accessible arrows are
-implemented; strict checks and both owned-emulator interaction scenarios pass. Preserve
-the `.local/client-usability/` backup of 19 watch identity ciphertexts and 18 portrait hashes
-around physical updates. Next stages are shared recording cues, phone organization/inline
-pictures/branding, independently paired foreground phone text/voice, then GIF overrides.
-Phone client requires TLS and never borrows watch keys; existing relay stays independent.
-Live phone speech and animation power remain physical gates. Earlier results below remain
-valid; they do not establish the new phone/GIF features. The execution ledger is ignored in
-`.superpowers/sdd/2026-10-12-client-usability/progress.md`.
+implemented; strict checks and both owned-emulator interaction scenarios pass. The preserve-data
+physical update also passed: scrolling stayed in place and Server settings opened. All 19 watch
+identity ciphertexts and 18 portrait hashes matched before/after installation; original timeout
+was restored. Receipts stay private in `.local/client-usability/`.
+
+Shared Android recording/codec adapters and actual start/finish/cancel cues are implemented.
+Six owned-Wear audio/codec tests pass, including denied permission and replacement-callback
+regressions; the latter fails without the generation guard. Strict checks passed before the
+new replacement test, which also passes in its current build. Actual cue audibility/speech
+quality remains an owner observation gate. Sound respects silent/DND/notification volume.
+
+Box directory, inline pictures and original branding are committed. The new foreground-only
+phone client has separate per-endpoint identities, explicit Connect, TLS, draft/reply retention,
+text/PCM voice and approval controls. Two isolated stock TLS server tests pass, including
+independent identities, reconnect, chat, microphone capture and foreground shutdown; no live
+phone pairing was initiated. Final phone UI/storage regressions and strict verification are
+in progress; do not claim physical phone speech. A discovered manual-picture uniqueness
+regression is being fixed under the directory agent's scope.
+
+Next: finish storage/UI integration, implement the approved GIF plan, review the whole branch,
+then preserve-data device delivery. Phone client never borrows watch keys; existing relay stays
+independent. Live phone speech and animation power remain physical gates. Earlier results below
+do not establish the new phone/GIF features. Execution ledgers remain ignored under `.superpowers/`.
+
 
 Updated: 2026-10-12. The authorized live profile/portrait setup and typed cellular relay
 checks are complete. All three sources are on the phone; all 18 supplied round picture

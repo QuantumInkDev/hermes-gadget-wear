@@ -1,4 +1,4 @@
-package dev.quantumink.hermesgadget.wear
+package dev.quantumink.hermesgadget.client
 
 import android.Manifest
 import android.content.Context
@@ -14,16 +14,19 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.max
 
 class PcmCapture(private val context: Context) {
-    private class Capture {
+    private class Capture(val generation: Long) {
         val stopped = AtomicBoolean(false)
         val finishing = AtomicBoolean(false)
+        val started = AtomicBoolean(false)
 
         @Volatile var recorder: AudioRecord? = null
     }
     private var active: Capture? = null
+    private val generations = AtomicLong()
 
     @Synchronized
     fun start(
@@ -32,10 +35,12 @@ class PcmCapture(private val context: Context) {
         format: String = "pcm16",
         onHeader: (ByteArray) -> Unit = {},
         onLevel: (ByteArray) -> Unit = {},
-        onFinished: () -> Unit = {}
+        onFinished: () -> Unit = {},
+        onStarted: () -> Unit = {},
+        onStopped: (Boolean) -> Unit = {}
     ) {
         stop()
-        val capture = Capture()
+        val capture = Capture(generations.incrementAndGet())
         active = capture
         Thread({
             var encoder: OpusEncoder? = null
@@ -65,6 +70,18 @@ class PcmCapture(private val context: Context) {
                 check(recorder.state == AudioRecord.STATE_INITIALIZED)
                 if (capture.stopped.get()) return@Thread
                 recorder.startRecording()
+                check(recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING)
+                capture.started.set(true)
+                onStarted()
+                if (capture.stopped.get() || capture.finishing.get()) return@Thread
+                // Drop the samples recorded while the start cue ran, before forwarding audio.
+                val queued = ByteArray(max(minimum, 3200))
+                var drained = 0
+                while (drained++ < 8 &&
+                    recorder.read(queued, 0, queued.size, AudioRecord.READ_NON_BLOCKING) > 0
+                ) {
+                    if (capture.stopped.get() || capture.finishing.get()) return@Thread
+                }
                 val bytes = ByteArray(640)
                 while (!capture.stopped.get() && !capture.finishing.get()) {
                     val count = recorder.read(bytes, 0, bytes.size, AudioRecord.READ_BLOCKING)
@@ -94,9 +111,17 @@ class PcmCapture(private val context: Context) {
                     recorder.release()
                 }
                 capture.recorder = null
-                if (capture.finishing.get() && !capture.stopped.get()) onFinished()
+                synchronized(this@PcmCapture) { if (active === capture) active = null }
+                if (capture.started.get() && capture.generation == generations.get()) {
+                    onStopped(capture.finishing.get() && !capture.stopped.get())
+                }
+                if (capture.finishing.get() && !capture.stopped.get() &&
+                    capture.generation == generations.get()
+                ) {
+                    onFinished()
+                }
             }
-        }, "watch-microphone").apply { isDaemon = true }.start()
+        }, "gadget-microphone").apply { isDaemon = true }.start()
     }
 
     @Synchronized
@@ -268,7 +293,7 @@ class PcmPlayback(
                     }
                 }
             }
-        }, "watch-speaker").apply { isDaemon = true }.start()
+        }, "gadget-speaker").apply { isDaemon = true }.start()
     }
 
     @Synchronized

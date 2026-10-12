@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "hermes-gadget-wear"
-include(":protocol", ":wear", ":mobile")
+include(":protocol", ":client", ":wear", ":mobile")

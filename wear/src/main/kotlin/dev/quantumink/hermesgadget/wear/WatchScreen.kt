@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -72,6 +73,7 @@ import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
+import dev.quantumink.hermesgadget.client.CuePreferences
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
 import dev.quantumink.hermesgadget.protocol.ConversationMode
 import dev.quantumink.hermesgadget.protocol.TransportPath
@@ -320,6 +322,8 @@ private fun SetupPage(
 ) {
     val profile = watch.profile
     val cleartext = draft.url.trim().startsWith("ws:", ignoreCase = true)
+    val context = LocalContext.current
+    val soundCues by CuePreferences.enabled.collectAsStateWithLifecycle()
     RoundPage {
         item { Heading(stringResource(R.string.setup_title)) }
         item { Body(stringResource(R.string.setup_hint), muted = true) }
@@ -408,6 +412,9 @@ private fun SetupPage(
         }
         item { Secondary(stringResource(R.string.profiles_title), profiles) }
         item { Secondary(stringResource(R.string.permissions), permissions) }
+        item {
+            Toggle("Recording sound cues", soundCues) { CuePreferences.set(context, !soundCues) }
+        }
         if (profile != null) item { Secondary(stringResource(R.string.back), onBack) }
         item { Secondary(stringResource(R.string.reset_setup), onReset) }
     }
