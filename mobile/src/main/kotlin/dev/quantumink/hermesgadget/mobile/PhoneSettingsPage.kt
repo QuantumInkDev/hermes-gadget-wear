@@ -13,6 +13,7 @@ import dev.quantumink.hermesgadget.client.CuePreferences
 fun PhoneSettingsPage(context: Context, navigate: (String) -> Unit) {
     val soundCues by CuePreferences.enabled.collectAsStateWithLifecycle()
     Text("Settings", style = MaterialTheme.typography.headlineMedium)
+    Button({ navigate("appearance") }) { Text("Appearance") }
     Button({ navigate("boxes") }) { Text("Boxes and discovery") }
     Button({ navigate("manual") }) { Text("Manual watch endpoints") }
     Button({ navigate("speech") }) { Text("Watch speech providers") }

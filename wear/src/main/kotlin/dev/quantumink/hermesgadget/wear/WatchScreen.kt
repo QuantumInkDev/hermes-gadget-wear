@@ -35,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -73,15 +72,15 @@ import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
+import androidx.wear.compose.material3.TimeText
+import androidx.wear.compose.material3.TimeTextDefaults
+import androidx.wear.compose.material3.timeTextCurvedText
 import dev.quantumink.hermesgadget.client.CuePreferences
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
 import dev.quantumink.hermesgadget.protocol.ConversationMode
 import dev.quantumink.hermesgadget.protocol.TransportPath
 import dev.quantumink.hermesgadget.protocol.TransportPreference
 import kotlinx.coroutines.withTimeoutOrNull
-
-private val Accent = Color(0xFFB6ED93)
-private val Muted = Color(0xFFB3B8B0)
 
 @Composable
 fun WaitingScreen() {
@@ -101,6 +100,13 @@ fun WatchScreen(
     var editing by navigation.editing
     var newProfile by navigation.newProfile
     var imported by navigation.imported
+    var appearanceReturn by remember { mutableStateOf("home") }
+    val context = LocalContext.current
+    fun openAppearance() {
+        appearanceReturn = route
+        route = "appearance"
+    }
+    androidx.activity.compose.BackHandler(route == "appearance") { route = appearanceReturn }
     fun selectActivePage() {
         val current = service.state.value
         val page = ProfilePages.merge(current.profiles, current.catalog).firstOrNull {
@@ -120,6 +126,7 @@ fun WatchScreen(
     }
     when {
         watch.loading -> WaitingScreen()
+        route == "appearance" -> WatchAppearancePage(context) { route = appearanceReturn }
         route == "reset" -> RoundPage {
             item { Heading(stringResource(R.string.reset_setup)) }
             item { Body(stringResource(R.string.reset_warning)) }
@@ -244,7 +251,8 @@ fun WatchScreen(
             onBack = { route = "home" },
             onReset = { route = "reset" },
             permissions = permissions,
-            profiles = { route = "profiles" }
+            profiles = { route = "profiles" },
+            appearance = ::openAppearance
         )
         route == "text" -> TextPage(
             text = textDraft,
@@ -301,6 +309,7 @@ fun WatchScreen(
                         service.disconnect()
                         route = "profiles"
                     },
+                    appearance = ::openAppearance,
                     page = page,
                     pageScroll = pageScroll,
                     pageControls = pageControls
@@ -318,6 +327,7 @@ private fun SetupPage(
     onReset: () -> Unit,
     permissions: () -> Unit,
     profiles: () -> Unit,
+    appearance: () -> Unit,
     draft: SetupDraft
 ) {
     val profile = watch.profile
@@ -412,6 +422,7 @@ private fun SetupPage(
         }
         item { Secondary(stringResource(R.string.profiles_title), profiles) }
         item { Secondary(stringResource(R.string.permissions), permissions) }
+        item { Secondary("Appearance", appearance) }
         item {
             Toggle("Recording sound cues", soundCues) { CuePreferences.set(context, !soundCues) }
         }
@@ -498,6 +509,7 @@ private fun ConversationPage(
     settings: () -> Unit,
     type: () -> Unit,
     profiles: () -> Unit,
+    appearance: () -> Unit,
     page: ProfilePage,
     pageScroll: TransformingLazyColumnState,
     pageControls: @Composable () -> Unit
@@ -704,6 +716,14 @@ private fun ConversationPage(
             if (watch.catalogNotice.isNotBlank()) item { Body(watch.catalogNotice, muted = true) }
             item { Secondary(stringResource(R.string.profiles_title), profiles) }
             item { Secondary(stringResource(R.string.settings), settings) }
+            item {
+                Secondary(
+                    "Appearance",
+                    appearance,
+                    enabled = !watch.saving && conversation.prompt == null &&
+                        conversation.mode != ConversationMode.LISTENING
+                )
+            }
         }
     }
 }
@@ -715,7 +735,16 @@ internal fun RoundPage(
     state: TransformingLazyColumnState = rememberTransformingLazyColumnState(),
     content: TransformingLazyColumnScope.() -> Unit
 ) {
-    AppScaffold(containerColor = Color.Black) {
+    AppScaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground,
+        timeText = {
+            val style = TimeTextDefaults.timeTextStyle(
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            TimeText { time -> timeTextCurvedText(time, style) }
+        }
+    ) {
         ScreenScaffold(
             state,
             modifier = modifier,
@@ -751,7 +780,11 @@ internal fun Heading(value: String) {
 internal fun Body(value: String, muted: Boolean = false) {
     Text(
         value,
-        color = if (muted) Muted else Color(0xFFF0F3EB),
+        color = if (muted) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
         style = MaterialTheme.typography.bodyMedium,
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth()
@@ -789,15 +822,21 @@ private fun Input(
     val keyboardController = LocalSoftwareKeyboardController.current
     val singleLine = keyboard == KeyboardType.Uri || keyboard == KeyboardType.Password
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(label, color = Muted, style = MaterialTheme.typography.labelMedium)
+        Text(
+            label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium
+        )
         BasicTextField(
             value, changed,
             enabled = enabled,
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                .clip(RoundedCornerShape(16.dp)).background(Color(0xFF20251F)).padding(12.dp)
+                .clip(
+                    RoundedCornerShape(16.dp)
+                ).background(MaterialTheme.colorScheme.surfaceContainer).padding(12.dp)
                 .semantics { contentDescription = label },
             textStyle = TextStyle(
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = MaterialTheme.typography.bodyMedium.fontSize
             ),
             keyboardOptions = KeyboardOptions(keyboardType = keyboard, imeAction = ImeAction.Done),
@@ -814,17 +853,18 @@ private fun Input(
                 VisualTransformation.None
             },
             minLines = 1, maxLines = if (singleLine) 1 else 4,
-            cursorBrush = SolidColor(Accent)
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
         )
     }
 }
 
 @Composable
 private fun VoiceMark(level: Float, listening: Boolean) {
+    val accent = MaterialTheme.colorScheme.primary
     Canvas(Modifier.size(48.dp)) {
-        drawCircle(Accent.copy(alpha = 0.18f), style = Stroke(3.dp.toPx()))
+        drawCircle(accent.copy(alpha = 0.18f), style = Stroke(3.dp.toPx()))
         drawCircle(
-            Accent,
+            accent,
             radius =
             size.minDimension * (0.15f + if (listening) level * 0.24f else 0f)
         )
@@ -873,7 +913,7 @@ private fun CancelControl(cancel: (Boolean) -> Unit) {
     val current by rememberUpdatedState(cancel)
     Box(
         Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp))
-            .background(Color(0xFF20251F))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .semantics {
                 role = Role.Button
                 onClick(label) {

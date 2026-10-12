@@ -24,15 +24,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.quantumink.hermesgadget.client.AppearancePreferences
 import dev.quantumink.hermesgadget.client.CuePreferences
 import dev.quantumink.hermesgadget.client.R as ClientR
 
@@ -115,7 +115,9 @@ class MainActivity : ComponentActivity() {
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         enabled = RelaySettings.enabled(this)
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
+            val appearance = remember { AppearancePreferences(this@MainActivity) }
+            val mode by appearance.mode.collectAsStateWithLifecycle()
+            PhoneAppearance(mode) {
                 val phone by conversation.state.collectAsStateWithLifecycle()
                 val status by RelaySettings.status.collectAsStateWithLifecycle()
                 var destination by androidx.compose.runtime.saveable.rememberSaveable {
@@ -160,7 +162,7 @@ class MainActivity : ComponentActivity() {
                             stringResource(R.string.app_name),
                             Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                             style = MaterialTheme.typography.titleLarge,
-                            color = Color(0xFFB6ED93)
+                            color = MaterialTheme.colorScheme.primary
                         )
                         when (destination) {
                             "profiles" -> DirectoryPage(
@@ -199,6 +201,9 @@ class MainActivity : ComponentActivity() {
                                         navigate("settings")
                                     }
                                     "speech" -> SpeechSettingsPage(this@MainActivity) {
+                                        navigate("settings")
+                                    }
+                                    "appearance" -> AppearancePage(this@MainActivity) {
                                         navigate("settings")
                                     }
                                     "settings" -> PhoneSettingsPage(this@MainActivity, ::navigate)

@@ -27,7 +27,7 @@ import androidx.wear.compose.foundation.AmbientMode
 import androidx.wear.compose.foundation.AmbientTickEffect
 import androidx.wear.compose.foundation.LocalAmbientModeManager
 import androidx.wear.compose.foundation.rememberAmbientModeManager
-import androidx.wear.compose.material3.MaterialTheme
+import dev.quantumink.hermesgadget.client.AppearancePreferences
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
@@ -79,7 +79,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             val ambientManager = rememberAmbientModeManager()
             CompositionLocalProvider(LocalAmbientModeManager provides ambientManager) {
-                MaterialTheme {
+                val appearance = remember { AppearancePreferences(this@MainActivity) }
+                val mode by appearance.mode.collectAsStateWithLifecycle()
+                WatchAppearance(mode) {
                     val ambient = ambientManager.currentAmbientMode as? AmbientMode.Ambient
                     var minute by remember {
                         mutableLongStateOf(System.currentTimeMillis() / 60000)

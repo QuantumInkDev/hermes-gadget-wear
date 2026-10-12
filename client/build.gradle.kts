@@ -19,4 +19,5 @@ dependencies {
     implementation(libs.play.services.wearable)
     constraints { implementation(libs.fragment) }
     implementation(libs.coroutines.android)
+    testImplementation(libs.junit)
 }
