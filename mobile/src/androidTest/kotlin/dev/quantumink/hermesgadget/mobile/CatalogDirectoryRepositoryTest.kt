@@ -89,6 +89,10 @@ class CatalogDirectoryRepositoryTest {
                     }
                 )
                 assertEquals(listOf("b", "a", "manual", "c"), repository.sourceOrder())
+                repository.selectWatchPhoto("a:one", photo(7))
+                val orderedPortrait = repository.savedPages().single { it.key == "a:one" }
+                    .profile.portrait?.sha256
+                assertTrue(orderedPortrait != null)
                 repository.movePage("a:one", -1)
                 repository.movePage("manual:${ids[1]}", -1)
                 repository.moveSource("a", -1)
@@ -127,6 +131,10 @@ class CatalogDirectoryRepositoryTest {
                         }
                     )
                 assertEquals(failed.map { it.key }, repository.savedPages().map { it.key })
+                assertEquals(
+                    orderedPortrait,
+                    repository.savedPages().single { it.key == "a:one" }.profile.portrait?.sha256
+                )
                 offline = false
                 val returned = repository.refresh(true).get(4, TimeUnit.SECONDS)
                 assertEquals(

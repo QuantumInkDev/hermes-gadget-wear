@@ -17,11 +17,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.quantumink.hermesgadget.client.AppearancePreferences
 import dev.quantumink.hermesgadget.client.CuePreferences
-import dev.quantumink.hermesgadget.client.R as ClientR
 
 class MainActivity : ComponentActivity() {
     private val catalogNetwork = object : android.net.ConnectivityManager.NetworkCallback() {
@@ -139,31 +138,14 @@ class MainActivity : ComponentActivity() {
                     navigate(if (destination == "conversation") "profiles" else "settings")
                 }
                 PhoneScaffold(
-                    bottomBar = {
-                        androidx.compose.material3.NavigationBar {
-                            listOf(
-                                "profiles" to "Profiles",
-                                "watch" to "Watch",
-                                "settings" to "Settings"
-                            )
-                                .forEach { (route, label) ->
-                                    NavigationBarItem(
-                                        selected = destination == route,
-                                        onClick = { navigate(route) },
-                                        icon = { NavigationIcon(route) },
-                                        label = { Text(label) }
-                                    )
-                                }
+                    topBar = {
+                        androidx.compose.foundation.layout.Box(Modifier.statusBarsPadding()) {
+                            PhoneBrandHeader()
                         }
-                    }
+                    },
+                    bottomBar = { PhoneNavigationBar(destination, ::navigate) }
                 ) { padding ->
                     Column(Modifier.fillMaxSize().padding(padding).imePadding()) {
-                        Text(
-                            stringResource(R.string.app_name),
-                            Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
                         when (destination) {
                             "profiles" -> DirectoryPage(
                                 this@MainActivity,
@@ -338,14 +320,4 @@ class MainActivity : ComponentActivity() {
             }
         }.onFailure { RelaySettings.report(getString(R.string.association_unavailable)) }
     }
-}
-
-@androidx.compose.runtime.Composable
-private fun NavigationIcon(route: String) {
-    val resource = when (route) {
-        "profiles" -> ClientR.drawable.ic_nav_profiles
-        "watch" -> ClientR.drawable.ic_nav_watch
-        else -> ClientR.drawable.ic_nav_settings
-    }
-    androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(resource), null)
 }

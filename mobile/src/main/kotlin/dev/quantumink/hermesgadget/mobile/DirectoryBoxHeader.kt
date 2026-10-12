@@ -41,7 +41,7 @@ internal fun DirectoryBoxHeader(
     val corner = if (hasContents) 0.dp else 16.dp
     Surface(
         modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         shape = RoundedCornerShape(16.dp, 16.dp, corner, corner)
     ) {
         Row(
@@ -57,7 +57,7 @@ internal fun DirectoryBoxHeader(
                 }
             ).semantics(mergeDescendants = canToggle) {
                 stateDescription = if (expanded) "Expanded" else "Collapsed"
-            }.padding(16.dp),
+            }.padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -68,15 +68,15 @@ internal fun DirectoryBoxHeader(
                 Icon(
                     painterResource(R.drawable.ic_box),
                     null,
-                    Modifier.padding(10.dp).size(22.dp),
+                    Modifier.padding(6.dp).size(18.dp),
                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(label, style = MaterialTheme.typography.titleMedium)
-                Text(count, style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    if (count == "0 profiles") "No cached profiles yet. $status" else status,
+                    "$count · " +
+                        if (count == "0 profiles") "No cached profiles yet. $status" else status,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

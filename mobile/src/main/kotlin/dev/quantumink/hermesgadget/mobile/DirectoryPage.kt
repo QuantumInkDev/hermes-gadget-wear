@@ -21,11 +21,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,6 +45,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -69,6 +71,18 @@ fun DirectoryPage(
     modifier: Modifier = Modifier
 ) {
     val repository = remember(context.applicationContext) { CatalogRepository.get(context) }
+    DirectoryContent(context, repository, onTalk, onBoxes, onManual, modifier)
+}
+
+@Composable
+internal fun DirectoryContent(
+    context: Context,
+    repository: CatalogRepository,
+    onTalk: (CatalogPage) -> Unit,
+    onBoxes: () -> Unit,
+    onManual: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val pages by repository.pages.collectAsStateWithLifecycle()
     val notice by repository.notice.collectAsStateWithLifecycle()
     val health by repository.health.collectAsStateWithLifecycle()
@@ -77,6 +91,7 @@ fun DirectoryPage(
     var sourceOrder by remember { mutableStateOf(emptyList<String>()) }
     var profiles by remember { mutableStateOf(emptyMap<String, EndpointProfile?>()) }
     var query by rememberSaveable { mutableStateOf("") }
+    var menu by remember { mutableStateOf(false) }
     var reorder by rememberSaveable { mutableStateOf(false) }
     var collapsed by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var pictureKey by rememberSaveable { mutableStateOf<String?>(null) }
@@ -167,42 +182,72 @@ fun DirectoryPage(
     ) {
         item(key = "directory-controls") {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Your profiles", style = MaterialTheme.typography.headlineSmall)
-                Text("Choose a profile to talk or chat. Phone pairing is separate from your watch.")
-                if (!reorder && query.isBlank()) {
-                    Text(
-                        "Tap a box header to show or hide its profiles.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Your profiles", style = MaterialTheme.typography.headlineLarge)
+                        Text(
+                            "A conversation, one tap away.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Box {
+                        IconButton(onClick = { menu = true }) {
+                            Icon(painterResource(R.drawable.ic_more), "Directory options")
+                        }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(text = {
+                                Text("Refresh")
+                            }, enabled = !busy, onClick = {
+                                menu = false
+                                work { repository.refresh(true).get(20, TimeUnit.SECONDS) }
+                            })
+                            DropdownMenuItem(
+                                text = { Text("Reorder") },
+                                enabled =
+                                !busy && query.isBlank(),
+                                onClick = {
+                                    menu = false
+                                    reorder = true
+                                }
+                            )
+                            DropdownMenuItem(text = {
+                                Text("Manage boxes")
+                            }, enabled = !busy, onClick = {
+                                menu = false
+                                onBoxes()
+                            })
+                            DropdownMenuItem(text = {
+                                Text("Manual setup")
+                            }, enabled = !busy, onClick = {
+                                menu = false
+                                onManual()
+                            })
+                        }
+                    }
                 }
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it.take(64) },
                     label = { Text("Search profiles or boxes") },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_search), null) },
+                    shape = RoundedCornerShape(28.dp),
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !reorder,
                     singleLine = true
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(enabled = !busy, onClick = {
-                        work { repository.refresh(true).get(20, TimeUnit.SECONDS) }
-                    }) { Text("Refresh") }
-                    OutlinedButton(enabled = !busy && query.isBlank(), onClick = {
-                        reorder = !reorder
-                    }) { Text(if (reorder) "Done reordering" else "Reorder") }
-                }
                 if (query.isNotBlank()) {
-                    Text("Search results stay expanded. Clear search to collapse boxes or reorder.")
+                    Text(
+                        "Matching boxes stay open while you search.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    TextButton(onClick = { query = "" }) { Text("Clear search") }
                 }
                 if (reorder) {
                     Text(
                         "Move boxes and profiles with the arrows. This order also appears on your watch."
                     )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onBoxes, enabled = !busy) { Text("Manage boxes") }
-                    TextButton(onClick = onManual, enabled = !busy) { Text("Manual setup") }
+                    TextButton(onClick = { reorder = false }) { Text("Done reordering") }
                 }
                 if (busy) Text("Updating profiles…")
                 if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
@@ -283,25 +328,41 @@ fun DirectoryPage(
                     ) {
                         Box(
                             Modifier.fillMaxWidth().padding(
-                                start = 12.dp,
-                                end = 12.dp,
-                                bottom = if (last) 12.dp else 8.dp
+                                start = 0.dp,
+                                end = 0.dp,
+                                bottom = if (last) 4.dp else 0.dp
                             )
                         ) {
-                            DirectoryCard(
-                                page = page,
-                                repository = repository,
-                                chosenPicture = page.key in watchPictures,
-                                profile = profiles[page.key],
-                                busy = busy,
-                                reorder = reorder,
-                                canMoveUp = index > 0,
-                                canMoveDown = index < group.lastIndex,
-                                onTalk = { onTalk(page) },
-                                onPicture = { pictureKey = page.key },
-                                onDetails = { detailKey = page.key },
-                                onMove = { delta -> work { repository.movePage(page.key, delta) } }
-                            )
+                            Column {
+                                ProfileRow(
+                                    page = page,
+                                    repository = repository,
+                                    chosenPicture = page.key in watchPictures,
+                                    profile = profiles[page.key],
+                                    busy = busy,
+                                    reorder = reorder,
+                                    canMoveUp = index > 0,
+                                    canMoveDown = index < group.lastIndex,
+                                    onTalk = { onTalk(page) },
+                                    onPicture = { pictureKey = page.key },
+                                    onDetails = { detailKey = page.key },
+                                    onResetPicture = {
+                                        work { repository.useBoxPicture(page.key) }
+                                    },
+                                    onRetire = { retiringKey = page.key },
+                                    onMove = { delta ->
+                                        work { repository.movePage(page.key, delta) }
+                                    }
+                                )
+                                if (!last) {
+                                    HorizontalDivider(
+                                        Modifier.padding(start = 72.dp, end = 16.dp),
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(
+                                            alpha = 0.35f
+                                        )
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -394,88 +455,6 @@ fun DirectoryPage(
 }
 
 @Composable
-private fun DirectoryCard(
-    page: CatalogPage,
-    repository: CatalogRepository,
-    chosenPicture: Boolean,
-    profile: EndpointProfile?,
-    busy: Boolean,
-    reorder: Boolean,
-    canMoveUp: Boolean,
-    canMoveDown: Boolean,
-    onTalk: () -> Unit,
-    onPicture: () -> Unit,
-    onDetails: () -> Unit,
-    onMove: (Int) -> Unit
-) {
-    val reason = when {
-        profile == null -> "Talk/Chat needs a configured TLS Gadget endpoint."
-        !profile.endpoint.isTls ->
-            "Talk/Chat requires a wss TLS endpoint. " +
-                "Review this legacy endpoint in Settings."
-        else -> null
-    }
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                DirectoryPortrait(repository, page)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(page.profile.name, style = MaterialTheme.typography.titleMedium)
-                    Text(page.sourceLabel, style = MaterialTheme.typography.bodySmall)
-                    Text(
-                        catalogStatus(page.status, page.sourceId == "manual"),
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Text(
-                        if (chosenPicture) {
-                            "Using watch picture"
-                        } else if (page.sourceId ==
-                            "manual"
-                        ) {
-                            "Phone picture or default"
-                        } else if (page.profile.portrait ==
-                            null
-                        ) {
-                            "Default picture"
-                        } else {
-                            "Using box picture"
-                        },
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                }
-            }
-            if (reorder) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Order within this box", Modifier.weight(1f))
-                    OrderArrow(
-                        "Move ${page.profile.name} earlier in ${page.sourceLabel}",
-                        "↑",
-                        !busy && canMoveUp
-                    ) { onMove(-1) }
-                    OrderArrow(
-                        "Move ${page.profile.name} later in ${page.sourceLabel}",
-                        "↓",
-                        !busy && canMoveDown
-                    ) { onMove(1) }
-                }
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(enabled = !busy && reason == null, onClick = onTalk) {
-                        Text("Talk/Chat")
-                    }
-                    OutlinedButton(enabled = !busy, onClick = onPicture) { Text("Picture") }
-                }
-                if (reason != null) Text(reason, style = MaterialTheme.typography.bodySmall)
-                TextButton(onClick = onDetails, enabled = !busy) { Text("Endpoint details") }
-            }
-        }
-    }
-}
-
-@Composable
 internal fun DirectoryPortrait(
     repository: CatalogRepository,
     page: CatalogPage,
@@ -515,7 +494,7 @@ internal fun DirectoryPortrait(
 }
 
 @Composable
-private fun OrderArrow(description: String, glyph: String, enabled: Boolean, onClick: () -> Unit) {
+internal fun OrderArrow(description: String, glyph: String, enabled: Boolean, onClick: () -> Unit) {
     IconButton(
         onClick = onClick,
         enabled = enabled,
