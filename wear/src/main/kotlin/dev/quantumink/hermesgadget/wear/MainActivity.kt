@@ -104,7 +104,40 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(service, watch, tileLaunch.pendingKey) {
                         if (service != null && watch != null) reconcileTile(service)
                     }
-                    if (service == null ||
+                    if (ambient != null) {
+                        val artwork = if (service == null) {
+                            null to null
+                        } else {
+                            val pictures = remember(service) {
+                                service.state.map { watch ->
+                                    val page = ProfilePages.merge(watch.profiles, watch.catalog)
+                                        .singleOrNull { it.key == watch.selectedPage }
+                                    val artwork = page?.let { watch.artwork[it.key] }
+                                    val pet = if (page?.approved?.endpoint?.url ==
+                                        watch.profile?.endpoint?.url &&
+                                        page?.approved != null
+                                    ) {
+                                        watch.pet ?: artwork?.pet
+                                    } else {
+                                        artwork?.pet
+                                    }
+                                    pet to artwork?.portrait
+                                }.distinctUntilChanged()
+                            }
+                            val artwork by pictures.collectAsStateWithLifecycle(
+                                initialValue =
+                                null to null
+                            )
+                            artwork
+                        }
+                        AmbientPet(
+                            artwork.first,
+                            minute,
+                            ambient.isLowBitAmbientSupported,
+                            ambient.isBurnInProtectionRequired,
+                            artwork.second
+                        )
+                    } else if (service == null ||
                         (tileLaunch.pendingKey != null && !tileLaunch.deferred)
                     ) {
                         WaitingScreen()
@@ -124,34 +157,6 @@ class MainActivity : ComponentActivity() {
                                 })
                             }
                         }
-                    } else if (ambient != null) {
-                        val pictures = remember(service) {
-                            service.state.map { watch ->
-                                val page = ProfilePages.merge(watch.profiles, watch.catalog)
-                                    .singleOrNull { it.key == watch.selectedPage }
-                                val artwork = page?.let { watch.artwork[it.key] }
-                                val pet = if (page?.approved?.endpoint?.url ==
-                                    watch.profile?.endpoint?.url &&
-                                    page?.approved != null
-                                ) {
-                                    watch.pet ?: artwork?.pet
-                                } else {
-                                    artwork?.pet
-                                }
-                                pet to artwork?.portrait
-                            }.distinctUntilChanged()
-                        }
-                        val artwork by pictures.collectAsStateWithLifecycle(
-                            initialValue =
-                            null to null
-                        )
-                        AmbientPet(
-                            artwork.first,
-                            minute,
-                            ambient.isLowBitAmbientSupported,
-                            ambient.isBurnInProtectionRequired,
-                            artwork.second
-                        )
                     } else {
                         if (tileLaunch.notice.isNotEmpty()) {
                             androidx.compose.ui.window.Dialog(
