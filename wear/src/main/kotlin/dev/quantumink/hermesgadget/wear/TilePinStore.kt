@@ -12,8 +12,23 @@ import java.io.File
 class TilePinStore(context: Context, private val file: File = File(context.filesDir, "tile-pins")) {
     private val application = context.applicationContext
     fun read(): TilePins = synchronized(lock) { load().pins }
-    fun editLocal(focus: String?, grid: List<String?>): TilePins = synchronized(lock) {
-        val next = load().editLocal(focus, grid)
+    fun editLocal(focus: String?, grid: List<String?>): TilePins = mutateLocal {
+        it.copy(focus = focus, grid = grid)
+    }
+
+    /** A field action cannot carry an editor's stale snapshot over a concurrent phone edit. */
+    fun editFocus(focus: String?): TilePins = mutateLocal { it.copy(focus = focus) }
+    fun editSlot(index: Int, key: String?): TilePins = mutateLocal { current ->
+        require(index in 0..3)
+        val grid = (current.grid + List(4 - current.grid.size) { null })
+            .map { if (key != null && it == key) null else it }.toMutableList()
+        grid[index] = key
+        current.copy(grid = grid)
+    }
+    private fun mutateLocal(change: (TilePins) -> TilePins): TilePins = synchronized(lock) {
+        val current = load()
+        val changed = change(current.pins)
+        val next = current.editLocal(changed.focus, changed.grid)
         save(next)
         next.pins
     }

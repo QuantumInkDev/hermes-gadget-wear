@@ -85,13 +85,13 @@ fun ProfilePinEditor(pages: List<ProfilePage>, key: String, locked: Boolean, clo
         }
             .onSuccess { pins = it }.onFailure { notice = "Tile settings need attention" }
     }
-    fun edit(focus: String?, grid: List<String?>) {
+    fun edit(change: () -> dev.quantumink.hermesgadget.protocol.TilePins) {
         if (locked || saving || pages.none { it.key == key }) return
         saving = true
         scope.launch {
             runCatching {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    store.editLocal(focus, grid)
+                    change()
                 }
             }
                 .onSuccess {
@@ -116,7 +116,7 @@ fun ProfilePinEditor(pages: List<ProfilePage>, key: String, locked: Boolean, clo
             if (current != null) {
                 item {
                     Secondary(if (current.focus == key) "Clear Focus" else "Use for Focus", {
-                        edit(if (current.focus == key) null else key, current.grid)
+                        edit { store.editFocus(if (current.focus == key) null else key) }
                     }, enabled = !locked && !saving)
                 }
                 current.grid.forEachIndexed { index, value ->
@@ -125,17 +125,7 @@ fun ProfilePinEditor(pages: List<ProfilePage>, key: String, locked: Boolean, clo
                             pages.singleOrNull { it.key == value }?.label
                                 ?: if (value == null) "Empty" else "Unavailable"
                         Secondary("Slot ${index + 1}: $label", {
-                            val next = current.grid.map {
-                                if (it ==
-                                    key
-                                ) {
-                                    null
-                                } else {
-                                    it
-                                }
-                            }.toMutableList()
-                            next[index] = if (value == key) null else key
-                            edit(current.focus, next)
+                            edit { store.editSlot(index, if (value == key) null else key) }
                         }, enabled = !locked && !saving)
                     }
                 }
