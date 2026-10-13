@@ -187,7 +187,13 @@ fun ProfileCarousel(
                             }
                         }
                     }
-                ) { Text("Jump to profile", textAlign = TextAlign.Center) }
+                ) {
+                    Text(
+                        "Jump to profile",
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
             Box(
                 Modifier.fillMaxSize().hierarchicalFocusGroup(

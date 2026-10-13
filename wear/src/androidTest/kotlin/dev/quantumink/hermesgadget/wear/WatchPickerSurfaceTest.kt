@@ -96,6 +96,7 @@ class WatchPickerSurfaceTest {
         val scale = mutableStateOf(1f)
         var mounts = 0
         var disposals = 0
+        val footerOnly = InstrumentationRegistry.getArguments().getString("footerOnly") == "true"
         instrumentation.runOnMainSync {
             service.rememberPage(pages.first().key)
             activity.setContent {
@@ -174,6 +175,10 @@ class WatchPickerSurfaceTest {
                 }
                 instrumentation.uiAutomation.waitForIdle(200, 3000)
                 assertRoundPickerBounds()
+                if (footerOnly) {
+                    capture("${theme.name}-$font-end-padding")
+                    continue
+                }
                 click("Choose a profile")
                 capture("${theme.name}-$font-picker")
                 instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)

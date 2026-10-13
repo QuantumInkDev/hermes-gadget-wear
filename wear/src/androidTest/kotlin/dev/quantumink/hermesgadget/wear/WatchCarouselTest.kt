@@ -652,8 +652,12 @@ class WatchCarouselTest {
         }
         // Stop the drag before release. A fast release legitimately flings past Type;
         // this regression measures stationary controls rather than kinetic scrolling.
-        SystemClock.sleep(150)
-        event(MotionEvent.ACTION_MOVE, 120f)
+        // Subpixel/one-pixel movement keeps the platform velocity tracker sampling
+        // a stationary finger; identical MOVE coordinates can be coalesced away.
+        for (y in listOf(121f, 120f, 120.5f, 120f)) {
+            SystemClock.sleep(150)
+            event(MotionEvent.ACTION_MOVE, y)
+        }
         event(MotionEvent.ACTION_UP, 120f)
     }
     private fun rotaryPulse(delta: Float) {
