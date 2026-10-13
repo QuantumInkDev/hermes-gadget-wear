@@ -7,6 +7,21 @@ Critical/Important breakage. It independently checks current source/APK/receipt 
 existing XML/native outputs without rerunning suites. This is software review approval;
 physical acceptance remains separate.
 
+## Owner portrait correction after the scoped review — 2026-10-13
+
+`b3d9ca6` removes artwork overlays, moves profile jumping to the card footer and prefers a
+device-tuned recording tick; `f35bf59` centers the footer label across the whole button.
+Warning-strict checks pass 116 JVM tests / 33 XML reports with all four APKs. Eleven affected
+native methods, 18 full geometry scenarios and 18 centered-footer cases pass. Initial fixture
+failures and unconfigured stock-server skips were resolved with the proper three-server
+workflow. Ninety-one watch/recording exports are refreshed with separate source-bound evidence.
+This owner-requested follow-up is not covered by the earlier independent scoped re-review.
+
+Physical preserving installation verifies the matching certificate/APK, all 78 baseline files,
+19 identities and 29 artwork files unchanged, with original timeout retained. The owner confirms
+both recording ticks are noticeable. Fresh away reply receipt, speech, microphone contamination,
+extended comfort, tile edit acknowledgement/launch and quantitative power remain open.
+
 | Finding | Correction | Behavioral evidence |
 |---|---|---|
 | Catalog refresh interrupts an active turn | Service defers the latest catalog while recording, replying or awaiting approval; the mounted carousel retains the approved endpoint and page projection. Unlock applies normal review/fallback behavior. | Changed URL, absent URL and removal across all three locks; service deferral while the interactive surface is absent; existing horizontal/vertical carousel checks. |

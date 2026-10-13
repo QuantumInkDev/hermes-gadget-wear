@@ -31,6 +31,15 @@ unchanged. Associated watch snapshot readback matches existing Focus revision 1,
 slots and 19 profile keys. No phone edit or live speech turn was sent. Owned debugging helpers
 and the exact temporary phone grant are removed. Owner art remains excluded from public captures.
 
+The 2026-10-13 owner correction is subsequently installed at `f35bf59`: artwork stays clear,
+Jump to profile is the final card control and its full-width label is centered. Both updates
+preserve all 78 current baseline files, 19 identities, 29 artwork files and original timeout.
+The owner confirms noticeable recording start/finish ticks; comfort and microphone contamination
+remain separate observations. Follow-up strict checks, 11 distinct native methods, 18 full
+geometry scenarios and 18 centered-footer cases pass. The gallery refreshes 91 exports with
+separate follow-up provenance; this is not a new whole-branch review. Owned watch debugging
+is disconnected and its bridge stopped.
+
 Still open: native owner observations; four favorites and Focus/grid system tile addition/every
 target; associated Data Layer phone edit acknowledgement (physical snapshot readback passes;
 owned emulator API_UNAVAILABLE remains recorded); speech/haptic comfort/mic contamination, away reply/sleep receipt and

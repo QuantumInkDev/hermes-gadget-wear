@@ -1,4 +1,4 @@
-<!-- Current continuation: native software and final scoped review pass at c248b03/6b00947. Both physical devices updated preserving identities/art; Moonlight selected. Phone reads the watch's Focus revision 1 and 19 profile keys; grid favorites and owner speech/system-tile checks remain open. -->
+<!-- Current continuation: centered watch footer delivered at f35bf59; owner confirms both recording ticks. Phone c248b03 reads Focus revision 1 and 19 keys. Seven phone home-widget layouts are in design review; grid favorites, away replies and system tile checks remain open. -->
 # Session status
 
 Quantum Relay for Hermes native redesign is implemented and reviewed: Portrait studio,
@@ -16,13 +16,22 @@ Final strict checks pass 116 JVM tests across 33 XML reports, zero failures/erro
 with all four debug/instrumentation APKs built. Focused native receipts record 34 passing
 executions / 32 distinct methods and 18 geometry scenarios; 72 affected PNGs were refreshed.
 
-Physical watch delivery is complete at `c248b03`: matching certificate and installed APK hash,
-all 19 identity files and 75 protected baseline files unchanged at installation. Normal UI
-then selected Moonlight and configured the current profile for Focus (revision 1); the four
-grid slots remain empty for the owner's choices. The portrait is still 340×340 pixels at its
-original tested position and exposes Start recording/picker. Normal catalog refresh updates
-page metadata; identity/artwork files remain protected. Original 15-second timeout is retained.
-No new live typed query or physical microphone/speech observation is claimed this session.
+Physical watch delivery now includes the owner's portrait correction (`b3d9ca6`) and centered
+footer label (`f35bf59`). No microphone badge or floating picker covers the artwork; Jump to
+profile is the final card control. Horizontal swipes, accessible selection, external rings
+and the original 340×340-pixel portrait position remain. Matching certificate/installed APK
+hash and backups are verified; all 78 baseline files, 19 identities and 29 artwork files
+remain unchanged at both installations. Normal UI verifies the clear first view and footer
+control, then returns to the top. Original 15-second timeout, Moonlight and Focus revision 1
+are retained; the four grid slots remain empty. The owner confirms a noticeable tick at both
+recording start and finish. No fresh server reply, voice, microphone contamination, extended
+haptic comfort or away power result is inferred from that observation.
+
+The follow-up passes warning-strict checks (116 JVM tests, 33 XML reports, all four APKs),
+11 distinct affected native methods, 18 full geometry scenarios and 18 centered-footer cases.
+Two stock carousel checks were rerun with their required three-server fixture and pass;
+initial missing-server skips are not counted. The gallery refreshes 91 watch/recording exports
+with source-bound follow-up evidence, separate from the earlier scoped review.
 
 Physical phone delivery is complete at `c248b03` (2026-10-13): current APK/data backed up, matching
 certificate and installed APK hash verified, all 99 baseline files unchanged at installation,
@@ -37,10 +46,17 @@ microphone recording was performed. Owned debugging bridges are stopped and the 
 temporary phone debugging grant was removed/read back. APKs, backups and receipts remain
 ignored under `.local/native-design/`; no persistent Mac power helper is installed.
 
+New requested work: phone home-screen portrait shortcuts in 1×1, 2×2, 2×4, 1×4, 4×4, 1×5
+and 2×5 layouts. The owner defines these as rows × columns, so 1×4 and 1×5 are horizontal.
+OS light/dark and wallpaper colors are required. Design review precedes widget implementation;
+see the [phone-home-widgets design](docs/superpowers/specs/2026-10-13-phone-home-widgets-design.md).
+No widget code is implemented yet.
+
 Remaining gates: native owner observations; specified four favorites, Focus/grid system tile
 addition and every target launch; associated phone edit acknowledgement after verified
 physical snapshot readback; actual speech, haptic comfort/mic contamination,
-away reply/sleep receipt and quantitative Light/GIF/audio/battery checks. Actual emulator OS
+away reply/sleep receipt and quantitative Light/GIF/audio/battery checks. Tick noticeability
+passes by owner report; comfort and contamination remain open. Actual emulator OS
 power saver remains capability-skipped; reduced-motion static behavior passes. Historical
 logs prove generated replies, not watch receipt or a confirmed cause. Eighteen prior normal
 owner GIF imports/assignments were verified; do not reimport or publish personal art.

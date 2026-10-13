@@ -7,12 +7,18 @@ No personal artwork, endpoint, conversation, credential or device backup is incl
 
 The [manifest](manifest.json) records origin, dimensions and SHA-256 for every PNG. Unchanged
 reviewed Task 1/2/6/8 receipts are reused; Task 7 refreshes the phone surfaces after tile editing
-was added. The final fix refreshes 72 watch captures after correcting settled clock visibility;
-unchanged phone, ambient, recording and tile images are reused. AndroidX
+was added. The earlier final fix refreshed 72 watch captures after correcting settled clock
+visibility. The owner portrait correction below refreshes watch and recording exports;
+unchanged phone, ambient and tile images are reused. AndroidX
 [TileRenderer](https://developer.android.com/reference/androidx/wear/tiles/renderer/TileRenderer)
 renders the exact production ProtoLayout/resources in a synthetic host; those images do not
 claim system-carousel addition. Original [Voice Q masters](../../store-assets/voice-q/manifest.json)
 and launcher artwork remain separate from personal portraits.
+
+The 2026-10-13 owner correction refreshes 91 watch/recording exports: clear portraits with no
+microphone badge or floating menu, and a full-width centered Jump to profile button at the
+end of the card. External recording rings, swipe navigation and original portrait geometry
+remain. The verification record separates this follow-up from the earlier scoped review.
 
 ## Three appearances
 
@@ -133,6 +139,13 @@ preserving 99 baseline files at installation; native navigation/Moonlight select
 all 18 identities and 54 artwork files. Physical associated-watch snapshot readback matches
 Focus revision 1, empty grid and 19 profile keys. Four grid choices, phone edit acknowledgement,
 physical tile addition/every target launch,
-speech/haptic strength/microphone contamination and quantitative Light/GIF/audio/battery tests
+speech/haptic comfort/microphone contamination and quantitative Light/GIF/audio/battery tests
 remain controller/owner gates. Eighteen prior normal owner GIF imports/assignments are already
 verified privately; they are not reimported or included here. No Play release is claimed.
+
+The follow-up `f35bf59` watch build is installed preserving all 78 baseline files, 19 identities,
+29 artwork files and original timeout. The owner confirms both recording ticks are noticeable.
+Eleven distinct affected native methods pass; full geometry and centered-footer checks each
+cover 18 theme/font/density scenarios. Historical acceptance/review counts above remain tied
+to their earlier commits. This observation does not establish fresh speech, away reply receipt
+or microphone contamination.

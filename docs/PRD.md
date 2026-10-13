@@ -12,9 +12,11 @@ portraits, accessible profile details, foreground Talk/Chat, live capture/playba
 a muted-volume hint and revision-safe watch tile editing.
 
 The watch retains stable swipe pages, per-page drafts/scroll, selection locks and rotary
-focus, with a direct profile picker. Hold the portrait to record, release to send or drag
+focus, with a labeled Jump to profile control at the end of each card. Keep the artwork
+clear of floating menus and microphone badges. Hold the portrait to record, release to send or drag
 down to cancel; short taps and interrupted gestures do not send. Actual capture drives the
-external rings and very light start/accepted-finish haptics. A foreground active turn may
+external rings and device-tuned start/accepted-finish ticks with capability fallbacks. Both
+ticks are noticeable by owner report on the physical watch. A foreground active turn may
 keep the display on for at most two minutes; completion, background and ambient release it.
 Historical missing replies during an away trial remain an unconfirmed transport diagnosis.
 
@@ -23,7 +25,7 @@ They launch the intended page without starting recording. Unknown/removed keys s
 locked selection is deferred visibly. The watch owns a durable revision, and stale phone edits
 require review instead of overwriting newer watch choices. Synthetic native acceptance and its
 limits are recorded in the [demo](demo/native-clients/README.md). Physical tile addition,
-associated Data Layer phone edit acknowledgement, speech, away replies, haptic strength and
+associated Data Layer phone edit acknowledgement, speech, away replies, haptic comfort and
 battery remain gates. Physical phone snapshot readback matches the watch's existing Focus
 revision, empty grid and all 19 profile keys; both devices received preserving native updates.
 

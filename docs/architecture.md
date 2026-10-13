@@ -19,6 +19,10 @@ are stored. Screenshot hosts are non-exported, debug-only, synthetic fixtures.
 Back restores rotary focus without remounting the conversation. `recordingPortrait` owns only
 the artwork hold after touch slop/long-press checks. Multi-pointer interruption, ACTION_CANCEL
 and disposal cancel owned capture; actual capture state drives rings, not touch-down.
+The card footer owns the full-width centered Jump to profile control; the portrait has no
+floating picker or microphone badge. Accessible profile actions retain selection locks.
+Watch recording feedback prefers a supported predefined tick, with primitive/amplitude/default
+fallbacks and system haptic settings retained. Phone recording feedback is unchanged.
 `ConversationScreenLease` uses elapsed realtime and a two-minute foreground-turn cap for
 FLAG_KEEP_SCREEN_ON. It never renews from meter/status updates or acquires a wake lock.
 

@@ -1,5 +1,31 @@
 # Progress
 
+## Clear watch portraits and centered footer — 2026-10-13
+
+The owner's correction removes the floating profile menu and microphone badge from the
+watch artwork. Jump to profile is the final card control, with its label centered across the
+full button. Horizontal swipes, accessible profile selection, stable scroll/drafts, recording
+locks, external rings and original portrait geometry remain. A supported device-tuned tick
+replaces the attenuated recording cue; the owner confirms both start and finish are noticeable.
+
+Warning-strict checks pass 116 JVM tests / 33 XML reports and all four APK builds. Eleven
+distinct affected native methods pass, including configured three-server horizontal and
+vertical carousel regressions. Initial fixture failures and missing-server assumption skips
+were resolved; skipped cases are not counted as passes. Full theme/font/density geometry
+covers 18 scenarios, followed by 18 centered-footer cases. The native gallery refreshes
+91 watch/recording exports; unchanged captures retain their earlier provenance.
+
+Preserving physical watch updates verify matching signer/installed APK hash and unchanged
+78 baseline files, 19 identities and 29 artwork files. The final `f35bf59` build shows the
+clear first view and footer jump control. Original timeout, appearance and tile pins remain;
+the owned bridge is stopped. Demo note: hold the unobscured portrait, release after the two
+ticks, swipe profiles or scroll to the centered Jump to profile control. Fresh away replies,
+speech, microphone contamination, extended haptic comfort and quantitative power remain gates.
+
+The newly requested seven phone home-widget sizes use rows × columns and OS theming.
+Their design is being prepared; no phone widget implementation or hardware acceptance is
+claimed here.
+
 ## Native client software acceptance — 2026-10-12
 
 The approved native clients are implemented: Portrait studio/Voice Q, three themes,
