@@ -362,6 +362,120 @@ class CatalogRepositoryTest {
         }
     }
 
+    @Test fun blockedWatchPublicationDoesNotBlockCurrentPhoneProfileOrCancellation() {
+        fixture { context, vault, setup, portraits, animations ->
+            val source =
+                CatalogSource("a", "Box", "https://a.example.invalid/catalog/v1", "synthetic")
+            vault.saveSources(listOf(source))
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val worker = java.util.concurrent.Executors.newSingleThreadExecutor()
+            val repository = CatalogRepository(
+                context,
+                vault,
+                setup,
+                portraits,
+                animations = animations,
+                fetchProfiles = {
+                    listOf(CatalogProfile("p", "Agent", "wss://a.example.invalid/gadget", null))
+                },
+                publish = { _, _ ->
+                    entered.countDown()
+                    release.await(5, TimeUnit.SECONDS)
+                }
+            )
+            try {
+                val refresh = repository.refresh(true)
+                assertTrue(entered.await(2, TimeUnit.SECONDS))
+                val page = repository.pages.value.single()
+                val lookup = worker.submit<EndpointProfile?> { repository.profileFor(page) }
+                assertEquals(
+                    "wss://a.example.invalid/gadget",
+                    lookup.get(500, TimeUnit.MILLISECONDS)?.endpoint?.url
+                )
+                val cancel = worker.submit { repository.saveSource(source) }
+                cancel.get(500, TimeUnit.MILLISECONDS)
+                assertTrue(refresh.isCancelled)
+            } finally {
+                release.countDown()
+                worker.shutdownNow()
+                repository.close()
+            }
+        }
+    }
+
+    @Test fun newerPictureKeepsInflightPublicationAssetsUntilOrderedReplacement() {
+        fixture { context, vault, setup, portraits, animations ->
+            val profile =
+                EndpointProfile(Endpoint.parse("wss://a.example.invalid/gadget"), "Agent", "")
+            setup.save(profile)
+            val block = java.util.concurrent.atomic.AtomicBoolean(false)
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val published = java.util.Collections.synchronizedList(mutableListOf<String>())
+            val worker = java.util.concurrent.Executors.newFixedThreadPool(2)
+            val repository = CatalogRepository(
+                context,
+                vault,
+                setup,
+                portraits,
+                animations = animations,
+                publish = { pages, store ->
+                    val hash = requireNotNull(pages.single().profile.portrait).sha256
+                    if (block.compareAndSet(true, false)) {
+                        entered.countDown()
+                        release.await(5, TimeUnit.SECONDS)
+                    }
+                    assertNotNull(
+                        "In-flight immutable publication still owns its asset",
+                        store.file(hash)
+                    )
+                    published.add(hash)
+                }
+            )
+            try {
+                repository.selectPhoto(profile, photo(android.graphics.Color.RED))
+                val old = requireNotNull(repository.pages.value.single().profile.portrait).sha256
+                published.clear()
+                block.set(true)
+                val first = worker.submit {
+                    repository.movePage(repository.pages.value.single().key, 0)
+                }
+                assertTrue(entered.await(2, TimeUnit.SECONDS))
+                val second = worker.submit {
+                    repository.selectPhoto(profile, photo(android.graphics.Color.BLUE))
+                }
+                val until = android.os.SystemClock.uptimeMillis() + 2000
+                while (repository.pages.value.single().profile.portrait?.sha256 == old &&
+                    android.os.SystemClock.uptimeMillis() < until
+                ) {
+                    android.os.SystemClock.sleep(20)
+                }
+                val fresh = requireNotNull(repository.pages.value.single().profile.portrait).sha256
+                assertTrue(fresh != old)
+                // Wait until the mutation has left its monitor.
+                repository.profileFor(repository.pages.value.single())
+                assertNotNull(
+                    "New edit must not retire media still being published",
+                    portraits.file(old)
+                )
+                release.countDown()
+                first.get(2, TimeUnit.SECONDS)
+                second.get(2, TimeUnit.SECONDS)
+                assertEquals(listOf(old, fresh), published.toList())
+                assertNotNull(portraits.file(fresh))
+                assertTrue(
+                    "Old media retires after replacement publication",
+                    portraits.file(old) == null
+                )
+            } finally {
+                release.countDown()
+                worker.shutdownNow()
+                repository.close()
+            }
+        }
+    }
+
     private fun photo(color: Int): ByteArray {
         val bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply {
             eraseColor(android.graphics.Color.BLUE + color)

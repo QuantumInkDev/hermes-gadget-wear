@@ -84,6 +84,10 @@ data class WatchState(
     val playbackLevel: Float = 0f,
     val haptic: Long = 0
 ) {
+    val selectionLocked: Boolean get() = saving || captureActive ||
+        connection.conversation.prompt != null ||
+        connection.conversation.mode == ConversationMode.LISTENING ||
+        connection.conversation.busy
     override fun toString(): String = "WatchState(content=redacted)"
 }
 
@@ -141,6 +145,8 @@ class GadgetService : Service() {
 
     @Volatile private var pendingSetup: EndpointProfile? = null
     private var rejectedCatalogNotice = ""
+    private var deferredCatalog:
+        Pair<List<dev.quantumink.hermesgadget.protocol.CatalogPage>, String>? = null
 
     private fun rosterProfiles(): List<EndpointProfile> {
         val profiles = mutableState.value.profiles
@@ -200,6 +206,14 @@ class GadgetService : Service() {
         )
         surfaceScope.launch {
             mutableState.collect { watch ->
+                // The service outlives ambient/activity composition replacement. Keep the
+                // approved roster/session projection until the same selection lock clears.
+                if (!watch.selectionLocked) {
+                    deferredCatalog?.let { pending ->
+                        deferredCatalog = null
+                        applyCatalog(pending.first, pending.second)
+                    }
+                }
                 WatchSurfaces.publish(this@GadgetService, watch)
                 val profile = watch.profile
                 if (profile != null && !watch.connection.conversation.busy &&
@@ -303,6 +317,11 @@ class GadgetService : Service() {
             }
             return
         }
+        if (mutableState.value.selectionLocked) {
+            deferredCatalog = pages.toList() to selected
+            return
+        }
+        deferredCatalog = null
         rejectedCatalogNotice = ""
         mutableState.update {
             it.copy(
@@ -762,6 +781,7 @@ class GadgetService : Service() {
     }
 
     fun reset() {
+        deferredCatalog = null
         closeConnection()
         drafts.clear()
         catalog.reset()

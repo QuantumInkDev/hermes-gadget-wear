@@ -34,12 +34,7 @@ class CatalogRepository internal constructor(
         PortraitDescriptor,
         Long
     ) -> ByteArray = client::portrait,
-    private val publish: (
-        List<CatalogPage>,
-        PortraitStore
-    ) -> Unit = { pages, store ->
-        ProfileSync.publishCatalog(context, pages, store, vault.animations(), animations)
-    }
+    private val publish: ((List<CatalogPage>, PortraitStore) -> Unit)? = null
 ) : AutoCloseable {
     private val sync = Executors.newSingleThreadExecutor()
     private val mutablePages = MutableStateFlow<List<CatalogPage>>(emptyList())
@@ -168,50 +163,54 @@ class CatalogRepository internal constructor(
                 val saved = combined(raw)
                 mutablePages.value = saved
                 portraits.protect(references(saved))
-                sync.execute {
+                publishCurrent(saved, version, result).whenComplete { _, error ->
                     synchronized(this) {
-                        if (version == revision && !result.isCancelled) {
-                            runCatching { publishCurrent(saved) }.onFailure {
-                                mutableNotice.value =
-                                    "Sync needs attention. Cached profiles were kept."
-                            }
+                        if (version == revision && !result.isCancelled && error != null) {
+                            mutableNotice.value = "Sync needs attention. Cached profiles were kept."
                         }
                     }
                 }
             }
         }
         future.whenComplete { incoming, failure ->
-            if (synchronized(this) { version != revision || result.isCancelled }) {
-                cleanup()
-                result.cancel(false)
-                return@whenComplete
-            }
-            if (failure != null) {
-                cleanup()
-                mutableNotice.value = "Catalog needs attention. Cached profiles were kept."
-                result.completeExceptionally(failure)
-            } else {
-                sync.execute {
+            synchronized(this) {
+                if (version != revision || result.isCancelled) {
+                    cleanup()
+                    result.cancel(false)
+                    return@whenComplete
+                }
+                if (failure != null) {
+                    cleanup()
+                    mutableNotice.value = "Catalog needs attention. Cached profiles were kept."
+                    result.completeExceptionally(failure)
+                } else {
                     try {
-                        synchronized(this) {
-                            if (version != revision || result.isCancelled) return@execute
-                            val raw = combined(incoming, false)
-                            vault.savePages(raw)
-                            val saved = combined(raw)
-                            mutablePages.value = saved
-                            portraits.protect(references(saved))
-                            portraits.retain(references(saved))
-                            publishCurrent(saved)
-                            mutableNotice.value =
-                                if (discovery.statuses().values.any {
-                                        it == CatalogStatus.ATTENTION
+                        val raw = combined(incoming, false)
+                        vault.savePages(raw)
+                        val saved = combined(raw)
+                        mutablePages.value = saved
+                        portraits.protect(references(saved))
+                        portraits.retain(references(saved))
+                        publishCurrent(saved, version, result).whenComplete { _, error ->
+                            synchronized(this) {
+                                if (version == revision && !result.isCancelled) {
+                                    if (error == null) {
+                                        mutableNotice.value = if (discovery.statuses().values.any {
+                                                it == CatalogStatus.ATTENTION
+                                            }
+                                        ) {
+                                            "A catalog connection needs attention. Cached profiles were kept."
+                                        } else {
+                                            "Profiles refreshed. New connections need watch review."
+                                        }
+                                        result.complete(saved)
+                                    } else {
+                                        mutableNotice.value =
+                                            "Sync needs attention. Cached profiles were kept."
+                                        result.completeExceptionally(error)
                                     }
-                                ) {
-                                    "A catalog connection needs attention. Cached profiles were kept."
-                                } else {
-                                    "Profiles refreshed. New connections need watch review."
                                 }
-                            result.complete(saved)
+                            }
                         }
                     } catch (error: Exception) {
                         mutableNotice.value = "Sync needs attention. Cached profiles were kept."
@@ -223,7 +222,7 @@ class CatalogRepository internal constructor(
         return result
     }
 
-    @Synchronized fun selectPhoto(profile: EndpointProfile, bytes: ByteArray) {
+    fun selectPhoto(profile: EndpointProfile, bytes: ByteArray) = change {
         val previous = combined(vault.pages(), false)
         portraits.protect(references(previous))
         val portrait = portraits.normalize(bytes)
@@ -285,7 +284,7 @@ class CatalogRepository internal constructor(
         publishCurrent(updated)
     }
 
-    @Synchronized fun selectWatchPhoto(key: String, bytes: ByteArray) {
+    fun selectWatchPhoto(key: String, bytes: ByteArray) = change {
         val raw = combined(vault.pages(), false)
         val page = raw.single { it.key == key }
         portraits.protect(references(raw))
@@ -321,7 +320,7 @@ class CatalogRepository internal constructor(
         publishPictures(raw)
     }
 
-    @Synchronized fun useBoxPicture(key: String) {
+    fun useBoxPicture(key: String) = change {
         val raw = combined(vault.pages(), false)
         val page = raw.single { it.key == key }
         val fallbackId = page.profile.gadgetUrl?.let { url ->
@@ -343,9 +342,76 @@ class CatalogRepository internal constructor(
         publishCurrent(effective)
     }
 
-    private fun publishCurrent(pages: List<CatalogPage>) {
-        publish(pages, portraits)
-        animations.retain(vault.animations().values.map { it.sha256 }.toSet())
+    private var publishingPortraits = emptySet<String>()
+    private var lastPublication: CompletableFuture<Unit>? = null
+
+    /** Mutations enqueue under the state monitor, then wait without holding that monitor. */
+    private fun change(action: () -> Unit) {
+        val completion = synchronized(this) {
+            val previous = lastPublication
+            action()
+            lastPublication.takeIf { it !== previous }
+        }
+        completion?.get()
+    }
+
+    // Called under the repository monitor. One executor preserves enqueue/publication order;
+    // snapshots contain their own animation association, never a later vault revision.
+    private fun publishCurrent(
+        pages: List<CatalogPage>,
+        version: Long = revision,
+        refresh: CompletableFuture<List<CatalogPage>>? = null
+    ): CompletableFuture<Unit> {
+        val pictureAnimations = vault.animations().toMap()
+        val completion = CompletableFuture<Unit>()
+        lastPublication = completion
+        sync.execute {
+            val current = synchronized(this) {
+                val valid = version == revision && refresh?.isCancelled != true &&
+                    lastPublication === completion
+                if (valid) {
+                    publishingPortraits = pages.mapNotNull { it.profile.portrait?.sha256 }.toSet()
+                    portraits.protect(references(mutablePages.value))
+                }
+                valid
+            }
+            if (!current) {
+                completion.cancel(false)
+                return@execute
+            }
+            try {
+                // Data Layer operations can block for seconds. No repository state lock here.
+                publish?.invoke(pages, portraits)
+                    ?: ProfileSync.publishCatalog(
+                        context,
+                        pages,
+                        portraits,
+                        pictureAnimations,
+                        animations
+                    )
+                synchronized(this) {
+                    publishingPortraits = emptySet()
+                    cleanup()
+                    if (version == revision && refresh?.isCancelled != true) {
+                        animations.retain(pictureAnimations.values.map { it.sha256 }.toSet())
+                    }
+                }
+                completion.complete(Unit)
+            } catch (error: Exception) {
+                synchronized(this) {
+                    publishingPortraits = emptySet()
+                    runCatching { cleanup() }
+                }
+                completion.completeExceptionally(error)
+            }
+        }
+        return completion
+    }
+
+    /** Resolve a stable key and its endpoint together on the caller's IO worker. */
+    @Synchronized fun currentProfile(key: String): Pair<CatalogPage, EndpointProfile>? {
+        val page = mutablePages.value.singleOrNull { it.key == key } ?: return null
+        return profileFor(page)?.let { page to it }
     }
 
     private fun withPortrait(page: CatalogPage, portrait: PortraitDescriptor): CatalogPage =
@@ -357,7 +423,7 @@ class CatalogRepository internal constructor(
             page.checkedAt
         )
 
-    @Synchronized fun retirePage(key: String) {
+    fun retirePage(key: String) = change {
         val previous = vault.pages()
         require(previous.single { it.key == key }.status == CatalogStatus.WITHDRAWN)
         val remaining = previous.filterNot { it.key == key }
@@ -375,7 +441,7 @@ class CatalogRepository internal constructor(
     }
 
     /** Called after owner-confirmed removal from the independent phone setup vault. */
-    @Synchronized fun setupRemoved() {
+    fun setupRemoved() = change {
         retireFallbacks(vault.pages())
         val raw = combined(vault.pages(), false)
         val retained = raw.map { it.key }.toSet()
@@ -402,7 +468,7 @@ class CatalogRepository internal constructor(
         vault.saveFallbacks(vault.fallbacks().filter { it.profile.id in retained })
     }
 
-    @Synchronized fun movePage(key: String, delta: Int) {
+    fun movePage(key: String, delta: Int) = change {
         val pages = CatalogOrder.moveProfile(combined(vault.pages(), false), key, delta)
         vault.savePages(pages)
         val effective = combined(pages)
@@ -411,7 +477,7 @@ class CatalogRepository internal constructor(
         publishCurrent(effective)
     }
 
-    @Synchronized fun moveSource(id: String, delta: Int) {
+    fun moveSource(id: String, delta: Int) = change {
         val raw = combined(vault.pages(), false)
         val order = sourceOrder(raw).toMutableList()
         val index = order.indexOf(id)
@@ -495,7 +561,7 @@ class CatalogRepository internal constructor(
 
     private fun references(pages: List<CatalogPage>): Set<String> =
         (pages + vault.pages() + vault.fallbacks() + vault.overrides())
-            .mapNotNull { it.profile.portrait?.sha256 }.toSet()
+            .mapNotNull { it.profile.portrait?.sha256 }.toSet() + publishingPortraits
 
     @Synchronized private fun cleanup() {
         val keep = references(combined(vault.pages()))

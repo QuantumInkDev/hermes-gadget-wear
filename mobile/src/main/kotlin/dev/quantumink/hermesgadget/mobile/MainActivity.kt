@@ -31,7 +31,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import dev.quantumink.hermesgadget.client.AppearancePreferences
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     private val catalogNetwork = object : android.net.ConnectivityManager.NetworkCallback() {
@@ -49,7 +54,10 @@ class MainActivity : ComponentActivity() {
             .registerDefaultNetworkCallback(catalogNetwork)
     }
 
+    private var talkRequest: Job? = null
+
     override fun onStop() {
+        talkRequest?.cancel()
         started = false
         conversation.hide()
         getSystemService(android.net.ConnectivityManager::class.java)
@@ -126,16 +134,19 @@ class MainActivity : ComponentActivity() {
                             ?: run { destination = "profiles" }
                     }
                 }
+                val directoryState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+                val directoryScroll = androidx.compose.foundation.lazy.rememberLazyListState()
                 fun navigate(value: String) {
+                    talkRequest?.cancel()
                     if (destination == "conversation") conversation.hide()
                     destination = value
                 }
                 androidx.activity.compose.BackHandler(
-                    destination !in setOf("profiles", "watch", "settings")
+                    destination != "profiles"
                 ) {
                     navigate(
                         when (destination) {
-                            "conversation" -> "profiles"
+                            "conversation", "watch", "settings" -> "profiles"
                             "tiles" -> "watch"
                             else -> "settings"
                         }
@@ -170,21 +181,38 @@ class MainActivity : ComponentActivity() {
                         ).consumeWindowInsets(padding).imePadding()
                     ) {
                         when (destination) {
-                            "profiles" -> DirectoryPage(
-                                this@MainActivity,
-                                onTalk = { page ->
-                                    runCatching {
-                                        CatalogRepository.get(this@MainActivity).profileFor(page)
-                                    }
-                                        .getOrNull()?.let {
-                                            conversation.open(it, page)
-                                            destination = "conversation"
+                            "profiles" -> directoryState.SaveableStateProvider("profiles") {
+                                DirectoryPage(
+                                    this@MainActivity,
+                                    listState = directoryScroll,
+                                    onTalk = { page ->
+                                        talkRequest?.cancel()
+                                        talkRequest = lifecycleScope.launch {
+                                            val repository = CatalogRepository.get(
+                                                this@MainActivity
+                                            )
+                                            val resolved = withContext(Dispatchers.IO) {
+                                                runCatching {
+                                                    repository.currentProfile(page.key)
+                                                }.getOrNull()
+                                            }
+                                            if (resolved != null && started &&
+                                                lifecycle.currentState.isAtLeast(
+                                                    androidx.lifecycle.Lifecycle.State.RESUMED
+                                                ) &&
+                                                destination == "profiles" &&
+                                                repository.pages.value.any { it === resolved.first }
+                                            ) {
+                                                conversation.open(resolved.second, resolved.first)
+                                                destination = "conversation"
+                                            }
                                         }
-                                },
-                                onBoxes = { navigate("boxes") },
-                                onManual = { navigate("manual") },
-                                modifier = Modifier.weight(1f)
-                            )
+                                    },
+                                    onBoxes = { navigate("boxes") },
+                                    onManual = { navigate("manual") },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                             "conversation" -> ConversationPage(
                                 conversation,
                                 phone.page,

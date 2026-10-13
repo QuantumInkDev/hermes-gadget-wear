@@ -17,6 +17,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,7 +43,6 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import dev.quantumink.hermesgadget.protocol.CatalogStatus
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
-import dev.quantumink.hermesgadget.protocol.ConversationMode
 
 @Composable
 fun ProfileCarousel(
@@ -57,10 +57,16 @@ fun ProfileCarousel(
         @Composable () -> Unit
     ) -> Unit
 ) {
-    val pages =
+    val incoming =
         remember(watch.profiles, watch.catalog) {
             ProfilePages.merge(watch.profiles, watch.catalog)
         }
+    val locked = watch.selectionLocked
+    // Keep both stable pager keys and the approved conversation projection mounted for the
+    // entire turn. Catalog URL changes/removals reconcile only after the selection lock clears.
+    val projection = remember { CarouselProjection(incoming) }
+    val pages = if (locked) projection.pages else incoming
+    SideEffect { projection.pages = pages }
     if (pages.isEmpty()) return
     val keys = pages.map { it.key }
     LaunchedEffect(keys) { navigation.retainScrolls(keys.toSet()) }
@@ -71,9 +77,6 @@ fun ProfileCarousel(
         }.coerceAtLeast(0)
     val pager = rememberPagerState(initialPage = initial) { pages.size }
     var correcting by remember { mutableStateOf(true) }
-    val locked = watch.saving || watch.connection.conversation.prompt != null ||
-        watch.connection.conversation.mode == ConversationMode.LISTENING ||
-        watch.connection.conversation.busy
     LaunchedEffect(keys, watch.selectedPage) {
         correcting = true
         val key = watch.selectedPage.ifBlank { navigation.page.value }
@@ -88,7 +91,7 @@ fun ProfileCarousel(
         pager.settledPage,
         pager.isScrollInProgress,
         correcting,
-        watch.saving,
+        locked,
         watch.profile?.endpoint?.url,
         pages
     ) {
@@ -98,7 +101,7 @@ fun ProfileCarousel(
         navigation.page.value = page.key
         if (watch.selectedPage != page.key) service.rememberPage(page.key)
         service.preparePages((index - 1..index + 1).mapNotNull { pages.getOrNull(it)?.key })
-        if (watch.saving) return@LaunchedEffect
+        if (locked) return@LaunchedEffect
         val approved = page.approved
         if (approved == null) {
             if (watch.connection.status != ConnectionStatus.OFFLINE) service.disconnect()
@@ -390,3 +393,5 @@ fun ProfileIdentity(
         }
     }
 }
+
+private class CarouselProjection(var pages: List<ProfilePage>)

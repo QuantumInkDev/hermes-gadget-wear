@@ -27,6 +27,7 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun PetView(watch: WatchState, compact: Boolean = false, animated: Boolean = true) {
+    val running = animated && artworkMotionAllowed()
     val conversation = watch.connection.conversation
     val mode = when {
         conversation.prompt != null -> "waiting"
@@ -45,13 +46,14 @@ fun PetView(watch: WatchState, compact: Boolean = false, animated: Boolean = tru
     val frames = atlas?.rows?.get(row)
     var frame by remember(atlas, mode, row) { mutableIntStateOf(0) }
     var mouth by remember(atlas) { mutableIntStateOf(0) }
-    LaunchedEffect(watch.playbackLevel, mode, animated) {
+    LaunchedEffect(watch.playbackLevel, mode, running) {
         mouth =
-            if (animated && mode == "talking") PetStates.mouth(watch.playbackLevel, mouth) else 0
+            if (running && mode == "talking") PetStates.mouth(watch.playbackLevel, mouth) else 0
     }
-    LaunchedEffect(atlas, mode, row, animated) {
+    LaunchedEffect(atlas, mode, row, running) {
         val count = frames?.size ?: 1
-        if (animated && mode !in setOf("sleeping", "talking") && count > 1) {
+        if (!running) frame = 0
+        if (running && mode !in setOf("sleeping", "talking") && count > 1) {
             while (true) {
                 delay(((atlas?.loopMs ?: 1100) / count).toLong())
                 frame =
@@ -60,7 +62,7 @@ fun PetView(watch: WatchState, compact: Boolean = false, animated: Boolean = tru
         }
     }
     val bitmap = frames?.get(
-        if (!animated) {
+        if (!running) {
             0
         } else if (row ==
             "talking"
@@ -77,7 +79,7 @@ fun PetView(watch: WatchState, compact: Boolean = false, animated: Boolean = tru
                 "${atlas?.name ?: "Sample pet"}: $mode"
         }
     ) {
-        val bob = if (animated && mode == "talking" &&
+        val bob = if (running && mode == "talking" &&
             row != "talking"
         ) {
             watch.playbackLevel.coerceIn(0f, 0.5f) * 6.dp.toPx()

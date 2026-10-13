@@ -17,7 +17,9 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -68,10 +70,11 @@ fun DirectoryPage(
     onTalk: (CatalogPage) -> Unit,
     onBoxes: () -> Unit,
     onManual: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState()
 ) {
     val repository = remember(context.applicationContext) { CatalogRepository.get(context) }
-    DirectoryContent(context, repository, onTalk, onBoxes, onManual, modifier)
+    DirectoryContent(context, repository, onTalk, onBoxes, onManual, modifier, listState)
 }
 
 @Composable
@@ -81,7 +84,8 @@ internal fun DirectoryContent(
     onTalk: (CatalogPage) -> Unit,
     onBoxes: () -> Unit,
     onManual: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState()
 ) {
     val pages by repository.pages.collectAsStateWithLifecycle()
     val notice by repository.notice.collectAsStateWithLifecycle()
@@ -156,15 +160,25 @@ internal fun DirectoryContent(
         busy = false
     }
     LaunchedEffect(pages) {
-        profiles = withContext(Dispatchers.IO) {
-            pages.associate { it.key to runCatching { repository.profileFor(it) }.getOrNull() }
+        val snapshot = withContext(Dispatchers.IO) {
+            Triple(
+                pages.associate { it.key to runCatching { repository.profileFor(it) }.getOrNull() },
+                repository.sources(),
+                repository.sourceOrder()
+            )
         }
+        profiles = snapshot.first
+        sources = snapshot.second
+        sourceOrder = snapshot.third
     }
 
     val groups = CatalogOrder.group(pages).associateBy { it.first().sourceId }
     val labels = sources.associate { it.id to it.label }
     val ids = (sourceOrder + groups.keys).distinct().filter { id ->
         id != "manual" || groups[id].orEmpty().isNotEmpty() || reorder
+    }
+    LaunchedEffect(ids, busy) {
+        if (!busy) collapsed = collapsed.filter { it in ids }
     }
     val visible = ids.filter { id ->
         val label = if (id == "manual") {
@@ -176,6 +190,7 @@ internal fun DirectoryContent(
             groups[id].orEmpty().any { it.profile.name.contains(query.trim(), ignoreCase = true) }
     }
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxSize().imePadding(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp)

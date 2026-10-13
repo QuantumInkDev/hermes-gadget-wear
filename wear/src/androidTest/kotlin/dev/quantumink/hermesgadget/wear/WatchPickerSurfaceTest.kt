@@ -16,8 +16,12 @@ import android.view.accessibility.AccessibilityNodeInfo
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.Density
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.quantumink.hermesgadget.client.Appearance
@@ -100,21 +104,28 @@ class WatchPickerSurfaceTest {
                     LocalDensity provides Density(density.density, scale.value)
                 ) {
                     WatchAppearance(appearance.value) {
-                        ProfileCarousel(watch.value, navigation, service, connect = {
-                            error("Must not connect")
-                        }, review = {}) { page, scroll, _ ->
-                            DisposableEffect(Unit) {
-                                mounts++
-                                onDispose { disposals++ }
+                        androidx.compose.foundation.layout.Box(
+                            Modifier.semantics {
+                                testTagsAsResourceId =
+                                    true
                             }
-                            ConversationPage(
-                                watch.value, service,
-                                connect = {
-                                    error("Must not connect")
-                                }, startRecording = { error("Must not record") },
-                                settings = {}, type = {}, profiles = {}, appearance = {},
-                                page = page, pageScroll = scroll
-                            )
+                        ) {
+                            ProfileCarousel(watch.value, navigation, service, connect = {
+                                error("Must not connect")
+                            }, review = {}) { page, scroll, _ ->
+                                DisposableEffect(Unit) {
+                                    mounts++
+                                    onDispose { disposals++ }
+                                }
+                                ConversationPage(
+                                    watch.value, service,
+                                    connect = {
+                                        error("Must not connect")
+                                    }, startRecording = { error("Must not record") },
+                                    settings = {}, type = {}, profiles = {}, appearance = {},
+                                    page = page, pageScroll = scroll
+                                )
+                            }
                         }
                     }
                 }
@@ -139,6 +150,13 @@ class WatchPickerSurfaceTest {
                 instrumentation.uiAutomation.waitForIdle(200, 3000)
                 SystemClock.sleep(250)
                 assertRoundPickerBounds()
+                assertTrue(
+                    "Initial clock must be present",
+                    nodes().any {
+                        it.viewIdResourceName ==
+                            "page-clock"
+                    }
+                )
                 assertTrue(nodes().any { it.stateDescription?.toString() == "Profile 1 of 18" })
                 assertTrue(
                     nodes().any {
@@ -157,6 +175,8 @@ class WatchPickerSurfaceTest {
                 assertEquals(0, disposals)
                 assertEquals(1, mounts)
                 assertTrue(!activity.isFinishing)
+                scroll()
+                assertSettledClockHidden()
                 instrumentation.runOnMainSync {
                     watch.value = watch.value.copy(
                         connection = watch.value.connection.copy(
@@ -175,6 +195,7 @@ class WatchPickerSurfaceTest {
                     "Scrolled content must not retain a floating picker over reply/actions",
                     nodes().none { it.contentDescription?.toString() == "Choose a profile" }
                 )
+                assertSettledClockHidden()
                 capture("${theme.name}-$font-reply")
                 SystemClock.sleep(400)
                 val before = scroll.anchorItemIndex to scroll.anchorItemScrollOffset
@@ -202,6 +223,7 @@ class WatchPickerSurfaceTest {
                 )
                 assertEquals(pages.first().key, service.state.value.selectedPage)
                 assertEquals(0, disposals)
+                assertSettledClockHidden()
                 runBlocking {
                     withContext(Dispatchers.Main) {
                         scroll.scrollToItem(scroll.layoutInfo.totalItemsCount - 1)
@@ -211,6 +233,7 @@ class WatchPickerSurfaceTest {
                 SystemClock.sleep(300)
                 node("Profile 1 of 18", scroll = false)
                 assertNoIndicatorTextOverlap()
+                assertSettledClockHidden()
                 capture("${theme.name}-$font-end-padding")
             }
         }
@@ -252,6 +275,240 @@ class WatchPickerSurfaceTest {
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
             instrumentation.uiAutomation.waitForIdle(200, 3000)
             SystemClock.sleep(250)
+        }
+    }
+
+    @Test fun catalogChangeDuringEveryTurnLockRetainsMountedSessionUntilIdle() = fixture {
+            activity,
+            service
+        ->
+        val profile =
+            EndpointProfile(Endpoint.parse("wss://original.example.invalid/gadget"), "Original", "")
+        fun catalog(url: String?) = listOf(
+            CatalogPage(
+                "synthetic",
+                "Box",
+                CatalogProfile("p", "Original", url, null),
+                CatalogStatus.AVAILABLE,
+                1
+            )
+        )
+        val original = catalog(profile.endpoint.url)
+        val navigation = WatchNavigation()
+        val watch =
+            mutableStateOf(
+                WatchState(
+                    profile = profile,
+                    profiles = listOf(profile),
+                    catalog = original,
+                    selectedPage = "synthetic:p",
+                    connection = ConnectionState(status = ConnectionStatus.PAIRED)
+                )
+            )
+        var mounts = 0
+        var disposals = 0
+        val epoch = GadgetService::class.java.getDeclaredField("epoch").apply {
+            isAccessible = true
+        }
+            .get(service) as java.util.concurrent.atomic.AtomicLong
+        instrumentation.runOnMainSync {
+            service.rememberPage("synthetic:p")
+            activity.setContent {
+                WatchAppearance(Appearance.DARK) {
+                    val serviceState = service.state.collectAsState()
+                    ProfileCarousel(
+                        watch.value.copy(
+                            selectedPage = serviceState.value.selectedPage
+                        ),
+                        navigation,
+                        service,
+                        {
+                            error("Unexpected connection")
+                        },
+                        {}
+                    ) { page, _, _ ->
+                        DisposableEffect(page.key) {
+                            mounts++
+                            onDispose { disposals++ }
+                        }
+                        androidx.wear.compose.material3.Text("Mounted original session")
+                    }
+                }
+            }
+        }
+        node("Mounted original session", scroll = false)
+        val locks = listOf(
+            ConversationState(mode = ConversationMode.LISTENING),
+            ConversationState(
+                mode = ConversationMode.REPLY,
+                busy = true,
+                reply = "Reply in progress"
+            ),
+            ConversationState(prompt = Prompt("pending", "Approval", "Keep approval", 0, null))
+        )
+        for (lock in locks) {
+            for (changed in listOf(
+                catalog("wss://replacement.example.invalid/gadget"),
+                catalog(null),
+                emptyList()
+            )) {
+                instrumentation.runOnMainSync {
+                    watch.value =
+                        watch.value.copy(
+                            connection = ConnectionState(
+                                status = ConnectionStatus.PAIRED,
+                                conversation = lock
+                            )
+                        )
+                }
+                instrumentation.uiAutomation.waitForIdle(100, 2000)
+                val before = epoch.get()
+                val beforeDisposals = disposals
+                instrumentation.runOnMainSync { watch.value = watch.value.copy(catalog = changed) }
+                instrumentation.uiAutomation.waitForIdle(200, 2000)
+                SystemClock.sleep(200)
+                assertEquals("Catalog must not disconnect an active turn", before, epoch.get())
+                assertEquals(
+                    "Catalog must not dispose the active approval/recording surface",
+                    beforeDisposals,
+                    disposals
+                )
+                node("Mounted original session", scroll = false)
+                assertEquals("synthetic:p", service.state.value.selectedPage)
+                instrumentation.runOnMainSync {
+                    watch.value =
+                        watch.value.copy(
+                            connection = ConnectionState(status = ConnectionStatus.PAIRED)
+                        )
+                }
+                instrumentation.uiAutomation.waitForIdle(200, 2000)
+                if (changed.isNotEmpty()) {
+                    node("Review connection")
+                    assertEquals(beforeDisposals + 1, disposals)
+                } else {
+                    repeat(40) {
+                        if (!navigation.page.value.startsWith("watch:")) SystemClock.sleep(50)
+                    }
+                    assertTrue(
+                        "Idle removal must reconcile to saved endpoint: ${navigation.page.value}",
+                        navigation.page.value.startsWith("watch:")
+                    )
+                }
+                instrumentation.runOnMainSync {
+                    watch.value =
+                        watch.value.copy(catalog = original, selectedPage = "synthetic:p")
+                }
+                node("Mounted original session", scroll = false)
+                repeat(40) {
+                    if (service.state.value.selectedPage != "synthetic:p") SystemClock.sleep(50)
+                }
+                assertEquals(
+                    "Restored roster must settle before the next turn",
+                    "synthetic:p",
+                    service.state.value.selectedPage
+                )
+            }
+        }
+        assertTrue(mounts > 1)
+    }
+
+    @Test fun serviceCatalogProjectionSurvivesAbsentSurfaceUntilEveryTurnLockClears() = fixture {
+            activity,
+            service
+        ->
+        val original = service.state.value
+        val flow = GadgetService::class.java.getDeclaredField("mutableState").apply {
+            isAccessible =
+                true
+        }.get(service)
+        val set = flow.javaClass.getMethod("setValue", Any::class.java).apply {
+            isAccessible = true
+        }
+        val profile =
+            EndpointProfile(
+                Endpoint.parse("wss://absent.example.invalid/gadget"),
+                "Absent fixture",
+                ""
+            )
+        val page =
+            CatalogPage(
+                "synthetic",
+                "Fixture",
+                CatalogProfile("p", "Absent fixture", profile.endpoint.url, null),
+                CatalogStatus.AVAILABLE,
+                1
+            )
+        val changed =
+            CatalogPage(
+                "synthetic",
+                "Fixture",
+                CatalogProfile(
+                    "p",
+                    "Changed fixture",
+                    "wss://changed.example.invalid/gadget",
+                    null
+                ),
+                CatalogStatus.AVAILABLE,
+                2
+            )
+        val locks = listOf(
+            ConversationState(mode = ConversationMode.LISTENING),
+            ConversationState(mode = ConversationMode.REPLY, busy = true),
+            ConversationState(prompt = Prompt("pending", "Approval", "Keep approval", 0, null))
+        )
+        try {
+            instrumentation.runOnMainSync { activity.setContent { } }
+            for (lock in locks) {
+                val active = original.copy(
+                    profile = profile,
+                    profiles = listOf(profile),
+                    catalog = listOf(page),
+                    selectedPage = page.key,
+                    loading = false,
+                    connection = ConnectionState(
+                        status = ConnectionStatus.PAIRED,
+                        conversation = lock
+                    )
+                )
+                instrumentation.runOnMainSync {
+                    set.invoke(flow, active)
+                    service.applyCatalog(listOf(changed), changed.key)
+                }
+                assertEquals(
+                    "Catalog must remain frozen even with no interactive composition",
+                    profile.endpoint.url,
+                    service.state.value.catalog.single().profile.gadgetUrl
+                )
+                assertEquals(profile.endpoint.url, service.state.value.profile?.endpoint?.url)
+                instrumentation.runOnMainSync {
+                    set.invoke(
+                        flow,
+                        service.state.value.copy(
+                            connection = ConnectionState(status = ConnectionStatus.PAIRED)
+                        )
+                    )
+                }
+                repeat(40) {
+                    if (service.state.value.catalog.single().profile.gadgetUrl !=
+                        changed.profile.gadgetUrl
+                    ) {
+                        SystemClock.sleep(50)
+                    }
+                }
+                assertEquals(
+                    changed.profile.gadgetUrl,
+                    service.state.value.catalog.single().profile.gadgetUrl
+                )
+                assertTrue(
+                    ProfilePages.merge(
+                        service.state.value.profiles,
+                        service.state.value.catalog
+                    ).first().approved ==
+                        null
+                )
+            }
+        } finally {
+            instrumentation.runOnMainSync { set.invoke(flow, original) }
         }
     }
 
@@ -402,6 +659,16 @@ class WatchPickerSurfaceTest {
         assertTrue(target.performAction(AccessibilityNodeInfo.ACTION_CLICK))
         instrumentation.waitForIdleSync()
         SystemClock.sleep(250)
+    }
+
+    private fun assertSettledClockHidden() {
+        // AndroidX restores its clock after the idle timeout; wait beyond that transition.
+        SystemClock.sleep(2500)
+        val clocks = nodes().filter { it.isVisibleToUser && it.viewIdResourceName == "page-clock" }
+        assertTrue(
+            "Settled scrolled content must not share the clock paint region: $clocks",
+            clocks.isEmpty()
+        )
     }
 
     private fun assertNoIndicatorTextOverlap() {

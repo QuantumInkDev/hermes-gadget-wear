@@ -44,10 +44,54 @@ fun AnimatedPortrait(
     animated: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val allowed = artworkMotionAllowed()
+    var drawable by remember(file) { mutableStateOf<Drawable?>(null) }
+    val running = animated && allowed && file != null
+    LaunchedEffect(file, running) {
+        drawable = if (running) {
+            withContext(Dispatchers.IO) {
+                runCatching { GifDecoder.drawable(requireNotNull(file).readBytes()) }.getOrNull()
+            }
+        } else {
+            null
+        }
+    }
+    val picture = drawable
+    if (running && picture is AnimatedImageDrawable) {
+        AndroidView(
+            factory = { ImageView(it).apply { scaleType = ImageView.ScaleType.FIT_CENTER } },
+            modifier = modifier.clip(CircleShape),
+            onRelease = { view ->
+                (view.drawable as? AnimatedImageDrawable)?.stop()
+                view.setImageDrawable(null)
+            },
+            update = { view ->
+                if (view.drawable !== picture) {
+                    (view.drawable as? AnimatedImageDrawable)?.stop()
+                    view.setImageDrawable(picture)
+                }
+                view.contentDescription = description
+                picture.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
+                picture.start()
+            }
+        )
+    } else {
+        Image(
+            remember(fallback) {
+                fallback.asImageBitmap()
+            },
+            description,
+            modifier.clip(CircleShape)
+        )
+    }
+}
+
+/** Observable shared policy for GIF and custom sprite stepping. */
+@Composable
+internal fun artworkMotionAllowed(): Boolean {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var allowed by remember(context, lifecycle) { mutableStateOf(false) }
-    var drawable by remember(file) { mutableStateOf<Drawable?>(null) }
     DisposableEffect(context, lifecycle) {
         fun update() {
             allowed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
@@ -89,42 +133,5 @@ fun AnimatedPortrait(
             context.contentResolver.unregisterContentObserver(motion)
         }
     }
-    val running = animated && allowed && file != null
-    LaunchedEffect(file, running) {
-        drawable = if (running) {
-            withContext(Dispatchers.IO) {
-                runCatching { GifDecoder.drawable(requireNotNull(file).readBytes()) }.getOrNull()
-            }
-        } else {
-            null
-        }
-    }
-    val picture = drawable
-    if (running && picture is AnimatedImageDrawable) {
-        AndroidView(
-            factory = { ImageView(it).apply { scaleType = ImageView.ScaleType.FIT_CENTER } },
-            modifier = modifier.clip(CircleShape),
-            onRelease = { view ->
-                (view.drawable as? AnimatedImageDrawable)?.stop()
-                view.setImageDrawable(null)
-            },
-            update = { view ->
-                if (view.drawable !== picture) {
-                    (view.drawable as? AnimatedImageDrawable)?.stop()
-                    view.setImageDrawable(picture)
-                }
-                view.contentDescription = description
-                picture.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
-                picture.start()
-            }
-        )
-    } else {
-        Image(
-            remember(fallback) {
-                fallback.asImageBitmap()
-            },
-            description,
-            modifier.clip(CircleShape)
-        )
-    }
+    return allowed
 }

@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -734,7 +735,15 @@ internal fun RoundPage(
             val style = TimeTextDefaults.timeTextStyle(
                 color = MaterialTheme.colorScheme.onBackground
             )
-            TimeText { time -> timeTextCurvedText(time, style) }
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val first = state.layoutInfo.visibleItems.firstOrNull { it.index == 0 }
+            // AndroidX restores TimeText at idle even at the end of the list. Only the
+            // original top placement reserves its region; never paint over scrolled actions.
+            if (first != null && first.offset >= with(density) { topPadding.roundToPx() }) {
+                TimeText(modifier = Modifier.testTag("page-clock")) { time ->
+                    timeTextCurvedText(time, style)
+                }
+            }
         }
     ) {
         ScreenScaffold(
