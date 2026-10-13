@@ -2,38 +2,35 @@
 
 ## Native client software acceptance — 2026-10-12
 
-Portrait studio, original Voice Q, Light/Dark/Electronic Moonlight, phone Profiles/Watch/Settings,
-foreground conversation waveforms, watch picker/portrait recording and Focus/four-profile tiles
-are implemented. Tasks 1–6 and 8 have clean scoped reviews. The full strict check at `328d769`
-passed 116 JVM tests with zero failures/errors/skips and built all four debug/test APKs.
-The final Task 7 production overlay correction also passes the exact strict command with the
-same 116 clean JVM tests and all four APKs. The [native demo](demo/native-clients/README.md) records final visual receipts, focused regression
-checks and exact remaining gates. Prototype approval is historical design evidence only.
+The approved native clients are implemented: Portrait studio/Voice Q, three themes,
+box/profile organization, independent phone Talk/Chat/waveforms, swipe-first watch picker,
+portrait recording/rings/light haptics, bounded foreground reply visibility and one/four tiles.
+Tasks 1–6 and 8 and Task 7 software acceptance have clean scoped reviews. Whole-branch review
+found four Important issues and one Minor at `ccb2953`; one fix wave `c248b03` resolves all five,
+and the single scoped re-review finds no new Critical/Important breakage. The
+[review record](native-client-review.md) explains corrections and source-bound validation.
 
-Task 7 software acceptance is complete at `b511dbb`. It closes the deferred narrow/large-font details Close, post-dialog microphone notice,
-second-pointer and ACTION_CANCEL native checks. The prior picker Back/rotary minor was already
-resolved in `3a75fd5`; its existing six theme/font cases remain evidence. Original synthetic
-native captures cover actual layouts and static tile rendering. The physical watch check found
-page dots across the name and a fixed picker over scrolled controls; final acceptance tracks
-these overlay corrections with a native reproduction and the updated checks in the demo.
+Final strict checks: 116 JVM tests / 33 XML reports, zero failures/errors/skips, all four
+APK builds and warnings as failures. Final native receipts: 34 passing executions / 32
+methods, no failure/skip in those receipts; 18 density/theme/font scenarios. The
+[native gallery](demo/native-clients/README.md) contains 173 original synthetic captures,
+with 72 clock-affected exports refreshed and unchanged images retaining reviewed provenance.
 
-The watch received `328d769` through a matching-signature preserving update: installed APK hash,
-19 identity files and 75 protected baseline files verified; original 15-second timeout retained.
-The phone remains on `b724231`; final native phone/watch delivery and owner visual/voice/tile
-acceptance are still open. All eighteen owner GIFs were previously imported through normal
-selection and independently assigned on watch; no reimport or personal art publication occurred.
-Owner reports on the earlier phone/watch build remain separate from native redesign acceptance.
+Physical watch `c248b03` delivery verifies matching certificate/APK and unchanged 19 identities
+plus 75 protected baseline files at installation. Normal UI selected Moonlight and configured
+Focus for the current profile, revision 1; grid favorites remain unspecified. Original
+15-second timeout is retained and the 340×340-pixel portrait position is unchanged. Physical
+phone remains `b724231`; its tested native update is staged pending fresh wireless pairing.
+Prior normal owner GIF imports/assignments remain verified, without reimport or publication.
 
-Actual associated Data Layer tile delivery is unverified (owned AVD API_UNAVAILABLE). The OS
-power-saver recording case is a capability skip; reduced-motion static output is verified.
-Physical speech/haptic strength/mic contamination, away reply/sleep receipt, tile addition and
-each portrait launch, Light/GIF power and quantitative audio/battery tests remain open. Server
-logs prove historical replies were generated, not received on the watch. Whole-branch review,
-final preserving delivery and draft-PR publication are controller-owned gates.
+Actual associated pin transport/system tile placement/every target, final-build speech,
+haptic strength/mic contamination, away reply/sleep receipt and quantitative Light/GIF/audio/
+battery tests remain open. OS power saver is a capability skip; reduced motion passes.
+Historical server-generated replies do not prove watch receipt. Keep the PR draft.
 
-Demo note: use the native gallery to compare three appearances, large phone text with the IME,
-watch portrait/picker/reply and static Focus/grid. The owned emulator verifies behavior without
-contacting personal servers or changing physical setup.
+Demo note: compare the native three-theme gallery, keyboard/large text, watch portrait/
+picker/reply and static Focus/grid; hold the physical watch portrait for the next owner speech
+trial. Personal endpoints/art and device preservation receipts remain ignored.
 
 ## Client usability follow-up — 2026-10-12
 

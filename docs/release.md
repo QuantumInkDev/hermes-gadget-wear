@@ -9,31 +9,31 @@ phone; private tailnet relay and optional phone voice still require the companio
 
 ## Native design acceptance — 2026-10-12
 
-The [native demo and receipt matrix](demo/native-clients/README.md) cover the three themes,
-phone destinations/keyboard/large text, watch recording/picker/reply/ambient and static tile
-layouts using original synthetic fixtures. Voice Q masters and launcher artwork are in
-[store assets](store-assets/voice-q/). This is debug/software evidence, not Play acceptance.
+The [native demo](demo/native-clients/README.md) and [review resolutions](native-client-review.md)
+cover three themes, native phone/keyboard/large text, watch recording/picker/reply/ambient
+and static tile layouts with original synthetic fixtures. Voice Q masters/launcher art are
+in [store assets](store-assets/voice-q/). This is debug/software evidence, not Play acceptance.
 
-The unchanged implementation at `328d769` passed the exact full strict Task 7 command:
-116 JVM tests, zero failures/errors/skips, both debug APKs and both instrumentation APKs.
-The final overlay correction at `b511dbb` also passes the exact strict command: 116 clean JVM
-tests and all four APKs. Sixteen native passing executions include 18 theme/font/round-size
-scenarios; a combined-run enrollment guard skip passed when rerun alone. Exact receipts are
-recorded in the demo verification record.
-The watch received a matching-signature preserving `328d769` update with installed APK hash
-verification, all 19 identity files and 75 protected baseline files unchanged, and its original
-15-second timeout retained. The physical phone still runs `b724231`; final matching phone/watch
-native delivery and owner observations are not yet complete. Eighteen owner GIF imports through
-normal selection and per-profile watch assignment were verified before this design; personal
-art and preservation receipts remain ignored and are not public demo material.
+One whole-branch review at `ccb2953`, one corrective wave `c248b03` and one scoped re-review
+resolve four Important issues and one Minor, with no new Critical/Important breakage.
+Final strict checks pass 116 JVM tests, zero failures/errors/skips, and all four app/test APKs.
+Final native receipts record 34 passing executions / 32 distinct methods and 18 geometry
+scenarios; 72 affected exports were refreshed in `6b00947`.
 
-Still open: whole-branch independent review; final preserving delivery and normal Moonlight/pin
-configuration; physical Focus/grid addition and every portrait launch; associated Data Layer
-configuration delivery (owned emulator reports API_UNAVAILABLE); speech, haptic strength/mic
-contamination, away reply/sleep receipt, Light/GIF battery cost and quantitative audio/battery
-matrix. Actual OS power saver could not be enabled on the owned AVD and is capability-skipped,
-not passed; reduced-motion static output is verified. Keep the PR draft until those and the
-existing publication/signing/privacy/Play prerequisites are assessed.
+The physical watch received preserving `c248b03`: matching signer/installed APK hash,
+19 identities and 75 protected baseline files unchanged at installation, original 15-second
+timeout retained. Normal UI selected Moonlight and configured the current profile for Focus,
+revision 1. Four grid slots remain empty for owner choices. The phone still runs `b724231`;
+its tested new APK is staged pending fresh wireless pairing. Eighteen prior normal owner GIF
+imports/assignments are verified privately; personal art is excluded from public captures.
+
+Still open: physical phone preserving delivery/native observations; four favorites and Focus/
+grid system tile addition/every target; associated Data Layer pin transport (owned emulator
+API_UNAVAILABLE); speech/haptic comfort/mic contamination, away reply/sleep receipt and
+quantitative Light/GIF/audio/battery matrix. Actual emulator OS saver is capability-skipped,
+not passed; reduced motion is verified. Keep this PR draft while hardware gates and existing
+publication/signing/privacy/Play prerequisites are assessed. Historical generated replies
+and synthetic delay tests do not establish the historical missing-reply cause.
 
 ## Artifacts and signing
 

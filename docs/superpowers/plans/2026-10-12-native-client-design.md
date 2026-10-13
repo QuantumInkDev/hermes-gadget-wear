@@ -11,10 +11,16 @@
 **Spec:** `docs/superpowers/specs/2026-10-12-native-client-design.md`, approved 2026-10-12.
 **Visual reference:** `docs/design/native-client-preview.html`, Portrait studio / Voice Q.
 
+**Software checkpoint:** Tasks 1–6 and 8 plus Task 7 software checks/reviews pass at `c248b03`
+with gallery/evidence `6b00947`. See [review resolutions](../../native-client-review.md) and
+[actual native captures](../../demo/native-clients/README.md). Checked test steps describe
+recorded software/fixture work, including explicitly unavailable transport/saver capabilities;
+they do not assert physical acceptance. Device delivery/configuration gates below remain open.
+
 ## Global Constraints
 
 - Keep protocol free of Android imports and preserve stock Hermes Gadget SDK v0.2.0 wire behavior.
-- Existing app/package IDs and matching signing identity remain unchanged. No uninstall, clear-data, identity copying or vault seeding of physical/personal installs, and no screenshot-security bypass. The existing guarded synthetic-only carousel harness may reset only the verified owned Hermes_M2 emulator and create localhost fixture state; it must exclude physical devices.
+- Existing app/package IDs and matching signing identity remain unchanged. No uninstall, clear-data, identity copying or vault seeding of physical/personal installs, and no screenshot-security bypass. The existing guarded synthetic-only carousel harness may reset only the verified owned Hermes_M2 emulator and create localhost fixture state; it must exclude physical devices. Native phone navigation may use a separately guarded clean stock-image fixture with only reserved synthetic endpoints; ambiguous existing app data must remain untouched and no identities/user data may be copied.
 - Never commit personal endpoints, tailnet details, credentials, signing keys or personal art; maintainer material stays in ignored `.local/`.
 - Light, Dark and Electronic Moonlight persist independently on phone/watch; existing installs default to Dark. Explicit palettes are not overridden by wallpaper colors.
 - Normal text contrast targets 4.5:1; large text/essential boundaries target 3:1. Phone background/surface/main text/secondary/accent/on-accent values are exactly the approved spec table.
@@ -32,7 +38,7 @@
 
 **Interfaces:** `enum class Appearance { LIGHT, DARK, MOONLIGHT }`; `data class AppearanceTokens` with ARGB Int semantic roles; `fun appearanceTokens(mode: Appearance, watch: Boolean = false): AppearanceTokens`; `AppearancePreferences(context)` exposes `val mode: StateFlow<Appearance>` and `fun set(mode: Appearance)`; `PhoneAppearance(mode, content)` and `WatchAppearance(mode, content)` wrap their own MaterialTheme; `AppearancePage(context, back)` is a native chooser. New roles may extend the token data class as needed by actual Material schemes, without changing these entry points.
 
-- [ ] Write tests before implementation. Contrast must be computed from the actual tokens, not copied expected ratios. Check all three text/action pairs, persisted mode after a fresh preferences instance and untouched unrelated preferences. Native tests probe actual foreground/container relationships through each theme wrapper.
+- [x] Write tests before implementation. Contrast must be computed from the actual tokens, not copied expected ratios. Check all three text/action pairs, persisted mode after a fresh preferences instance and untouched unrelated preferences. Native tests probe actual foreground/container relationships through each theme wrapper.
   ```kotlin
   Appearance.entries.forEach { mode ->
       val palette = appearanceTokens(mode)
@@ -41,14 +47,14 @@
       assertTrue(contrast(palette.onAccent, palette.accent) >= 4.5)
   }
   ```
-- [ ] Run `./gradlew :client:testDebugUnitTest :mobile:compileDebugAndroidTestKotlin :wear:compileDebugAndroidTestKotlin --warning-mode=fail --max-workers=4`; record the expected missing appearance capability/contrast regression before implementing. Native runtime follows on owned emulators; do not use the personal phone for instrumentation.
-- [ ] Implement the token mappings from the spec, durable preferences and native adapters. Use complete semantic ColorScheme roles, with explicit Scaffold content/container colors; remove UI hard-coded green/custom dark surfaces only where they defeat theme inheritance. Add Settings→Appearance and a watch appearance entry without changing connection callbacks. Each device keeps its independent choice.
+- [x] Run `./gradlew :client:testDebugUnitTest :mobile:compileDebugAndroidTestKotlin :wear:compileDebugAndroidTestKotlin --warning-mode=fail --max-workers=4`; record the expected missing appearance capability/contrast regression before implementing. Native runtime follows on owned emulators; do not use the personal phone for instrumentation.
+- [x] Implement the token mappings from the spec, durable preferences and native adapters. Use complete semantic ColorScheme roles, with explicit Scaffold content/container colors; remove UI hard-coded green/custom dark surfaces only where they defeat theme inheritance. Add Settings→Appearance and a watch appearance entry without changing connection callbacks. Each device keeps its independent choice.
   ```kotlin
   enum class Appearance { LIGHT, DARK, MOONLIGHT }
   // Shared tokens are ARGB integers; Compose Color/ColorScheme adaptation belongs in each app.
   // Preferences use a dedicated appearance file, default DARK, and publish after durable save.
   ```
-- [ ] Replace the original client icon resource artwork with the approved original Voice Q geometry, preserve resource names used by manifests, and add matching monochrome/adaptive/legacy resources. Essential foreground stays within the adaptive safe area. SVG masters and a manifest identify original geometry; no personal avatars enter these assets.
+- [x] Replace the original client icon resource artwork with the approved original Voice Q geometry, preserve resource names used by manifests, and add matching monochrome/adaptive/legacy resources. Essential foreground stays within the adaptive safe area. SVG masters and a manifest identify original geometry; no personal avatars enter these assets.
   ```xml
   <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
       <background android:drawable="@color/quantumink_relay_background" />
@@ -56,7 +62,7 @@
       <monochrome android:drawable="@drawable/quantumink_relay_monochrome" />
   </adaptive-icon>
   ```
-- [ ] Run focused tests, then `./gradlew check :mobile:assembleDebug :wear:assembleDebug --warning-mode=fail --max-workers=4` once with the repository's existing Python test environments. Keep logs in this plan workspace; commit only Task 1 files and report RED/GREEN, visual limitations and interfaces.
+- [x] Run focused tests, then `./gradlew check :mobile:assembleDebug :wear:assembleDebug --warning-mode=fail --max-workers=4` once with the repository's existing Python test environments. Keep logs in this plan workspace; commit only Task 1 files and report RED/GREEN, visual limitations and interfaces.
 
 ## Task 2: Native portrait directory and navigation chrome
 
@@ -64,19 +70,19 @@
 
 **Interfaces:** Consume Task 1 `PhoneAppearance` and semantic scheme. Keep `DirectoryPage(context, onTalk, onBoxes, onManual, modifier)` signature and CatalogRepository operations. Export `PhoneBrandHeader(title, subtitle, actions)` for native app bars; picture/detail/retire/order functions retain existing repository contracts. MainActivity continues to own destination/lifecycle and Connect/record callbacks.
 
-- [ ] First add native tests for full-row conversation entry, profile overflow access to picture/reset/details, independent collapse and search expansion, and custom ordering persistence. Keep real repository fixtures; do not replace operations with toast/no-op controls.
+- [x] First add native tests for full-row conversation entry, profile overflow access to picture/reset/details, independent collapse and search expansion, and custom ordering persistence. Keep real repository fixtures; do not replace operations with toast/no-op controls.
   ```kotlin
   compose.onNodeWithContentDescription("Open Alpha Talk and Chat").performClick()
   compose.onNodeWithContentDescription("Options for Alpha").performClick()
   compose.onNodeWithText("Watch picture").assertIsDisplayed()
   ```
-- [ ] Compile/run the focused native cases on an owned emulator and record missing entry/menu failures before UI changes. Existing stable-order/picture/vault cases must remain passing after the presentation change.
-- [ ] Implement portrait-led compact rows, coherent headline/app bar, tonal surfaces, grouped count/catalog status and an overflow replacing the permanent button cluster. All Refresh/Reorder/Manage boxes/Manual setup and picture override/reset/details/retire actions remain reachable. Native search uses the actual query; offline/empty/error states retain art/order and recovery actions. Larger text wraps rather than truncating essential actions.
+- [x] Compile/run the focused native cases on an owned emulator and record missing entry/menu failures before UI changes. Existing stable-order/picture/vault cases must remain passing after the presentation change.
+- [x] Implement portrait-led compact rows, coherent headline/app bar, tonal surfaces, grouped count/catalog status and an overflow replacing the permanent button cluster. All Refresh/Reorder/Manage boxes/Manual setup and picture override/reset/details/retire actions remain reachable. Native search uses the actual query; offline/empty/error states retain art/order and recovery actions. Larger text wraps rather than truncating essential actions.
   ```kotlin
   // Profile row primary click invokes onTalk(page); its separate labeled overflow opens actions.
   // Expanded state remains keyed by source ID; list items and drafts remain keyed by page.key.
   ```
-- [ ] Run targeted directory/order tests, theme/large-font render checks, and strict mobile build/lint. Commit only Task 2 changes, with an honest fixture/native rendering report.
+- [x] Run targeted directory/order tests, theme/large-font render checks, and strict mobile build/lint. Commit only Task 2 changes, with an honest fixture/native rendering report.
 
 ## Task 3: Native foreground conversation, relay dashboard and settings
 
@@ -84,21 +90,21 @@
 
 **Interfaces:** Preserve `ConversationPage(model, page, connect, record, back, modifier)`, PhoneConversation methods/state and foreground lifecycle. Extend guarded presentation state with bounded real capture/playback levels for the owner-requested waveforms. Existing PCM ConversationState.level and PcmPlayback onLevel callbacks are the source; no new audio session/controller or stored recording is introduced. `WatchDashboard` consumes enabled/status and existing enable/disable/associate/stop callbacks; it does not own or replace the relay controller. Task 6 adds tile configuration to this dashboard. Appearance chooser from Task 1 remains reachable.
 
-- [ ] First cover actual composer/send, permission/review/pairing visibility, listening/cancel/Stop voice through playback, and Back/background/lock termination. Reuse controlled TLS server/playback fixtures for concurrency; show native content at keyboard/large-font sizes.
+- [x] First cover actual composer/send, permission/review/pairing visibility, listening/cancel/Stop voice through playback, and Back/background/lock termination. Reuse controlled TLS server/playback fixtures for concurrency; show native content at keyboard/large-font sizes.
   ```kotlin
   // During actual PCM playback:
   compose.onNodeWithText("Stop voice").assertIsEnabled().performClick()
   assertFalse(model.state.value.speaking)
   // Leaving via native Back preserves the draft and closes foreground socket/audio work.
   ```
-- [ ] Record expected missing/native-layout failures without weakening existing phone-conversation regression assertions.
-- [ ] Build a compact profile toolbar, text conversation, comfortable typed composer and prominent hold-to-talk surface. Setup remains accessible but does not dominate ready conversations. Preserve live transcript/reply/card/image/prompt/error rendering, approval guard, downward/sliding cancellation, lifecycle shutdown and per-endpoint isolation. Restyle relay and all setup/settings surfaces using the same semantic scheme; no generic raw green/dark containers remain.
+- [x] Record expected missing/native-layout failures without weakening existing phone-conversation regression assertions.
+- [x] Build a compact profile toolbar, text conversation, comfortable typed composer and prominent hold-to-talk surface. Setup remains accessible but does not dominate ready conversations. Preserve live transcript/reply/card/image/prompt/error rendering, approval guard, downward/sliding cancellation, lifecycle shutdown and per-endpoint isolation. Restyle relay and all setup/settings surfaces using the same semantic scheme; no generic raw green/dark containers remain.
   ```kotlin
   // Native UI delegates Connect/record/finish/cancel/send/answer/stop directly to existing callbacks.
   // No new network, microphone or lifecycle controller is introduced for presentation.
   ```
-- [ ] Add real level-driven capture and response waveforms, guarded by session/playback versions; reset on cancel/stop/end/background/profile change. Reduced motion and power saver show static meters. Cover stale callbacks, real nonzero PCM envelope, lifecycle reset and media-muted hint in focused tests. Preserve the profile’s existing server speech voice. Owner reported silence; read-only physical evidence found STREAM_MUSIC speaker volume 0/15, so verify with owner after raising volume before inferring a TTS defect. Never alter media volume automatically.
-- [ ] Run actual phone TLS/playback cases and native theme/inset/permission presentations, then strict mobile checks/build. Commit Task 3 and identify remaining tile dashboard work as Task 6, without showing unfinished controls to users.
+- [x] Add real level-driven capture and response waveforms, guarded by session/playback versions; reset on cancel/stop/end/background/profile change. Reduced motion and power saver show static meters. Cover stale callbacks, real nonzero PCM envelope, lifecycle reset and media-muted hint in focused tests. Preserve the profile’s existing server speech voice. Owner reported silence; read-only physical evidence found STREAM_MUSIC speaker volume 0/15, so verify with owner after raising volume before inferring a TTS defect. Never alter media volume automatically.
+- [x] Run actual phone TLS/playback cases and native theme/inset/permission presentations, then strict mobile checks/build. Commit Task 3 and identify remaining tile dashboard work as Task 6, without showing unfinished controls to users.
 
 ## Task 4: Swipe-first watch portrait, page indicator and profile picker
 
@@ -106,18 +112,18 @@
 
 **Interfaces:** Retain existing ProfileCarousel service/pager contracts. `ProfilePicker(pages, selectedKey, locked, select, close, pin)` lists stable pages; `pin` is supplied by Task 5 when the store exists. `ProfilePageIndicator(index, count)` draws a bounded indicator and exposes position/count semantics. Until Task 5 the picker only selects; never show a no-op Pin control.
 
-- [ ] Add tests before removing controls: no visual Previous/Next buttons, accessible count, picker selection by stable key, locked/deferred behavior and per-page scroll retention through return/refresh/cancelled drag. At least one case uses eighteen synthetic pages and larger fonts.
+- [x] Add tests before removing controls: no visual Previous/Next buttons, accessible count, picker selection by stable key, locked/deferred behavior and per-page scroll retention through return/refresh/cancelled drag. At least one case uses eighteen synthetic pages and larger fonts.
   ```kotlin
   compose.onNodeWithContentDescription("Choose a profile").performClick()
   compose.onNodeWithText("Profile 17").performClick()
   assertEquals(expectedStableKey, service.state.value.selectedPage)
   ```
-- [ ] Observe the pre-change missing picker/visible arrow failure, then implement native round rows and at-most-six indicator marks. Remove PageControls buttons, retain the actual tested pager/focus hierarchy and mounted conversation list. Add named accessible selection actions with existing locks. Preserve 160-dp portrait, clock relationship, ambient rules and the current hold/release/cancel recorder semantics.
+- [x] Observe the pre-change missing picker/visible arrow failure, then implement native round rows and at-most-six indicator marks. Remove PageControls buttons, retain the actual tested pager/focus hierarchy and mounted conversation list. Add named accessible selection actions with existing locks. Preserve 160-dp portrait, clock relationship, ambient rules and the current hold/release/cancel recorder semantics.
   ```kotlin
   // Selection uses stable page key through the existing service operation, never a cached index.
   // Overlay changes do not conditionally replace the conversation's vertical scrolling content.
   ```
-- [ ] Run complete carousel and vertical-touch/return/refresh/abort regressions, picker/large-font rendering and strict Wear checks/build. Commit Task 4 with no physical claim until the maintainer sees it on the Ultra.
+- [x] Run complete carousel and vertical-touch/return/refresh/abort regressions, picker/large-font rendering and strict Wear checks/build. Commit Task 4 with no physical claim until the maintainer sees it on the Ultra.
 
 ## Task 5: Durable one/four-profile tile store, rendering and launch routing
 
@@ -125,20 +131,20 @@
 
 **Interfaces:** `data class TilePins(revision: Long, focus: String?, grid: List<String?>)`; `data class TilePinEdit(baseRevision: Long, requestId: String, focus: String?, grid: List<String?>)`; `TilePinStore.read(): TilePins`, `editLocal(focus, grid): TilePins`, `apply(edit, knownKeys): TilePinResult` (accepted/current/conflict/rejected results); `TileProfileLaunch` validates a stable key and routes/defer-selects after binding. The store owns watch revision and idempotence. Task 6 consumes these contracts.
 
-- [ ] Write pure CAS/ordering/duplicate/capacity/membership tests and native durability/layout/launch tests first. At most four grid slots, no duplicate non-null keys, no unknown injected key, stale base rejected, duplicate accepted request returns the same revision without reapplying, and removed keys remain visibly unavailable rather than selecting another index.
+- [x] Write pure CAS/ordering/duplicate/capacity/membership tests and native durability/layout/launch tests first. At most four grid slots, no duplicate non-null keys, no unknown injected key, stale base rejected, duplicate accepted request returns the same revision without reapplying, and removed keys remain visibly unavailable rather than selecting another index.
   ```kotlin
   val newer = store.editLocal("a", listOf("a", "b", null, null))
   val result = store.apply(TilePinEdit(newer.revision - 1, "old-request", "b", emptyList()), setOf("a", "b"))
   assertEquals(newer, store.read())
   assertTrue(result is TilePinResult.Conflict)
   ```
-- [ ] Observe failures before implementing bounded atomic persistence and static snapshot/layout builders. The actual local normalized PNG is downsampled/bounded for tile resources with versions derived from current pins/art. Render zero/one/four entries, missing art and unavailable/offline keys in safe circles with separated 48-dp targets. Do not perform network work or animate/decode GIFs in tile rendering.
+- [x] Observe failures before implementing bounded atomic persistence and static snapshot/layout builders. The actual local normalized PNG is downsampled/bounded for tile resources with versions derived from current pins/art. Render zero/one/four entries, missing art and unavailable/offline keys in safe circles with separated 48-dp targets. Do not perform network work or animate/decode GIFs in tile rendering.
   ```kotlin
   // LaunchAction contains one stable page-key string extra and no endpoint/key/token.
   // GadgetTileService remains the installed Focus component; a new provider supplies the grid.
   ```
-- [ ] Handle onCreate/onNewIntent, service attachment, unknown keys and selection locks with visible deferred target behavior. Add local watch pin editing via the picker; update both tile providers on pin/art changes. Keep normal Connect/review and microphone gestures explicit.
-- [ ] Run pure/native tile, cold/warm launch, unknown/removed/deferred selection, resource invalidation and no-side-effect cases, plus existing surface/carousel checks; strict Wear builds. Commit Task 5 and document that actual launcher addition is still a physical gate.
+- [x] Handle onCreate/onNewIntent, service attachment, unknown keys and selection locks with visible deferred target behavior. Add local watch pin editing via the picker; update both tile providers on pin/art changes. Keep normal Connect/review and microphone gestures explicit.
+- [x] Run pure/native tile, cold/warm launch, unknown/removed/deferred selection, resource invalidation and no-side-effect cases, plus existing surface/carousel checks; strict Wear builds. Commit Task 5 and document that actual launcher addition is still a physical gate.
 
 ## Task 6: Phone tile composer and associated Data Layer synchronization
 
@@ -146,18 +152,18 @@
 
 **Interfaces:** Consume Task 5 TilePins/TilePinEdit/TilePinStore. Define a separate bounded versioned configuration item/message path; payload includes request ID, base revision and stable slots only. Phone state exposes acknowledged current pins, pending edit and conflict for ProfileTilesPage. Watch response carries request ID/result/current revision/pins. Authenticated associated peers/signatures are checked through the existing Wear boundary.
 
-- [ ] First test offline queued edit, reconnection delivery, duplicate delivery, reordered ack, concurrent watch edit, unknown key/capacity rejection and unrelated peer rejection. Use two real associated owned emulators for the Data Layer acceptance path when available; unit message tests alone do not prove delivery.
+- [x] First test offline queued edit, reconnection delivery, duplicate delivery, reordered ack, concurrent watch edit, unknown key/capacity rejection and unrelated peer rejection. Use two real associated owned emulators for the Data Layer acceptance path when available; unit message tests alone do not prove delivery.
   ```kotlin
   // Phone submits revision R; watch edits locally to R+1 before delivery.
   // Deliver the old edit: Conflict is shown and watch R+1 pins remain unchanged.
   // Deliver its acknowledgement twice: no newer phone request is retired accidentally.
   ```
-- [ ] Implement complete native Focus/grid slot chooser, reorder/replace/remove and pending/conflict/retry states in Watch→Profile tiles. Cache only the acknowledged roster/revision; verify current watch membership before acceptance. Bounded serialization rejects malformed/version/oversize input. Local watch edits work without phone connectivity; no vault/credential data is sent.
+- [x] Implement complete native Focus/grid slot chooser, reorder/replace/remove and pending/conflict/retry states in Watch→Profile tiles. Cache only the acknowledged roster/revision; verify current watch membership before acceptance. Bounded serialization rejects malformed/version/oversize input. Local watch edits work without phone connectivity; no vault/credential data is sent.
   ```kotlin
   // Apply only edit.baseRevision == current.revision; commit pins plus revision atomically.
   // A conflict is reviewed explicitly; timestamps never resolve revision ordering.
   ```
-- [ ] Run synchronization fixtures and native composer interactions with actual static pictures, then strict both-client checks/builds. Commit Task 6, with any transport/environment limitation explicit rather than marked passed.
+- [x] Run synchronization fixtures and native composer interactions with actual static pictures, then strict both-client checks/builds. Commit Task 6, with any transport/environment limitation explicit rather than marked passed.
 
 ## Task 8: Portrait Hold to talk, recording feedback and bounded reply visibility
 
@@ -174,16 +180,16 @@ existing non-exported synthetic host and actual MainActivity/stock localhost ser
 state, generation-safe RecordingFeedback and existing GIF/pet rendering. Preserve Gadget
 protocol, pairing, media codecs, pager ownership, app signatures and pin APIs.
 
-- [ ] First reproduce the requested missing portrait action and the foreground screen-sleep
+- [x] First reproduce the requested missing portrait action and the foreground screen-sleep
   risk with meaningful failing native tests. Read the verified content-free private server/
   watch lifecycle summary in `.local/native-design/away-reply-diagnostics/`; it establishes
   generated replies and short sleeps, not frame receipt or a proved network root cause.
-- [ ] Make the portrait/artwork itself the discoverable hold target: sustained hold starts,
+- [x] Make the portrait/artwork itself the discoverable hold target: sustained hold starts,
   release sends, downward drag cancels once. Short taps and pre-hold horizontal/vertical drags
   never record. Preserve normal swipes, per-page scroll, selection locks, prompt actions,
   permission denial, unavailable/offline states and pointer cancellation/disposal. Keep real
   accessible Start/Finish semantics and an immediate concise hint without duplicate captures.
-- [ ] Draw three concentric accent rings flowing outward only while actual recording is
+- [x] Draw three concentric accent rings flowing outward only while actual recording is
   active. Keep existing160dp portrait/top spacing. The rings fit the round safe area and never
   cover clock/labels/controls. Keep160dp art/top; rings extend81→88dp into surrounding
   space without moving the original168dp frame or its labels. Reuse the existing Ready/status
@@ -192,13 +198,13 @@ protocol, pairing, media codecs, pager ownership, app signatures and pin APIs.
   assertions. Reduced motion/power saver use a static outline/level cue;
   stopped/background/ambient/unselected pages have no continuous ring animation. Verify static,
   GIF and pet branches and all three appearances.
-- [ ] Add a watch-only verylight haptic tick at actual capture start and successful recorder
+- [x] Add a watch-only verylight haptic tick at actual capture start and successful recorder
   release/accepted finish, one per token. Use supported TICK primitive at0.15 scale; otherwise
   use an8ms amplitude32 pulse only with amplitude control, otherwise a supported EFFECT_TICK
   or a6ms default fallback. Respect system haptic enablement. Do not create a repeating haptic,
   change reply/prompt haptics, sound preference or phone cues, or falsely tick success after
   rejected/short/canceled/stale capture. Retain the joined RecordingFeedback outcome guards.
-- [ ] Implement foreground-only FLAG_KEEP_SCREEN_ON while LISTENING, busy processing,
+- [x] Implement foreground-only FLAG_KEEP_SCREEN_ON while LISTENING, busy processing,
   speechPending or speaking, with a120000ms monotonic cap per user-started conversation.
   Clear on completion/failure/hidden/ambient/disposal/cap; do not reset the deadline for status
   or meter updates. No wake lock, global setting change or background screen wake. Existing
@@ -206,7 +212,7 @@ protocol, pairing, media codecs, pager ownership, app signatures and pin APIs.
   notice rather than silently looking Ready. Cover actual window flag transitions and a delayed
   stock reply longer than the15second device default; do not claim the historical issue fixed
   without receipt/physical proof.
-- [ ] Run focused JVM/native RED→GREEN gesture, ring/lifecycle, haptic token/outcome and screen
+- [x] Run focused JVM/native RED→GREEN gesture, ring/lifecycle, haptic token/outcome and screen
   lease cases plus existing carousel vertical/horizontal/aborted/refresh regressions. Run strict
   affected builds/lint/format once. Produce synthetic native visual receipts in ignored local
   artifacts for final Task7; public captures never contain owner portraits/endpoints. Self-review,
@@ -218,13 +224,13 @@ protocol, pairing, media codecs, pager ownership, app signatures and pin APIs.
 
 **Interfaces:** All prior task interfaces are implemented and reviewed. Public docs describe actual behavior, not prototype-only states.
 
-- [ ] Run `./gradlew ktlintFormat check :mobile:assembleDebug :wear:assembleDebug :mobile:assembleDebugAndroidTest :wear:assembleDebugAndroidTest --warning-mode=fail --max-workers=4` with the established JDK/Python environments. Inspect all test reports for failures/errors/skips; native tests run on owned emulators with isolated session flags.
-- [ ] Capture/inspect all three themes, phone directory/Talk/Chat/relay/settings/setup/errors, narrow/large-font/keyboard layouts, watch portrait/picker/reply/ambient and both tile layouts. Verify actual semantics, clipping and contrast beyond the prototype's nine pairs. Fix visual defects before delivery, with covering tests for behavior regressions.
-- [ ] Dispatch one broad whole-branch review on the most capable configured model with full spec/ledger/diff evidence; resolve findings in one fix wave and scoped re-review. Per-task review does not replace this gate.
+- [x] Run `./gradlew ktlintFormat check :mobile:assembleDebug :wear:assembleDebug :mobile:assembleDebugAndroidTest :wear:assembleDebugAndroidTest --warning-mode=fail --max-workers=4` with the established JDK/Python environments. Inspect all test reports for failures/errors/skips; native tests run on owned emulators with isolated session flags.
+- [x] Capture/inspect all three themes, phone directory/Talk/Chat/relay/settings/setup/errors, narrow/large-font/keyboard layouts, watch portrait/picker/reply/ambient and both tile layouts. Verify actual semantics, clipping and contrast beyond the prototype's nine pairs. Fix visual defects before delivery, with covering tests for behavior regressions.
+- [x] Dispatch one broad whole-branch review on the most capable configured model with full spec/ledger/diff evidence; resolve findings in one fix wave and scoped re-review. Per-task review does not replace this gate.
 - [ ] Compare existing device certificates, back up APK/data and store protected-file hashes; install with preserving updates only. Verify APK hash and unchanged existing identities/portraits/preferences except the explicitly changed appearance/pins and normal new phone identities. Never bypass a signature mismatch.
-- [ ] Import the maintainer’s supplied eighteen bounded watch-256 GIFs through normal native picture selection; verify independent descriptors/caches on phone/watch and static ambient/tile/reduced-motion fallbacks. Personal assets and receipts remain ignored; originals are unchanged and no app cache is seeded.
+- [x] Import the maintainer’s supplied eighteen bounded watch-256 GIFs through normal native picture selection; verify independent descriptors/caches on phone/watch and static ambient/tile/reduced-motion fallbacks. Personal assets and receipts remain ignored; originals are unchanged and no app cache is seeded.
 - [ ] Through normal UI, choose the maintainer's preferred Moonlight appearance and configure Focus/four pins when devices are available. Verify physical tile addition and each portrait launch on the watch; request owner speech/visual observations. Restore temporary timeout settings after testing. Keep owner GIF/office and quantitative battery/audio gates distinct.
-- [ ] Record verified checks/demo notes and review results, update draft PR, run public secret/private-value scans, commit/push only authorized public files. Do not merge or publish a release. If hardware is unavailable, continue software work and leave only its exact hardware gates open.
+- [x] Record verified checks/demo notes and review results, update draft PR, run public secret/private-value scans, commit/push only authorized public files. Do not merge or publish a release. If hardware is unavailable, continue software work and leave only its exact hardware gates open.
 
 ## Pre-flight coverage
 

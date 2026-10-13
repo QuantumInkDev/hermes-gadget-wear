@@ -1,38 +1,49 @@
-<!-- Current continuation: native Tasks 1–6 and 8 reviewed; Task 7 software acceptance complete at b511dbb. Watch received preserving 328d769; phone remains b724231. Root owns broad review and final physical delivery. -->
+<!-- Current continuation: native software and final scoped review pass at c248b03/6b00947. Physical watch updated preserving identities/art; Moonlight and Focus configured. Physical phone remains b724231, new APK staged, fresh wireless pairing-dialog port needed. -->
 # Session status
 
-Quantum Relay for Hermes native redesign is implemented: Portrait studio, original Voice Q,
-Light/Dark/Electronic Moonlight, independent phone Talk/Chat, capture/playback waveforms,
-swipe-first watch picker/portrait recording, bounded foreground screen-on time and one/four
-profile tiles. Tasks 1–6 and 8 have clean scoped reviews. The full strict command on `328d769`
-passed 116 JVM tests without failures/errors/skips and built both apps and test APKs.
+Quantum Relay for Hermes native redesign is implemented and reviewed: Portrait studio,
+original Voice Q, Light/Dark/Electronic Moonlight, grouped/custom-ordered phone profiles,
+independent Talk/Chat with real capture/playback waveforms, swipe-first watch picker,
+portrait Hold to talk with outward rings/light haptics, a bounded two-minute foreground
+screen-on lease and one/four-profile tiles.
 
-Task 7 software acceptance is complete at `b511dbb`; test receipts and native gallery are tracked in
-[the native demo](docs/demo/native-clients/README.md) and the ignored SDD task-7 report/ledger.
-Deferred Task 2/3/8 native gaps are covered. The physical watch visual check reproduced two
-viewport-overlay collisions: dots across the name and picker across scrolled actions.
-The final fix preserves portrait/name/source geometry, hides occupied dots and scrolled picker,
-and retains accessible picker/count. The final exact strict command passes 116 clean JVM tests and all four APKs; native overlay
-acceptance passes all 18 theme/font/round-size scenarios. See the demo for exact receipts. Broad whole-branch review remains controller-owned.
+Tasks 1–6 and 8 plus Task 7 software acceptance have clean scoped reviews. One whole-branch
+review at `ccb2953` found four Important issues and one Minor; the single final fix wave
+`c248b03` addresses all five, and its scoped re-review finds no new Critical/Important
+breakage. [Review resolutions](docs/native-client-review.md) and the
+[native demo](docs/demo/native-clients/README.md) record source-bound evidence and limits.
+Final strict checks pass 116 JVM tests across 33 XML reports, zero failures/errors/skips,
+with all four debug/instrumentation APKs built. Focused native receipts record 34 passing
+executions / 32 distinct methods and 18 geometry scenarios; 72 affected PNGs were refreshed.
 
-Current delivery split: physical watch runs a preserving `328d769` update with matching
-certificate/APK hash, 19 identity files and 75 protected baseline files unchanged. Its original
-15-second timeout is retained. Physical phone remains `b724231` without current ADB access.
-Final corrected watch delivery and native phone delivery remain open; no new live query or
-physical speech test is claimed. Root restored the temporary phone debugging grant and closed
-its owned phone bridge. Personal receipts stay in `.local/native-design/`.
+Physical watch delivery is complete at `c248b03`: matching certificate and installed APK hash,
+all 19 identity files and 75 protected baseline files unchanged at installation. Normal UI
+then selected Moonlight and configured the current profile for Focus (revision 1); the four
+grid slots remain empty for the owner's choices. The portrait is still 340×340 pixels at its
+original tested position and exposes Start recording/picker. Normal catalog refresh updates
+page metadata; identity/artwork files remain protected. Original 15-second timeout is retained.
+No new live typed query or physical microphone/speech observation is claimed this session.
 
-Remaining gates: actual associated Data Layer tile configuration delivery (emulator
-API_UNAVAILABLE), physical tile addition and each target launch, normal Moonlight/pin setup,
-speech/haptic strength/mic contamination, away reply/sleep observation and Light/GIF quantitative
-battery/audio checks. Emulator OS power saver could not be enabled and is capability-skipped;
-reduced-motion static behavior passes. The historical missing-reply cause remains unproven.
-Eighteen normal owner GIF imports and profile assignments were already verified; do not reimport.
+The physical phone remains `b724231`, without current authorized ADB connectivity. Tested
+phone/watch APK copies and hashes are staged under ignored `.local/native-design/delivery/final-native/`.
+The supplied phone address is its connection port; a fresh pairing-dialog port is needed for
+wireless pairing. Enter its code locally on the Mac, never in chat. Temporary phone debugging
+policy was removed/read back; no persistent debugging grant or Mac power helper is installed.
+Private delivery/configuration/cleanup receipts remain under `.local/native-design/`.
+
+Remaining gates: physical phone preserving update and native owner observations; specified
+four favorites, Focus/grid system tile addition and every target launch; real associated pin
+transport after emulator API_UNAVAILABLE; actual speech, haptic comfort/mic contamination,
+away reply/sleep receipt and quantitative Light/GIF/audio/battery checks. Actual emulator OS
+power saver remains capability-skipped; reduced-motion static behavior passes. Historical
+logs prove generated replies, not watch receipt or a confirmed cause. Eighteen prior normal
+owner GIF imports/assignments were verified; do not reimport or publish personal art.
 
 The [approved design](docs/superpowers/specs/2026-10-12-native-client-design.md),
-[plan](docs/superpowers/plans/2026-10-12-native-client-design.md) and ignored SDD ledger are the
-continuation map. Keep the PR draft. No merge, release signing, Play upload or live server
-extension is authorized.
+[checked plan](docs/superpowers/plans/2026-10-12-native-client-design.md), review and release
+runbook are the continuation map. The completed SDD evidence/ledger is archived privately at
+`.local/native-design/closed-sdd/2026-10-12-native-client-design/`. Keep PR #1 draft. No merge,
+release signing, Play upload or live server extension is authorized.
 
 ## Earlier checkpoints (historical)
 
