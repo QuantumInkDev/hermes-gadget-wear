@@ -7,6 +7,34 @@ codes. Version name is 0.1.0. Target API is 37, minimum Wear API 33 and phone AP
 watch declares standalone=true because direct user-configured connections work without a
 phone; private tailnet relay and optional phone voice still require the companion.
 
+## Native design acceptance — 2026-10-12
+
+The [native demo and receipt matrix](demo/native-clients/README.md) cover the three themes,
+phone destinations/keyboard/large text, watch recording/picker/reply/ambient and static tile
+layouts using original synthetic fixtures. Voice Q masters and launcher artwork are in
+[store assets](store-assets/voice-q/). This is debug/software evidence, not Play acceptance.
+
+The unchanged implementation at `328d769` passed the exact full strict Task 7 command:
+116 JVM tests, zero failures/errors/skips, both debug APKs and both instrumentation APKs.
+The final overlay correction at `b511dbb` also passes the exact strict command: 116 clean JVM
+tests and all four APKs. Sixteen native passing executions include 18 theme/font/round-size
+scenarios; a combined-run enrollment guard skip passed when rerun alone. Exact receipts are
+recorded in the demo verification record.
+The watch received a matching-signature preserving `328d769` update with installed APK hash
+verification, all 19 identity files and 75 protected baseline files unchanged, and its original
+15-second timeout retained. The physical phone still runs `b724231`; final matching phone/watch
+native delivery and owner observations are not yet complete. Eighteen owner GIF imports through
+normal selection and per-profile watch assignment were verified before this design; personal
+art and preservation receipts remain ignored and are not public demo material.
+
+Still open: whole-branch independent review; final preserving delivery and normal Moonlight/pin
+configuration; physical Focus/grid addition and every portrait launch; associated Data Layer
+configuration delivery (owned emulator reports API_UNAVAILABLE); speech, haptic strength/mic
+contamination, away reply/sleep receipt, Light/GIF battery cost and quantitative audio/battery
+matrix. Actual OS power saver could not be enabled on the owned AVD and is capability-skipped,
+not passed; reduced-motion static output is verified. Keep the PR draft until those and the
+existing publication/signing/privacy/Play prerequisites are assessed.
+
 ## Artifacts and signing
 
 Run the strict checks from the README, then:
@@ -55,16 +83,16 @@ Use the [physical-device runbook](device-testing.md) to record the device gates 
 Phone and watch name: Quantum Relay for Hermes.
 Short description: Talk to your own Hermes agent from your phone or Wear OS watch.
 
-Hold the watch screen to speak, read a streamed reply, hear your profile's voice and answer
+Hold the watch portrait to speak, read a streamed reply, hear your profile's voice and answer
 approval prompts. Connect to the Hermes Gadget server you configure, directly or through
 an Android phone on your own Tailscale tailnet. Save independently paired profiles and see
-their optional pets. A Tile and complication open the conversation, with a quiet ambient
+their optional pets. Focus and four-profile tiles and a complication open the conversation, with a quiet ambient
 outline between interactions. Optional ElevenLabs phone voice uses your own key and billing.
 
 The phone also offers independently paired foreground Talk/Chat with each profile's server
 voice. Box groups, custom ordering and inline portraits are local controls. Optional watch
 GIF portrait overrides have bounded loops and a static fallback; state-driven pets remain
-a separate optional feature. The original orbit/speech app icon does not use the Nous mascot.
+a separate optional feature. The original Voice Q app icon does not use the Nous mascot.
 
 Requires a compatible self-hosted Hermes Gadget server. No project account, hosted agent,
 analytics or advertising. New pets, Opus and client voice require compatible optional server

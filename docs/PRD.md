@@ -1,6 +1,29 @@
 # Product requirements
 
-Status: implementation baseline, 2026-10-05. The [original brief](hermes-gadget-wear-prompt.md) remains the scope; verified corrections are recorded in [architecture](architecture.md) and [pets](pets.md).
+Status: native client implementation and software acceptance, 2026-10-12. Hardware and release gates remain open. The [original brief](hermes-gadget-wear-prompt.md) remains the scope; verified corrections are recorded in [architecture](architecture.md) and [pets](pets.md).
+
+## Native client behavior — 2026-10-12
+
+The approved [native design](superpowers/specs/2026-10-12-native-client-design.md) is implemented:
+Quantum Relay for Hermes uses original Voice Q artwork and independently persisted Light,
+Dark and Electronic Moonlight appearances. Existing installations default to Dark; ambient
+stays black and static. The phone provides Profiles, Watch and Settings, grouped searchable
+portraits, accessible profile details, foreground Talk/Chat, live capture/playback meters,
+a muted-volume hint and revision-safe watch tile editing.
+
+The watch retains stable swipe pages, per-page drafts/scroll, selection locks and rotary
+focus, with a direct profile picker. Hold the portrait to record, release to send or drag
+down to cancel; short taps and interrupted gestures do not send. Actual capture drives the
+external rings and very light start/accepted-finish haptics. A foreground active turn may
+keep the display on for at most two minutes; completion, background and ambient release it.
+Historical missing replies during an away trial remain an unconfirmed transport diagnosis.
+
+Focus and Pinned profiles tiles render static local pictures for one and four stable keys.
+They launch the intended page without starting recording. Unknown/removed keys stay unavailable;
+locked selection is deferred visibly. The watch owns a durable revision, and stale phone edits
+require review instead of overwriting newer watch choices. Synthetic native acceptance and its
+limits are recorded in the [demo](demo/native-clients/README.md). Physical tile addition,
+associated Data Layer delivery, speech, away replies, haptic strength and battery remain gates.
 
 ## Outcome and users
 

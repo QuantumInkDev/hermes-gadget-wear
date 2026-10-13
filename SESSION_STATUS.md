@@ -1,31 +1,40 @@
-<!-- Current continuation: 2026-10-12 native Tasks 1–6 and 8 reviewed. Task7 final native artifacts, whole-branch review and preserving delivery remain. Full strict check passed116JVM; physical devices retainb724231. Temporary watch timeout and phone debugging grant restored. Recovery ledger: .superpowers/sdd/2026-10-12-native-client-design/progress.md. -->
+<!-- Current continuation: native Tasks 1–6 and 8 reviewed; Task 7 software acceptance complete at b511dbb. Watch received preserving 328d769; phone remains b724231. Root owns broad review and final physical delivery. -->
 # Session status
 
-Native redesign approved, 2026-10-12: Portrait Studio, original Voice Q,
-Light/Dark/Electronic Moonlight, swipe-first watch picker without Previous/Next,
-and one/four-profile tiles. Tasks 1–5 are implemented with clean scoped reviews,
-including theme persistence, native phone directory/conversations, real capture/playback
-waveforms, watch picker, durable static tiles and guarded profile launches.
+Quantum Relay for Hermes native redesign is implemented: Portrait studio, original Voice Q,
+Light/Dark/Electronic Moonlight, independent phone Talk/Chat, capture/playback waveforms,
+swipe-first watch picker/portrait recording, bounded foreground screen-on time and one/four
+profile tiles. Tasks 1–6 and 8 have clean scoped reviews. The full strict command on `328d769`
+passed 116 JVM tests without failures/errors/skips and built both apps and test APKs.
 
-Task 6 phone tile composer/synchronization is committed at 5aa0d3b. Twenty-two affected
-JVM tests, five native cases across all three themes and strict affected checks pass.
-Review found a stale local watch editor could overwrite untouched fields after a phone
-edit. Fix 416389a uses atomic field mutations; both overwrite directions reproduced RED,
-then eight affected native cases and nine JVM cases/strict Wear checks passed. Fresh
-scoped re-review is clean; Task 6 is complete. Actual associated Data Layer delivery remains
-unverified after the owned emulator returned Wearable.API API_UNAVAILABLE.
+Task 7 software acceptance is complete at `b511dbb`; test receipts and native gallery are tracked in
+[the native demo](docs/demo/native-clients/README.md) and the ignored SDD task-7 report/ledger.
+Deferred Task 2/3/8 native gaps are covered. The physical watch visual check reproduced two
+viewport-overlay collisions: dots across the name and picker across scrolled actions.
+The final fix preserves portrait/name/source geometry, hides occupied dots and scrolled picker,
+and retains accessible picker/count. The final exact strict command passes 116 clean JVM tests and all four APKs; native overlay
+acceptance passes all 18 theme/font/round-size scenarios. See the demo for exact receipts. Broad whole-branch review remains controller-owned.
 
-The owner walk on the prior b724231 build showed transcripts/tool calls without observed
-replies. M5 server logs establish two generated replies; watch power events establish short
-sleep cycles, including sleep before final text/audio send. Frame receipt is unproved.
-Task 8 is implemented at 328d769 with a clean scoped review: portrait Hold to talk, outward
-recording rings, very light actual-start/finish haptics and a bounded foreground screen-on
-lease. Ten affected JVM and thirteen distinct native cases pass; the real activity retained
-a delayed twenty-second stock reply past its fifteen-second system timeout. Actual OS power
-saver is a documented emulator capability skip, not a pass. The full strict check passed
-116 JVM tests with zero failures/errors/skips; both debug and instrumentation APKs built. Task 7 final whole-branch checks/review, native artifacts
-and preserving physical delivery follow. Temporary watch timeout and phone debugging grant were restored and verified; receipts
-are recorded privately; physical devices still run b724231.
+Current delivery split: physical watch runs a preserving `328d769` update with matching
+certificate/APK hash, 19 identity files and 75 protected baseline files unchanged. Its original
+15-second timeout is retained. Physical phone remains `b724231` without current ADB access.
+Final corrected watch delivery and native phone delivery remain open; no new live query or
+physical speech test is claimed. Root restored the temporary phone debugging grant and closed
+its owned phone bridge. Personal receipts stay in `.local/native-design/`.
+
+Remaining gates: actual associated Data Layer tile configuration delivery (emulator
+API_UNAVAILABLE), physical tile addition and each target launch, normal Moonlight/pin setup,
+speech/haptic strength/mic contamination, away reply/sleep observation and Light/GIF quantitative
+battery/audio checks. Emulator OS power saver could not be enabled and is capability-skipped;
+reduced-motion static behavior passes. The historical missing-reply cause remains unproven.
+Eighteen normal owner GIF imports and profile assignments were already verified; do not reimport.
+
+The [approved design](docs/superpowers/specs/2026-10-12-native-client-design.md),
+[plan](docs/superpowers/plans/2026-10-12-native-client-design.md) and ignored SDD ledger are the
+continuation map. Keep the PR draft. No merge, release signing, Play upload or live server
+extension is authorized.
+
+## Earlier checkpoints (historical)
 
 Earlier safe dog-walk checkpoint: no physical operation or child task was running. All eighteen
 normal owner GIF assignments match every source frame and the correct watch profile

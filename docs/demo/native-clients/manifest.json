@@ -1,0 +1,1563 @@
+{
+  "synthetic_only": true,
+  "security": "No production phone window captured; synthetic-only nonexported debug host. No personal art or endpoint.",
+  "assets": [
+    {
+      "file": "phone/directory-light.png",
+      "sha256": "3f8326af015b59af14d9d610b40ea261eb8ed3eb8dcd2505f842e075fb176e2d",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 2 actual native directory, unchanged; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/directory-light-large.png",
+      "sha256": "2e7d1919003e6884d27ef4ad535d7ad867f3f58e3d7d3e8622ab0d3b374dc1d8",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 2 actual native directory, unchanged; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/conversation-light.png",
+      "sha256": "44f1c0143e18f6dc4958f0ce621fddd8e41dcc82deb5c50c21e83c62fbbe187b",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/conversation-light-large.png",
+      "sha256": "ca5c5fc736f569f17f8ece42c75177c1d881f3419cc3c4d5320c6c5f7f750ee8",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/keyboard-light.png",
+      "sha256": "0b403a88dd80587aeaebeb95927d4b542e337e1ea00b0e96871cea59d0a6adaf",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/keyboard-light-large.png",
+      "sha256": "4828ffa17f793ee26298cf3eb9d9228f4a9ac961552c6ba71b557d4a58b81edb",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speaking-light.png",
+      "sha256": "48895e019f952d6d4df5b5ff131a57b35605e977d26429000b017e6fe447c52e",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speaking-light-large.png",
+      "sha256": "d34074cee7d3bd423686ce6c33afb0d3b43f6d8442b8afe4b553d68ee51f8dad",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/error-light.png",
+      "sha256": "6c507ccc3ad646ee378f23d1d112aa93d7d44b017b8b06d4274791f485761266",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/error-light-large.png",
+      "sha256": "fcca79c0385dde2e380d485d476b0da59057fdf2014b99fc099b37005514948f",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/watch-light.png",
+      "sha256": "28b0cf0add7e71d7d2d72accb518e9eb43eb1ae2707f7c10b844a8e832e06f8c",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/watch-light-large.png",
+      "sha256": "497ab0380218205e9e5ffac954ad23670ad01b05c2abcccb82ea9b6c04d2f86b",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/settings-light.png",
+      "sha256": "304d0c5c83e2409b44f92ae63b20d7f9922ea21a7837bfd0f03620d63c6c7a32",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/settings-light-large.png",
+      "sha256": "32511523858f4d466f78cfdaf3f434a1eebf3cb97aa60f9f4ee22a9bb348fa0e",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/boxes-light.png",
+      "sha256": "3790d20391a924943d1aa1c73f13c2cb85c3e510bf014d10116dd69cc44d0f71",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/boxes-light-large.png",
+      "sha256": "cee38dcca66c9d41fcfedbe796fb20343383e05b1249eb96f878b4e5a6f54986",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/manual-light.png",
+      "sha256": "d75352418504d4612ae2fe6595aec87851d9d5f553ab67bd2cc0214fe21d6283",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/manual-light-large.png",
+      "sha256": "1d26cb6b7d21d2ccde401f76b99e5f335c3029cb579d8ed72b0b8087606cdebf",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speech-light.png",
+      "sha256": "f2aa208047e73d0f2abe0f02fd32a804ec312c5b5d0fee12db5dbbb7f105491e",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speech-light-large.png",
+      "sha256": "a5d6aebf7823fde690ce6bf0d960bd9701a12a49a5981b30535ee09454c89418",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/directory-dark.png",
+      "sha256": "1b4cd28b54e9bf6378af14ac908007ef7586d747e079d5221c25b3535bd3a103",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 2 actual native directory, unchanged; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/directory-dark-large.png",
+      "sha256": "3443c6b8ed5b0b2a756bc3939644c3319f4d5a71db1f29552f541d73051b4c8d",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 2 actual native directory, unchanged; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/conversation-dark.png",
+      "sha256": "cb23f692a155d8b875194b44bbb521f1230bc7730430b3dbb89150b3691b56c6",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/conversation-dark-large.png",
+      "sha256": "9f6fd2d70d5642e0c033a0664fa9ad77bac514926cc6adc5da7b260961f977fb",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/keyboard-dark.png",
+      "sha256": "b2cd0d7df5e06463c9702ce151b1b64cc7807e5a835a695307fff213a39d3091",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/keyboard-dark-large.png",
+      "sha256": "26e780e84ea1c8346779f8d5c983f4c02183230681b19f407cef0cf341bb7d82",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speaking-dark.png",
+      "sha256": "08aaeb322d83b10c7c6a5078d7dcca255d5a32f5f77e3b74830e66ffc92a1cd7",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speaking-dark-large.png",
+      "sha256": "04edf634757f8e65580347b9f4504be83d2e336a49804870eb5767b0eb88e970",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/error-dark.png",
+      "sha256": "bb682b17bc2f1086d40e72c9cb68ea65ecef2fc79db6233d8d2b808bfd49cee9",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/error-dark-large.png",
+      "sha256": "7ff2f67cccda62726a53efcc2fb1684def39747f92b6ab1b74078d0f04c256d0",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/watch-dark.png",
+      "sha256": "48119983764090af933205022dabe2a7eeb78c31a9e574c3d2ab7d3eb807f642",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/watch-dark-large.png",
+      "sha256": "4f3cc06d3792b9b3b194a216f79498a100d5a699e77989055e5757db957c1005",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/settings-dark.png",
+      "sha256": "ec892c1de6e7f87bdeaea65b4f10671afbd8184867fc139f2c573e645e51dcfa",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/settings-dark-large.png",
+      "sha256": "dee922a8cdd1e7b5f43784ba11f991af20994aa60a3d8287e79b810b3120c5d7",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/boxes-dark.png",
+      "sha256": "b293083ee0ff4c350636e413209f3ab76844932b81df1ac52ab2364e9b494106",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/boxes-dark-large.png",
+      "sha256": "e07290e895ecd62195763b51d1897548c2eadb59eaf47f8cbc44ad8898875c73",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/manual-dark.png",
+      "sha256": "580212f368654359166c9ada2c55aa5cea2f0ed4f6befadd411a603c8554d8a6",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/manual-dark-large.png",
+      "sha256": "cba5cf9a25f05bf70360fa4ecc5c364619e645d758d5788a8b16311a36c0b752",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speech-dark.png",
+      "sha256": "d3a2c406b728d10e5c6bbfde8e696f117ffa4ebf707e0c90a8907e52b788f462",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speech-dark-large.png",
+      "sha256": "54a42dfa0d16c304ebe2d490d5503edefbc8cab85471d5231a33bdcecb089000",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/directory-moonlight.png",
+      "sha256": "3b81477118448fd76cfc8e7ffc37546451d72d0188eb51226ffc1f31f3bdbecf",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 2 actual native directory, unchanged; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/directory-moonlight-large.png",
+      "sha256": "86b34c3f2d6f40690d1e00fe94cabb312e07293288d0afa045fd8ac546e8a88a",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 2 actual native directory, unchanged; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/conversation-moonlight.png",
+      "sha256": "858b0a187b050bccf9e0279609b4bb167df13f1d210451a473d19e9f323cbba0",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/conversation-moonlight-large.png",
+      "sha256": "863f430caafd6402c2d78963f8e45f4ad2bd4ce339023561935a7bc9d6d462d5",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/keyboard-moonlight.png",
+      "sha256": "d30e8303a16ffea202392eac43f47fc7b2c9715bbadd72873d65890d3564fafe",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/keyboard-moonlight-large.png",
+      "sha256": "12d84677c43df5dab4645f8cae7d748ef0197c1d61c50afb6a971c7fa275ebc8",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speaking-moonlight.png",
+      "sha256": "268dd643211b2bfc54ce9fcafd4c230b314cb7d7a2419f69d8fbf211e2dcf3e7",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speaking-moonlight-large.png",
+      "sha256": "2590e1209b3a50ee5adb44fd179ebb0a8fdd8e011fbca32d88d5b4b2cf583f39",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/error-moonlight.png",
+      "sha256": "c5261a309bf964612eec674a38208e602da4cf5fd6bf904bb00cb08e2cb65791",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/error-moonlight-large.png",
+      "sha256": "827cf9f0d5d192650eb673fcf2256d4a150a1a9bc4d4ceb489b53932d98e0768",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/watch-moonlight.png",
+      "sha256": "fe289ebe91b71099349188de58e5d5ce7870c638d85002470c603d661729e877",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/watch-moonlight-large.png",
+      "sha256": "c3ccebbb74c87cbfe9561bfc2ce3601945e1fee6c4ba775f59f433213dadd0ad",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/settings-moonlight.png",
+      "sha256": "9be1bc44cd31265accdc734ae45342b834a080bae7626fa2d9f789ade36b414e",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/settings-moonlight-large.png",
+      "sha256": "109815ea37612522068343f0d8ca9f79f7f9ebcfc45e299c55648ac15f248f03",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/boxes-moonlight.png",
+      "sha256": "db58ee02adc8245a18539920a8a0d8d887e7ff03c0c015953bfc790d54092d2c",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/boxes-moonlight-large.png",
+      "sha256": "21dbb05210d04b4dc2a96198ccef5c93fc0d671f609f27acaa8e36528c96d25a",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/manual-moonlight.png",
+      "sha256": "c4bfca8b2a570be3a4b515ef1e35d1452deb1b9bace1bc6eb71c2561973d23a8",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/manual-moonlight-large.png",
+      "sha256": "4a6db050a606bc40add20d603eae6f5e45e7b5e9e20564441788d8231978477a",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speech-moonlight.png",
+      "sha256": "465845dbced2c3da99860c1e714e65fe788571369bf009ccf78024d12812f34d",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speech-moonlight-large.png",
+      "sha256": "20a14abcd6de7302091682d8f0eb6fa372584e846f6914576ecd4e98198005fe",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "appearance/wear-moonlight.png",
+      "sha256": "4f8da671134aebc2998955b9f1747f90fa5b51b69b569effdf059227d4d80057",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 1 reviewed native appearance chooser; unchanged"
+    },
+    {
+      "file": "appearance/mobile-moonlight.png",
+      "sha256": "1ce464f119cf1852377058e748a9b61aa920ce0ac758434506d9722412bd5489",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 1 reviewed native appearance chooser; unchanged"
+    },
+    {
+      "file": "appearance/wear-light.png",
+      "sha256": "8fa4d5b29f9a1a8c9a74973f68fca1342ed791cce70101273832d54aaad12349",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 1 reviewed native appearance chooser; unchanged"
+    },
+    {
+      "file": "appearance/mobile-light.png",
+      "sha256": "f76db28d71d48cf745f078951cbcc80b2b9f10fb211ec36ec70c9f984f7f3742",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 1 reviewed native appearance chooser; unchanged"
+    },
+    {
+      "file": "appearance/mobile-dark.png",
+      "sha256": "3274a855ec73bbb8736af024e3df89eeb50078b0a22dde2247422d4f35ff668a",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 1 reviewed native appearance chooser; unchanged"
+    },
+    {
+      "file": "appearance/wear-dark.png",
+      "sha256": "936676a4997b4279afd6820d47d33370dc98204d07c5ec91cf560564842c7660",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 1 reviewed native appearance chooser; unchanged"
+    },
+    {
+      "file": "phone/profile-details-large-narrow.png",
+      "sha256": "543438c39f4e34ac67900ec6a54316f7ab2bf67e5c81e084c6810f338bb81545",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 2 native details; Task 7 strengthens Close-to-directory assertion"
+    },
+    {
+      "file": "recording/recording-light-large-font-scrolled.png",
+      "sha256": "1c361ac84d05f5e4961a520a81de73a1350cc0ade99d5cd0a006c1e30a4436e7",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-light-1.png",
+      "sha256": "ac759cd229b6f6fda6316fb2cae55e347da8f7009d6d1cad382cc82bf7ed77df",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-light-large-font.png",
+      "sha256": "918ad70c3b8cd5d2c8bd35689cc040ea4ccb0fb6c17acc2d3aeb3ee4fcc7f447",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-light-0.png",
+      "sha256": "ac0750573606dce744cb8b8a4f53406348d3cfe48fcb44951deb1c2470f63346",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-light-2.png",
+      "sha256": "efdea581825f87163f237c8114097f7bef952ff2cf2f1eb73b3ddf3289c5574c",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-moonlight-0-phase2.png",
+      "sha256": "58984658708da2df4863ca19d0049974d762f70ab31a22c7fa7c96f2fad42017",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-static-reduced-motion.png",
+      "sha256": "34ac79190bfe11519317b085b2cf4fbfa660b8e2166f54b180520013b23eec92",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-moonlight-large-font-scrolled.png",
+      "sha256": "992986ba13f80fd6834c38632cafd4be7936616883f33437e75c23c75451c1be",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-dark-2.png",
+      "sha256": "fa05ab227bde485e3fe4772764bc080d05be353c64b3b44babb5619e096061b3",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-dark-1.png",
+      "sha256": "df8836ee0166c344b1a6ab163bb4b28cbd842a181052dc1ae8ca651f036ea6a6",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-dark-large-font-scrolled.png",
+      "sha256": "8bfce6eef96c9dec6b10f0acdfa5ca794531bf808e0e4af425cb5abc6a4ace71",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-dark-0.png",
+      "sha256": "c576588a2c52cbeb5fa30ceba2d0d2ed13976e91cd92f64b79a5dc730351c392",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-light-0-phase2.png",
+      "sha256": "db7d1ff2084da280918c548d8903d94ac60dc63d22453b5a0c52e818f361dc77",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-dark-0-phase2.png",
+      "sha256": "3e3b8ac65ca987e515e49a076a41b57689ed785c9d58c33f102f7d8615e1b0a2",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-moonlight-1.png",
+      "sha256": "339b6b97a49bed97cff804f7ebb5c2546a45222f0875418ffdd281a2389b9d5f",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-moonlight-large-font.png",
+      "sha256": "a0c814b4f06ae6763bde2c2ca6c8eb465a0b502a9bc96e2aecd5a1fec1584532",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-moonlight-0.png",
+      "sha256": "9246c0343857de16bc73037416a87a94455ae7de55cd765e09c8cdbedcf7bb10",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-moonlight-2.png",
+      "sha256": "3a3a63f9efe176179a96d699a21bbf29bc667f969a23182befe7c8ddf07215bb",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "recording/recording-dark-large-font.png",
+      "sha256": "5445a6d1389a9465d13198133b93d3974a862e31186fbfd9c73bbab0eabcfdf9",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 8 approved actual native static/GIF/pet capture rings; unchanged"
+    },
+    {
+      "file": "phone-tiles/moonlight-1.0-pending.png",
+      "sha256": "ed21c74de322d8b6ce42c756dcf05adff98fe00858c09b43fe1d99f6b7f4aede",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/dark-1.3-pictures.png",
+      "sha256": "c2f57d6c47e6a49b968358059a65c338174b44bf14ad06fe8b60b79f46184b63",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/moonlight-1.3-pending.png",
+      "sha256": "b14cdd63d97125171af78bc0621a0eb2333f806b6e5d69c7249b104f2fc64119",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/moonlight-1.3-pictures.png",
+      "sha256": "f49f8f5eed406289ef5ecd808fa9b36ff036ab8cb8a22f21cfecde5e064957cf",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/light-1.0-pictures.png",
+      "sha256": "a1ba35671f09386294b75ff07dd52a62ec55991da69b7cb45b483c20512d12e2",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/dark-1.0-pictures.png",
+      "sha256": "44d28811f1560421175a8f4a7f17abd19e39571b3b24425d20465de414d46ac9",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/light-1.3-pending.png",
+      "sha256": "8cf0ea9828db73fc3d80074f52b5a236c0cd60f411959445e0e0e6ccc045d860",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/light-1.3-pictures.png",
+      "sha256": "4858b11fab036efe68b6651adf66098d189ccf7c38fe38ecbf15af82b24dd166",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/moonlight-1.0-pictures.png",
+      "sha256": "9d5d36ae918c15eef41294eaf1b8bf6e3962b5cae11e0c553debd92e3cfca3cd",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/dark-1.3-pending.png",
+      "sha256": "c763803df492192ff18b180513e612af7b391c3bb302d139215e15ae693f72fd",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/dark-1.0-pending.png",
+      "sha256": "8d5e5838e56e7ab83f8444673f79f0dad517165dc05494e99f540763b6575c57",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/light-1.0-pending.png",
+      "sha256": "e71d174b43b554af72411ab1460bba9edd9beed7871f10401e39ac841b0b9af9",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "tiles/tile-pinned-profiles.png",
+      "sha256": "a9a4910aee88805ed9447c958c4461bd1994684f8e3a7edc5512af6f9e8089a1",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 AndroidX TileRenderer with original face admitted via actual PortraitCache and production circular ProfileTileSnapshot.build; not physical launcher addition"
+    },
+    {
+      "file": "tiles/tile-focus.png",
+      "sha256": "7761de26464a155f37b3973bd328f45114d6ed1a071571cf605c3899efe8418a",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 AndroidX TileRenderer with original face admitted via actual PortraitCache and production circular ProfileTileSnapshot.build; not physical launcher addition"
+    },
+    {
+      "file": "watch/ambient.png",
+      "sha256": "3da7a3e4a9b82c250c0b6be4f9b5541b7b2cdcb0f0c15591913ddc2ffb272b87",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 4 native owned-emulator synthetic ambient; unchanged renderer, later actual-activity unavailable-route sleep/wake regression passed Task5"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.0-reply.png",
+      "sha256": "df95bdd79ed205c339c2b3d8a456392d9024c13962249928ed6bc36c7dfe5101",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/dark-1.3-end-padding.png",
+      "sha256": "79b974bbb718ff30444632c0e8379661e23697227442d71f2983f2a9857110a7",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/light-1.0-picker.png",
+      "sha256": "dd83601eaa4af1e46899aba5c0ee2a0c33f84cf79dd5a7d986fbc4b3b4351e1e",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/dark-1.3-picker.png",
+      "sha256": "1b4f6b725ab76453dfd42f1b8c89ae0d2b933237ff09d3e8d8476e8e3f844483",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/dark-1.3-reply.png",
+      "sha256": "46b390166296f908725a942ba6a85491b5546d829b5dee8b15cff9ba97c73fb0",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/light-1.3-portrait.png",
+      "sha256": "a584e1d5ffe8a299b1f09983eab624f311af6072a2e4532550644f1841bbc7c7",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.0-picker.png",
+      "sha256": "e188d67798c0dbe5bac5c00cb44765806981478c667fc99dd21864897ccdc149",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.3-end-padding.png",
+      "sha256": "34c959c988c05f593dc21f0ef8a8d8732068d705a9c78f1c34c14022fa50e1b9",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/light-1.3-end-padding.png",
+      "sha256": "9582ea38a9e2e824f743dfeadcf9c8c2f122f3cd9aae181e920200a1e9ea22c3",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.0-portrait.png",
+      "sha256": "1051f786f4d8afafcc912c9863c4fbde4dd8d07b61fa0a337ad33e6388314aa9",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/dark-1.0-portrait.png",
+      "sha256": "6b526430a9e4df7fe973190fa8c53df0a4a4b3a5cf055086c8e0c3010d9a2557",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/light-1.0-reply.png",
+      "sha256": "f8163ad205175996cd31451c076202c5ae4e43545169b8eff3d448d19c590795",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/dark-1.3-portrait.png",
+      "sha256": "06bbbbab0caa6225c56b36f8b3b1f460f9d17413c748bc9f2e1bbc635f7cc0d4",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.3-portrait.png",
+      "sha256": "e562bcaf5505a1740bdeceda50ca50a82af82dad8cf11f3d81a989c28b32dca9",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/light-1.3-reply.png",
+      "sha256": "8dab3199905200daf9d0a1df43d996d9c744c80d8d1454461b267535cc89aac9",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.0-end-padding.png",
+      "sha256": "3cc6f6dd8dc03a8e5dbc93ba40658ce1f4381b581e80866aa65ca86ce1f2036e",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/light-1.0-end-padding.png",
+      "sha256": "d8062fbe8593782a27d8112e8fd94bec97d4974f4c4d7d794a9d9403ac62ce10",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/dark-1.0-end-padding.png",
+      "sha256": "055528cf6aad7a260a247699b5e10ac4ab3eb9c9b0ab85988e712719f49b3843",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.3-reply.png",
+      "sha256": "f70ea3f92e9167e1fc50fc411469dfb12ead0a516cb97fcae3696c0050ef798e",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/dark-1.0-picker.png",
+      "sha256": "a9a9b9b825e5aaed6007231267682f02322e6348b0df48f4185c9d1281443131",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.3-picker.png",
+      "sha256": "f8a7b2cf635fd25c3285cd0c014f009b1565b284e66b7593836a8cf5be07885d",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/dark-1.0-reply.png",
+      "sha256": "39f46892f73034d0b7d181e85c03b4fe93b862eedbe646223142914c51c73991",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/light-1.0-portrait.png",
+      "sha256": "c0ad41dbd0b32b9fc290a75f342db6beac8cbd9ab439978dfd8ede046c74a5b3",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-340/light-1.3-picker.png",
+      "sha256": "760cc6349ded9d7889f90c4c78a8b1ed799e8eaa087a2c8d28fec47c9e5c80d2",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.0-reply.png",
+      "sha256": "5b78483b58fe43124d81909bdd1f16dd6044fe0623896a46e91234f1c691f656",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/dark-1.3-end-padding.png",
+      "sha256": "9296a4dcf939c78cf3037da429b9732b18eac6acd5930f58dec2cc4c1ae24d98",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/light-1.0-picker.png",
+      "sha256": "5af28bdc277a28775ba83084dd33e5a2827214fe32c4f6cc8715cd18ddccc00d",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/dark-1.3-picker.png",
+      "sha256": "92f1f347a50e6498b558d0270472334ad1445d75d252ae510a124e276ebac705",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/dark-1.3-reply.png",
+      "sha256": "a3449ee22f627ceabf20bab1ef22a3b09b50df09f206fbe777143defe3e8d02c",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/light-1.3-portrait.png",
+      "sha256": "1cc4bb56698053d0d5fecb91db3c252f6f889e73936212613bba8a5d5d7756ec",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.0-picker.png",
+      "sha256": "80918c239ee1ee2833aa39ce220a6b8796aa2b69317eaf15d9f2e13be09235bc",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.3-end-padding.png",
+      "sha256": "29f7c9bbde40d4a76fb8bd7d0449eb7582d01ca9d8b2d4c604ca184fc01eaaa3",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/light-1.3-end-padding.png",
+      "sha256": "eced77a94406124fd6b899a204e908de3ca1a60ac06fd5190480449f92ecf5c6",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.0-portrait.png",
+      "sha256": "946276b6671160232d5ab5e1568aeba0f1506b6f746e7a60862daee274503f24",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/dark-1.0-portrait.png",
+      "sha256": "94b86c2adb4986174b204ec2f2d0c0e1ea9e0b426b1112e44d4279738f232a02",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/light-1.0-reply.png",
+      "sha256": "d97781d6dc23b9360501f6271086b4d057b7dace41110ba8c70b8c48b7aafe27",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/dark-1.3-portrait.png",
+      "sha256": "a590dd1f024a39b6ad5624b570e2c9a9ab34ab9b1098d8273aed50ffe8d47a6a",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.3-portrait.png",
+      "sha256": "34ac41ca43940a69ef76cd6732918de67c0975600bb0c231f9ac1af9a55cc13e",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/light-1.3-reply.png",
+      "sha256": "2e2e14a7f879a3f7528f1b1f328a32a0bb242eb4432d8e9d64ed0027f9cd094c",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.0-end-padding.png",
+      "sha256": "85c8a3b59c9c5b49cb2d28dac633389598e76b2bccbe0144a71fa81ffba278fe",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/light-1.0-end-padding.png",
+      "sha256": "294eed8f96dcc86f3b277a53154ea9e1a7c04ac7e421a55ac7bebea426324e10",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/dark-1.0-end-padding.png",
+      "sha256": "be77325200757a179b562e23539e925a65fc3d0d40cd91c47d6cef9c655736b3",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.3-reply.png",
+      "sha256": "335ee9d65416c9bda7dbd0c01b2b327dd01a7c53a36660aeea7ca19ea0092d82",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/dark-1.0-picker.png",
+      "sha256": "7ca7c4e9933b0b3ca8fba2f9434a0460d0ce9d46315794b44bb4544be8134ed7",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.3-picker.png",
+      "sha256": "bea945ddd89ff864b59e06a6b1e77764e92d9cb0c99cb19528f23fa609335dee",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/dark-1.0-reply.png",
+      "sha256": "dfc0357cdaf3aaf2f0776632d216440b2d1f487b479ad92a22f85f8c26acd879",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/light-1.0-portrait.png",
+      "sha256": "cb9eb11f0fb70e4c55e429e2111c1a40400e387c8550a5976766bb87a5a1ceed",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-360/light-1.3-picker.png",
+      "sha256": "3b57b986b93fb690c38097e0c52f6339069a03beaca8048fb9ef7ae9be5b5a16",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.0-reply.png",
+      "sha256": "3cce80f5adfb8239051511bed48bbc27718fbb786c1593701280fd2b0b9fd916",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/dark-1.3-end-padding.png",
+      "sha256": "53ffe35914b1915da8c6e43d2fa5e1fb2e859447fcf3d2cb72ef8f0718757326",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/light-1.0-picker.png",
+      "sha256": "aeadb26d41424c7aaaa59939d5aae2afc79cede92a56fb2f0309dc1e8b9f46e3",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/dark-1.3-picker.png",
+      "sha256": "dc61adff4d476d8094016fa59e2d8e4766e708486c38a8c0a3d31b2c726d961c",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/dark-1.3-reply.png",
+      "sha256": "74367446bf039b8f0b7f087ab2125893a65fbee0dda2c800a3b57ef133c3b0b7",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/light-1.3-portrait.png",
+      "sha256": "b0204e5cf250a9e0529102494c3aabfd276602b8ebb37bc16f49727edf6afddc",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.0-picker.png",
+      "sha256": "235e995730106492049ad1c4d705f6313fafc84a6301e17f32f10779e718fb77",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.3-end-padding.png",
+      "sha256": "b15e98b2aa9a6024dfee32d8c39e82a6b42576711bc44ba27f3562aedccdb93b",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/light-1.3-end-padding.png",
+      "sha256": "1cf019666ee3962230c9fe5e3ae6368d093db8a611c282f12593c93c97f21843",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.0-portrait.png",
+      "sha256": "a2f6d6c0a113f6a577538f6e26ab381184ff7f5a19359ec383b7cfe9ac27c8e6",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/dark-1.0-portrait.png",
+      "sha256": "ee121a40637a91d5369ca0864a67602f9c92414838dde2ccf26a2e10019e3540",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/light-1.0-reply.png",
+      "sha256": "8362bac92e2258dc4c22b9d405ebecfd5ae2f5b46c95b0d66825733b9b4d3575",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/dark-1.3-portrait.png",
+      "sha256": "a205707ea8a0de89753e1c73fd5db63d33d58628582257975d3984a71ddc1482",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.3-portrait.png",
+      "sha256": "d996c7b560869cd4b2eac66df9c8a478c78e178ef5bfce4eda732ee17239be4c",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/light-1.3-reply.png",
+      "sha256": "359adafadddb932c44bd24352676ad77ea962f31722343cd50637713f18649a7",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.0-end-padding.png",
+      "sha256": "d1ae162d176bce6ecd8077c516592c9b6e695c92e71609cceb01f09b171a32dd",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/light-1.0-end-padding.png",
+      "sha256": "8eee358fcb954c6e8ad50aa4ed6f62ce471b7843fe1489d19bf08a568a9e7ba2",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/dark-1.0-end-padding.png",
+      "sha256": "5bd5e9d4be2b7a32ffb85c5e53cb25109b78c303131a1e85297ffd2b15390e8e",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.3-reply.png",
+      "sha256": "2eb728b21da9cbf3da616bcecffb61252d89341f3cf781fc8e87524c0c231662",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/dark-1.0-picker.png",
+      "sha256": "22e90167fb1c065d49d1810521b9c42f9f1528b32ed095ab098863b8facb5576",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.3-picker.png",
+      "sha256": "ae6acdf6161c784036a503d42286c883147b976219f41a5cc9ae1b4c7c7d57a8",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/dark-1.0-reply.png",
+      "sha256": "9757265b4d05722d75e36d6690133ed8ec29cfc4e01f9493419d517fea52464a",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/light-1.0-portrait.png",
+      "sha256": "9dd1e0f8464588088293d46ebfefd59720a415580147665c7170f525c919d4a3",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    },
+    {
+      "file": "watch/density-400/light-1.3-picker.png",
+      "sha256": "c64c090e8a5fc01af9a5930a3be35e0d7d7231210a1f30a99fbe33ff1f2e80a0",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+    }
+  ]
+}

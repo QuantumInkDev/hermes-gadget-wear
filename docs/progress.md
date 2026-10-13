@@ -1,26 +1,39 @@
 # Progress
 
-## Native design exploration and resumed phone setup — 2026-10-12
+## Native client software acceptance — 2026-10-12
 
-The maintainer reports that the current watch scrolling/controls and recording cues work.
-This closes the hands-on functional observation, not measured audio contamination or battery
-acceptance. GIF artwork is being prepared by the maintainer; the next off-network trial is
-planned separately.
+Portrait studio, original Voice Q, Light/Dark/Electronic Moonlight, phone Profiles/Watch/Settings,
+foreground conversation waveforms, watch picker/portrait recording and Focus/four-profile tiles
+are implemented. Tasks 1–6 and 8 have clean scoped reviews. The full strict check at `328d769`
+passed 116 JVM tests with zero failures/errors/skips and built all four debug/test APKs.
+The final Task 7 production overlay correction also passes the exact strict command with the
+same 116 clean JVM tests and all four APKs. The [native demo](demo/native-clients/README.md) records final visual receipts, focused regression
+checks and exact remaining gates. Prototype approval is historical design evidence only.
 
-Authorized phone setup began through its existing Talk/Chat screen. The displayed M5 Max
-endpoint matched the reviewed private mapping and the normal stock pairing approval CLI
-succeeded. The phone disconnected before Ready/reply verification; that and GPU/ARM phone
-pairing remain open. Existing phone app files were backed up privately before beginning.
-No device identity was copied and no live microphone test was initiated.
+Task 7 software acceptance is complete at `b511dbb`. It closes the deferred narrow/large-font details Close, post-dialog microphone notice,
+second-pointer and ACTION_CANCEL native checks. The prior picker Back/rotary minor was already
+resolved in `3a75fd5`; its existing six theme/font cases remain evidence. Original synthetic
+native captures cover actual layouts and static tile rendering. The physical watch check found
+page dots across the name and a fixed picker over scrolled controls; final acceptance tracks
+these overlay corrections with a native reproduction and the updated checks in the demo.
 
-Native phone/Wear, tile launch and adaptive-icon guidance was researched. The maintainer's
-actual Electronic Moonlight palette was found in Cursor. The [proposed design](superpowers/specs/2026-10-12-native-client-design.md)
-defines three themes, an original geometric mark, a compact phone directory/conversation,
-swipe-first watch navigation with a direct picker and one/four-profile tiles. The [interactive
-preview](design/native-client-preview.html) uses original synthetic portraits; the owner's
-ignored preview substitutes existing round portraits. Prototype rendering/interaction checks
-are design evidence, not native app or physical tile acceptance. Implementation awaits review
-of the concrete design.
+The watch received `328d769` through a matching-signature preserving update: installed APK hash,
+19 identity files and 75 protected baseline files verified; original 15-second timeout retained.
+The phone remains on `b724231`; final native phone/watch delivery and owner visual/voice/tile
+acceptance are still open. All eighteen owner GIFs were previously imported through normal
+selection and independently assigned on watch; no reimport or personal art publication occurred.
+Owner reports on the earlier phone/watch build remain separate from native redesign acceptance.
+
+Actual associated Data Layer tile delivery is unverified (owned AVD API_UNAVAILABLE). The OS
+power-saver recording case is a capability skip; reduced-motion static output is verified.
+Physical speech/haptic strength/mic contamination, away reply/sleep receipt, tile addition and
+each portrait launch, Light/GIF power and quantitative audio/battery tests remain open. Server
+logs prove historical replies were generated, not received on the watch. Whole-branch review,
+final preserving delivery and draft-PR publication are controller-owned gates.
+
+Demo note: use the native gallery to compare three appearances, large phone text with the IME,
+watch portrait/picker/reply and static Focus/grid. The owned emulator verifies behavior without
+contacting personal servers or changing physical setup.
 
 ## Client usability follow-up — 2026-10-12
 
@@ -521,9 +534,9 @@ pass. Physical devices retain the previous preserving debug build; no server ext
 power helper, release signature, merge or Play publication was performed.
 
 
-Native directory checkpoint — 2026-10-12: Task1 review findings are resolved in838351c,
+Native directory checkpoint — 2026-10-12: Task 1 review findings are resolved in838351c,
 with14 affected native tests, strict affected checks and debug-only host release exclusion.
-Scoped re-review is clean. Task2 portrait rows, box groups, accessible options and native
+Scoped re-review is clean. Task 2 portrait rows, box groups, accessible options and native
 brand/navigation are committed0696683. Nineteen native and13 mobile JVM checks pass; the
 final directory rerun passes11 cases. Actual320dp/font1.8 native menu/details/vertical
 reachability checks pass with system settings restored. Scoped review is running; physical

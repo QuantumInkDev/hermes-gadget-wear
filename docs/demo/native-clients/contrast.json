@@ -1,0 +1,1087 @@
+{
+  "method": "WCAG relative luminance of explicit native semantic tokens; native adapter tests separately verify resolved color roles. Disabled decorative controls are not claimed as enabled text. Screenshots separately reviewed for clipping, IME and dialog visibility.",
+  "source": "client/src/main/kotlin/dev/quantumink/hermesgadget/client/Appearance.kt",
+  "source_sha256": "2c3a644168ecff809c20fcb0d4194c70a2d0e6d41037689d137b606f1f51965a",
+  "relationships": [
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "text",
+      "background": "background",
+      "ratio": 14.166,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "text",
+      "background": "surface",
+      "ratio": 15.034,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "text",
+      "background": "surfaceLow",
+      "ratio": 14.166,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "text",
+      "background": "surfaceHigh",
+      "ratio": 13.187,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "text",
+      "background": "surfaceHighest",
+      "ratio": 12.259,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "secondaryText",
+      "background": "background",
+      "ratio": 6.125,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "secondaryText",
+      "background": "surface",
+      "ratio": 6.501,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "secondaryText",
+      "background": "surfaceLow",
+      "ratio": 6.125,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "secondaryText",
+      "background": "surfaceHigh",
+      "ratio": 5.702,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "secondaryText",
+      "background": "surfaceHighest",
+      "ratio": 5.301,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "onAccent",
+      "background": "accent",
+      "ratio": 5.806,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "onSupportingAccent",
+      "background": "supportingAccent",
+      "ratio": 5.981,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "onAccentContainer",
+      "background": "accentContainer",
+      "ratio": 12.591,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "onError",
+      "background": "error",
+      "ratio": 6.536,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "onErrorContainer",
+      "background": "errorContainer",
+      "ratio": 12.775,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "inverseText",
+      "background": "inverseSurface",
+      "ratio": 15.034,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "outline",
+      "background": "background",
+      "ratio": 4.483,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "outline",
+      "background": "surface",
+      "ratio": 4.758,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "outline",
+      "background": "surfaceHigh",
+      "ratio": 4.173,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "LIGHT",
+      "foreground": "outline",
+      "background": "surfaceHighest",
+      "ratio": 3.88,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "text",
+      "background": "background",
+      "ratio": 14.166,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "text",
+      "background": "surface",
+      "ratio": 15.034,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "text",
+      "background": "surfaceLow",
+      "ratio": 14.166,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "text",
+      "background": "surfaceHigh",
+      "ratio": 13.187,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "text",
+      "background": "surfaceHighest",
+      "ratio": 12.259,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "secondaryText",
+      "background": "background",
+      "ratio": 6.125,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "secondaryText",
+      "background": "surface",
+      "ratio": 6.501,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "secondaryText",
+      "background": "surfaceLow",
+      "ratio": 6.125,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "secondaryText",
+      "background": "surfaceHigh",
+      "ratio": 5.702,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "secondaryText",
+      "background": "surfaceHighest",
+      "ratio": 5.301,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "onAccent",
+      "background": "accent",
+      "ratio": 5.806,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "onSupportingAccent",
+      "background": "supportingAccent",
+      "ratio": 5.981,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "onAccentContainer",
+      "background": "accentContainer",
+      "ratio": 12.591,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "onError",
+      "background": "error",
+      "ratio": 6.536,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "onErrorContainer",
+      "background": "errorContainer",
+      "ratio": 12.775,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "inverseText",
+      "background": "inverseSurface",
+      "ratio": 15.034,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "outline",
+      "background": "background",
+      "ratio": 4.483,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "outline",
+      "background": "surface",
+      "ratio": 4.758,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "outline",
+      "background": "surfaceHigh",
+      "ratio": 4.173,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "LIGHT",
+      "foreground": "outline",
+      "background": "surfaceHighest",
+      "ratio": 3.88,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "text",
+      "background": "background",
+      "ratio": 16.277,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "text",
+      "background": "surface",
+      "ratio": 14.446,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "text",
+      "background": "surfaceLow",
+      "ratio": 15.309,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "text",
+      "background": "surfaceHigh",
+      "ratio": 12.376,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "text",
+      "background": "surfaceHighest",
+      "ratio": 10.77,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "secondaryText",
+      "background": "background",
+      "ratio": 9.312,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "secondaryText",
+      "background": "surface",
+      "ratio": 8.265,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "secondaryText",
+      "background": "surfaceLow",
+      "ratio": 8.759,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "secondaryText",
+      "background": "surfaceHigh",
+      "ratio": 7.081,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "secondaryText",
+      "background": "surfaceHighest",
+      "ratio": 6.162,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "onAccent",
+      "background": "accent",
+      "ratio": 9.999,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "onSupportingAccent",
+      "background": "supportingAccent",
+      "ratio": 9.632,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "onAccentContainer",
+      "background": "accentContainer",
+      "ratio": 9.937,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "onError",
+      "background": "error",
+      "ratio": 9.57,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "onErrorContainer",
+      "background": "errorContainer",
+      "ratio": 8.294,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "inverseText",
+      "background": "inverseSurface",
+      "ratio": 12.591,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "outline",
+      "background": "background",
+      "ratio": 6.035,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "outline",
+      "background": "surface",
+      "ratio": 5.356,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "outline",
+      "background": "surfaceHigh",
+      "ratio": 4.589,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "DARK",
+      "foreground": "outline",
+      "background": "surfaceHighest",
+      "ratio": 3.993,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "text",
+      "background": "background",
+      "ratio": 17.587,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "text",
+      "background": "surface",
+      "ratio": 14.446,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "text",
+      "background": "surfaceLow",
+      "ratio": 15.309,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "text",
+      "background": "surfaceHigh",
+      "ratio": 12.376,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "text",
+      "background": "surfaceHighest",
+      "ratio": 10.77,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "secondaryText",
+      "background": "background",
+      "ratio": 10.062,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "secondaryText",
+      "background": "surface",
+      "ratio": 8.265,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "secondaryText",
+      "background": "surfaceLow",
+      "ratio": 8.759,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "secondaryText",
+      "background": "surfaceHigh",
+      "ratio": 7.081,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "secondaryText",
+      "background": "surfaceHighest",
+      "ratio": 6.162,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "onAccent",
+      "background": "accent",
+      "ratio": 9.999,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "onSupportingAccent",
+      "background": "supportingAccent",
+      "ratio": 9.632,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "onAccentContainer",
+      "background": "accentContainer",
+      "ratio": 9.937,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "onError",
+      "background": "error",
+      "ratio": 9.57,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "onErrorContainer",
+      "background": "errorContainer",
+      "ratio": 8.294,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "inverseText",
+      "background": "inverseSurface",
+      "ratio": 12.591,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "outline",
+      "background": "background",
+      "ratio": 6.521,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "outline",
+      "background": "surface",
+      "ratio": 5.356,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "outline",
+      "background": "surfaceHigh",
+      "ratio": 4.589,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "DARK",
+      "foreground": "outline",
+      "background": "surfaceHighest",
+      "ratio": 3.993,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "text",
+      "background": "background",
+      "ratio": 10.902,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "text",
+      "background": "surface",
+      "ratio": 9.592,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "text",
+      "background": "surfaceLow",
+      "ratio": 10.23,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "text",
+      "background": "surfaceHigh",
+      "ratio": 8.432,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "text",
+      "background": "surfaceHighest",
+      "ratio": 7.376,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "secondaryText",
+      "background": "background",
+      "ratio": 8.063,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "secondaryText",
+      "background": "surface",
+      "ratio": 7.094,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "secondaryText",
+      "background": "surfaceLow",
+      "ratio": 7.566,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "secondaryText",
+      "background": "surfaceHigh",
+      "ratio": 6.236,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "secondaryText",
+      "background": "surfaceHighest",
+      "ratio": 5.455,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "onAccent",
+      "background": "accent",
+      "ratio": 7.073,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "onSupportingAccent",
+      "background": "supportingAccent",
+      "ratio": 10.978,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "onAccentContainer",
+      "background": "accentContainer",
+      "ratio": 6.41,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "onError",
+      "background": "error",
+      "ratio": 9.57,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "onErrorContainer",
+      "background": "errorContainer",
+      "ratio": 8.294,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "inverseText",
+      "background": "inverseSurface",
+      "ratio": 10.902,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "outline",
+      "background": "background",
+      "ratio": 5.583,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "outline",
+      "background": "surface",
+      "ratio": 4.912,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "outline",
+      "background": "surfaceHigh",
+      "ratio": 4.318,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "phone",
+      "appearance": "MOONLIGHT",
+      "foreground": "outline",
+      "background": "surfaceHighest",
+      "ratio": 3.777,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "text",
+      "background": "background",
+      "ratio": 14.092,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "text",
+      "background": "surface",
+      "ratio": 9.592,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "text",
+      "background": "surfaceLow",
+      "ratio": 10.23,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "text",
+      "background": "surfaceHigh",
+      "ratio": 8.432,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "text",
+      "background": "surfaceHighest",
+      "ratio": 7.376,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "secondaryText",
+      "background": "background",
+      "ratio": 10.422,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "secondaryText",
+      "background": "surface",
+      "ratio": 7.094,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "secondaryText",
+      "background": "surfaceLow",
+      "ratio": 7.566,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "secondaryText",
+      "background": "surfaceHigh",
+      "ratio": 6.236,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "secondaryText",
+      "background": "surfaceHighest",
+      "ratio": 5.455,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "onAccent",
+      "background": "accent",
+      "ratio": 7.073,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "onSupportingAccent",
+      "background": "supportingAccent",
+      "ratio": 10.978,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "onAccentContainer",
+      "background": "accentContainer",
+      "ratio": 6.41,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "onError",
+      "background": "error",
+      "ratio": 9.57,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "onErrorContainer",
+      "background": "errorContainer",
+      "ratio": 8.294,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "inverseText",
+      "background": "inverseSurface",
+      "ratio": 10.902,
+      "target": 4.5,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "outline",
+      "background": "background",
+      "ratio": 7.216,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "outline",
+      "background": "surface",
+      "ratio": 4.912,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "outline",
+      "background": "surfaceHigh",
+      "ratio": 4.318,
+      "target": 3.0,
+      "passed": true
+    },
+    {
+      "device": "watch",
+      "appearance": "MOONLIGHT",
+      "foreground": "outline",
+      "background": "surfaceHighest",
+      "ratio": 3.777,
+      "target": 3.0,
+      "passed": true
+    }
+  ]
+}

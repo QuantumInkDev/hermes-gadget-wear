@@ -1,16 +1,47 @@
 # Architecture
 
-Approved extension (2026-10-11): [multi-box profile carousel](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md).
+Implemented baseline (2026-10-11): [multi-box profile carousel](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md).
 The phone merges independently refreshed read-only catalogs and synchronizes bounded
 portrait/status metadata; the watch retains separate TLS Gadget identities/connections.
 Catalog, swipe pages and ambient-safe review development are approved. No new live
 server installation or multiplexed routing is implied.
 
+## Native client implementation — 2026-10-12
+
+`client/Appearance` defines explicit semantic palettes; native phone/Wear adapters and
+independent device preferences apply them without wallpaper overrides. Phone presentation
+surfaces retain the existing repositories, independent phone identity vault, foreground
+conversation controller and secure production window. Waveform levels come from actual
+capture/playback and reset on cancel/stop/background/profile changes; no animation samples
+are stored. Screenshot hosts are non-exported, debug-only, synthetic fixtures.
+
+`WatchNavigation` retains stable page keys, drafts and TransformingLazyColumn state. Picker
+Back restores rotary focus without remounting the conversation. `recordingPortrait` owns only
+the artwork hold after touch slop/long-press checks. Multi-pointer interruption, ACTION_CANCEL
+and disposal cancel owned capture; actual capture state drives rings, not touch-down.
+`ConversationScreenLease` uses elapsed realtime and a two-minute foreground-turn cap for
+FLAG_KEEP_SCREEN_ON. It never renews from meter/status updates or acquires a wake lock.
+
+`TilePinStore` atomically persists Focus, four deduplicated slots, monotonic revision and
+accepted request receipts. Field-specific local mutations preserve simultaneous phone edits.
+Phone configuration items carry stable keys, base revision and request ID across the existing
+associated Data Layer boundary. Stale edits return the current watch state; duplicate requests
+return their original acknowledgement. Pending/offline delivery is visible on the phone.
+`ProfileTileSnapshot` supplies bounded static resources; `ProfileTileLayout` renders one/four
+local shortcuts without network/audio work. `TileProfileLaunch` validates only stable keys,
+handles cold/warm binding, and visibly defers locked selection. Ambient takes precedence over
+all pending/unavailable launch routes. The existing Focus service component is preserved.
+
+See the [native acceptance record](demo/native-clients/README.md). Emulator transport returned
+Wearable.API API_UNAVAILABLE: reducer/store/native-editor proofs do not establish associated
+phone/watch delivery. The OS power-saver ring case is explicitly capability-skipped; reduced
+motion is verified. Physical speech, sleep/reply receipt, tile addition and power cost remain open.
+
 ## Verified sources
 
 SDK `v0.2.0` resolves to commit `323e3303ab68981f810fc3208119cd8a22e64af0`. Read in full: [protocol](https://github.com/Adolanium/hermes-gadget-sdk/blob/323e3303ab68981f810fc3208119cd8a22e64af0/docs/protocol.md), [Hermes integration](https://github.com/Adolanium/hermes-gadget-sdk/blob/323e3303ab68981f810fc3208119cd8a22e64af0/docs/hermes-integration.md), architecture, porting, faces, and tailscale-funnel in the same snapshot. Also reviewed the Linux client, simulator transport/conversation, devserver, Python protocol helpers/tests, firmware vectors, and hub handshake/audio routes. Pet evidence is pinned separately in [pets](pets.md).
 
-Corrections to the brief: `linux/client.py` now hosts the native C++ core through `NativeDevice`; it is not an independent pure-protocol client. Kotlin will implement the documented wire contract, using the Python protocol helpers and firmware vectors as the oracle. The stock adapter can auto-confirm a deliberate `session.new` within its confirmation window. Streaming `reply.delta.text` is cumulative.
+Corrections to the brief: `linux/client.py` now hosts the native C++ core through `NativeDevice`; it is not an independent pure-protocol client. Kotlin implements the documented wire contract, using the Python protocol helpers and firmware vectors as the oracle. The stock adapter can auto-confirm a deliberate `session.new` within its confirmation window. Streaming `reply.delta.text` is cumulative.
 
 ## Modules and boundaries
 
@@ -183,13 +214,13 @@ provide. Document the wire and migration questions; implementation and outreach 
 an explicit maintainer decision and upstream feedback. Real multiplexed behavior cannot be
 claimed from independent v1 endpoints or unit tests.
 
-## M8 design plan
+## Historical M8 design baseline
 
 Tile and short-text complication expose a local snapshot and launch the app; they never
 open sockets, start a microphone or synthesize speech in the background. Connection/pet
-state is process-local and becomes Offline after process death. An encrypted, bounded
-120-character last-reply excerpt survives process death for the active endpoint's Tile;
-it is isolated on profile switch and cleared by whole reset. A complication
+state is process-local and becomes Offline after process death. The original M8 tile used an
+encrypted, bounded 120-character last-reply snapshot, isolated on profile switch and cleared
+by whole reset. The native Focus/grid design supersedes that tile presentation. A complication
 shares only generic state with the selected watch face, never reply text, URLs or keys.
 Update on meaningful state changes with throttling; no periodic network polling.
 

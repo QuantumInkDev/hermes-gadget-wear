@@ -5,6 +5,34 @@ the watch or create conversation listeners. Each stock Gadget v0.2.0 profile nee
 listener, certificate-valid `wss` URL and pairing approval. A box that is off the network
 keeps its cached page and picture; the app does not move its conversation to another box.
 
+## Navigate and choose appearance
+
+Profiles contains the searchable directory. Tap a box header to collapse it; use Directory
+options for Refresh, Reorder, Manage boxes or Manual setup. Tap a profile row for Talk/Chat;
+its separate options contain Endpoint details and Watch picture. Settings → Appearance offers
+Light, Dark and Electronic Moonlight. Choose appearance separately on phone and watch.
+
+On the watch, swipe horizontally between profiles or open Choose a profile. Vertical scrolling
+reveals replies and controls; returning to a page preserves its position and draft. Hold the
+portrait to talk, release to send, or drag down to cancel. The visible mic and accessible
+Start/Finish action remain available without scrolling. Recording rings indicate actual capture;
+reduced motion uses a static outline. The foreground screen-on allowance ends with the turn or
+after two minutes. It does not guarantee delivery while disconnected or fix historical away replies.
+
+## Configure Focus and Pinned profiles tiles
+
+On the phone, open Watch → Edit profile tiles. Choose one Focus profile and up to four ordered
+Pinned profiles slots, then Save to watch. Offline delivery remains pending; Retry delivery
+resubmits it. If the watch changed meanwhile, review the current watch choices before reapplying
+or keeping the watch version. The watch picker also offers per-profile pin editing while idle.
+
+Add Focus or Pinned profiles through the watch system tile carousel. The app cannot place them
+automatically. Each tile shows static local art, including an offline profile's cached picture;
+GIFs never animate there. Empty slots offer setup. Removed pins stay unavailable until replaced.
+Tap a portrait to open that exact profile, then deliberately hold to record. A busy conversation
+or approval defers a different selection visibly. Physical launcher addition and associated
+phone/watch synchronization remain acceptance gates for this native design.
+
 ## What each box needs
 
 | Item | Once per box | Once per profile |

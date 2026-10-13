@@ -1,0 +1,122 @@
+{
+  "status": "software acceptance complete; controller review and physical gates remain open",
+  "production_file": "wear/src/main/kotlin/dev/quantumink/hermesgadget/wear/ProfileCarousel.kt",
+  "production_sha256": "3c6e049b94db96867d9d576b7f556b3cae0f852ce4ea56f35b0087307ff31eae",
+  "full_strict": {
+    "command": "./gradlew ktlintFormat check :mobile:assembleDebug :wear:assembleDebug :mobile:assembleDebugAndroidTest :wear:assembleDebugAndroidTest --warning-mode=fail --max-workers=4",
+    "result": "BUILD SUCCESSFUL",
+    "tasks": 214,
+    "seconds": 7,
+    "jvm_tests": 116,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "receipt": "task-7-full-strict-final.log",
+    "sha256": "52cfad931224a5f8c5d07b0d761a261e1dbc1b130567798e5620301f93dc2f0d"
+  },
+  "native_checks": [
+    {
+      "receipt": "task-7-permission.log",
+      "tests": 1,
+      "seconds": 2.272,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "edefa9c5931560207ac62f14adc012d9468af55b2377c570fe52e4f2b7a151f3"
+    },
+    {
+      "receipt": "task-7-directory-large.log",
+      "tests": 1,
+      "seconds": 8.025,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "b9e310d100331ac1c13ccae234458e0ce307fba76fcdd90960b5f2cf23ec3ef3"
+    },
+    {
+      "receipt": "task-7-phone-final-layout.log",
+      "tests": 1,
+      "seconds": 19.983,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "e2d6781134791ad02a911080612e3fcbc8313430b815870385be3fd8712d3655"
+    },
+    {
+      "receipt": "task-7-phone-final-large.log",
+      "tests": 1,
+      "seconds": 19.178,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "360b5fd41c9f6b6f009573ff997f9f04f445748941d53ff725970aa5a0ac4a92"
+    },
+    {
+      "receipt": "task-7-layout-340.log",
+      "tests": 1,
+      "seconds": 45.722,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "9ad4b58048ddc78dea6e5a43d1ecb14c09f85725598363b91fe5ca1a4a040440"
+    },
+    {
+      "receipt": "task-7-layout-360.log",
+      "tests": 1,
+      "seconds": 50.967,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "c8bb5af3d0c04c4767f51110a6d98284bb8ee2055588a713a11305da632c3a56"
+    },
+    {
+      "receipt": "task-7-layout-400.log",
+      "tests": 1,
+      "seconds": 58.752,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "87056dee20a930bbdcd006910b40f83bfb076d77052db5a645bbd3ef455ad8c9"
+    },
+    {
+      "receipt": "task-7-native-final.log",
+      "tests": 7,
+      "seconds": 97.8,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "2d6f6dc61e6df4287977d9528c86dcacec820d9b3188c3956772cf00fe8f4dff"
+    },
+    {
+      "receipt": "task-7-carousel-final.log",
+      "tests": 2,
+      "passed": 1,
+      "seconds": 7.742,
+      "failures": 0,
+      "skips": 1,
+      "note": "Vertical passes; second case safely assumption-skipped because first case created enrollment. Rerun isolated below.",
+      "sha256": "5c4c8c9529f1c378357679de740b9e0c697d6a2a51896e24ea08506a0faae1b9"
+    },
+    {
+      "receipt": "task-7-carousel-horizontal-final.log",
+      "tests": 1,
+      "passed": 1,
+      "seconds": 16.825,
+      "failures": 0,
+      "skips": 0,
+      "note": "Horizontal/draft/recording/approval/rotary regression passes after guarded owned-emulator reset.",
+      "sha256": "fff30c1dbc16fc2129465a4ff8b1b8180de9251dbfa125a1cee2b788ba58a2fe"
+    }
+  ],
+  "contrast_relationships": 120,
+  "limits": [
+    "OS power-saver native case is capability-skipped; reduced motion passes.",
+    "Associated Data Layer transport gate remains open after Wearable.API API_UNAVAILABLE.",
+    "Whole-branch review, final preserving physical delivery, physical tiles/voice/away replies and quantitative battery remain open."
+  ],
+  "reused_evidence": [
+    "Task 1 native palettes/appearance persistence/security and chooser images",
+    "Task 2 unchanged directory/large details images with strengthened Task 7 Close check",
+    "Task 4 original ambient rendering, Task 5 actual activity unavailable-route ambient sleep/wake fix",
+    "Task 6 native phone tile composer and atomic concurrent edit synchronization receipts",
+    "Task 8 approved actual GIF/ring/large-font/reduced-motion captures and delayed stock 20-second reply receipt"
+  ],
+  "implementation_commit": "b511dbb3eb518acd837211689d5af6d9ac127675",
+  "native_passed_executions": 16,
+  "native_distinct_passing_methods": 13,
+  "native_guard_skip_resolved_by_isolated_rerun": 1,
+  "watch_visual_scenarios": 18,
+  "assets": 173
+}
