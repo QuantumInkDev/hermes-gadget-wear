@@ -16,14 +16,14 @@ enum class Cue { START, FINISH, CANCEL }
 enum class WatchTick { PRIMITIVE, AMPLITUDE, EFFECT, DEFAULT }
 
 object WatchRecordingHaptic {
-    const val SCALE = 0.15f
-    const val PULSE_MILLIS = 8L
-    const val AMPLITUDE = 32
-    const val FALLBACK_MILLIS = 6L
+    const val SCALE = 0.5f
+    const val PULSE_MILLIS = 20L
+    const val AMPLITUDE = 96
+    const val FALLBACK_MILLIS = 16L
     fun select(primitive: Boolean, amplitude: Boolean, effect: Boolean): WatchTick = when {
+        effect -> WatchTick.EFFECT
         primitive -> WatchTick.PRIMITIVE
         amplitude -> WatchTick.AMPLITUDE
-        effect -> WatchTick.EFFECT
         else -> WatchTick.DEFAULT
     }
 }

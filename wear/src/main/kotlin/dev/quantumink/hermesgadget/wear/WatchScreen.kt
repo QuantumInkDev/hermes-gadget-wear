@@ -286,7 +286,7 @@ fun WatchScreen(
                 imported = false
                 route = "setup"
             }
-        ) { page, pageScroll, _ ->
+        ) { page, pageScroll, jump ->
             key(page.key, watch.connection.conversation.prompt?.id) {
                 ConversationPage(
                     watch,
@@ -308,7 +308,8 @@ fun WatchScreen(
                     },
                     appearance = ::openAppearance,
                     page = page,
-                    pageScroll = pageScroll
+                    pageScroll = pageScroll,
+                    jump = jump
                 )
             }
         }
@@ -507,7 +508,8 @@ internal fun ConversationPage(
     profiles: () -> Unit,
     appearance: () -> Unit,
     page: ProfilePage,
-    pageScroll: TransformingLazyColumnState
+    pageScroll: TransformingLazyColumnState,
+    jump: @Composable () -> Unit = {}
 ) {
     val connection = watch.connection
     val conversation = connection.conversation
@@ -577,23 +579,7 @@ internal fun ConversationPage(
                             startRecording,
                             service::finishRecording,
                             service::cancelRecording
-                        ),
-                        recordingHint = if (paired &&
-                            page.status ==
-                            dev.quantumink.hermesgadget.protocol.CatalogStatus.AVAILABLE
-                        ) {
-                            if (conversation.mode ==
-                                ConversationMode.LISTENING
-                            ) {
-                                stringResource(R.string.release_send)
-                            } else if (!conversation.busy) {
-                                stringResource(R.string.hold_talk)
-                            } else {
-                                ""
-                            }
-                        } else {
-                            ""
-                        }
+                        )
                     )
                     Text(
                         when {
@@ -717,6 +703,7 @@ internal fun ConversationPage(
                         conversation.mode != ConversationMode.LISTENING
                 )
             }
+            item { jump() }
         }
     }
 }

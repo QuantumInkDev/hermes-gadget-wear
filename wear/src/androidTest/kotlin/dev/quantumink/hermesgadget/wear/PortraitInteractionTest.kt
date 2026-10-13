@@ -184,7 +184,7 @@ class PortraitInteractionTest {
                 assertTrue(
                     nodes().any {
                         it.isVisibleToUser &&
-                            it.contentDescription?.toString()?.contains("Release to send") == true
+                            it.contentDescription?.toString()?.contains("Finish recording") == true
                     }
                 )
                 capture("recording-${appearance.name.lowercase()}-large-font")
@@ -340,8 +340,7 @@ class PortraitInteractionTest {
             }, {
                 f.events.add("cancel")
                 f.recording.value = false
-            }),
-            if (f.recording.value) "Release to send" else "Hold to talk"
+            })
         )
     }
 
@@ -430,7 +429,7 @@ class PortraitInteractionTest {
         val observed = mutableSetOf<Int>()
         repeat(50) {
             // Known 160dp image at28dp top inset, plus4dp internal vertical centering.
-            // Sample an8x8 source-pixel interior, away from mic affordance and outer rings.
+            // Sample an8x8 source-pixel interior, away from the outer rings.
             automation.takeScreenshot()?.let { bitmap ->
                 val pixel = bitmap.getPixel(bitmap.width * 3 / 8, bitmap.height * 41 / 120)
                 if (pixel in expected) observed.add(pixel)

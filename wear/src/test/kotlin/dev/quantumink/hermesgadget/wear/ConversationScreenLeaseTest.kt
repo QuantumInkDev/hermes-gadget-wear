@@ -14,14 +14,12 @@ class ConversationScreenLeaseTest {
         assertEquals(120000L, ConversationScreenLease.remaining(120501, 120501))
     }
 
-    @Test fun lightTickSelectsOnlySupportedCapabilitiesInOrder() {
-        assertEquals(WatchTick.PRIMITIVE, WatchRecordingHaptic.select(true, true, true))
-        assertEquals(WatchTick.AMPLITUDE, WatchRecordingHaptic.select(false, true, true))
+    @Test fun recordingUsesDeviceTunedTickBeforeAttenuatedFallbacks() {
+        assertEquals(WatchTick.EFFECT, WatchRecordingHaptic.select(true, true, true))
+        assertEquals(WatchTick.EFFECT, WatchRecordingHaptic.select(false, true, true))
         assertEquals(WatchTick.EFFECT, WatchRecordingHaptic.select(false, false, true))
+        assertEquals(WatchTick.PRIMITIVE, WatchRecordingHaptic.select(true, true, false))
+        assertEquals(WatchTick.AMPLITUDE, WatchRecordingHaptic.select(false, true, false))
         assertEquals(WatchTick.DEFAULT, WatchRecordingHaptic.select(false, false, false))
-        assertEquals(0.15f, WatchRecordingHaptic.SCALE)
-        assertEquals(8L, WatchRecordingHaptic.PULSE_MILLIS)
-        assertEquals(32, WatchRecordingHaptic.AMPLITUDE)
-        assertEquals(6L, WatchRecordingHaptic.FALLBACK_MILLIS)
     }
 }

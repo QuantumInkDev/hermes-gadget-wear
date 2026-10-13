@@ -112,7 +112,7 @@ class WatchPickerSurfaceTest {
                         ) {
                             ProfileCarousel(watch.value, navigation, service, connect = {
                                 error("Must not connect")
-                            }, review = {}) { page, scroll, _ ->
+                            }, review = {}) { page, scroll, jump ->
                                 DisposableEffect(Unit) {
                                     mounts++
                                     onDispose { disposals++ }
@@ -123,7 +123,7 @@ class WatchPickerSurfaceTest {
                                         error("Must not connect")
                                     }, startRecording = { error("Must not record") },
                                     settings = {}, type = {}, profiles = {}, appearance = {},
-                                    page = page, pageScroll = scroll
+                                    page = page, pageScroll = scroll, jump = jump
                                 )
                             }
                         }
@@ -131,7 +131,7 @@ class WatchPickerSurfaceTest {
                 }
             }
         }
-        node("Choose a profile", scroll = false)
+        assertClearPortrait()
         assertEquals(1, mounts)
         for (theme in Appearance.entries) {
             for (font in listOf(1f, 1.3f)) {
@@ -149,7 +149,7 @@ class WatchPickerSurfaceTest {
                 }
                 instrumentation.uiAutomation.waitForIdle(200, 3000)
                 SystemClock.sleep(250)
-                assertRoundPickerBounds()
+                assertClearPortrait()
                 assertTrue(
                     "Initial clock must be present",
                     nodes().any {
@@ -167,6 +167,13 @@ class WatchPickerSurfaceTest {
                 )
                 assertNoIndicatorTextOverlap()
                 capture("${theme.name}-$font-portrait")
+                runBlocking {
+                    withContext(Dispatchers.Main) {
+                        scroll.scrollToItem(scroll.layoutInfo.totalItemsCount - 1)
+                    }
+                }
+                instrumentation.uiAutomation.waitForIdle(200, 3000)
+                assertRoundPickerBounds()
                 click("Choose a profile")
                 capture("${theme.name}-$font-picker")
                 instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
@@ -698,6 +705,20 @@ class WatchPickerSurfaceTest {
             for (y in listOf(bounds.top, bounds.bottom)) {
                 assertTrue((x - cx) * (x - cx) + (y - cy) * (y - cy) <= radius * radius)
             }
+        }
+    }
+
+    private fun assertClearPortrait() {
+        val portrait = node("Start recording", scroll = false)
+        val bounds = android.graphics.Rect().also(portrait::getBoundsInScreen)
+        nodes().filter {
+            it.isVisibleToUser && it.contentDescription?.toString() == "Choose a profile"
+        }.forEach { control ->
+            val controlBounds = android.graphics.Rect().also(control::getBoundsInScreen)
+            assertTrue(
+                "The jump menu must never overlap the portrait: $bounds / $controlBounds",
+                !android.graphics.Rect.intersects(bounds, controlBounds)
+            )
         }
     }
 

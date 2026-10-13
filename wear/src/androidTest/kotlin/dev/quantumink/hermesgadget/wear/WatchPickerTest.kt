@@ -221,15 +221,37 @@ class WatchPickerTest {
     }
 
     private fun tapRoundPicker() {
-        val target = node("Choose a profile", scroll = false)
-        val bounds = android.graphics.Rect().also(target::getBoundsInScreen)
         val display = context.resources.displayMetrics
         val minimum = 48 * display.density
-        assertTrue("Full 48dp picker width", bounds.width() >= minimum - 1)
-        assertTrue("Full 48dp picker height", bounds.height() >= minimum - 1)
+        var target = node("Choose a profile")
+        target.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.id)
+        instrumentation.uiAutomation.waitForIdle(200, 3000)
+        SystemClock.sleep(250)
+        var bounds = android.graphics.Rect().also(target::getBoundsInScreen)
         val cx = display.widthPixels / 2f
         val cy = display.heightPixels / 2f
         val radius = minOf(cx, cy)
+        fun insideRound(): Boolean = listOf(bounds.left, bounds.right).all { x ->
+            listOf(bounds.top, bounds.bottom).all { y ->
+                (x - cx) * (x - cx) + (y - cy) * (y - cy) <= radius * radius
+            }
+        }
+        repeat(8) {
+            target = node("Choose a profile", scroll = false)
+            bounds = android.graphics.Rect().also(target::getBoundsInScreen)
+            if (bounds.height() < minimum - 1 || !insideRound()) {
+                scrollPicker()
+                instrumentation.uiAutomation.waitForIdle(200, 3000)
+            }
+        }
+        instrumentation.uiAutomation.waitForIdle(200, 3000)
+        SystemClock.sleep(300)
+        bounds =
+            android.graphics.Rect().also(
+                node("Choose a profile", scroll = false)::getBoundsInScreen
+            )
+        assertTrue("Full 48dp picker width", bounds.width() >= minimum - 1)
+        assertTrue("Full 48dp picker height", bounds.height() >= minimum - 1)
         for (x in listOf(bounds.left, bounds.right)) {
             for (y in listOf(bounds.top, bounds.bottom)) {
                 val distance = (x - cx) * (x - cx) + (y - cy) * (y - cy)

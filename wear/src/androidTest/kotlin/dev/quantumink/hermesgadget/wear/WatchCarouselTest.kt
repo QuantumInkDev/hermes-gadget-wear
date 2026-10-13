@@ -461,7 +461,7 @@ class WatchCarouselTest {
                 beforeRotary != afterRotary
             }
             assertEquals(urls[1], service.state.value.profile?.endpoint?.url)
-            val chooser = scrollTo(backward = true) {
+            val chooser = scrollTo(backward = false) {
                 it.contentDescription?.toString() == "Choose a profile"
             }
             var actionNode: AccessibilityNodeInfo? = chooser

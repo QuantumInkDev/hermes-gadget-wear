@@ -3,18 +3,17 @@ package dev.quantumink.hermesgadget.wear
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -24,10 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
@@ -139,12 +134,22 @@ fun ProfileCarousel(
     Box(
         Modifier.fillMaxSize().semantics {
             stateDescription = "Profile ${position + 1} of ${pages.size}"
-            customActions = listOf(
-                CustomAccessibilityAction("Choose a profile") {
-                    navigation.pickerOpen.value = true
-                    true
+            customActions = buildList {
+                add(
+                    CustomAccessibilityAction("Choose a profile") {
+                        navigation.pickerOpen.value = true
+                        true
+                    }
+                )
+                if (!locked) {
+                    pages.getOrNull(position - 1)?.let { previous ->
+                        add(CustomAccessibilityAction("Previous profile") { select(previous.key) })
+                    }
+                    pages.getOrNull(position + 1)?.let { next ->
+                        add(CustomAccessibilityAction("Next profile") { select(next.key) })
+                    }
                 }
-            )
+            }
         }
     ) {
         HorizontalPager(state = pager, key = {
@@ -158,7 +163,7 @@ fun ProfileCarousel(
             val controls: @Composable () -> Unit = {
                 FilledTonalButton(
                     onClick = { navigation.pickerOpen.value = true },
-                    modifier = Modifier.size(48.dp).semantics {
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics {
                         contentDescription = "Choose a profile"
                         stateDescription = "${page.label} · Profile ${index + 1} of ${pages.size}"
                         customActions = if (locked) {
@@ -182,7 +187,7 @@ fun ProfileCarousel(
                             }
                         }
                     }
-                ) { Text("≡", style = MaterialTheme.typography.titleLarge) }
+                ) { Text("Jump to profile", textAlign = TextAlign.Center) }
             }
             Box(
                 Modifier.fillMaxSize().hierarchicalFocusGroup(
@@ -233,6 +238,7 @@ fun ProfileCarousel(
                                 Body(watch.catalogNotice, muted = true)
                             }
                         }
+                        item { controls() }
                     }
                 } else {
                     // Neighbors are static previews without rotary focus or a Gadget session.
@@ -242,14 +248,6 @@ fun ProfileCarousel(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         ProfileIdentity(page, watch.artwork[page.key], WatchState(), false)
-                    }
-                }
-                val firstItem = pageScroll.layoutInfo.visibleItems.firstOrNull { it.index == 0 }
-                val portraitAtTop = firstItem != null &&
-                    firstItem.offset >= with(density) { 28.dp.roundToPx() }
-                if (selected && portraitAtTop && watch.connection.conversation.prompt == null) {
-                    Box(Modifier.align(Alignment.BottomEnd).padding(end = 40.dp, bottom = 40.dp)) {
-                        controls()
                     }
                 }
             }
@@ -287,8 +285,7 @@ fun ProfileIdentity(
     artwork: PageArtwork?,
     watch: WatchState,
     selected: Boolean,
-    modifier: Modifier = Modifier,
-    recordingHint: String = ""
+    modifier: Modifier = Modifier
 ) {
     Column(
         Modifier.fillMaxWidth(),
@@ -321,52 +318,6 @@ fun ProfileIdentity(
                 }
             }
             RecordingRings(watch.captureActive, selected, watch.connection.conversation.level)
-            if (recordingHint.isNotEmpty()) {
-                val ink = MaterialTheme.colorScheme.onSurface
-                Canvas(
-                    Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp)
-                        .size(
-                            28.dp
-                        ).background(MaterialTheme.colorScheme.surfaceContainer, CircleShape)
-                        .semantics { contentDescription = recordingHint }
-                ) {
-                    val unit = size.width / 28f
-                    val stroke = Stroke(1.5f * unit)
-                    drawRoundRect(
-                        ink,
-                        Offset(11f * unit, 5f * unit),
-                        Size(6f * unit, 11f * unit),
-                        CornerRadius(3f * unit),
-                        style = stroke
-                    )
-                    drawArc(
-                        ink,
-                        0f,
-                        180f,
-                        false,
-                        Offset(8f * unit, 8f * unit),
-                        Size(
-                            12f * unit,
-                            12f * unit
-                        ),
-                        style = stroke
-                    )
-                    drawLine(
-                        ink,
-                        Offset(14f * unit, 20f * unit),
-                        Offset(14f * unit, 24f * unit),
-                        strokeWidth =
-                        1.5f * unit
-                    )
-                    drawLine(
-                        ink,
-                        Offset(10f * unit, 24f * unit),
-                        Offset(18f * unit, 24f * unit),
-                        strokeWidth =
-                        1.5f * unit
-                    )
-                }
-            }
         }
         Text(
             page.label,

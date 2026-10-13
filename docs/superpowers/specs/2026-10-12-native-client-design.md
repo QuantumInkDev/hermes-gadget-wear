@@ -137,7 +137,7 @@ the primary Hold to talk surface. A brief tap does not start recording; a sustai
 starts capture through the existing foreground permission/controller path, release sends,
 and a downward drag cancels. Preserve horizontal profile swipes, vertical scrolling, page
 selection locks, stable keys and current scroll positions. Keep an accessible named
-Start/Finish action, a compact visible mic affordance on the portrait, and Hold to talk /
+Start/Finish action and Hold to talk /
 Release to send in the existing status line without inserting a new pre-label text row;
 the user must not scroll past the picture to reach recording. Cover both static and GIF
 portraits and the pet fallback; artwork alone never initiates recording.
@@ -154,6 +154,15 @@ actual recorder start/release and accepted recording outcome. Retain cancellatio
 and the optional sound-cue setting. Choose supported low-intensity primitives or a short
 capability-aware fallback; respect system haptic settings and do not change phone cues.
 Physical haptic strength and microphone contamination require owner observation.
+
+Owner correction on 2026-10-13 supersedes the original portrait affordances: keep the
+artwork completely clear of microphone badges and floating menus. Put the labeled Jump to
+profile control at the end of the vertically scrolling card. Retain horizontal swipes and
+accessible profile-selection actions. Recording rings stay outside the unchanged portrait;
+the existing status line conveys Hold to talk / Release to send. The owner reports that the
+original recording ticks are imperceptible, so prefer a supported device-tuned tick over the
+attenuated primitive, with a short capability fallback. Respect system haptic settings and
+retain actual recorder-start/accepted-finish triggers; perceived strength needs an owner check.
 
 The owner also reported transcripts/tool calls without visible replies during the walk.
 Server logs show two M5 Max turns generated replies; watch logs show repeated short screen
