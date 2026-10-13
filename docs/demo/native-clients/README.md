@@ -128,7 +128,10 @@ completion. Physical away speech/reply/sleep behavior remains open.
 Physical delivery is recorded separately in [release preparation](../../release.md) and
 [session status](../../../SESSION_STATUS.md). Whole-branch review and its single fix-wave scoped re-review pass; see the
 [review resolutions](../../native-client-review.md). The physical watch received the corrected
-preserving build and normal Moonlight/Focus setup. Phone preserving delivery, four grid choices,
+preserving build and normal Moonlight/Focus setup. The phone received the same corrected build,
+preserving 99 baseline files at installation; native navigation/Moonlight selection preserve
+all 18 identities and 54 artwork files. Physical associated-watch snapshot readback matches
+Focus revision 1, empty grid and 19 profile keys. Four grid choices, phone edit acknowledgement,
 physical tile addition/every target launch,
 speech/haptic strength/microphone contamination and quantitative Light/GIF/audio/battery tests
 remain controller/owner gates. Eighteen prior normal owner GIF imports/assignments are already

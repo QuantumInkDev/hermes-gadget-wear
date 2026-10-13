@@ -33,8 +33,10 @@ handles cold/warm binding, and visibly defers locked selection. Ambient takes pr
 all pending/unavailable launch routes. The existing Focus service component is preserved.
 
 See the [native acceptance record](demo/native-clients/README.md). Emulator transport returned
-Wearable.API API_UNAVAILABLE: reducer/store/native-editor proofs do not establish associated
-phone/watch delivery. The OS power-saver ring case is explicitly capability-skipped; reduced
+Wearable.API API_UNAVAILABLE. Subsequent physical associated-watch snapshot readback matches
+the existing Focus revision, empty grid and all 19 profile keys; phone edit acknowledgement
+remains untested. Reducer/store/native-editor proofs do not replace that remaining transport
+gate. The OS power-saver ring case is explicitly capability-skipped; reduced
 motion is verified. Physical speech, sleep/reply receipt, tile addition and power cost remain open.
 
 ## Verified sources

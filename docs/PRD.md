@@ -23,7 +23,9 @@ They launch the intended page without starting recording. Unknown/removed keys s
 locked selection is deferred visibly. The watch owns a durable revision, and stale phone edits
 require review instead of overwriting newer watch choices. Synthetic native acceptance and its
 limits are recorded in the [demo](demo/native-clients/README.md). Physical tile addition,
-associated Data Layer delivery, speech, away replies, haptic strength and battery remain gates.
+associated Data Layer phone edit acknowledgement, speech, away replies, haptic strength and
+battery remain gates. Physical phone snapshot readback matches the watch's existing Focus
+revision, empty grid and all 19 profile keys; both devices received preserving native updates.
 
 ## Outcome and users
 

@@ -1,4 +1,4 @@
-<!-- Current continuation: native software and final scoped review pass at c248b03/6b00947. Physical watch updated preserving identities/art; Moonlight and Focus configured. Physical phone remains b724231, new APK staged, fresh wireless pairing-dialog port needed. -->
+<!-- Current continuation: native software and final scoped review pass at c248b03/6b00947. Both physical devices updated preserving identities/art; Moonlight selected. Phone reads the watch's Focus revision 1 and 19 profile keys; grid favorites and owner speech/system-tile checks remain open. -->
 # Session status
 
 Quantum Relay for Hermes native redesign is implemented and reviewed: Portrait studio,
@@ -24,16 +24,22 @@ original tested position and exposes Start recording/picker. Normal catalog refr
 page metadata; identity/artwork files remain protected. Original 15-second timeout is retained.
 No new live typed query or physical microphone/speech observation is claimed this session.
 
-The physical phone remains `b724231`, without current authorized ADB connectivity. Tested
-phone/watch APK copies and hashes are staged under ignored `.local/native-design/delivery/final-native/`.
-The supplied phone address is its connection port; a fresh pairing-dialog port is needed for
-wireless pairing. Enter its code locally on the Mac, never in chat. Temporary phone debugging
-policy was removed/read back; no persistent debugging grant or Mac power helper is installed.
-Private delivery/configuration/cleanup receipts remain under `.local/native-design/`.
+Physical phone delivery is complete at `c248b03` (2026-10-13): current APK/data backed up, matching
+certificate and installed APK hash verified, all 99 baseline files unchanged at installation,
+including 18 independent identities and 18 GIFs. Normal UI selected Moonlight, opened the
+directory, Settings and Talk/Chat, and returned to Profiles. After those actions all 18
+identities and 54 artwork files remain unchanged; only catalog/runtime metadata changed,
+with new appearance preferences and a tile-read cache. The five-minute timeout is unchanged.
+The selected associated watch returned Focus revision 1, an empty four-slot grid and 19
+profile keys, matching its prior verified configuration. This proves snapshot readback;
+phone edit acknowledgement and system tile launches remain untested. No live phone turn or
+microphone recording was performed. Owned debugging bridges are stopped and the exact
+temporary phone debugging grant was removed/read back. APKs, backups and receipts remain
+ignored under `.local/native-design/`; no persistent Mac power helper is installed.
 
-Remaining gates: physical phone preserving update and native owner observations; specified
-four favorites, Focus/grid system tile addition and every target launch; real associated pin
-transport after emulator API_UNAVAILABLE; actual speech, haptic comfort/mic contamination,
+Remaining gates: native owner observations; specified four favorites, Focus/grid system tile
+addition and every target launch; associated phone edit acknowledgement after verified
+physical snapshot readback; actual speech, haptic comfort/mic contamination,
 away reply/sleep receipt and quantitative Light/GIF/audio/battery checks. Actual emulator OS
 power saver remains capability-skipped; reduced-motion static behavior passes. Historical
 logs prove generated replies, not watch receipt or a confirmed cause. Eighteen prior normal

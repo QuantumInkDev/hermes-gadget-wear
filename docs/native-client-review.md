@@ -29,8 +29,11 @@ Actual secure phone navigation uses native input/accessibility without a screens
 An existing emulator's ambiguous data was preserved; a separately guarded clean stock
 fixture supplied the real navigation evidence and was stopped afterward.
 
-Physical matching-signature delivery, associated pin transport/system tile placement,
-owner speech/haptic/microphone observations, away reply/sleep receipt and quantitative
+Physical matching-signature delivery is verified on both devices. Phone installation preserves
+all 99 baseline files, including 18 identities and 18 GIFs; normal UI then preserves all
+identities and 54 artwork files. Physical associated-watch snapshot readback matches existing
+Focus revision 1, the empty grid and 19 profile keys. Associated phone edit acknowledgement/
+system tile placement, owner speech/haptic/microphone observations, away reply/sleep receipt and quantitative
 Light/GIF/audio/battery acceptance remain separate gates in [release preparation](release.md).
 The owned Wear emulator cannot enable actual OS power saver; that capability is not passed.
 The earlier associated-emulator Data Layer attempt returned API_UNAVAILABLE. Functional

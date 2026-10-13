@@ -23,13 +23,17 @@ scenarios; 72 affected exports were refreshed in `6b00947`.
 The physical watch received preserving `c248b03`: matching signer/installed APK hash,
 19 identities and 75 protected baseline files unchanged at installation, original 15-second
 timeout retained. Normal UI selected Moonlight and configured the current profile for Focus,
-revision 1. Four grid slots remain empty for owner choices. The phone still runs `b724231`;
-its tested new APK is staged pending fresh wireless pairing. Eighteen prior normal owner GIF
-imports/assignments are verified privately; personal art is excluded from public captures.
+revision 1. Four grid slots remain empty for owner choices. The phone also received `c248b03`
+with current APK/data backups and matching certificate/hash verification: all 99 baseline files
+unchanged at installation, including 18 identities and 18 GIFs. Normal native navigation and
+Moonlight selection preserve all identities and 54 artwork files; the five-minute timeout is
+unchanged. Associated watch snapshot readback matches existing Focus revision 1, four empty
+slots and 19 profile keys. No phone edit or live speech turn was sent. Owned debugging helpers
+and the exact temporary phone grant are removed. Owner art remains excluded from public captures.
 
-Still open: physical phone preserving delivery/native observations; four favorites and Focus/
-grid system tile addition/every target; associated Data Layer pin transport (owned emulator
-API_UNAVAILABLE); speech/haptic comfort/mic contamination, away reply/sleep receipt and
+Still open: native owner observations; four favorites and Focus/grid system tile addition/every
+target; associated Data Layer phone edit acknowledgement (physical snapshot readback passes;
+owned emulator API_UNAVAILABLE remains recorded); speech/haptic comfort/mic contamination, away reply/sleep receipt and
 quantitative Light/GIF/audio/battery matrix. Actual emulator OS saver is capability-skipped,
 not passed; reduced motion is verified. Keep this PR draft while hardware gates and existing
 publication/signing/privacy/Play prerequisites are assessed. Historical generated replies

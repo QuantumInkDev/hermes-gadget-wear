@@ -20,10 +20,16 @@ Physical watch `c248b03` delivery verifies matching certificate/APK and unchange
 plus 75 protected baseline files at installation. Normal UI selected Moonlight and configured
 Focus for the current profile, revision 1; grid favorites remain unspecified. Original
 15-second timeout is retained and the 340×340-pixel portrait position is unchanged. Physical
-phone remains `b724231`; its tested native update is staged pending fresh wireless pairing.
-Prior normal owner GIF imports/assignments remain verified, without reimport or publication.
+phone also received `c248b03` on 2026-10-13 after current APK/data backups and matching certificate/hash
+checks: all 99 baseline files unchanged at installation, including 18 independent identities
+and 18 GIFs. Normal UI selected Moonlight, opened directory/Settings/Talk/Chat and returned to
+Profiles; all identities and 54 artwork files remain unchanged afterward. Five-minute timeout
+is retained. The associated watch returned its existing Focus revision 1, empty four-slot grid
+and 19 profile keys. Snapshot readback is verified; edit acknowledgement is not. Owned debugging
+bridges and the exact temporary phone grant were removed. Prior owner GIF assignments remain
+verified, without reimport or publication. No live phone turn or microphone capture was tested.
 
-Actual associated pin transport/system tile placement/every target, final-build speech,
+Associated phone edit acknowledgement/system tile placement/every target, final-build speech,
 haptic strength/mic contamination, away reply/sleep receipt and quantitative Light/GIF/audio/
 battery tests remain open. OS power saver is a capability skip; reduced motion passes.
 Historical server-generated replies do not prove watch receipt. Keep the PR draft.
