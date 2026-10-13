@@ -214,6 +214,10 @@ class DirectoryPresentationTest {
                 fixture.clickText("Endpoint details")
                 fixture.awaitText("wss://alpha.example.invalid/gadget")
                 fixture.capture("profile-details-large-narrow")
+                fixture.clickText("Close")
+                fixture.await { fixture.findText("wss://alpha.example.invalid/gadget") == null }
+                fixture.awaitDescription("Open Alpha research writing companion Talk and Chat")
+                assertTrue("Closing details must not open a conversation", fixture.opened.isEmpty())
             }
         }
     }

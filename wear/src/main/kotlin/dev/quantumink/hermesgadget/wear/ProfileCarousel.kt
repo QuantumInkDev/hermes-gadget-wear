@@ -27,6 +27,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
@@ -121,7 +122,28 @@ fun ProfileCarousel(
         service.rememberPage(key)
         return true
     }
-    Box(Modifier.fillMaxSize()) {
+    val density = LocalDensity.current
+    val position = pager.settledPage.coerceIn(pages.indices)
+    val selectedScroll = navigation.scrollFor(pages[position].key)
+    val layout = selectedScroll.layoutInfo
+    val bandTop = layout.viewportSize.height - with(density) { 20.dp.toPx() }
+    val bandBottom = layout.viewportSize.height - with(density) { 8.dp.toPx() }
+    val indicatorClear = layout.visibleItems.isNotEmpty() &&
+        !pager.isScrollInProgress && watch.connection.conversation.prompt == null &&
+        !navigation.pickerOpen.value && layout.visibleItems.none {
+            it.offset < bandBottom && it.offset + it.transformedHeight > bandTop
+        }
+    Box(
+        Modifier.fillMaxSize().semantics {
+            stateDescription = "Profile ${position + 1} of ${pages.size}"
+            customActions = listOf(
+                CustomAccessibilityAction("Choose a profile") {
+                    navigation.pickerOpen.value = true
+                    true
+                }
+            )
+        }
+    ) {
         HorizontalPager(state = pager, key = {
             pages[it].key
         }, userScrollEnabled = !locked, modifier = Modifier.fillMaxSize()) { index ->
@@ -135,7 +157,7 @@ fun ProfileCarousel(
                     onClick = { navigation.pickerOpen.value = true },
                     modifier = Modifier.size(48.dp).semantics {
                         contentDescription = "Choose a profile"
-                        stateDescription = page.label
+                        stateDescription = "${page.label} · Profile ${index + 1} of ${pages.size}"
                         customActions = if (locked) {
                             emptyList()
                         } else {
@@ -219,18 +241,23 @@ fun ProfileCarousel(
                         ProfileIdentity(page, watch.artwork[page.key], WatchState(), false)
                     }
                 }
-                if (selected && pageScroll.anchorItemIndex == 0) {
+                val firstItem = pageScroll.layoutInfo.visibleItems.firstOrNull { it.index == 0 }
+                val portraitAtTop = firstItem != null &&
+                    firstItem.offset >= with(density) { 28.dp.roundToPx() }
+                if (selected && portraitAtTop && watch.connection.conversation.prompt == null) {
                     Box(Modifier.align(Alignment.BottomEnd).padding(end = 40.dp, bottom = 40.dp)) {
                         controls()
                     }
                 }
             }
         }
-        ProfilePageIndicator(
-            pager.settledPage,
-            pages.size,
-            Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp)
-        )
+        if (indicatorClear) {
+            ProfilePageIndicator(
+                pager.settledPage,
+                pages.size,
+                Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp)
+            )
+        }
     }
     if (navigation.pickerOpen.value && navigation.pinKey.value != null) {
         ProfilePinEditor(pages, requireNotNull(navigation.pinKey.value), locked) {

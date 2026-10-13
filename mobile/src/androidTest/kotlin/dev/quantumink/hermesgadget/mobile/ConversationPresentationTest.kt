@@ -326,6 +326,13 @@ class ConversationPresentationTest {
             }
             assertTrue(find("wss://synthetic.example.invalid/gadget") != null)
             click("Close")
+            repeat(50) {
+                if (find("Microphone permission was declined.") == null) SystemClock.sleep(40)
+            }
+            assertTrue(
+                "Permission notice must be visible after closing endpoint details",
+                find("Microphone permission was declined.") != null
+            )
             click("Back to profiles")
             assertTrue(!model.state.value.visible)
             model.open(profile)

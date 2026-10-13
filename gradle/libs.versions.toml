@@ -42,6 +42,7 @@ play-services-wearable = { module = "com.google.android.gms:play-services-wearab
 
 fragment = { module = "androidx.fragment:fragment", version.ref = "fragment" }
 
+wear-tiles-renderer = { module = "androidx.wear.tiles:tiles-renderer", version.ref = "wear-tiles" }
 wear-tiles = { module = "androidx.wear.tiles:tiles", version.ref = "wear-tiles" }
 wear-protolayout = { module = "androidx.wear.protolayout:protolayout", version.ref = "wear-protolayout" }
 wear-complications = { module = "androidx.wear.watchface:watchface-complications-data-source-ktx", version.ref = "wear-complications" }

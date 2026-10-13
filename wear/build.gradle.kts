@@ -86,4 +86,5 @@ dependencies {
     androidTestImplementation(libs.android.test.runner)
     androidTestImplementation(libs.android.test.junit)
     androidTestImplementation(libs.okhttp.tls)
+    androidTestImplementation(libs.wear.tiles.renderer)
 }

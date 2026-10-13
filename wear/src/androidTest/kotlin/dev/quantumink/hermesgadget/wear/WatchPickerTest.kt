@@ -177,7 +177,11 @@ class WatchPickerTest {
             val all = nodes()
             all.firstOrNull {
                 it.isVisibleToUser &&
-                    (it.text?.toString() == label || it.contentDescription?.toString() == label)
+                    (
+                        it.text?.toString() == label ||
+                            it.contentDescription?.toString() == label ||
+                            it.stateDescription?.toString() == label
+                        )
             }?.let { return it }
             if (scroll) scrollPicker()
             instrumentation.waitForIdleSync()

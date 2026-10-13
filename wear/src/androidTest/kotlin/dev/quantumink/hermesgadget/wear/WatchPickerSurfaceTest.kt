@@ -120,7 +120,7 @@ class WatchPickerSurfaceTest {
                 }
             }
         }
-        node("Choose a profile")
+        node("Choose a profile", scroll = false)
         assertEquals(1, mounts)
         for (theme in Appearance.entries) {
             for (font in listOf(1f, 1.3f)) {
@@ -130,9 +130,24 @@ class WatchPickerSurfaceTest {
                 }
                 val scroll = navigation.scrollFor(pages.first().key)
                 instrumentation.runOnMainSync { }
-                // The native list's backward accessibility action returns to its portrait.
-                repeat(6) { scroll(backward = true) }
+                // A font reflow preserves the old pixel offset. Clamp to the list start
+                // before comparing first-view geometry; later Back/rotary checks retain it.
+                instrumentation.uiAutomation.waitForIdle(200, 3000)
+                runBlocking {
+                    withContext(Dispatchers.Main) { scroll.scrollToItem(0, -10000) }
+                }
+                instrumentation.uiAutomation.waitForIdle(200, 3000)
+                SystemClock.sleep(250)
                 assertRoundPickerBounds()
+                assertTrue(nodes().any { it.stateDescription?.toString() == "Profile 1 of 18" })
+                assertTrue(
+                    nodes().any {
+                        it.actionList.any { action ->
+                            action.label?.toString() == "Choose a profile"
+                        }
+                    }
+                )
+                assertNoIndicatorTextOverlap()
                 capture("${theme.name}-$font-portrait")
                 click("Choose a profile")
                 capture("${theme.name}-$font-picker")
@@ -155,10 +170,21 @@ class WatchPickerSurfaceTest {
                 runBlocking { withContext(Dispatchers.Main) { scroll.scrollToItem(1) } }
                 instrumentation.uiAutomation.waitForIdle(200, 3000)
                 node(reply, scroll = false)
+                assertNoIndicatorTextOverlap()
+                assertTrue(
+                    "Scrolled content must not retain a floating picker over reply/actions",
+                    nodes().none { it.contentDescription?.toString() == "Choose a profile" }
+                )
                 capture("${theme.name}-$font-reply")
                 SystemClock.sleep(400)
                 val before = scroll.anchorItemIndex to scroll.anchorItemScrollOffset
-                instrumentation.runOnMainSync { navigation.pickerOpen.value = true }
+                val accessiblePicker = nodes().first {
+                    it.stateDescription?.toString() == "Profile 1 of 18"
+                }
+                val openPicker = accessiblePicker.actionList.first {
+                    it.label?.toString() == "Choose a profile"
+                }
+                assertTrue(accessiblePicker.performAction(openPicker.id))
                 node("Choose a profile", scroll = false, textOnly = true)
                 instrumentation.uiAutomation.waitForIdle(200, 3000)
                 instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
@@ -176,6 +202,16 @@ class WatchPickerSurfaceTest {
                 )
                 assertEquals(pages.first().key, service.state.value.selectedPage)
                 assertEquals(0, disposals)
+                runBlocking {
+                    withContext(Dispatchers.Main) {
+                        scroll.scrollToItem(scroll.layoutInfo.totalItemsCount - 1)
+                    }
+                }
+                instrumentation.uiAutomation.waitForIdle(200, 3000)
+                SystemClock.sleep(300)
+                node("Profile 1 of 18", scroll = false)
+                assertNoIndicatorTextOverlap()
+                capture("${theme.name}-$font-end-padding")
             }
         }
         val lockedStates = listOf(
@@ -301,7 +337,35 @@ class WatchPickerSurfaceTest {
     }
 
     private fun scroll(backward: Boolean = false) {
-        nodes().firstOrNull { it.isScrollable && it.isFocused }?.performAction(
+        if (!backward) {
+            // Small native steps avoid an accessibility page jump skipping a round row.
+            val display = context.resources.displayMetrics
+            val start = SystemClock.uptimeMillis()
+            for (step in 0..8) {
+                val action = when (step) {
+                    0 -> MotionEvent.ACTION_DOWN
+                    8 -> MotionEvent.ACTION_UP
+                    else -> MotionEvent.ACTION_MOVE
+                }
+                val event = MotionEvent.obtain(
+                    start,
+                    SystemClock.uptimeMillis(),
+                    action,
+                    display.widthPixels * .5f,
+                    display.heightPixels * (.7f - minOf(step, 7) * .02f),
+                    0
+                )
+                event.source = InputDevice.SOURCE_TOUCHSCREEN
+                assertTrue(instrumentation.uiAutomation.injectInputEvent(event, true))
+                event.recycle()
+                SystemClock.sleep(40)
+            }
+            instrumentation.uiAutomation.waitForIdle(200, 3000)
+            return
+        }
+        val target = nodes().firstOrNull { it.isScrollable && it.isFocused }
+            ?: nodes().firstOrNull { it.isScrollable }
+        target?.performAction(
             if (backward) {
                 AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
             } else {
@@ -338,6 +402,20 @@ class WatchPickerSurfaceTest {
         assertTrue(target.performAction(AccessibilityNodeInfo.ACTION_CLICK))
         instrumentation.waitForIdleSync()
         SystemClock.sleep(250)
+    }
+
+    private fun assertNoIndicatorTextOverlap() {
+        val indicator = nodes().firstOrNull {
+            it.contentDescription?.toString() == "Profile 1 of 18"
+        } ?: return
+        val band = android.graphics.Rect().also(indicator::getBoundsInScreen)
+        for (text in nodes().filter { it.isVisibleToUser && !it.text.isNullOrEmpty() }) {
+            val bounds = android.graphics.Rect().also(text::getBoundsInScreen)
+            assertTrue(
+                "Position dots must not paint across native text: ${text.text}; $band / $bounds",
+                !android.graphics.Rect.intersects(band, bounds)
+            )
+        }
     }
 
     private fun assertRoundPickerBounds() {

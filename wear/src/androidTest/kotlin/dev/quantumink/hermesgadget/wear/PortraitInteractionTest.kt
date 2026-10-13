@@ -97,6 +97,54 @@ class PortraitInteractionTest {
         )
     }
 
+    @Test fun secondPointerCancelsOnlyOwnedHold() = fixture { f ->
+        for (owned in listOf(false, true)) {
+            f.events.clear()
+            f.down()
+            if (owned) {
+                SystemClock.sleep(800)
+                assertEquals(listOf("start"), f.events)
+            }
+            if (!owned) {
+                SystemClock.sleep(100)
+                assertTrue("Second pointer arrives before hold ownership", f.events.isEmpty())
+            }
+            f.secondPointer(down = true)
+            SystemClock.sleep(800)
+            f.secondPointer(down = false)
+            f.up()
+            assertEquals(
+                "Second pointer must not send or duplicate cancellation; owned=$owned",
+                if (owned) listOf("start", "cancel") else emptyList<String>(),
+                f.events
+            )
+        }
+    }
+
+    @Test fun actionCancelCancelsOnlyOwnedHold() = fixture { f ->
+        for (owned in listOf(false, true)) {
+            f.events.clear()
+            f.down()
+            if (owned) {
+                SystemClock.sleep(800)
+                assertEquals(listOf("start"), f.events)
+            }
+            f.cancel()
+            SystemClock.sleep(800)
+            assertEquals(
+                "ACTION_CANCEL must not send or duplicate cancellation; owned=$owned",
+                if (owned) listOf("start", "cancel") else emptyList<String>(),
+                f.events
+            )
+        }
+        // A cancelled stream must release ownership for the next deliberate hold.
+        f.events.clear()
+        f.down()
+        SystemClock.sleep(800)
+        f.up()
+        assertEquals(listOf("start", "finish"), f.events)
+    }
+
     @Test fun ringsAcrossThemesArtworkAndReducedMotion() = fixture { f ->
         val scale = shell("settings get global animator_duration_scale")
         try {
@@ -326,14 +374,51 @@ class PortraitInteractionTest {
             event(MotionEvent.ACTION_UP)
             SystemClock.sleep(100)
         }
-        private fun event(action: Int) {
+        fun cancel() = event(MotionEvent.ACTION_CANCEL)
+        fun secondPointer(down: Boolean) {
+            val properties = Array(2) { index ->
+                MotionEvent.PointerProperties().apply {
+                    id = index
+                    toolType = MotionEvent.TOOL_TYPE_FINGER
+                }
+            }
+            val coordinates = Array(2) { index ->
+                MotionEvent.PointerCoords().apply {
+                    x = this@Fixture.x + index * 20f
+                    y = this@Fixture.y
+                    pressure = 1f
+                    size = 1f
+                }
+            }
+            val action = if (down) {
+                MotionEvent.ACTION_POINTER_DOWN
+            } else {
+                MotionEvent.ACTION_POINTER_UP
+            }
             val event = MotionEvent.obtain(
-                downTime,
-                SystemClock.uptimeMillis(),
-                action,
-                x + dx,
-                y + dy,
-                0
+                downTime, SystemClock.uptimeMillis(),
+                action or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT),
+                2, properties, coordinates, 0, 0, 1f, 1f, 0, 0,
+                android.view.InputDevice.SOURCE_TOUCHSCREEN, 0
+            )
+            assertTrue("Native second pointer injection", automation.injectInputEvent(event, true))
+            event.recycle()
+        }
+        private fun event(action: Int) {
+            val properties = MotionEvent.PointerProperties().apply {
+                id = 0
+                toolType = MotionEvent.TOOL_TYPE_FINGER
+            }
+            val coordinates = MotionEvent.PointerCoords().apply {
+                x = this@Fixture.x + dx
+                y = this@Fixture.y + dy
+                pressure = 1f
+                size = 1f
+            }
+            val event = MotionEvent.obtain(
+                downTime, SystemClock.uptimeMillis(), action,
+                1, arrayOf(properties), arrayOf(coordinates), 0, 0, 1f, 1f, 0, 0,
+                android.view.InputDevice.SOURCE_TOUCHSCREEN, 0
             )
             event.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
             automation.injectInputEvent(event, true)
