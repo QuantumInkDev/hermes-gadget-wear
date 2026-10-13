@@ -913,651 +913,651 @@
     },
     {
       "file": "watch/density-340/moonlight-1.0-reply.png",
-      "sha256": "df95bdd79ed205c339c2b3d8a456392d9024c13962249928ed6bc36c7dfe5101",
+      "sha256": "8d2046d8dab2ba1313622fa8f6c6d8e39d5f5d1a7b1e3a538c7c18bcf8adeb59",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/dark-1.3-end-padding.png",
-      "sha256": "79b974bbb718ff30444632c0e8379661e23697227442d71f2983f2a9857110a7",
+      "sha256": "73e52c8bdafdebcafd757978e6fb169be5327a5c1b6a3abefe422e2a284e1e66",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/light-1.0-picker.png",
-      "sha256": "dd83601eaa4af1e46899aba5c0ee2a0c33f84cf79dd5a7d986fbc4b3b4351e1e",
+      "sha256": "5d72c1ad1793d1ce409e243780a91ea5d5f60291ec17e6e30521d776dc2af18f",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/dark-1.3-picker.png",
-      "sha256": "1b4f6b725ab76453dfd42f1b8c89ae0d2b933237ff09d3e8d8476e8e3f844483",
+      "sha256": "bf7257d72fb42d0049dca3a33400cea23b7ed2ce2109ea2b13039226478e0c23",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/dark-1.3-reply.png",
-      "sha256": "46b390166296f908725a942ba6a85491b5546d829b5dee8b15cff9ba97c73fb0",
+      "sha256": "bcee4260f9a4b5b38409c0e52c6e84e4c44a7c936ae8c7d1fe1961eb7a784c65",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/light-1.3-portrait.png",
-      "sha256": "a584e1d5ffe8a299b1f09983eab624f311af6072a2e4532550644f1841bbc7c7",
+      "sha256": "bd3a87312e1a9300bcf1654fdd4cc0f90c143a16ad68408197270ed01de952f7",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/moonlight-1.0-picker.png",
-      "sha256": "e188d67798c0dbe5bac5c00cb44765806981478c667fc99dd21864897ccdc149",
+      "sha256": "1673d683c162b1e1d3f199468475043ef13c48fbdb471d4eb083e0231a3cb048",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/moonlight-1.3-end-padding.png",
-      "sha256": "34c959c988c05f593dc21f0ef8a8d8732068d705a9c78f1c34c14022fa50e1b9",
+      "sha256": "688a47fd82a03d3f6f1f1262c5cc1ffafca687028b49f19b71610aab1ff664c6",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/light-1.3-end-padding.png",
-      "sha256": "9582ea38a9e2e824f743dfeadcf9c8c2f122f3cd9aae181e920200a1e9ea22c3",
+      "sha256": "a7e99e0758e1f4a84caa80f6667ac678e51c9edcc6aa64e42e7b9494d49e8aad",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/moonlight-1.0-portrait.png",
-      "sha256": "1051f786f4d8afafcc912c9863c4fbde4dd8d07b61fa0a337ad33e6388314aa9",
+      "sha256": "60d8bd8404c4b9d6558dc0f9359b0456bc728e9fc6e4d2c9dbc814870c346eec",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/dark-1.0-portrait.png",
-      "sha256": "6b526430a9e4df7fe973190fa8c53df0a4a4b3a5cf055086c8e0c3010d9a2557",
+      "sha256": "8a7a6501375030664208cd897f87f34f8d4c69bd2f01ea7261eb4bb1f23fb3ed",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/light-1.0-reply.png",
-      "sha256": "f8163ad205175996cd31451c076202c5ae4e43545169b8eff3d448d19c590795",
+      "sha256": "19df698b67c4720d3aa54b533394f28afe54ad9de07da430db3a82063e8be384",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/dark-1.3-portrait.png",
-      "sha256": "06bbbbab0caa6225c56b36f8b3b1f460f9d17413c748bc9f2e1bbc635f7cc0d4",
+      "sha256": "a2f0805ea83bbeece267d4877220a98f079316eaedb34e0fa3b9042d7adc9199",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/moonlight-1.3-portrait.png",
-      "sha256": "e562bcaf5505a1740bdeceda50ca50a82af82dad8cf11f3d81a989c28b32dca9",
+      "sha256": "9865c96c972ee5f2d995d0892f9ec2c886a33822396cbd0530fbba87654351e3",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/light-1.3-reply.png",
-      "sha256": "8dab3199905200daf9d0a1df43d996d9c744c80d8d1454461b267535cc89aac9",
+      "sha256": "d8d9ee0cde3d396bf3fa4479b447ec65e9b8b348bb073f75ff1554dfe3c39ab3",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/moonlight-1.0-end-padding.png",
-      "sha256": "3cc6f6dd8dc03a8e5dbc93ba40658ce1f4381b581e80866aa65ca86ce1f2036e",
+      "sha256": "3bdd6972305aba9452521f227a321e62f5e1f51bed144fd45241469c6e145154",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/light-1.0-end-padding.png",
-      "sha256": "d8062fbe8593782a27d8112e8fd94bec97d4974f4c4d7d794a9d9403ac62ce10",
+      "sha256": "d7aa50d7bf394060ce3cecf04d4131e526d287785990cd3d9efcc5ba9ce96576",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/dark-1.0-end-padding.png",
-      "sha256": "055528cf6aad7a260a247699b5e10ac4ab3eb9c9b0ab85988e712719f49b3843",
+      "sha256": "3a89232cc283680f47ef5167c2ae0552cf706e0dfdcccdb4a426ea147aa66d9a",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/moonlight-1.3-reply.png",
-      "sha256": "f70ea3f92e9167e1fc50fc411469dfb12ead0a516cb97fcae3696c0050ef798e",
+      "sha256": "2111fb26acb22e953b2468dfd25143a524ece13cac80d028291c8fe8a44a762e",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/dark-1.0-picker.png",
-      "sha256": "a9a9b9b825e5aaed6007231267682f02322e6348b0df48f4185c9d1281443131",
+      "sha256": "f7c025420faeaf693641b6924e85b811cbe05e1b21c2f3e8a63c4452ff038759",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/moonlight-1.3-picker.png",
-      "sha256": "f8a7b2cf635fd25c3285cd0c014f009b1565b284e66b7593836a8cf5be07885d",
+      "sha256": "b8b0f1a04bc286a4411acbd4d9e2ccbd08e825b1846e5ba128429e624d6a0bdd",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/dark-1.0-reply.png",
-      "sha256": "39f46892f73034d0b7d181e85c03b4fe93b862eedbe646223142914c51c73991",
+      "sha256": "dc22543fd3efd401bcd04831311e9dbc28bfd7b7a4abfd7b791e4889e681e34d",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/light-1.0-portrait.png",
-      "sha256": "c0ad41dbd0b32b9fc290a75f342db6beac8cbd9ab439978dfd8ede046c74a5b3",
+      "sha256": "5996b36ed4ffd71ab591e7c6903bfea9aa32dcfe26f389362b4b76a1980f4fa7",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-340/light-1.3-picker.png",
-      "sha256": "760cc6349ded9d7889f90c4c78a8b1ed799e8eaa087a2c8d28fec47c9e5c80d2",
+      "sha256": "c513f5f414dc971f8dcf89b8196fb39d0c2a966831b54885f97c68a72985afd9",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density340"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/moonlight-1.0-reply.png",
-      "sha256": "5b78483b58fe43124d81909bdd1f16dd6044fe0623896a46e91234f1c691f656",
+      "sha256": "22fff9228677436fa148cd83a14bb7ec18c09f9b5a96f7d65f8510373a2afbbb",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/dark-1.3-end-padding.png",
-      "sha256": "9296a4dcf939c78cf3037da429b9732b18eac6acd5930f58dec2cc4c1ae24d98",
+      "sha256": "e68c4dd66ffd291b270f8c5257ed18415714d271f79f5caeac9d2ef7c1795906",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/light-1.0-picker.png",
-      "sha256": "5af28bdc277a28775ba83084dd33e5a2827214fe32c4f6cc8715cd18ddccc00d",
+      "sha256": "4321d4e782caef85f43938f8ebd4be5cef44abda7cfb40c2973c3d4175cf340f",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/dark-1.3-picker.png",
-      "sha256": "92f1f347a50e6498b558d0270472334ad1445d75d252ae510a124e276ebac705",
+      "sha256": "e5b30337163ca1ec00120ec350a71d569d548ef427e84dcf334dbb46dc8a38af",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/dark-1.3-reply.png",
-      "sha256": "a3449ee22f627ceabf20bab1ef22a3b09b50df09f206fbe777143defe3e8d02c",
+      "sha256": "27437238ee83c24689193e6974f93291daa72d51b16cf1cefbb625e760b691f8",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/light-1.3-portrait.png",
-      "sha256": "1cc4bb56698053d0d5fecb91db3c252f6f889e73936212613bba8a5d5d7756ec",
+      "sha256": "ddc3d8b2a93768b9172f618c4701e9e23393f4dd820132afc797a42b6927e09f",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/moonlight-1.0-picker.png",
-      "sha256": "80918c239ee1ee2833aa39ce220a6b8796aa2b69317eaf15d9f2e13be09235bc",
+      "sha256": "f03978277bcd3a3652060beb15ef63806f5cb266b974c447ed523270718c8524",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/moonlight-1.3-end-padding.png",
-      "sha256": "29f7c9bbde40d4a76fb8bd7d0449eb7582d01ca9d8b2d4c604ca184fc01eaaa3",
+      "sha256": "61ed90db47e3f8218bc4a51660ab49d41115e8aa251f65419be007be9161c47e",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/light-1.3-end-padding.png",
-      "sha256": "eced77a94406124fd6b899a204e908de3ca1a60ac06fd5190480449f92ecf5c6",
+      "sha256": "f761682303645773333da009c2fb0588a182ee23bb2db6b2157494e6e8490af6",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/moonlight-1.0-portrait.png",
-      "sha256": "946276b6671160232d5ab5e1568aeba0f1506b6f746e7a60862daee274503f24",
+      "sha256": "59e9a91faf18f8111dff5ce6bd460be125677885e5808ea5c52fc29b6c299383",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/dark-1.0-portrait.png",
-      "sha256": "94b86c2adb4986174b204ec2f2d0c0e1ea9e0b426b1112e44d4279738f232a02",
+      "sha256": "9322ac43fb4241273ae46a454ca2b40f409dd28936b24c54a7de900f5b2efc48",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/light-1.0-reply.png",
-      "sha256": "d97781d6dc23b9360501f6271086b4d057b7dace41110ba8c70b8c48b7aafe27",
+      "sha256": "5c4a9b4be06747fc15e01329541bcb6ff29527786fb8d22e50ab1ee473249fc9",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/dark-1.3-portrait.png",
-      "sha256": "a590dd1f024a39b6ad5624b570e2c9a9ab34ab9b1098d8273aed50ffe8d47a6a",
+      "sha256": "3861cefd86bbda5dad9f689131368622ab3166774384e29910ff6942f54ad27f",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/moonlight-1.3-portrait.png",
-      "sha256": "34ac41ca43940a69ef76cd6732918de67c0975600bb0c231f9ac1af9a55cc13e",
+      "sha256": "906e55618b3a429960b23974b144c805ffdc73b094c94596811e25917ae5d0be",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/light-1.3-reply.png",
-      "sha256": "2e2e14a7f879a3f7528f1b1f328a32a0bb242eb4432d8e9d64ed0027f9cd094c",
+      "sha256": "48567e55e04dca8fe8e939e837cc86adc7562f5c054501c19b4684c6de441871",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/moonlight-1.0-end-padding.png",
-      "sha256": "85c8a3b59c9c5b49cb2d28dac633389598e76b2bccbe0144a71fa81ffba278fe",
+      "sha256": "12681a4d2168594902b49f440ce7978f1e7c6f8647230d384b09ee3be62b3172",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/light-1.0-end-padding.png",
-      "sha256": "294eed8f96dcc86f3b277a53154ea9e1a7c04ac7e421a55ac7bebea426324e10",
+      "sha256": "538434d275754502535a8951dac209a6da9e97cba749ce526da6cc507f2c4386",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/dark-1.0-end-padding.png",
-      "sha256": "be77325200757a179b562e23539e925a65fc3d0d40cd91c47d6cef9c655736b3",
+      "sha256": "aab800ae093ae3e77b518370658f2d24cf0df368d55a76d4668c50428412b330",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/moonlight-1.3-reply.png",
-      "sha256": "335ee9d65416c9bda7dbd0c01b2b327dd01a7c53a36660aeea7ca19ea0092d82",
+      "sha256": "7f61bfa74725b15f5bd0dbab17578106e3076ae39cadc113adb6c307ea62546a",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/dark-1.0-picker.png",
-      "sha256": "7ca7c4e9933b0b3ca8fba2f9434a0460d0ce9d46315794b44bb4544be8134ed7",
+      "sha256": "b88dc044be296421100dadf510303be503fcf02a77c90e0e74e12a5776214c20",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/moonlight-1.3-picker.png",
-      "sha256": "bea945ddd89ff864b59e06a6b1e77764e92d9cb0c99cb19528f23fa609335dee",
+      "sha256": "35e6b2fdeba9fcea9f1a23cdaf33c362b7a0bc0f7cbbd8ad2d5276ae27ad7fc9",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/dark-1.0-reply.png",
-      "sha256": "dfc0357cdaf3aaf2f0776632d216440b2d1f487b479ad92a22f85f8c26acd879",
+      "sha256": "54db905251809d113fa0348247319206992e742f8b07a8b9625316ac01c701e8",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/light-1.0-portrait.png",
-      "sha256": "cb9eb11f0fb70e4c55e429e2111c1a40400e387c8550a5976766bb87a5a1ceed",
+      "sha256": "836191c2b3dcf23d8a9e919d40aa7028b1a4a07e4d8d6c4beca90bf0e60c18c6",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-360/light-1.3-picker.png",
-      "sha256": "3b57b986b93fb690c38097e0c52f6339069a03beaca8048fb9ef7ae9be5b5a16",
+      "sha256": "22182ee3653f92935787dfa8d027c7303c8d74d8bc057c23d1093bb89a3f308e",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density360"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/moonlight-1.0-reply.png",
-      "sha256": "3cce80f5adfb8239051511bed48bbc27718fbb786c1593701280fd2b0b9fd916",
+      "sha256": "0a99109cacc5db6a54d0651cc67abc4a88cacb944dd5cf74e638b9134822a17d",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/dark-1.3-end-padding.png",
-      "sha256": "53ffe35914b1915da8c6e43d2fa5e1fb2e859447fcf3d2cb72ef8f0718757326",
+      "sha256": "20d572345cc8cc118e7ea21e24348edbeb01a016a30662cafe3020f543d98332",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/light-1.0-picker.png",
-      "sha256": "aeadb26d41424c7aaaa59939d5aae2afc79cede92a56fb2f0309dc1e8b9f46e3",
+      "sha256": "cdcde560ff5be7de62751c53e160fa943e9bcfe1b91a6e631d8478ec4ec2d5d5",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/dark-1.3-picker.png",
-      "sha256": "dc61adff4d476d8094016fa59e2d8e4766e708486c38a8c0a3d31b2c726d961c",
+      "sha256": "133bb3bfb1ebc4185cfbe24d30fc796561d2382a35f1ef9dc6d9f67eeda9d7b4",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/dark-1.3-reply.png",
-      "sha256": "74367446bf039b8f0b7f087ab2125893a65fbee0dda2c800a3b57ef133c3b0b7",
+      "sha256": "90424041dc25c3cd527a0b0e452e161777a4514c82f4074e13276d2bd6f5a9d5",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/light-1.3-portrait.png",
-      "sha256": "b0204e5cf250a9e0529102494c3aabfd276602b8ebb37bc16f49727edf6afddc",
+      "sha256": "0bc5fa508ad8256b956af606f19b93d2b01d3ce9aca6adedfdb4b7bc95f71910",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/moonlight-1.0-picker.png",
-      "sha256": "235e995730106492049ad1c4d705f6313fafc84a6301e17f32f10779e718fb77",
+      "sha256": "0678cc29dc5d7f5922b90180f7580ee974b5104a44420fbd1cdf04cab56b0467",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/moonlight-1.3-end-padding.png",
-      "sha256": "b15e98b2aa9a6024dfee32d8c39e82a6b42576711bc44ba27f3562aedccdb93b",
+      "sha256": "a7bc04b8e43d4da09fe26a34ed2f2a574e2a8abdb5a0d70222e631f0451d59f5",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/light-1.3-end-padding.png",
-      "sha256": "1cf019666ee3962230c9fe5e3ae6368d093db8a611c282f12593c93c97f21843",
+      "sha256": "ce369eac3a17b20f77d4019de03b3dcbae18c082923cc6fc20b0edd88310197a",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/moonlight-1.0-portrait.png",
-      "sha256": "a2f6d6c0a113f6a577538f6e26ab381184ff7f5a19359ec383b7cfe9ac27c8e6",
+      "sha256": "541e87d7d88d12ccb7ccb2a5f721191b2b52952390c01156bb3ab453a1f220a6",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/dark-1.0-portrait.png",
-      "sha256": "ee121a40637a91d5369ca0864a67602f9c92414838dde2ccf26a2e10019e3540",
+      "sha256": "6cdfd93d11dbf9bf43d7fdecc979b863b10e828d422d37f46c21cefa3f239ea6",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/light-1.0-reply.png",
-      "sha256": "8362bac92e2258dc4c22b9d405ebecfd5ae2f5b46c95b0d66825733b9b4d3575",
+      "sha256": "2e4704a3ba58d511ad1cc25846b9e8ce4c1d0de2b15be8036b79f34fa6cf936e",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/dark-1.3-portrait.png",
-      "sha256": "a205707ea8a0de89753e1c73fd5db63d33d58628582257975d3984a71ddc1482",
+      "sha256": "cb320127d77199dca5897411ce3944e9ea406fe41dd026681a7597f2e930d18b",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/moonlight-1.3-portrait.png",
-      "sha256": "d996c7b560869cd4b2eac66df9c8a478c78e178ef5bfce4eda732ee17239be4c",
+      "sha256": "76051d4ea520df902c355ad4b26beb2cb75325db31221d4901045c62625d8308",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/light-1.3-reply.png",
-      "sha256": "359adafadddb932c44bd24352676ad77ea962f31722343cd50637713f18649a7",
+      "sha256": "ab043b4cfa27048bba0f4ccd686abd9d6ffce4e99ad5dab5c03fac45d79591c9",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/moonlight-1.0-end-padding.png",
-      "sha256": "d1ae162d176bce6ecd8077c516592c9b6e695c92e71609cceb01f09b171a32dd",
+      "sha256": "a73bc0d793310396f2ccfdb89628f238572965b04c362feff67755fc58f5de95",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/light-1.0-end-padding.png",
-      "sha256": "8eee358fcb954c6e8ad50aa4ed6f62ce471b7843fe1489d19bf08a568a9e7ba2",
+      "sha256": "cf8e406b69be32359d154dc1dc411e042d72232b4b67c9fda7ea1c1c9c402c37",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/dark-1.0-end-padding.png",
-      "sha256": "5bd5e9d4be2b7a32ffb85c5e53cb25109b78c303131a1e85297ffd2b15390e8e",
+      "sha256": "eef3e8776f338339b0643288b16aedf1ad7d94c5b02ba4662ba8510721cf3eb5",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/moonlight-1.3-reply.png",
-      "sha256": "2eb728b21da9cbf3da616bcecffb61252d89341f3cf781fc8e87524c0c231662",
+      "sha256": "a495c2e922e5ebf50c5dc0e06c56f7242095405bd3e8878885ce53c5ef76e289",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/dark-1.0-picker.png",
-      "sha256": "22e90167fb1c065d49d1810521b9c42f9f1528b32ed095ab098863b8facb5576",
+      "sha256": "6d682ef895d0c4185b031f5bdeade3c728a5f956c7b0638708907f3d2f9ed8d2",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/moonlight-1.3-picker.png",
-      "sha256": "ae6acdf6161c784036a503d42286c883147b976219f41a5cc9ae1b4c7c7d57a8",
+      "sha256": "f4515a5db1b44976e4738ce5fe64b460910acdf1a936299225cfd7951ed967c3",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/dark-1.0-reply.png",
-      "sha256": "9757265b4d05722d75e36d6690133ed8ec29cfc4e01f9493419d517fea52464a",
+      "sha256": "1b030f7dc1a35783f5dda13d0855dbbc1f75b6fb1c1f4abe52bf550c2e3f3eca",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/light-1.0-portrait.png",
-      "sha256": "9dd1e0f8464588088293d46ebfefd59720a415580147665c7170f525c919d4a3",
+      "sha256": "80a72a06e4cae0953b68e232078d2d972e510f9d8781829f743c13c1ea45c60f",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     },
     {
       "file": "watch/density-400/light-1.3-picker.png",
-      "sha256": "c64c090e8a5fc01af9a5930a3be35e0d7d7231210a1f30a99fbe33ff1f2e80a0",
+      "sha256": "f932c34cd5c6c428ea0605c9ed3f9827c5ee29729e7f94c25004f579ad418ef3",
       "size": [
         480,
         480
       ],
-      "origin": "Task 7 native carousel alltheme/font geometry after overlay fix; actual480px/density400"
+      "origin": "Final fix native export; settled clock visibility, mounted picker/scroll/locks; same original portrait geometry"
     }
   ]
 }

@@ -7,7 +7,8 @@ No personal artwork, endpoint, conversation, credential or device backup is incl
 
 The [manifest](manifest.json) records origin, dimensions and SHA-256 for every PNG. Unchanged
 reviewed Task 1/2/6/8 receipts are reused; Task 7 refreshes the phone surfaces after tile editing
-was added and the watch carousel after fixing overlay collisions. AndroidX
+was added. The final fix refreshes 72 watch captures after correcting settled clock visibility;
+unchanged phone, ambient, recording and tile images are reused. AndroidX
 [TileRenderer](https://developer.android.com/reference/androidx/wear/tiles/renderer/TileRenderer)
 renders the exact production ProtoLayout/resources in a synthetic host; those images do not
 claim system-carousel addition. Original [Voice Q masters](../../store-assets/voice-q/manifest.json)
@@ -90,16 +91,26 @@ concurrent local/phone edits have separate native store/editor and JVM coverage.
 
 ## Checks and limitations
 
-The original exact full strict receipt at `328d769` and the final Task 7 overlay build each
-passed 116 JVM tests with zero failures/errors/skips. The final run completed 214 Gradle tasks
-with warnings treated as failures and built both debug APKs and both instrumentation APKs:
+The final fix passed 116 JVM tests across 33 XML reports with zero failures/errors/skips.
+The single final strict run completed 214 Gradle tasks in 14 seconds with zero warnings and
+built both debug APKs and both instrumentation APKs:
 
 ```sh
 ./gradlew ktlintFormat check :mobile:assembleDebug :wear:assembleDebug :mobile:assembleDebugAndroidTest :wear:assembleDebugAndroidTest --warning-mode=fail --max-workers=4
 ```
 
-Task 7 adds focused phone checks, real two-pointer/cancel events, static native tile rendering
-and overlay regressions. The [verification record](verification.json) identifies final checks,
+The final fix records 34 passing focused native executions (32 distinct methods), including
+18 clock theme/font/density scenarios. The clock remains hidden over settled scrolled content;
+the original 160-dp artwork and first-view identity geometry remain unchanged. Catalog changes
+retain the mounted active turn and approved session until recording/reply/approval locks clear.
+Phone lookup runs off the UI thread, publication releases the repository monitor, and in-flight
+portrait assets remain bounded and protected until ordered replacement. Real secure MainActivity
+checks verify responsive Talk/navigation, stop/resume cancellation, source-collapse pruning and
+query/collapse/exact row position after Talk/Back and Settings/Back. Sprite pets now share the
+observed reduced-motion/lifecycle/power policy used by GIFs.
+
+Earlier Task 7 checks cover real two-pointer/cancel events and static native tile rendering.
+The [verification record](verification.json) identifies final checks,
 reused receipts and capability limits. Warning-strict Gradle runs use JDK 17 and the existing
 pinned stock/extension Python environments. Device tests use only guarded owned emulators and
 a worker-owned ADB server; physical setup and personal captures are excluded.
