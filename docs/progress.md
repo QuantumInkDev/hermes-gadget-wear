@@ -1,5 +1,18 @@
 # Progress
 
+## Image-only 1×1 shortcut — 2026-10-14
+
+At the owner's request, a configured Focus widget with available artwork shows only the
+image; the portrait fills the former caption space. Full name/source remain accessible.
+Missing-art/recovery labels and larger-widget captions are retained. Four native Focus
+exports are refreshed with per-asset provenance. The existing native mismatch check now
+requires the hidden caption and full accessible name. Twelve affected native methods and
+strict full checks/all four APKs pass (133 JVM tests /38 reports, no failures/errors/skips).
+Build `acfe414` is installed, preserving all 104 baseline files, 18 identities, 55 art files,
+timeout, widget configuration and seven providers. The phone was locked during the final
+visual check; native verification and preserving installation are proven, physical visual
+readback awaits unlock. Private records remain in `.local/widget-image-only/`.
+
 ## Nova widget sizing correction — 2026-10-14
 
 The owner's configured 1×1 Nova widget showed recovery because the launcher's advertised

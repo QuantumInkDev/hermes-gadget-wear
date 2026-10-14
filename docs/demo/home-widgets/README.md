@@ -2,7 +2,7 @@
 
 [Interactive native gallery](index.html) — seven layouts × four appearances, using
 original public fixture robots. The dimensions are **rows × columns**; 1×4 and 1×5
-are horizontal. Captions and portraits are separate; every cell opens the exact bot.
+are horizontal. The configured 1×1 portrait has no caption, per the owner’s 2026-10-14 refinement; larger layouts retain separate captions. Every cell opens the exact bot.
 
 `HomeWidgetHostTest` binds real provider IDs, sends RemoteViews through AppWidgetManager,
 inflates them in AppWidgetHostView and measures 112 small/large, portrait/landscape,
@@ -31,3 +31,7 @@ To add: long-press the launcher → Widgets → Quantum Relay for Hermes → cho
 Choose slots, use Move earlier/later to order them, pick an appearance and Save widget.
 Reconfigure through the launcher or Settings → Home screen widgets. Widgets use the
 current effective portrait's static PNG fallback; animation remains in the apps.
+
+The four Focus PNGs were refreshed for the image-only refinement at their per-asset
+source/APK hashes in the manifest. Names/source remain accessible to screen readers;
+missing artwork and empty/unavailable slots retain their recovery labels.

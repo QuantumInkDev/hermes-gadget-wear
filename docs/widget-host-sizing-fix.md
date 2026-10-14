@@ -45,3 +45,13 @@ Phone captures and device-specific records remain private under `.local/widget-l
 No personal image is published. The newly booted test emulator is stopped after verification,
 with its prior data retained. The physical watch is unchanged. Other physical widget sizes,
 launchers, wallpaper changes and remaining release gates retain their earlier status.
+
+## Owner follow-up: image-only Focus
+
+Production `acfe414` removes the visible caption when Focus artwork is present and lets the
+portrait fill the space. Accessible name/source and missing-art recovery remain. Larger
+layouts keep their captions. All twelve affected native methods and strict checks/all four
+APKs pass. The preserving phone update retains all 104 baseline files, 18 identities, 55
+artwork files and configuration. The phone was locked at final visual inspection; the new
+image-only appearance is native-tested but not claimed as physically read back. Four public
+synthetic Focus exports have refreshed per-asset hashes. Private receipts stay ignored.

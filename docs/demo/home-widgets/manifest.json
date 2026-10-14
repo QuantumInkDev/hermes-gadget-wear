@@ -47,35 +47,59 @@
     },
     {
       "file": "focus-dark.png",
-      "sha256": "3009533a5d1c66f39ab18c21c2028fee62d7c8710d6d437c07e63b51d8bf3b88",
+      "sha256": "96a88ea8ae295529853df0f7a4a51d3830ff3e812d136a8727c13a37f0f76cf4",
       "size": [
         149,
         267
-      ]
+      ],
+      "source_commit": "acfe414e6788c318f4f40cf4a6b5e061e645746b",
+      "artifacts": {
+        "mobile_apk": "158f00e8806172a44563cd5b19085ab234bd6fdfb4fe625cec9c21f04c0d685a",
+        "mobile_test_apk": "a9a141aed1987217ea2c8c8b47400d994cad785dfdc4e96e8ed28963217356ec"
+      },
+      "change": "Maintainer requested image-only configured 1x1; accessible name retained."
     },
     {
       "file": "focus-light.png",
-      "sha256": "938b240c1f76075a48caaf758d2812baeb878ddeebda9e54f5cd265fbcc8e7ea",
+      "sha256": "0263e300f1be7bfb7372de9e64a1fa06251197baef9142b56c1384ba604d4ae3",
       "size": [
         149,
         267
-      ]
+      ],
+      "source_commit": "acfe414e6788c318f4f40cf4a6b5e061e645746b",
+      "artifacts": {
+        "mobile_apk": "158f00e8806172a44563cd5b19085ab234bd6fdfb4fe625cec9c21f04c0d685a",
+        "mobile_test_apk": "a9a141aed1987217ea2c8c8b47400d994cad785dfdc4e96e8ed28963217356ec"
+      },
+      "change": "Maintainer requested image-only configured 1x1; accessible name retained."
     },
     {
       "file": "focus-moonlight.png",
-      "sha256": "27f75c0f1e7ea6f894cbb06acf48c0854e7109f2a9b6897876f708e1737c4f9f",
+      "sha256": "7bfca6808f1dd63694d079c3632348e82156ee8b31585f8317e2ac38d38caaaa",
       "size": [
         149,
         267
-      ]
+      ],
+      "source_commit": "acfe414e6788c318f4f40cf4a6b5e061e645746b",
+      "artifacts": {
+        "mobile_apk": "158f00e8806172a44563cd5b19085ab234bd6fdfb4fe625cec9c21f04c0d685a",
+        "mobile_test_apk": "a9a141aed1987217ea2c8c8b47400d994cad785dfdc4e96e8ed28963217356ec"
+      },
+      "change": "Maintainer requested image-only configured 1x1; accessible name retained."
     },
     {
       "file": "focus-system.png",
-      "sha256": "f80f83ac04f3621b365744fc5b76c08325227e6d1726692eff62bbf9ab98f04e",
+      "sha256": "b98e02bdbe9f3eb3e7a70b43e3836772f3cc80cc40ed4a902b029d58b06fccc5",
       "size": [
         149,
         267
-      ]
+      ],
+      "source_commit": "acfe414e6788c318f4f40cf4a6b5e061e645746b",
+      "artifacts": {
+        "mobile_apk": "158f00e8806172a44563cd5b19085ab234bd6fdfb4fe625cec9c21f04c0d685a",
+        "mobile_test_apk": "a9a141aed1987217ea2c8c8b47400d994cad785dfdc4e96e8ed28963217356ec"
+      },
+      "change": "Maintainer requested image-only configured 1x1; accessible name retained."
     },
     {
       "file": "four-dark.png",
@@ -246,5 +270,6 @@
       ]
     }
   ],
-  "os_night_transition": "Same native hosts retain published RemoteViews across an actual OS day/night change, rebuild content and verify System surface/text/accent change; all three fixed palettes and app appearance unchanged, original OS mode restored."
+  "os_night_transition": "Same native hosts retain published RemoteViews across an actual OS day/night change, rebuild content and verify System surface/text/accent change; all three fixed palettes and app appearance unchanged, original OS mode restored.",
+  "followup": "The four Focus exports are refreshed at their per-asset source/APK hashes; all other assets retain the original provenance."
 }

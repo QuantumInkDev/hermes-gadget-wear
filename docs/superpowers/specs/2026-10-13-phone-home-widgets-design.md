@@ -62,6 +62,10 @@ actual wallpaper and night changes instead of relying on these mockup palettes.
 [Android dynamic widget colors](https://developer.android.com/develop/ui/views/appwidgets/enhance)
 supports system DayNight theming and API-specific fallbacks.
 
+Owner refinement, 2026-10-14: a configured 1×1 Focus widget with available artwork is image-only.
+Keep its full name/source in accessible semantics; missing-art/recovery labels remain. Larger
+layouts continue to use captions. This supersedes the original 1×1 caption treatment below.
+
 Use a quiet rounded tonal container, circular portraits and captions beneath each image.
 Keep microphones, menus, selection badges and status dots off the artwork. One entire cell
 is the profile target, at least 48 dp in either dimension at supported placement sizes.

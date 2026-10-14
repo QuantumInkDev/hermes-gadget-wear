@@ -1,5 +1,15 @@
-<!-- Current continuation: Nova widget sizing fix b264796 is installed; the existing 1x1 portrait and Talk/Chat launch are verified. All 104 baseline files /18 identities /55 art files preserved. Watch f35bf59 unchanged. -->
+<!-- Current continuation: 1x1 portrait-only refinement acfe414 installed; 104 baseline files /18 identities /55 artwork files preserved. Native checks pass; phone was locked during final visual check. -->
 # Session status
+
+The owner requested an image-only 1×1 shortcut. Build `acfe414` hides the caption when the
+configured Focus portrait is available, giving that space to the image. The full name/source
+remain on the accessible cell; missing-art/recovery labels and larger-widget captions remain.
+Strict checks/all four APKs pass 133 JVM tests /38 reports and twelve affected native methods.
+Four synthetic Focus gallery exports are refreshed with individual source/APK provenance.
+The matching-signer preserving update is installed on the phone: all 104 baseline files,
+18 identities, 55 art files, timeout and seven providers are unchanged. Its configuration
+is retained. The phone was locked during the final visual check, so this image-only delivery's
+physical appearance is not claimed as observed. Private receipts: `.local/widget-image-only/`.
 
 The configured Nova 1×1 widget recovery bug is fixed and physically verified at `b264796`.
 The renderer supplies supported-minimum and tiny-recovery variants alongside advertised
