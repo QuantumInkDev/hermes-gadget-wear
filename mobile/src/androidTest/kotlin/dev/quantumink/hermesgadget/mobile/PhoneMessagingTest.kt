@@ -4,7 +4,10 @@ import android.graphics.Rect
 import android.os.SystemClock
 import android.view.InputDevice
 import android.view.MotionEvent
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import dev.quantumink.hermesgadget.protocol.ConnectionState
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
 import dev.quantumink.hermesgadget.protocol.ConversationMode
@@ -16,6 +19,84 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class PhoneMessagingTest {
+    @Test fun failedAccessibleStartReturnsToTheTextComposerWithoutSending() {
+        assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
+        NativePhoneFixture().use { ui ->
+            val state = mutableStateOf(ready())
+            var sent = 0
+            var cancelled = 0
+            ui.show { modifier ->
+                ConversationControls(state.value, {}, {}, {
+                    state.value = state.value.copy(
+                        connection = state.value.connection.copy(
+                            conversation = ConversationState(mode = ConversationMode.LISTENING)
+                        )
+                    )
+                }, { sent++ }, { cancelled++ }, {}, {}, false, modifier)
+            }
+            ui.click("Hold to record", true)
+            ui.await { ui.find("Finish and send recording", true) != null }
+            state.value = ready().copy(error = "Microphone unavailable.")
+            ui.await { ui.find("Hold to record", true) != null }
+            ui.enter("Draft after failed recording")
+            assertEquals(0, sent)
+            assertEquals(1, cancelled)
+        }
+    }
+
+    @Test fun rtlKeepsCancelPhysicallyLeftOfTheMic() {
+        assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
+        NativePhoneFixture().use { ui ->
+            val state = mutableStateOf(ready())
+            var sent = 0
+            var cancelled = 0
+            ui.show { modifier ->
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                    ConversationControls(state.value, {}, {}, {
+                        state.value = state.value.copy(
+                            connection = state.value.connection.copy(
+                                conversation = ConversationState(mode = ConversationMode.LISTENING)
+                            )
+                        )
+                    }, { sent++ }, { cancelled++ }, {}, {}, false, modifier)
+                }
+            }
+            ui.await { mic(ui) != null }
+            val micBounds = Rect().also(requireNotNull(mic(ui))::getBoundsInScreen)
+            val start = SystemClock.uptimeMillis()
+            fun event(action: Int, x: Float) {
+                val event = MotionEvent.obtain(
+                    start,
+                    SystemClock.uptimeMillis(),
+                    action,
+                    x,
+                    micBounds.exactCenterY(),
+                    0
+                )
+                event.source = InputDevice.SOURCE_TOUCHSCREEN
+                assertTrue(ui.instrumentation.uiAutomation.injectInputEvent(event, true))
+                event.recycle()
+            }
+            event(MotionEvent.ACTION_DOWN, micBounds.exactCenterX())
+            SystemClock.sleep(400)
+            val cancelBounds = Rect().also(
+                requireNotNull(ui.find("Cancel recording", true))::getBoundsInScreen
+            )
+            assertTrue(
+                "RTL reversed physical cancellation controls",
+                cancelBounds.centerX() < micBounds.centerX()
+            )
+            event(
+                MotionEvent.ACTION_MOVE,
+                micBounds.exactCenterX() - 75 * ui.context.resources.displayMetrics.density
+            )
+            event(MotionEvent.ACTION_UP, micBounds.exactCenterX())
+            ui.instrumentation.waitForIdleSync()
+            assertEquals(1, cancelled)
+            assertEquals(0, sent)
+        }
+    }
+
     @Test fun releaseShortPressAndPointerCancellationHaveOneTerminalOutcome() {
         assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
         for (kind in listOf("release", "short", "cancel", "disconnect")) {

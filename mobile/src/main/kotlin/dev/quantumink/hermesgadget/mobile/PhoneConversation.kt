@@ -11,6 +11,7 @@ import dev.quantumink.hermesgadget.protocol.ConnectionObserver
 import dev.quantumink.hermesgadget.protocol.ConnectionState
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
 import dev.quantumink.hermesgadget.protocol.ConversationEffect
+import dev.quantumink.hermesgadget.protocol.ConversationMode
 import dev.quantumink.hermesgadget.protocol.ConversationState
 import dev.quantumink.hermesgadget.protocol.DirectConnection
 import dev.quantumink.hermesgadget.protocol.EndpointProfile
@@ -37,6 +38,7 @@ data class PhoneConversationState(
     val speaking: Boolean = false,
     val playbackLevel: Float = 0f,
     val recordingStartedAt: Long? = null,
+    val recordingEndVersion: Long = 0,
     val mediaMuted: Boolean = false,
     val visible: Boolean = false,
     val error: String = ""
@@ -75,6 +77,7 @@ class PhoneConversation @JvmOverloads constructor(
     private var playback: PcmPlayback? = null
     private var recordingFeedback: RecordingFeedback? = null
     private var recordingToken: String? = null
+    private var recordingRequested = false
     private val cues = RecordingCues(application)
 
     @Synchronized fun open(
@@ -148,6 +151,10 @@ class PhoneConversation @JvmOverloads constructor(
                     val socket = connection ?: return@synchronized
                     when (effect) {
                         is ConversationEffect.CaptureStart -> {
+                            if (!recordingRequested) {
+                                socket.cancelRecording()
+                                return@synchronized
+                            }
                             recordingToken = effect.token
                             mutable.update { it.copy(recordingStartedAt = null) }
                             feedback.begin(effect.token)
@@ -163,6 +170,7 @@ class PhoneConversation @JvmOverloads constructor(
                                                 version
                                             )
                                         ) {
+                                            endRecordingAttempt()
                                             socket.captureFailed(
                                                 effect.token,
                                                 "Microphone unavailable."
@@ -205,8 +213,7 @@ class PhoneConversation @JvmOverloads constructor(
                         is ConversationEffect.RecordingOutcome ->
                             feedback.outcome(effect.token, effect.finished)
                         ConversationEffect.CaptureStop -> {
-                            recordingToken = null
-                            mutable.update { it.copy(recordingStartedAt = null) }
+                            endRecordingAttempt()
                             microphone.stop()
                         }
                         is ConversationEffect.PlaybackStart -> {
@@ -340,20 +347,44 @@ class PhoneConversation @JvmOverloads constructor(
     }
 
     @Synchronized fun startRecording() {
-        if (mutable.value.visible && !mutable.value.sending) connection?.startRecording()
+        val current = mutable.value
+        if (recordingRequested) return
+        if (current.visible && !current.sending &&
+            current.connection.status == ConnectionStatus.PAIRED &&
+            !current.connection.conversation.busy &&
+            current.connection.conversation.mode != ConversationMode.LISTENING
+        ) {
+            recordingRequested = true
+            mutable.update { it.copy(error = "") }
+            connection?.startRecording()
+        } else {
+            endRecordingAttempt()
+        }
     }
 
     @Synchronized fun finishRecording() {
-        recordingToken = null
-        mutable.update { it.copy(recordingStartedAt = null) }
+        endRecordingAttempt()
         if (mutable.value.visible && capture?.finish() != true) connection?.finishRecording()
     }
 
     @Synchronized fun cancelRecording() {
-        recordingToken = null
-        mutable.update { it.copy(recordingStartedAt = null) }
+        endRecordingAttempt()
         capture?.stop()
         connection?.cancelRecording()
+    }
+
+    /** Permission never auto-starts a stale press; the UI receives a terminal attempt signal. */
+    @Synchronized fun recordingUnavailable(reason: String) {
+        cancelRecording()
+        notice(reason)
+    }
+
+    private fun endRecordingAttempt() {
+        recordingRequested = false
+        recordingToken = null
+        mutable.update {
+            it.copy(recordingStartedAt = null, recordingEndVersion = it.recordingEndVersion + 1)
+        }
     }
 
     @Synchronized fun answer(id: String, yes: Boolean) {
@@ -375,6 +406,7 @@ class PhoneConversation @JvmOverloads constructor(
     @Synchronized fun hide() {
         ++epoch // Invalidate observers before stopping adapters or closing the socket.
         recordingToken = null
+        recordingRequested = false
         recordingFeedback?.invalidate()
         recordingFeedback = null
         capture?.stop()

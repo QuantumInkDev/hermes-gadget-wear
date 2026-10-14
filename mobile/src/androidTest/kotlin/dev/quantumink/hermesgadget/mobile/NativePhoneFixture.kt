@@ -220,6 +220,21 @@ internal class NativePhoneFixture : AutoCloseable {
         image.recycle()
     }
     override fun close() {
+        // A failed gesture assertion must not leave InputDispatcher's injected pointer down.
+        val now = SystemClock.uptimeMillis()
+        val cancel = android.view.MotionEvent.obtain(
+            now,
+            now,
+            android.view.MotionEvent.ACTION_CANCEL,
+            0f,
+            0f,
+            0
+        ).apply { source = android.view.InputDevice.SOURCE_TOUCHSCREEN }
+        try {
+            instrumentation.uiAutomation.injectInputEvent(cancel, true)
+        } finally {
+            cancel.recycle()
+        }
         instrumentation.uiAutomation.serviceInfo = instrumentation.uiAutomation.serviceInfo.apply {
             flags = originalAccessibilityFlags
         }

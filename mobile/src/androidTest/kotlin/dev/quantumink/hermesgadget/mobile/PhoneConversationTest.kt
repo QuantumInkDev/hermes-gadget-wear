@@ -298,6 +298,51 @@ class PhoneConversationTest {
         }
     }
 
+    @Test fun permissionCompletionReturnsAccessibleRecordingToIdleWithoutCapture() = fixture {
+            model,
+            profiles,
+            _,
+            _
+        ->
+        NativePhoneFixture().use { ui ->
+            model.open(profiles[0])
+            model.connect()
+            await { model.state.value.connection.status == ConnectionStatus.PAIRED }
+            var result = "Microphone ready. Hold to talk again."
+            ui.show { modifier ->
+                ConversationPage(
+                    model,
+                    null,
+                    model::connect,
+                    { model.recordingUnavailable(result) },
+                    model::hide,
+                    modifier
+                )
+            }
+            for (message in listOf(
+                "Microphone ready. Hold to talk again.",
+                "Microphone permission was declined."
+            )) {
+                result = message
+                val before = model.state.value.recordingEndVersion
+                ui.click("Hold to record", true)
+                await { model.state.value.recordingEndVersion > before }
+                ui.await { ui.find(message) != null && ui.find("Hold to record", true) != null }
+                assertEquals(ConversationMode.READY, model.state.value.connection.conversation.mode)
+                assertEquals(null, model.state.value.recordingStartedAt)
+                assertEquals(null, ui.find("Finish and send recording", true))
+            }
+            ui.enter("Draft after permission completion")
+            assertEquals("Draft after permission completion", model.state.value.draft)
+            ui.click("Send message", true)
+            await {
+                model.state.value.connection.conversation.reply.contains(
+                    "Draft after permission completion"
+                )
+            }
+        }
+    }
+
     private fun fixture(
         factory: (
             (

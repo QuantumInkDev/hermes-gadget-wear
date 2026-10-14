@@ -22,6 +22,7 @@ class PcmCapture(private val context: Context) {
         val stopped = AtomicBoolean(false)
         val finishing = AtomicBoolean(false)
         val started = AtomicBoolean(false)
+        val startup = CaptureStartGate()
 
         @Volatile var recorder: AudioRecord? = null
     }
@@ -69,9 +70,14 @@ class PcmCapture(private val context: Context) {
                 capture.recorder = recorder
                 check(recorder.state == AudioRecord.STATE_INITIALIZED)
                 if (capture.stopped.get()) return@Thread
-                recorder.startRecording()
-                check(recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING)
-                capture.started.set(true)
+                if (!capture.startup.start {
+                        recorder.startRecording()
+                        check(recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING)
+                        capture.started.set(true)
+                    }
+                ) {
+                    return@Thread
+                }
                 onStarted()
                 if (capture.stopped.get() || capture.finishing.get()) return@Thread
                 // Drop the samples recorded while the start cue ran, before forwarding audio.
@@ -127,6 +133,13 @@ class PcmCapture(private val context: Context) {
     @Synchronized
     fun finish(): Boolean {
         val capture = active ?: return false
+        if (capture.finishing.get()) return true
+        if (!capture.startup.finish()) {
+            active = null
+            capture.stopped.set(true)
+            capture.recorder?.let { runCatching { it.stop() } }
+            return false
+        }
         capture.finishing.set(true)
         capture.recorder?.let { runCatching { it.stop() } }
         return true
@@ -137,6 +150,7 @@ class PcmCapture(private val context: Context) {
         val capture = active ?: return
         active = null
         capture.stopped.set(true)
+        capture.startup.cancel()
         capture.recorder?.let { runCatching { it.stop() } }
     }
 }

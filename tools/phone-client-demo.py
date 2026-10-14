@@ -80,7 +80,7 @@ def main():
                 subprocess.run(command, env=env, check=True, stdout=output, stderr=subprocess.STDOUT,
                                timeout=90)
             result = args.output.read_text()
-            if "OK (5 tests)" not in result or "FAILURES!!!" in result:
+            if "OK (6 tests)" not in result or "FAILURES!!!" in result:
                 raise RuntimeError("Phone client instrumentation failed; inspect the output log.")
             print("Phone identity and two-stock-TLS-server checks passed.")
         finally:

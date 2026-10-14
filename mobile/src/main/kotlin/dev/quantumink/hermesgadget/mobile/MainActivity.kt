@@ -117,7 +117,7 @@ class MainActivity : ComponentActivity() {
         }
     private val microphone =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            conversation.notice(
+            conversation.recordingUnavailable(
                 if (granted) {
                     "Microphone ready. Hold to talk again."
                 } else {
@@ -402,6 +402,7 @@ class MainActivity : ComponentActivity() {
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) !=
             PackageManager.PERMISSION_GRANTED
         ) {
+            conversation.recordingUnavailable("Allow microphone access, then hold to talk again.")
             microphone.launch(Manifest.permission.RECORD_AUDIO)
         } else {
             conversation.startRecording()

@@ -155,6 +155,11 @@ class DirectoryPresentationTest {
                 }
             )
             fixture.awaitDescription("Open Alpha Talk and Chat")
+            // A progressive OFFLINE page is visible before the refresh's final vault write.
+            // Wait for the actual UI operation to finish before the fixture edits that vault.
+            fixture.await {
+                fixture.findDescription("Open Alpha Talk and Chat")?.isEnabled == true
+            }
             fixture.withdrawAlpha()
             fixture.clickDescription("Options for Alpha")
             fixture.clickText("Forget withdrawn card")
