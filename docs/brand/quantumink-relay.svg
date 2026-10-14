@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108">
+  <title>QuantumInk Relay original orbit and speech icon</title>
+  <rect width="108" height="108" rx="24" fill="#141a24" />
+  <path d="M36 28H72C81 28 86 34 86 43V64C86 72 80 78 72 78H50L34 86V78C26 77 22 72 22 64V43C22 34 28 28 36 28Z"
+      fill="none" stroke="#e9edf8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M39 44L68 43L57 65Z" fill="none" stroke="#9dabff" stroke-width="3" stroke-linejoin="round" />
+  <g fill="#7dddd2">
+    <circle cx="39" cy="44" r="6" />
+    <circle cx="68" cy="43" r="6" />
+    <circle cx="57" cy="65" r="6" />
+  </g>
+</svg>

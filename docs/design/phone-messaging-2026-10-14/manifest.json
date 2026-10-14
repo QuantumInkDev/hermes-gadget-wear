@@ -1,0 +1,15 @@
+{
+  "status": "proposed, not production",
+  "assets": [
+    {
+      "file": "courier-concept.png",
+      "sha256": "80b9f1f9d315e213e9633c8726524bc35e934412d5752427dbeb8a010ebf016f",
+      "origin": "built-in image generation, original, no references"
+    },
+    {
+      "file": "winged-relay-concept.svg",
+      "sha256": "5ac1ae5230cd4c072b9f229521b70f7668e19d6946fcb176ea4ce1112192d9dd",
+      "origin": "original geometric SVG"
+    }
+  ]
+}

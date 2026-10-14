@@ -27,13 +27,17 @@ import androidx.wear.compose.foundation.AmbientMode
 import androidx.wear.compose.foundation.AmbientTickEffect
 import androidx.wear.compose.foundation.LocalAmbientModeManager
 import androidx.wear.compose.foundation.rememberAmbientModeManager
-import androidx.wear.compose.material3.MaterialTheme
+import dev.quantumink.hermesgadget.client.AppearancePreferences
+import dev.quantumink.hermesgadget.protocol.ConnectionStatus
+import dev.quantumink.hermesgadget.protocol.ConversationMode
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 class MainActivity : ComponentActivity() {
     private var gadget by mutableStateOf<GadgetService?>(null)
     private var bound = false
+    private val navigation = WatchNavigation()
+    private val tileLaunch = TileProfileLaunch()
     private val networkPermissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { gadget?.connect() }
@@ -71,15 +75,21 @@ class MainActivity : ComponentActivity() {
                 true
             }
         )
-        if (current.state.value.profile != null && !current.state.value.loading) requestConnection()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val launchIntent = savedInstanceState?.getString("pendingTileKey")?.let {
+            Intent().putExtra(TileProfileLaunch.EXTRA_PAGE_KEY, it)
+        } ?: intent
+        tileLaunch.receive(launchIntent)
+        intent.removeExtra(TileProfileLaunch.EXTRA_PAGE_KEY)
         setContent {
             val ambientManager = rememberAmbientModeManager()
             CompositionLocalProvider(LocalAmbientModeManager provides ambientManager) {
-                MaterialTheme {
+                val appearance = remember { AppearancePreferences(this@MainActivity) }
+                val mode by appearance.mode.collectAsStateWithLifecycle()
+                WatchAppearance(mode) {
                     val ambient = ambientManager.currentAmbientMode as? AmbientMode.Ambient
                     var minute by remember {
                         mutableLongStateOf(System.currentTimeMillis() / 60000)
@@ -92,24 +102,92 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     val service = gadget
-                    if (service == null) {
-                        WaitingScreen()
-                    } else if (ambient != null) {
-                        val pets = remember(service) {
-                            service.state.map { it.pet }.distinctUntilChanged()
+                    val watch = service?.state?.collectAsStateWithLifecycle()?.value
+                    KeepConversationVisible(
+                        window,
+                        watch?.screenTurnStarted,
+                        watch?.conversationInProgress == true,
+                        ambient != null
+                    ) { service?.screenLeaseExpired(watch?.screenTurnStarted) }
+                    LaunchedEffect(service, watch, tileLaunch.pendingKey) {
+                        if (service != null && watch != null) reconcileTile(service)
+                    }
+                    if (ambient != null) {
+                        val artwork = if (service == null) {
+                            null to null
+                        } else {
+                            val pictures = remember(service) {
+                                service.state.map { watch ->
+                                    val page = ProfilePages.merge(watch.profiles, watch.catalog)
+                                        .singleOrNull { it.key == watch.selectedPage }
+                                    val artwork = page?.let { watch.artwork[it.key] }
+                                    val pet = if (page?.approved?.endpoint?.url ==
+                                        watch.profile?.endpoint?.url &&
+                                        page?.approved != null
+                                    ) {
+                                        watch.pet ?: artwork?.pet
+                                    } else {
+                                        artwork?.pet
+                                    }
+                                    pet to artwork?.portrait
+                                }.distinctUntilChanged()
+                            }
+                            val artwork by pictures.collectAsStateWithLifecycle(
+                                initialValue =
+                                null to null
+                            )
+                            artwork
                         }
-                        val pet by pets.collectAsStateWithLifecycle(initialValue = null)
                         AmbientPet(
-                            pet,
+                            artwork.first,
                             minute,
                             ambient.isLowBitAmbientSupported,
-                            ambient.isBurnInProtectionRequired
+                            ambient.isBurnInProtectionRequired,
+                            artwork.second
                         )
+                    } else if (service == null ||
+                        (tileLaunch.pendingKey != null && !tileLaunch.deferred)
+                    ) {
+                        WaitingScreen()
+                    } else if (tileLaunch.unavailable) {
+                        RoundPage {
+                            item { Heading("Profile unavailable") }
+                            item {
+                                Body(
+                                    "This tile's profile was removed or is not in the local roster."
+                                )
+                            }
+                            item {
+                                Secondary("Choose a profile", {
+                                    tileLaunch.clear()
+                                    navigation.route.value = "home"
+                                    navigation.pickerOpen.value = true
+                                })
+                            }
+                        }
                     } else {
+                        if (tileLaunch.notice.isNotEmpty()) {
+                            androidx.compose.ui.window.Dialog(
+                                onDismissRequest = tileLaunch::dismissNotice
+                            ) {
+                                RoundPage {
+                                    item { Heading("Profile waiting") }
+                                    item { Body(tileLaunch.notice) }
+                                    item {
+                                        Secondary(
+                                            "Continue current turn",
+                                            tileLaunch::dismissNotice
+                                        )
+                                    }
+                                    item { Secondary("Cancel switch", tileLaunch::clear) }
+                                }
+                            }
+                        }
                         WatchScreen(
                             service = service,
                             connect = ::requestConnection,
                             startRecording = ::requestRecording,
+                            navigation = navigation,
                             permissions = {
                                 startActivity(
                                     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
@@ -123,6 +201,30 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun reconcileTile(service: GadgetService) {
+        tileLaunch.reconcile(service.state.value) { key ->
+            service.rememberPage(key)
+            navigation.page.value = key
+            navigation.route.value = "home"
+            navigation.pickerOpen.value = false
+            navigation.pinKey.value = null
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        tileLaunch.receive(intent)
+        intent.removeExtra(TileProfileLaunch.EXTRA_PAGE_KEY)
+        setIntent(intent)
+        gadget?.let(::reconcileTile)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        val pending = tileLaunch.pendingKey ?: if (tileLaunch.unavailable) "" else null
+        pending?.let { outState.putString("pendingTileKey", it) }
+        super.onSaveInstanceState(outState)
+    }
+
     override fun onStart() {
         super.onStart()
         if (!bound) {
@@ -134,6 +236,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         gadget?.hidden()
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.attributes = window.attributes.apply {
             screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
         }

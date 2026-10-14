@@ -1,0 +1,275 @@
+{
+  "source_commit": "5a9a459ca8972b2f7a2668cd9411913752f71110",
+  "artifacts": {
+    "mobile_apk": "82234bdf1662b29e662128c464dfe32c65e14b699804b4f2c094a23db7788102",
+    "mobile_test_apk": "1b24e7d8e761da057cd3e66dacc0841a94b55e575dc2fcb6489c2aa304bae792"
+  },
+  "synthetic_only": true,
+  "origin": "HomeWidgetHostTest on native Android API37 AppWidgetHostView; raw view.draw exports exclude launcher padding. host-screen.png is an unretouched UiAutomation screenshot of the non-exported synthetic debug host. Production FLAG_SECURE is retained.",
+  "geometry_scenarios": 112,
+  "capability_limits": [
+    "Actual two-wallpaper palette changes unverified: emulator wallpaper could not be backed up; no mutation attempted.",
+    "API29-30 runtime unavailable; fallback resources and strict lint pass.",
+    "Physical One UI placement, five-column grid, reboot and exact taps await phone connection/owner observation."
+  ],
+  "assets": [
+    {
+      "file": "eight-dark.png",
+      "sha256": "fa2ab4407115a8d3cf85b4315ed473c35e366373f5dbc3623503dea847881e29",
+      "size": [
+        724,
+        577
+      ]
+    },
+    {
+      "file": "eight-light.png",
+      "sha256": "ec926a70ced0dc462ae0435d6cad697e1a95863593d6dc004541cebf54a99156",
+      "size": [
+        724,
+        577
+      ]
+    },
+    {
+      "file": "eight-moonlight.png",
+      "sha256": "e24de083c823f6974779306d3d8b294733ae8b02657d99686b3845a9ed88fee3",
+      "size": [
+        724,
+        577
+      ]
+    },
+    {
+      "file": "eight-system.png",
+      "sha256": "7e5347bf2c6183d338ffd7049d0bb167940b69e1f89d809f7bacc610df274c90",
+      "size": [
+        724,
+        577
+      ]
+    },
+    {
+      "file": "focus-dark.png",
+      "sha256": "96a88ea8ae295529853df0f7a4a51d3830ff3e812d136a8727c13a37f0f76cf4",
+      "size": [
+        149,
+        267
+      ],
+      "source_commit": "acfe414e6788c318f4f40cf4a6b5e061e645746b",
+      "artifacts": {
+        "mobile_apk": "158f00e8806172a44563cd5b19085ab234bd6fdfb4fe625cec9c21f04c0d685a",
+        "mobile_test_apk": "a9a141aed1987217ea2c8c8b47400d994cad785dfdc4e96e8ed28963217356ec"
+      },
+      "change": "Maintainer requested image-only configured 1x1; accessible name retained."
+    },
+    {
+      "file": "focus-light.png",
+      "sha256": "0263e300f1be7bfb7372de9e64a1fa06251197baef9142b56c1384ba604d4ae3",
+      "size": [
+        149,
+        267
+      ],
+      "source_commit": "acfe414e6788c318f4f40cf4a6b5e061e645746b",
+      "artifacts": {
+        "mobile_apk": "158f00e8806172a44563cd5b19085ab234bd6fdfb4fe625cec9c21f04c0d685a",
+        "mobile_test_apk": "a9a141aed1987217ea2c8c8b47400d994cad785dfdc4e96e8ed28963217356ec"
+      },
+      "change": "Maintainer requested image-only configured 1x1; accessible name retained."
+    },
+    {
+      "file": "focus-moonlight.png",
+      "sha256": "7bfca6808f1dd63694d079c3632348e82156ee8b31585f8317e2ac38d38caaaa",
+      "size": [
+        149,
+        267
+      ],
+      "source_commit": "acfe414e6788c318f4f40cf4a6b5e061e645746b",
+      "artifacts": {
+        "mobile_apk": "158f00e8806172a44563cd5b19085ab234bd6fdfb4fe625cec9c21f04c0d685a",
+        "mobile_test_apk": "a9a141aed1987217ea2c8c8b47400d994cad785dfdc4e96e8ed28963217356ec"
+      },
+      "change": "Maintainer requested image-only configured 1x1; accessible name retained."
+    },
+    {
+      "file": "focus-system.png",
+      "sha256": "b98e02bdbe9f3eb3e7a70b43e3836772f3cc80cc40ed4a902b029d58b06fccc5",
+      "size": [
+        149,
+        267
+      ],
+      "source_commit": "acfe414e6788c318f4f40cf4a6b5e061e645746b",
+      "artifacts": {
+        "mobile_apk": "158f00e8806172a44563cd5b19085ab234bd6fdfb4fe625cec9c21f04c0d685a",
+        "mobile_test_apk": "a9a141aed1987217ea2c8c8b47400d994cad785dfdc4e96e8ed28963217356ec"
+      },
+      "change": "Maintainer requested image-only configured 1x1; accessible name retained."
+    },
+    {
+      "file": "four-dark.png",
+      "sha256": "68003203405f46c87595efb2012eea2581ad79ef4776b7439e6c3ec117f2a319",
+      "size": [
+        341,
+        577
+      ]
+    },
+    {
+      "file": "four-light.png",
+      "sha256": "0a742c0b6b0a0a0255481c67d557235574e45148aaea194ba3445c0ff0c29627",
+      "size": [
+        341,
+        577
+      ]
+    },
+    {
+      "file": "four-moonlight.png",
+      "sha256": "1189b1b20b388f8da2327abcffd8d1d6575ee189efca5c7b80d9e7f0e71d80a4",
+      "size": [
+        341,
+        577
+      ]
+    },
+    {
+      "file": "four-system.png",
+      "sha256": "5bc3fb60c212a726bbe02ee9db7a7788bfc8009e78416b858210f53b8165e8f2",
+      "size": [
+        341,
+        577
+      ]
+    },
+    {
+      "file": "host-screen.png",
+      "sha256": "59b71f45ba4ca75707ba669d5c358f2927e452524d1b612a24772740510fb5bd",
+      "size": [
+        1080,
+        2400
+      ]
+    },
+    {
+      "file": "sixteen-dark.png",
+      "sha256": "b7d14849688d19d87315d8b54d567e06e65e062ab5582b60956c4ce13aee4e8a",
+      "size": [
+        724,
+        1194
+      ]
+    },
+    {
+      "file": "sixteen-light.png",
+      "sha256": "87f21b3deca026abf83bdc0fa8b71936dfded97be67ddd858f2de2d2acdf5eca",
+      "size": [
+        724,
+        1194
+      ]
+    },
+    {
+      "file": "sixteen-moonlight.png",
+      "sha256": "6fb0d78f94534ed3038712deeaea094068459191476a6b25e4a1f4b68cc60b70",
+      "size": [
+        724,
+        1194
+      ]
+    },
+    {
+      "file": "sixteen-system.png",
+      "sha256": "1a7a7294aad74b365e0b6b43023b333d659eeb87ffe68815f3a21ca0952c758a",
+      "size": [
+        724,
+        1194
+      ]
+    },
+    {
+      "file": "strip_five-dark.png",
+      "sha256": "4ffffd1a58e639d0a4eb4d84f155deebc2a983cae29be922d2a3532ea0b239a9",
+      "size": [
+        916,
+        267
+      ]
+    },
+    {
+      "file": "strip_five-light.png",
+      "sha256": "a0ce7e9fb5412e648c7b0e89544346e406e1e7460e0b682623cece27565eab5a",
+      "size": [
+        916,
+        267
+      ]
+    },
+    {
+      "file": "strip_five-moonlight.png",
+      "sha256": "6c3cf9dee568f2f79c4d3f90d80176cac8652d9b3a6366670f374f1b96f0e54a",
+      "size": [
+        916,
+        267
+      ]
+    },
+    {
+      "file": "strip_five-system.png",
+      "sha256": "ae954d5343869392f2d93d1a34e2c5cec3cce06c9754c2b9b99df216c62dc3c4",
+      "size": [
+        916,
+        267
+      ]
+    },
+    {
+      "file": "strip_four-dark.png",
+      "sha256": "1db37129b7798b7a4cc1bbc82e9c57ba93c85ef53ce69486f8f1c78505708d21",
+      "size": [
+        724,
+        267
+      ]
+    },
+    {
+      "file": "strip_four-light.png",
+      "sha256": "f190410eaf530cc4c741966967e18d37f878301d63a15c3667c2be9400fec6dc",
+      "size": [
+        724,
+        267
+      ]
+    },
+    {
+      "file": "strip_four-moonlight.png",
+      "sha256": "57a43f2d54cd879dcc3b0f73617a20025cdb9252009c4b66e87ef37bffc82780",
+      "size": [
+        724,
+        267
+      ]
+    },
+    {
+      "file": "strip_four-system.png",
+      "sha256": "48e1a76925da2a71e58cd99b22d76c0f1f1c1d1b16a268b3f34262e9e3d9b8d8",
+      "size": [
+        724,
+        267
+      ]
+    },
+    {
+      "file": "ten-dark.png",
+      "sha256": "042f4a53ba98950e79fb81d8fe3d803823fbaa91cca1427ccc12521984c5ec08",
+      "size": [
+        916,
+        577
+      ]
+    },
+    {
+      "file": "ten-light.png",
+      "sha256": "eb7375974a33f92fd608ee19e49303a413b179e6924129613f93e8cd1a50250e",
+      "size": [
+        916,
+        577
+      ]
+    },
+    {
+      "file": "ten-moonlight.png",
+      "sha256": "2e667595abb6bb8183c2df8f9d0595cbe3dd0797fcd22dd54c77089dc71adef3",
+      "size": [
+        916,
+        577
+      ]
+    },
+    {
+      "file": "ten-system.png",
+      "sha256": "fd23b409881fa06129427642feb4bb490065b7c0fe8b7665a71523d4639a3b3d",
+      "size": [
+        916,
+        577
+      ]
+    }
+  ],
+  "os_night_transition": "Same native hosts retain published RemoteViews across an actual OS day/night change, rebuild content and verify System surface/text/accent change; all three fixed palettes and app appearance unchanged, original OS mode restored.",
+  "followup": "The four Focus exports are refreshed at their per-asset source/APK hashes; all other assets retain the original provenance."
+}

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
@@ -9,19 +10,26 @@
     <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND" />
     <uses-feature android:name="android.software.companion_device_setup" android:required="false" />
     <application
+        android:name=".CompanionApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
-        android:icon="@drawable/ic_gadget"
+        android:icon="@mipmap/ic_quantumink_relay"
+        android:roundIcon="@mipmap/ic_quantumink_relay_round"
         android:label="@string/app_name"
         android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
-        <activity android:name=".MainActivity" android:exported="true">
+        <activity android:name=".MainActivity" android:exported="true"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+        <activity android:name=".widgets.HomeWidgetConfigActivity" android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" /></intent-filter>
         </activity>
         <receiver android:name=".RelayStopReceiver" android:exported="false" />
         <service android:name=".RelayService" android:exported="true"
@@ -31,5 +39,44 @@
                 <data android:scheme="wear" android:host="*" android:pathPrefix="/hermes/" />
             </intent-filter>
         </service>
+        <service android:name=".TilePinSyncService" android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/hermes/tile-pins/v1/" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.CAPABILITY_CHANGED" />
+                <data android:scheme="wear" android:host="*" android:path="/hermes_tile_watch_v1" />
+            </intent-filter>
+        </service>
+        <receiver android:name=".widgets.FocusHomeWidget" android:exported="false" android:label="@string/home_widget_focus">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/home_widget_focus" />
+        </receiver>
+        <receiver android:name=".widgets.FourHomeWidget" android:exported="false" android:label="@string/home_widget_four">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/home_widget_four" />
+        </receiver>
+        <receiver android:name=".widgets.EightHomeWidget" android:exported="false" android:label="@string/home_widget_eight">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/home_widget_eight" />
+        </receiver>
+        <receiver android:name=".widgets.FourStripHomeWidget" android:exported="false" android:label="@string/home_widget_strip_four">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/home_widget_strip_four" />
+        </receiver>
+        <receiver android:name=".widgets.SixteenHomeWidget" android:exported="false" android:label="@string/home_widget_sixteen">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/home_widget_sixteen" />
+        </receiver>
+        <receiver android:name=".widgets.FiveStripHomeWidget" android:exported="false" android:label="@string/home_widget_strip_five">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/home_widget_strip_five" />
+        </receiver>
+        <receiver android:name=".widgets.TenHomeWidget" android:exported="false" android:label="@string/home_widget_ten">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/home_widget_ten" />
+        </receiver>
     </application>
 </manifest>

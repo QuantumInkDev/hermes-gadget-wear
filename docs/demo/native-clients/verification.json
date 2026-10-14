@@ -1,0 +1,411 @@
+{
+  "status": "Five whole-branch findings fixed; scoped controller review and physical gates remain open",
+  "production_file": "wear/src/main/kotlin/dev/quantumink/hermesgadget/wear/ProfileCarousel.kt",
+  "production_sha256": "5f8d64d0d00181c78f07b63fa5416b29323b88f2484d906e0bc327ec9829190a",
+  "full_strict": {
+    "command": "./gradlew ktlintFormat check :mobile:assembleDebug :wear:assembleDebug :mobile:assembleDebugAndroidTest :wear:assembleDebugAndroidTest --warning-mode=fail --max-workers=4",
+    "result": "BUILD SUCCESSFUL",
+    "tasks": 214,
+    "seconds": 14,
+    "jvm_tests": 116,
+    "xml_files": 33,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "warnings": 0,
+    "receipt": "full-strict.log",
+    "sha256": "2c60087a867568026a32b2eb6816c7378a3e6599fedd2275fd5b0615290b9b15",
+    "environment": "JDK17; existing pinned stock and extension Python environments",
+    "apks": [
+      {
+        "file": "mobile/build/outputs/apk/debug/mobile-debug.apk",
+        "bytes": 35124571,
+        "sha256": "cff89d8bfa7b32b31ffea1dc5423a814accd03bc2b75625075cc497d956028ea"
+      },
+      {
+        "file": "wear/build/outputs/apk/debug/wear-debug.apk",
+        "bytes": 40114537,
+        "sha256": "ba223c73a8d600174be0f4421485918a2e0ff2048d74fe28c19efb1c6d245053"
+      },
+      {
+        "file": "mobile/build/outputs/apk/androidTest/debug/mobile-debug-androidTest.apk",
+        "bytes": 1952363,
+        "sha256": "f0ebe35f8676a95b42321d6d532b2dd11a7dd1883b34248ea743d3dd54de3bf2"
+      },
+      {
+        "file": "wear/build/outputs/apk/androidTest/debug/wear-debug-androidTest.apk",
+        "bytes": 6011275,
+        "sha256": "517454c848d9544488cd715b1ea7e6a1ddbb6b28075021e7509257520f2eb1b7"
+      }
+    ]
+  },
+  "native_checks": [
+    {
+      "receipt": "green-final-phone-0.log",
+      "tests": 11,
+      "seconds": 5.299,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "ce1a7d5ce9f9fe9fb0d808bd136f6d42de99f3b04a1e04b9d1eb4b61fae62828"
+    },
+    {
+      "receipt": "green-navigation-final-0.log",
+      "tests": 4,
+      "seconds": 20.516,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "90568b839b7412d4d49c10804fdc9b6481d138a5ed6253c0b3bbb5396ef7cc83"
+    },
+    {
+      "receipt": "green-final-phone-2.log",
+      "tests": 2,
+      "seconds": 0.505,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "ed7d0789fb07e0027626206a014692c898605b735c52476b870c8c2044318714"
+    },
+    {
+      "receipt": "green-final-phone-3.log",
+      "tests": 1,
+      "seconds": 0.169,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "63803de8aa2c194a70abf8a4c3b05eab2fcfef758a3081d9fd94f4243ba44c35"
+    },
+    {
+      "receipt": "green-publication-1.log",
+      "tests": 4,
+      "seconds": 0.745,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "9e2602a816d9c6d63b079fc912b2ef70b2f3ac3e3b1b582d02f600195e0f11a6"
+    },
+    {
+      "receipt": "green-service-0.log",
+      "tests": 1,
+      "seconds": 1.083,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "f83f08552c09cf871056dce4747394f96296196bd6e90f1bf10216f4cc40136b"
+    },
+    {
+      "receipt": "green-service-1.log",
+      "tests": 1,
+      "seconds": 18.252,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "27aacf04575730bb8e53c2779a3c905e2c0ad2197336c389b7b130b974e0135e"
+    },
+    {
+      "receipt": "green-artwork-ambient-0.log",
+      "tests": 1,
+      "seconds": 5.746,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "94529a22532dc71df284970b7ad5be61177da268fd0af2435b811fa89397a5a3"
+    },
+    {
+      "receipt": "green-artwork-ambient-1.log",
+      "tests": 2,
+      "seconds": 7.518,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "3adea2176327465aa4a9ac7c5b45a97a80c5a3aea3daeea75d866f7f3e6d9cad"
+    },
+    {
+      "receipt": "green-artwork-ambient-2.log",
+      "tests": 1,
+      "seconds": 1.822,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "abfbab7a063cbba3e82f29a55d255f6583a82e4ecae536e59cdc4e986cba9121"
+    },
+    {
+      "receipt": "green-artwork-ambient-3.log",
+      "tests": 1,
+      "seconds": 4.203,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "2c4887f16a26fe0048a6923153a80d263671ba76ac6b4367d134239311b1120c"
+    },
+    {
+      "receipt": "gallery-340.log",
+      "tests": 1,
+      "seconds": 110.315,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "5557e983edd0f88a42be4bd665c04e111411c3eb3216e19e26a35b39f531ebcd"
+    },
+    {
+      "receipt": "gallery-360.log",
+      "tests": 1,
+      "seconds": 115.249,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "a4bf6ba997ce4d4689f10b86cec01e09eb0dda569fe54fe7da0d8fa874521a9d"
+    },
+    {
+      "receipt": "gallery-400.log",
+      "tests": 1,
+      "seconds": 123.247,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "2ff3a99b104c5736b30fc70a7de541067e3ce9541278e86bb3e4a0833a9c6bcd"
+    },
+    {
+      "receipt": "green-carousel-horizontal.log",
+      "tests": 1,
+      "seconds": 16.465,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "d4aa0b58a34198f850d6c191e97d76f1c7cb5aa89935fe4b9501155b239db8f4"
+    },
+    {
+      "receipt": "green-carousel-vertical.log",
+      "tests": 1,
+      "seconds": 8.007,
+      "failures": 0,
+      "skips": 0,
+      "sha256": "c6f808ca30804fd130cceddcc1077d07322e538085f63e8fea81a6e370cc4eb0"
+    }
+  ],
+  "contrast_relationships": 120,
+  "limits": [
+    "OS power-saver native case is capability-skipped; reduced motion passes.",
+    "Associated Data Layer transport gate remains open after Wearable.API API_UNAVAILABLE.",
+    "Scoped fix review, preserving physical delivery, physical tiles/voice/away replies and quantitative battery remain controller/owner gates."
+  ],
+  "reused_evidence": [
+    "Task 1 native palettes/appearance persistence/security and chooser images",
+    "Task 2 unchanged directory/large details images with strengthened Task 7 Close check",
+    "Task 4 original ambient rendering, Task 5 actual activity unavailable-route ambient sleep/wake fix",
+    "Task 6 native phone tile composer and atomic concurrent edit synchronization receipts",
+    "Task 8 approved actual GIF/ring/large-font/reduced-motion captures and delayed stock 20-second reply receipt",
+    "Unchanged Task 7 phone/permission/static TileRenderer receipts (direct export provenance retained)",
+    "Unchanged OS saver capability limit; new selected pet reduced-motion and retained lifecycle policy transitions pass"
+  ],
+  "implementation_commit": "c248b03e6689812f20f553f035d7ec7dadc7c600",
+  "native_passed_executions": 34,
+  "native_distinct_passing_methods": 32,
+  "watch_visual_scenarios": 18,
+  "assets": 173,
+  "prior_task7": {
+    "full_strict": {
+      "command": "./gradlew ktlintFormat check :mobile:assembleDebug :wear:assembleDebug :mobile:assembleDebugAndroidTest :wear:assembleDebugAndroidTest --warning-mode=fail --max-workers=4",
+      "result": "BUILD SUCCESSFUL",
+      "tasks": 214,
+      "seconds": 7,
+      "jvm_tests": 116,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "receipt": "task-7-full-strict-final.log",
+      "sha256": "52cfad931224a5f8c5d07b0d761a261e1dbc1b130567798e5620301f93dc2f0d"
+    },
+    "native_checks": [
+      {
+        "receipt": "task-7-permission.log",
+        "tests": 1,
+        "seconds": 2.272,
+        "failures": 0,
+        "skips": 0,
+        "sha256": "edefa9c5931560207ac62f14adc012d9468af55b2377c570fe52e4f2b7a151f3"
+      },
+      {
+        "receipt": "task-7-directory-large.log",
+        "tests": 1,
+        "seconds": 8.025,
+        "failures": 0,
+        "skips": 0,
+        "sha256": "b9e310d100331ac1c13ccae234458e0ce307fba76fcdd90960b5f2cf23ec3ef3"
+      },
+      {
+        "receipt": "task-7-phone-final-layout.log",
+        "tests": 1,
+        "seconds": 19.983,
+        "failures": 0,
+        "skips": 0,
+        "sha256": "e2d6781134791ad02a911080612e3fcbc8313430b815870385be3fd8712d3655"
+      },
+      {
+        "receipt": "task-7-phone-final-large.log",
+        "tests": 1,
+        "seconds": 19.178,
+        "failures": 0,
+        "skips": 0,
+        "sha256": "360b5fd41c9f6b6f009573ff997f9f04f445748941d53ff725970aa5a0ac4a92"
+      },
+      {
+        "receipt": "task-7-layout-340.log",
+        "tests": 1,
+        "seconds": 45.722,
+        "failures": 0,
+        "skips": 0,
+        "sha256": "9ad4b58048ddc78dea6e5a43d1ecb14c09f85725598363b91fe5ca1a4a040440"
+      },
+      {
+        "receipt": "task-7-layout-360.log",
+        "tests": 1,
+        "seconds": 50.967,
+        "failures": 0,
+        "skips": 0,
+        "sha256": "c8bb5af3d0c04c4767f51110a6d98284bb8ee2055588a713a11305da632c3a56"
+      },
+      {
+        "receipt": "task-7-layout-400.log",
+        "tests": 1,
+        "seconds": 58.752,
+        "failures": 0,
+        "skips": 0,
+        "sha256": "87056dee20a930bbdcd006910b40f83bfb076d77052db5a645bbd3ef455ad8c9"
+      },
+      {
+        "receipt": "task-7-native-final.log",
+        "tests": 7,
+        "seconds": 97.8,
+        "failures": 0,
+        "skips": 0,
+        "sha256": "2d6f6dc61e6df4287977d9528c86dcacec820d9b3188c3956772cf00fe8f4dff"
+      },
+      {
+        "receipt": "task-7-carousel-final.log",
+        "tests": 2,
+        "passed": 1,
+        "seconds": 7.742,
+        "failures": 0,
+        "skips": 1,
+        "note": "Vertical passes; second case safely assumption-skipped because first case created enrollment. Rerun isolated below.",
+        "sha256": "5c4c8c9529f1c378357679de740b9e0c697d6a2a51896e24ea08506a0faae1b9"
+      },
+      {
+        "receipt": "task-7-carousel-horizontal-final.log",
+        "tests": 1,
+        "passed": 1,
+        "seconds": 16.825,
+        "failures": 0,
+        "skips": 0,
+        "note": "Horizontal/draft/recording/approval/rotary regression passes after guarded owned-emulator reset.",
+        "sha256": "fff30c1dbc16fc2129465a4ff8b1b8180de9251dbfa125a1cee2b788ba58a2fe"
+      }
+    ],
+    "native_passed_executions": 16,
+    "native_distinct_passing_methods": 13,
+    "native_guard_skip_resolved_by_isolated_rerun": 1,
+    "implementation_commit": "b511dbb3eb518acd837211689d5af6d9ac127675"
+  },
+  "production_files": {
+    "mobile/src/main/kotlin/dev/quantumink/hermesgadget/mobile/CatalogRepository.kt": "32985ff65034b5f9baf9b5c6202c3c678991180f5b1501f67583f0dfac42432d",
+    "mobile/src/main/kotlin/dev/quantumink/hermesgadget/mobile/DirectoryPage.kt": "9e6037ca39fc57b73708f61b287270ad43a66689228425479269a97354fe3d53",
+    "mobile/src/main/kotlin/dev/quantumink/hermesgadget/mobile/MainActivity.kt": "f95f73f0792eff400028800950d049dd96ee423410fa76c89f40c6649a9bffa0",
+    "wear/src/main/kotlin/dev/quantumink/hermesgadget/wear/AnimatedPortrait.kt": "d06a62fb603abbb0630475d045c22fcaf26440da3c43a0db27aedc3f33dd28fa",
+    "wear/src/main/kotlin/dev/quantumink/hermesgadget/wear/GadgetService.kt": "ec3e66516a02a53c3b50946cca2934d84933c75e6b815bb7a5e09611e1000cc6",
+    "wear/src/main/kotlin/dev/quantumink/hermesgadget/wear/PetView.kt": "25a1fcae6f3b6dba7b3f52ed64ada9062a0a535a3dffd97b4696f73a03882a4f",
+    "wear/src/main/kotlin/dev/quantumink/hermesgadget/wear/ProfileCarousel.kt": "5f8d64d0d00181c78f07b63fa5416b29323b88f2484d906e0bc327ec9829190a",
+    "wear/src/main/kotlin/dev/quantumink/hermesgadget/wear/WatchScreen.kt": "a2e749c0eb6c9356896ce7b7f729cbb1af06938435f128b2c2ad415575ea924b"
+  },
+  "native_evidence_scope": "34 focused executions, 32 distinct methods; geometry method covers 18 theme/font/density scenarios. Original phone provenance guard skipped before use of a clean stock-only owned phone fixture. Actual secure MainActivity exercised without capture.",
+  "finding_checks": {
+    "catalog_turn_lock": "Three turn locks times changed URL/null URL/removal; mounted projection/session and absent-surface service deferral.",
+    "settled_clock": "18 scenarios; initial original geometry and absent clock after settled touch/rotary/reply/end navigation.",
+    "phone_publication": "Blocked publisher lookup/cancellation; real MainActivity Talk/navigation/stop-resume; ordered concurrent picture retirement with bounded active hash pins; GIF pending/cache capacity.",
+    "pet_policy": "Selected sprite same-composition reduced-motion and lifecycle transitions; shared observed GIF/pet power policy; actual OS saver remains capability-limited.",
+    "directory_return": "18 synthetic profiles, real touch/search/scroll/Talk/Back/Settings/Back; query, collapse, exact visible row bounds and source pruning."
+  },
+  "watch_portrait_correction": {
+    "code_commit": "f35bf59cccb2be26a0da4d7514c298d20b9f5fe6",
+    "strict_jvm": {
+      "tests": 116,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "xml_reports": 33,
+    "all_four_apks_built": true,
+    "production_files": {
+      "client/src/main/kotlin/dev/quantumink/hermesgadget/client/RecordingCues.kt": "b27ddff8263d553770fa220f9215cd21650d501155747e889154e4b8df53bc49",
+      "wear/src/main/kotlin/dev/quantumink/hermesgadget/wear/ProfileCarousel.kt": "50aade517d7a623afc6f969d7f15b09e52e67ed12a18342c736e3a4b898ed010",
+      "wear/src/main/kotlin/dev/quantumink/hermesgadget/wear/WatchScreen.kt": "e271009cf44dba381c2bd35842c99e80b1b34acf2f1b7b71e29dcc1fc55b3b6b"
+    },
+    "distinct_passing_methods": [
+      "dev.quantumink.hermesgadget.wear.PortraitInteractionTest#actionCancelCancelsOnlyOwnedHold",
+      "dev.quantumink.hermesgadget.wear.PortraitInteractionTest#holdReleaseDragCancellationAndDisposalAreSingleOwnedActions",
+      "dev.quantumink.hermesgadget.wear.PortraitInteractionTest#ringsAcrossThemesArtworkAndReducedMotion",
+      "dev.quantumink.hermesgadget.wear.PortraitInteractionTest#secondPointerCancelsOnlyOwnedHold",
+      "dev.quantumink.hermesgadget.wear.PortraitInteractionTest#tapsPreholdHorizontalVerticalDragsAndDisabledPortraitNeverRecord",
+      "dev.quantumink.hermesgadget.wear.RecordingPortraitTest#portraitOffersVisibleStartWithoutScrolling",
+      "dev.quantumink.hermesgadget.wear.WatchCarouselTest#threePagesSwipeWithSeparateDraftsPortraitsAndRecordingProtection",
+      "dev.quantumink.hermesgadget.wear.WatchCarouselTest#verticalTouchScrollKeepsControlsReachable",
+      "dev.quantumink.hermesgadget.wear.WatchPickerSurfaceTest#pickerBackRetainsMountedConversationAndLocksRejectSelection",
+      "dev.quantumink.hermesgadget.wear.WatchPickerTest#eighteenProfilesSelectExactStableKeyAtLargeType",
+      "dev.quantumink.hermesgadget.wear.WatchPickerTest#openPickerRetainsSurvivingKeyWhenCatalogShrinks"
+    ],
+    "full_geometry_scenarios": 18,
+    "centered_footer_scenarios": 18,
+    "refreshed_native_exports": 91,
+    "owner_start_and_finish_ticks_confirmed": true,
+    "physical_delivery": {
+      "matching_certificate_and_installed_apk_hash": true,
+      "apk_sha256": "7584918bbb2107b72231567a852fe83412f5ddcd4e586221616bc83fd1ac41c7",
+      "baseline_files_unchanged": 78,
+      "identities_unchanged": 19,
+      "artwork_files_unchanged": 29,
+      "original_timeout_preserved": true,
+      "footer_jump_visible": true
+    },
+    "receipts": [
+      {
+        "receipt": "strict-build.log",
+        "sha256": "24851dd43fff5196584c49ca7855daa9c1ecea1905b846f994de3b9baa6edccf"
+      },
+      {
+        "receipt": "centered-build.log",
+        "sha256": "5de0c214a2e630e98bba3a7df33be2a419d0b6612f1ceb73e39e67b4437028f1"
+      },
+      {
+        "receipt": "native-picker-rerun.log",
+        "sha256": "8e6e4cbfef104da38a107c435542c04a4575281436b708e0065a380bf54ae6f3"
+      },
+      {
+        "receipt": "carousel-horizontal.log",
+        "sha256": "47232405113347b235c25cbaabc0999a568ba8ddb6f3dffaaf6cd1125c6484aa"
+      },
+      {
+        "receipt": "carousel-vertical-final.log",
+        "sha256": "cc038b60b2d408310a2545896ae131c661b5b661e0aecb254a6a5ee03989b29f"
+      },
+      {
+        "receipt": "recording-export.log",
+        "sha256": "4565420b5eb01d3753fc209675db3620cef11a69dc07783921e8b0096c23e028"
+      },
+      {
+        "receipt": "gallery-340.log",
+        "sha256": "5dc72d96ac3aa33dfcc927a2f30bbc75fa9236a56602de91276a8a6c2d8842ec"
+      },
+      {
+        "receipt": "gallery-360.log",
+        "sha256": "eccb0c6ec8dc849fb499635448189b944382ebf09154a1aa652e73557a9e8457"
+      },
+      {
+        "receipt": "gallery-400.log",
+        "sha256": "f901132f355f7e16e60789114ad8814aa053b0412c57c15bfc29060781b2d972"
+      },
+      {
+        "receipt": "footer-gallery-340.log",
+        "sha256": "f17600e1877b085435e3698141c7fa7fe93023fe5d483d6f1e08041516d51dea"
+      },
+      {
+        "receipt": "footer-gallery-360.log",
+        "sha256": "0a8adfda6206dc0229eafee58306afb6b10fa1eae33fc7cbe8d61e597d7c55f3"
+      },
+      {
+        "receipt": "footer-gallery-400.log",
+        "sha256": "03442024579cb33cc5c0b65c514c9ced6297d47af7c43f5aa4fbf5b42b8b30ea"
+      }
+    ],
+    "scope": "Owner-requested follow-up after the c248b03 scoped review; earlier review counts/provenance remain historical, not a new review of this correction.",
+    "limits": [
+      "Initial fixture failures were corrected; unconfigured stock-server assumption skips were rerun with the guarded three-server workflow and passed.",
+      "Physical haptic noticeability is confirmed by the owner; microphone contamination, extended comfort, fresh away reply receipt and quantitative power acceptance remain open."
+    ]
+  }
+}

@@ -1,5 +1,11 @@
 # Pets: verified atlas contract and missing states
 
+Approved profile-page extension (2026-10-11): the [multi-box carousel design](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md)
+uses each profile's cached portrait until its validated pet is available, then crossfades
+to that pet. New listening/talking/sleeping poses remain a separate registered companion
+sheet. Only the selected foreground page animates; personal art and visual acceptance
+remain private, and no new animation delivery is claimed yet.
+
 ## Source and local evidence
 
 Reviewed `agent/pet/constants.py`, `store.py`, and `generate/{prompts,atlas,orchestrate}.py` at Hermes commit [79af3f6cea8067284a7ea5725078578b3f790adb](https://github.com/NousResearch/hermes-agent/tree/79af3f6cea8067284a7ea5725078578b3f790adb/agent/pet). `store.pets_dir()` uses the active Hermes home, and `resolve_active_pet` uses the configured slug then alphabetical fallback. Base metadata uses `id`, `displayName`, `description`, and `spritesheetPath`; generated sheets are normally lossless WebP, so the delivery extension must transcode to PNG without discarding alpha.
@@ -104,3 +110,40 @@ tool tests. API 37 pet delivery/cache and cache-corruption instrumentation passe
 stock SDK draft regression still passed. Strict build/lint/format/warnings checks pass.
 [Synthetic round-screen capture](demo/m5/README.md). Personal pet transfer, Ultra
 legibility, physical lip sync and ambient power remain unverified.
+
+## Carousel presentation — 2026-10-11
+
+Each stable page chooses its validated endpoint pet, last good cached portrait, then the
+original neutral robot. The portrait can be the imported box image or an explicit per-profile
+watch override selected on the phone. An override survives box refreshes without changing
+the box's original image; a validated endpoint pet still takes priority over either portrait.
+Portraits occupy 160×160 dp inside a fixed 160×168 dp frame; pets retain a centered
+96×104 dp canvas. A 220 ms crossfade keeps the identity text in place.
+Only the selected available foreground page animates;
+neighbor previews and offline/ambient remain static. Existing wave/work/jump/error cues,
+legacy fallback and amplitude mouth hysteresis are retained. Ambient chooses the selected
+page's pet, including a neutral outline for an unapproved card, rather than a previous
+conversation's pet.
+
+[Original three-color fixtures](demo/carousel/fixtures/manifest.json) include unchanged
+1536×1872 base sheets plus registered 1152×624 listening/talking/sleeping companions.
+The renderer test rejects corrupt pet bytes while retaining a portrait, checks identity
+placement through arrival and compares actual moving/frozen rendered frames. Actual-service
+base-only and companion delivery tests pass; the three-page test checks endpoint artwork
+isolation and real synthetic listening. [Captures and reproduction](demo/carousel/README.md).
+These are synthetic software checks; owner artwork, physical lip sync and power remain open.
+
+## Watch GIF overrides — 2026-10-12
+
+A user-selected GIF is an optional portrait loop, independent of endpoint pet delivery.
+It has a static normalized PNG fallback in the original version-1 roster. The extra manifest
+binds the animation and fallback hashes to the stable box/profile key. Import limits are
+256×256, 256 KiB, 120 frames, ten seconds per loop after clamping short delays to 50 ms,
+and 2,097,152 full-canvas pixels across frames. See [picture setup](profile-setup.md).
+
+Only the selected available foreground page runs the loop, including a reviewed catalog
+card before endpoint enrollment. Neighbor previews, reduced motion and power saver use
+the PNG. Ambient receives that static portrait and displays a dim grayscale circle, or a
+64×64 sparse black/white rendition for low-bit displays, under the existing minute shift.
+A pet idle outline retains priority. No GIF decoding or animation occurs in ambient mode.
+These rendering rules do not establish physical watch battery cost or lip-sync quality.

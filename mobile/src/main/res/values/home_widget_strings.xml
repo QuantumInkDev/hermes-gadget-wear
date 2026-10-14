@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_widget_choose">Choose bots</string>
+    <string name="home_widget_bot">Bot</string>
+    <string name="home_widget_focus">1×1 · Focus</string>
+    <string name="home_widget_four">2×2 · Four bots</string>
+    <string name="home_widget_eight">2×4 · Eight bots</string>
+    <string name="home_widget_strip_four">1×4 · Four-bot strip</string>
+    <string name="home_widget_sixteen">4×4 · Sixteen bots</string>
+    <string name="home_widget_strip_five">1×5 · Five-bot strip</string>
+    <string name="home_widget_ten">2×5 · Ten bots</string>
+</resources>

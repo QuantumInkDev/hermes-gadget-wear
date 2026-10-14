@@ -51,7 +51,7 @@ class EndpointProfile(
 }
 
 object EndpointProfiles {
-    const val MAX_PROFILES = 8
+    const val MAX_PROFILES = 32
     const val MAX_BYTES = 65536
     const val SETUP_PATH = "/hermes/setup/v1"
     fun encode(profiles: List<EndpointProfile>): String {
@@ -82,7 +82,7 @@ object EndpointProfiles {
             .also(::validate)
     }
     private fun validate(profiles: List<EndpointProfile>) {
-        require(profiles.size <= MAX_PROFILES) { "At most eight profiles are supported." }
+        require(profiles.size <= MAX_PROFILES) { "At most 32 profiles are supported." }
         require(profiles.map { it.endpoint.url }.toSet().size == profiles.size) {
             "Each URL can appear only once."
         }

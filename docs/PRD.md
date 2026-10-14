@@ -1,6 +1,42 @@
 # Product requirements
 
-Status: implementation baseline, 2026-10-05. The [original brief](hermes-gadget-wear-prompt.md) remains the scope; verified corrections are recorded in [architecture](architecture.md) and [pets](pets.md).
+Status: native client implementation and software acceptance, 2026-10-12. Hardware and release gates remain open. The [original brief](hermes-gadget-wear-prompt.md) remains the scope; verified corrections are recorded in [architecture](architecture.md) and [pets](pets.md).
+
+## Native client behavior — 2026-10-12
+
+Phone refinement approved 2026-10-14: **Quantum Relay for Hermes Agents** uses original
+Courier artwork, a single-line leading title above smaller destination headings and a
+compact inline text/voice composer. Hold the mic to record, release to send, or slide
+physically left to discard. A live amplitude stream/timer and accessible recording actions
+share the existing foreground conversation; playback keeps the profile's server voice.
+Directory and catalog share a picture sheet with a full-width Cancel footer. Light, Dark,
+Electronic Moonlight, per-profile pairing/drafts and existing watch artwork remain the basis.
+Verification and physical delivery are recorded in progress.md, not implied by design approval.
+
+The approved [native design](superpowers/specs/2026-10-12-native-client-design.md) is implemented:
+The earlier Quantum Relay for Hermes build introduced Voice Q artwork and independently persisted Light,
+Dark and Electronic Moonlight appearances. Existing installations default to Dark; ambient
+stays black and static. The phone provides Profiles, Watch and Settings, grouped searchable
+portraits, accessible profile details, foreground Talk/Chat, live capture/playback meters,
+a muted-volume hint and revision-safe watch tile editing.
+
+The watch retains stable swipe pages, per-page drafts/scroll, selection locks and rotary
+focus, with a labeled Jump to profile control at the end of each card. Keep the artwork
+clear of floating menus and microphone badges. Hold the portrait to record, release to send or drag
+down to cancel; short taps and interrupted gestures do not send. Actual capture drives the
+external rings and device-tuned start/accepted-finish ticks with capability fallbacks. Both
+ticks are noticeable by owner report on the physical watch. A foreground active turn may
+keep the display on for at most two minutes; completion, background and ambient release it.
+Historical missing replies during an away trial remain an unconfirmed transport diagnosis.
+
+Focus and Pinned profiles tiles render static local pictures for one and four stable keys.
+They launch the intended page without starting recording. Unknown/removed keys stay unavailable;
+locked selection is deferred visibly. The watch owns a durable revision, and stale phone edits
+require review instead of overwriting newer watch choices. Synthetic native acceptance and its
+limits are recorded in the [demo](demo/native-clients/README.md). Physical tile addition,
+associated Data Layer phone edit acknowledgement, speech, away replies, haptic comfort and
+battery remain gates. Physical phone snapshot readback matches the watch's existing Focus
+revision, empty grid and all 19 profile keys; both devices received preserving native updates.
 
 ## Outcome and users
 
@@ -43,8 +79,48 @@ A two-second cancel hold requests a new session. The stock adapter may auto-conf
 - No firmware OTA installation on Android: test the shared MAC vector, but omit `caps.ota`; distribution uses Android installation/update mechanisms.
 - Do not claim that every Hermes installation has working ffmpeg or that every Ultra has a usable Opus encoder before checking them at M4.
 
+## Approved multi-box profile carousel — 2026-10-11
+
+The maintainer requests swipeable watch profiles from three independently available Hermes
+boxes, initially showing each profile's picture and later its pet with additional animations.
+The [concrete design](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md)
+specifies an automatic phone catalog, independent TLS Gadget endpoints, stable offline pages,
+portrait/pet fallbacks and safe selection. The maintainer approved app and isolated catalog implementation;
+real-box acceptance is not claimed. The multiplexed Gadget v2 gate remains separate.
+
+The maintainer subsequently requests live setup and explicit watch-specific portrait choice.
+Imported box pictures are the default. A profile can choose a phone-selected watch picture
+that takes precedence over future box portrait refreshes; returning to the box picture uses
+its latest cached image. This choice is per source/profile, works before conversation setup,
+and never changes a box's original artwork or endpoint/pairing. Validated pets retain priority.
+The [implementation plan](superpowers/plans/2026-10-11-watch-portraits-and-profile-setup.md)
+also covers the generic publication setup instructions and private live rollout evidence.
+
 ## Milestone gates
+
+The maintainer approved the [client-usability follow-up](superpowers/specs/2026-10-12-client-usability-design.md)
+on 2026-10-12: Quantum Relay for Hermes branding with an original icon, usable watch scrolling and
+recording cues, phone profiles grouped/sorted by box with inline effective pictures, and
+independently paired foreground phone text/voice conversations. Phone chat requires TLS;
+it does not borrow watch keys or change the opaque relay. Animated watch-picture overrides
+are an approved final stage with [explicit limits and PNG fallbacks](superpowers/specs/2026-10-12-animated-picture-design.md).
+These are requirements; implementation and physical acceptance are recorded separately.
 
 Follow M0–M8 from the brief. M0 delivers these design documents, runnable starter apps, a pure JVM module, reproducible wrapper/catalog, build/test/lint/format CI, and secret scanning. M1 adds wire models, framing, identity, handshake/heartbeat behavior, upstream vectors, and a JVM test using the actual SDK development server. M2 requires the maintainer's endpoint and approval plus a real hardware demo. M3–M8 retain the original measurements and release gates; unit tests alone never close them.
 
 Every milestone records exact checks and a short demo in [progress](progress.md). Claims of success must distinguish local tests, CI, emulator, real Hermes, and physical watch evidence.
+
+## Approved phone home widgets — 2026-10-13
+
+Seven portrait shortcut presets use rows × columns: 1×1, 2×2, 2×4, 1×4, 4×4,
+1×5 and 2×5. Each instance has its own stable-key bot slots, accessible ordering
+and appearance. Follow system uses OS colors/night mode; Light, Dark and Electronic
+Moonlight remain explicit per-widget choices. Portraits have captions below and no
+overlays; GIF overrides use their validated static fallback.
+
+A cell opens that exact profile's foreground Talk/Chat screen. Connect, recording,
+sending and pairing remain deliberate actions. Busy turns defer a different bot;
+withdrawn or stale targets offer editing rather than an index-based substitute.
+Five-column presets require a suitable launcher grid. Physical placement/theme and
+older-runtime acceptance are recorded separately in [release preparation](release.md).
+See the [approved widget specification](superpowers/specs/2026-10-13-phone-home-widgets-design.md).

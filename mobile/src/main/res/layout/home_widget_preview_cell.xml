@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+    android:orientation="vertical" android:gravity="center" android:padding="4dp">
+    <ImageView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:src="@mipmap/ic_quantumink_relay" android:scaleType="fitCenter" android:contentDescription="@null" />
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center"
+        android:text="@string/home_widget_bot" android:textColor="?android:attr/textColorPrimary" android:textSize="12sp" />
+</LinearLayout>

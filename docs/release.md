@@ -7,6 +7,73 @@ codes. Version name is 0.1.0. Target API is 37, minimum Wear API 33 and phone AP
 watch declares standalone=true because direct user-configured connections work without a
 phone; private tailnet relay and optional phone voice still require the companion.
 
+## Native design acceptance — 2026-10-12
+
+The [native demo](demo/native-clients/README.md) and [review resolutions](native-client-review.md)
+cover three themes, native phone/keyboard/large text, watch recording/picker/reply/ambient
+and static tile layouts with original synthetic fixtures. Voice Q masters/launcher art are
+in [store assets](store-assets/voice-q/). This is debug/software evidence, not Play acceptance.
+
+One whole-branch review at `ccb2953`, one corrective wave `c248b03` and one scoped re-review
+resolve four Important issues and one Minor, with no new Critical/Important breakage.
+Final strict checks pass 116 JVM tests, zero failures/errors/skips, and all four app/test APKs.
+Final native receipts record 34 passing executions / 32 distinct methods and 18 geometry
+scenarios; 72 affected exports were refreshed in `6b00947`.
+
+The physical watch received preserving `c248b03`: matching signer/installed APK hash,
+19 identities and 75 protected baseline files unchanged at installation, original 15-second
+timeout retained. Normal UI selected Moonlight and configured the current profile for Focus,
+revision 1. Four grid slots remain empty for owner choices. The phone also received `c248b03`
+with current APK/data backups and matching certificate/hash verification: all 99 baseline files
+unchanged at installation, including 18 identities and 18 GIFs. Normal native navigation and
+Moonlight selection preserve all identities and 54 artwork files; the five-minute timeout is
+unchanged. Associated watch snapshot readback matches existing Focus revision 1, four empty
+slots and 19 profile keys. No phone edit or live speech turn was sent. Owned debugging helpers
+and the exact temporary phone grant are removed. Owner art remains excluded from public captures.
+
+The 2026-10-13 owner correction is subsequently installed at `f35bf59`: artwork stays clear,
+Jump to profile is the final card control and its full-width label is centered. Both updates
+preserve all 78 current baseline files, 19 identities, 29 artwork files and original timeout.
+The owner confirms noticeable recording start/finish ticks; comfort and microphone contamination
+remain separate observations. Follow-up strict checks, 11 distinct native methods, 18 full
+geometry scenarios and 18 centered-footer cases pass. The gallery refreshes 91 exports with
+separate follow-up provenance; this is not a new whole-branch review. Owned watch debugging
+is disconnected and its bridge stopped.
+
+Still open: native owner observations; four favorites and Focus/grid system tile addition/every
+target; associated Data Layer phone edit acknowledgement (physical snapshot readback passes;
+owned emulator API_UNAVAILABLE remains recorded); speech/haptic comfort/mic contamination, away reply/sleep receipt and
+quantitative Light/GIF/audio/battery matrix. Actual emulator OS saver is capability-skipped,
+not passed; reduced motion is verified. Keep this PR draft while hardware gates and existing
+publication/signing/privacy/Play prerequisites are assessed. Historical generated replies
+and synthetic delay tests do not establish the historical missing-reply cause.
+
+## Phone home-widget acceptance — 2026-10-13
+
+Seven phone presets use rows × columns: 1×1, 2×2, 2×4, 1×4, 4×4, 1×5 and 2×5.
+Each has independent bot selection/order and OS/Light/Dark/Electronic Moonlight appearance.
+Static effective portraits keep captions below the image. Taps resolve the exact current
+profile into foreground Talk/Chat, with normal explicit connection/record/send/pairing.
+The [native gallery](demo/home-widgets/README.md) binds 29 synthetic PNGs to source/APKs.
+
+Current software checks pass 125 JVM tests / 35 reports with no failures/errors/skips and
+all four APKs under warning-strict checks. Thirty-eight distinct native methods pass, including
+real stock TLS audio/vault regressions, plus 112 native host geometry scenarios. System night
+resources match Android's native theme, and fixed-theme caption contrasts pass. The separate
+wallpaper capability probe is not counted as two-palette acceptance: backup was unavailable,
+so the emulator wallpaper was untouched. API 29–30 runtime remains unavailable.
+
+One fresh whole-feature review found three Important items; the single corrective pass
+addresses all three, with no Critical/Minor items. See the [review record](phone-home-widgets-review.md).
+The phone received the widget APK over its existing paired wireless ADB connection on
+2026-10-14. Current APK/data backups, matching signer and installed APK hash are verified;
+all 101 baseline files, 18 identities, 54 artwork files and five-minute timeout are unchanged.
+Seven providers are registered. No app UI was launched. One UI placement of all supported
+presets, two wallpaper/night changes, custom ordering, multiple instances, exact portrait
+taps and reboot remain open. Five-column acceptance requires a five-column host.
+Watch tiles retain their independent configuration.
+Existing speech, power, publishing/signing/privacy and Play gates remain open.
+
 ## Artifacts and signing
 
 Run the strict checks from the README, then:
@@ -52,20 +119,30 @@ Use the [physical-device runbook](device-testing.md) to record the device gates 
 
 ## Draft listing
 
-Name: Hermes Gadget
-Short description: Talk to your own Hermes agent from your Wear OS watch.
+Phone and watch name: Quantum Relay for Hermes.
+Short description: Talk to your own Hermes agent from your phone or Wear OS watch.
 
-Hold the watch screen to speak, read a streamed reply, hear your profile's voice and answer
+Hold the watch portrait to speak, read a streamed reply, hear your profile's voice and answer
 approval prompts. Connect to the Hermes Gadget server you configure, directly or through
 an Android phone on your own Tailscale tailnet. Save independently paired profiles and see
-their optional pets. A Tile and complication open the conversation, with a quiet ambient
+their optional pets. Focus and four-profile tiles and a complication open the conversation, with a quiet ambient
 outline between interactions. Optional ElevenLabs phone voice uses your own key and billing.
+
+The phone also offers independently paired foreground Talk/Chat with each profile's server
+voice. Box groups, custom ordering and inline portraits are local controls. Optional watch
+GIF portrait overrides have bounded loops and a static fallback; state-driven pets remain
+a separate optional feature. The original Voice Q app icon does not use the Nous mascot.
 
 Requires a compatible self-hosted Hermes Gadget server. No project account, hosted agent,
 analytics or advertising. New pets, Opus and client voice require compatible optional server
 extensions. Messages pushed while disconnected are lost with today's stock server, except
 pending prompts that are re-sent. This app is an independent MIT project; do not imply
 endorsement by upstream, Samsung, Google, Tailscale or ElevenLabs.
+
+The [community SDK's license and trademark notice](https://github.com/Adolanium/hermes-gadget-sdk#affiliation-and-trademarks)
+do not establish blanket permission
+from Nous Research to use its marks or mascot. Verify publication naming and rights before
+upload; the original app identity and factual compatibility text are the approved direction.
 
 ## Primary references
 
@@ -86,3 +163,14 @@ are separate artifacts and can have different hashes. APKs/AABs stay ignored.
 | mobile | 10000 | 9,104,355 | `fad98dfee3a1d383298136c8998fb22ba036e98ce2937a82b97abc19965eff3e` |
 
 [Actual synthetic watch captures](demo/m8/README.md) and [original store-art drafts](store-assets/README.md) are available for review. Physical battery/quality and Play gates remain open.
+
+## Multi-source carousel acceptance gate
+
+The [carousel demo](demo/carousel/README.md) is software/emulator evidence. Before installing
+its live publishers, review each private mapping, profile avatar, catalog-only credential,
+HTTPS publication and explicit Gadget endpoint. Approve newly paired URLs individually and
+preserve existing enrollment ciphertexts/signatures. Test the new catalog refresh/portrait
+Data Layer path on the real paired devices, three independent TLS conversations, stable
+pages/order/drafts through source loss/return, locked-phone/background relay and ambient/wake.
+Record actual owner pet/portrait/companion behavior separately. This does not close existing
+speech, battery, signing, privacy hosting or Play gates.

@@ -11,6 +11,7 @@ import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.SSLException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -107,6 +108,8 @@ class DirectConnection(
         (capabilities["pet"] as? JsonObject)?.get("asset_channel") == JsonPrimitive(4)
     private var petRequested = false
     private val stopped = AtomicBoolean(false)
+    private data class Recording(val token: String, val generation: Long)
+    private val recording = AtomicReference<Recording?>()
     private val overloaded = AtomicBoolean(false)
     private val executor = ThreadPoolExecutor(
         1,
@@ -516,6 +519,9 @@ class DirectConnection(
 
     private fun effects(values: List<ConversationEffect>): Boolean {
         val epoch = generation
+        values.filterIsInstance<ConversationEffect.CaptureStart>().forEach {
+            recording.set(Recording(it.token, epoch))
+        }
         var accepted = true
         for (effect in values) {
             if (stopped.get() || epoch != generation) {
@@ -523,6 +529,7 @@ class DirectConnection(
                 break
             }
             when (effect) {
+                is ConversationEffect.RecordingOutcome -> Unit
                 is ConversationEffect.Send -> {
                     if (!handshake.canSendConversation || !send(effect.message)) accepted = false
                 }
@@ -539,7 +546,22 @@ class DirectConnection(
                 else -> observer.effect(effect, generation)
             }
         }
+        for (outcome in values.filterIsInstance<ConversationEffect.RecordingOutcome>()) {
+            recordingOutcome(outcome.copy(finished = outcome.finished && accepted))
+        }
+        if (!accepted) {
+            for (capture in values.filterIsInstance<ConversationEffect.CaptureStart>()) {
+                recordingOutcome(ConversationEffect.RecordingOutcome(capture.token, false))
+            }
+        }
         return accepted
+    }
+
+    private fun recordingOutcome(outcome: ConversationEffect.RecordingOutcome) {
+        val active = recording.get() ?: return
+        if (active.token == outcome.token && recording.compareAndSet(active, null)) {
+            observer.effect(outcome, active.generation)
+        }
     }
 
     private fun send(message: Message): Boolean {
@@ -596,6 +618,9 @@ class DirectConnection(
         timer.shutdownNow()
         executor.shutdownNow().forEach { (it as? Work)?.rejected?.invoke() }
         observer.effect(ConversationEffect.CaptureStop, generation)
+        recording.getAndSet(null)?.let {
+            observer.effect(ConversationEffect.RecordingOutcome(it.token, false), it.generation)
+        }
         observer.effect(ConversationEffect.PlaybackStop, generation)
         observer.stateChanged(
             ConnectionState(

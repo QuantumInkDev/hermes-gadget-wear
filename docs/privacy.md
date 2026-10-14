@@ -1,6 +1,6 @@
 # Privacy policy draft
 
-Hermes Gadget for Wear OS is a client for a Hermes server that you choose. The project
+Quantum Relay for Hermes on phone and watch is a client for a Hermes server that you choose. The project
 operates no conversation backend, accounts, advertising or analytics service. This draft
 matches the current app; the publisher must add its identity, contact and effective date
 and host the final policy at a public URL before Play submission.
@@ -12,6 +12,12 @@ Typed messages, battery percentage, pairing identity and supported device-action
 also go to that server. The server may transcribe, process, retain or forward content under
 its own configuration and providers. The app cannot delete server history or control those
 providers. Heart rate, steps, location, contacts and advertising IDs are not requested.
+
+The phone's Talk/Chat screen uses its own independently paired TLS connection. It sends
+phone recordings and typed messages directly to that profile's server; leaving or locking
+that foreground screen closes the connection and stops audio. Drafts and replies are retained
+in bounded memory through rotation, not sent again automatically on reconnect. This connection
+is separate from the phone's relay for watch traffic.
 
 Direct TLS and phone relay use certificate/hostname validation. The phone relay forwards
 watch-owned TLS bytes to your server and can observe the target, timing and volume. Private
@@ -25,12 +31,17 @@ provider's policies. This option is disclosed and selected per endpoint; Server 
 default. Keys are not sent to Hermes. Read-only key tests access subscription/quota data.
 No paid synthesis request is automatically retried after failure.
 
-Android Keystore protects watch identity/settings and phone setup/voice keys at rest.
+Android Keystore protects watch identity/settings and phone conversation/setup/voice keys at rest.
 Phone-assisted setup intentionally shares endpoint names, URLs and optional access tokens
 with the same-package paired watch through Google Play Services Data Layer. Device identity
 and ElevenLabs keys are excluded from setup sync. Google Play Services may route Data Layer
-traffic via Bluetooth, Wi-Fi or its cloud transport. App backup is disabled, and phone setup
+traffic via Bluetooth, Wi-Fi or its cloud transport. App backup is disabled, and phone
 screens block screenshots. No project-operated telemetry receives this data.
+
+Box catalogs and portrait overrides are stored locally. A user-selected watch picture,
+including a bounded GIF and its static fallback, is sent to the paired watch through Data
+Layer. It is not uploaded to the box or changed there. Catalog-only credentials stay on
+the phone and are not reused as Gadget pairing keys or synchronized to the watch.
 
 The watch caches bounded pet assets and an encrypted short last-reply excerpt for its Tile.
 A selected watch face receives generic connection/pet state through the complication, never

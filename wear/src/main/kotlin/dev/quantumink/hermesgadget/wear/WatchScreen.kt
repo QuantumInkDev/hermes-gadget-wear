@@ -1,13 +1,10 @@
 package dev.quantumink.hermesgadget.wear
 
 import android.graphics.Bitmap
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,16 +33,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
@@ -60,10 +56,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope
+import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.Button
@@ -71,14 +69,15 @@ import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
+import androidx.wear.compose.material3.TimeText
+import androidx.wear.compose.material3.TimeTextDefaults
+import androidx.wear.compose.material3.timeTextCurvedText
+import dev.quantumink.hermesgadget.client.CuePreferences
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
 import dev.quantumink.hermesgadget.protocol.ConversationMode
 import dev.quantumink.hermesgadget.protocol.TransportPath
 import dev.quantumink.hermesgadget.protocol.TransportPreference
 import kotlinx.coroutines.withTimeoutOrNull
-
-private val Accent = Color(0xFFB6ED93)
-private val Muted = Color(0xFFB3B8B0)
 
 @Composable
 fun WaitingScreen() {
@@ -90,37 +89,49 @@ fun WatchScreen(
     service: GadgetService,
     connect: () -> Unit,
     startRecording: () -> Unit,
-    permissions: () -> Unit = {}
+    permissions: () -> Unit = {},
+    navigation: WatchNavigation = remember { WatchNavigation() }
 ) {
     val watch by service.state.collectAsStateWithLifecycle()
-    var route by remember { mutableStateOf("home") }
-    var editing by remember { mutableStateOf<EndpointProfile?>(null) }
-    var newProfile by remember { mutableStateOf(false) }
-    var imported by remember { mutableStateOf(false) }
+    var route by navigation.route
+    var editing by navigation.editing
+    var newProfile by navigation.newProfile
+    var imported by navigation.imported
+    var appearanceReturn by navigation.appearanceReturn
+    val context = LocalContext.current
+    fun openAppearance() {
+        appearanceReturn = route
+        route = "appearance"
+    }
+    androidx.activity.compose.BackHandler(route == "appearance") { route = appearanceReturn }
+    fun selectActivePage() {
+        val current = service.state.value
+        val page = ProfilePages.merge(current.profiles, current.catalog).firstOrNull {
+            it.approved?.endpoint?.url == current.profile?.endpoint?.url
+        }
+        navigation.page.value = page?.key.orEmpty()
+        if (page != null) service.rememberPage(page.key)
+    }
     val textDraft = watch.draft
     val editingText = route == "text"
     DisposableEffect(editingText) { onDispose { if (editingText) service.finishTextInput() } }
     val feedback = LocalHapticFeedback.current
     var haptic by remember { mutableLongStateOf(watch.haptic) }
-    LaunchedEffect(watch.loading, watch.profile?.endpoint?.url) {
-        if (!watch.loading && watch.profile != null &&
-            watch.connection.status == ConnectionStatus.OFFLINE
-        ) {
-            connect()
-        }
-    }
     LaunchedEffect(watch.haptic) {
         if (watch.haptic != haptic) feedback.performHapticFeedback(HapticFeedbackType.LongPress)
         haptic = watch.haptic
     }
     when {
         watch.loading -> WaitingScreen()
+        route == "appearance" -> WatchAppearancePage(context) { route = appearanceReturn }
         route == "reset" -> RoundPage {
             item { Heading(stringResource(R.string.reset_setup)) }
             item { Body(stringResource(R.string.reset_warning)) }
             item {
                 Primary(stringResource(R.string.reset_setup), enabled = !watch.saving) {
                     service.reset()
+                    navigation.clearSetup()
+                    navigation.clearPages()
                     route =
                         "home"
                 }
@@ -133,6 +144,7 @@ fun WatchScreen(
                 item {
                     Primary(profile.label, enabled = !watch.saving) {
                         service.selectProfile(profile.endpoint.url) {
+                            selectActivePage()
                             route = "home"
                             connect()
                         }
@@ -144,6 +156,7 @@ fun WatchScreen(
                     stringResource(R.string.add_profile),
                     enabled = !watch.saving,
                     onClick = {
+                        navigation.clearSetup()
                         editing = null
                         newProfile = true
                         imported = false
@@ -185,6 +198,7 @@ fun WatchScreen(
             watch.imports.forEach { profile ->
                 item {
                     Secondary(profile.label, onClick = {
+                        navigation.clearSetup()
                         editing = profile
                         newProfile = false
                         imported = true
@@ -205,6 +219,7 @@ fun WatchScreen(
                 Primary(stringResource(R.string.remove_profile), enabled = !watch.saving) {
                     watch.profile?.let { profile ->
                         service.removeProfile(profile.endpoint.url) {
+                            selectActivePage()
                             route = "home"
                             connect()
                         }
@@ -213,12 +228,17 @@ fun WatchScreen(
             }
             item { Secondary(stringResource(R.string.back), onClick = { route = "profiles" }) }
         }
-        watch.profile == null || route == "setup" -> SetupPage(
+        (watch.profile == null && watch.catalog.isEmpty()) || route == "setup" -> SetupPage(
             watch.copy(profile = if (newProfile) null else editing ?: watch.profile),
-            imported = imported,
+            draft = navigation.setupFor(
+                if (newProfile) null else editing ?: watch.profile,
+                imported
+            ),
             onSave = { url, label, token, local, accepted, transport ->
                 service.save(url, label, token, local, accepted, transport) {
                     route = "home"
+                    navigation.clearSetup()
+                    selectActivePage()
                     editing = null
                     newProfile = false
                     imported = false
@@ -228,7 +248,8 @@ fun WatchScreen(
             onBack = { route = "home" },
             onReset = { route = "reset" },
             permissions = permissions,
-            profiles = { route = "profiles" }
+            profiles = { route = "profiles" },
+            appearance = ::openAppearance
         )
         route == "text" -> TextPage(
             text = textDraft,
@@ -246,25 +267,51 @@ fun WatchScreen(
             },
             back = { route = "home" }
         )
-        else -> key(watch.connection.conversation.prompt?.id) {
-            ConversationPage(
-                watch,
-                service,
-                connect,
-                startRecording,
-                settings = {
-                    service.disconnect()
-                    editing = null
-                    newProfile = false
-                    imported = false
-                    route = "setup"
-                },
-                type = { if (service.prepareTextInput()) route = "text" },
-                profiles = {
-                    service.disconnect()
-                    route = "profiles"
+        else -> ProfileCarousel(
+            watch,
+            navigation,
+            service,
+            connect,
+            review = { page ->
+                service.disconnect()
+                navigation.clearSetup()
+                editing = page.approved ?: page.discovered?.profile?.gadgetUrl?.let { url ->
+                    EndpointProfile(
+                        dev.quantumink.hermesgadget.protocol.Endpoint.parse(url),
+                        page.label,
+                        ""
+                    )
                 }
-            )
+                newProfile = editing == null
+                imported = false
+                route = "setup"
+            }
+        ) { page, pageScroll, jump ->
+            key(page.key, watch.connection.conversation.prompt?.id) {
+                ConversationPage(
+                    watch,
+                    service,
+                    connect,
+                    startRecording,
+                    settings = {
+                        service.disconnect()
+                        navigation.clearSetup()
+                        editing = null
+                        newProfile = false
+                        imported = false
+                        route = "setup"
+                    },
+                    type = { if (service.prepareTextInput()) route = "text" },
+                    profiles = {
+                        service.disconnect()
+                        route = "profiles"
+                    },
+                    appearance = ::openAppearance,
+                    page = page,
+                    pageScroll = pageScroll,
+                    jump = jump
+                )
+            }
         }
     }
 }
@@ -277,77 +324,76 @@ private fun SetupPage(
     onReset: () -> Unit,
     permissions: () -> Unit,
     profiles: () -> Unit,
-    imported: Boolean = false
+    appearance: () -> Unit,
+    draft: SetupDraft
 ) {
     val profile = watch.profile
-    var url by remember(profile) { mutableStateOf(profile?.endpoint?.url.orEmpty()) }
-    var label by remember(profile) { mutableStateOf(profile?.label ?: "My Hermes") }
-    var token by remember(profile) { mutableStateOf(profile?.accessToken.orEmpty()) }
-    var local by remember(profile) { mutableStateOf(profile?.endpoint?.privateNetwork ?: false) }
-    var accepted by remember(profile) {
-        mutableStateOf(!imported && (profile?.endpoint?.cleartextAccepted ?: false))
-    }
-    var showToken by remember { mutableStateOf(token.isNotEmpty()) }
-    var transport by remember(profile) {
-        mutableStateOf(profile?.transport ?: TransportPreference.AUTO)
-    }
-    val cleartext = url.trim().startsWith("ws:", ignoreCase = true)
+    val cleartext = draft.url.trim().startsWith("ws:", ignoreCase = true)
+    val context = LocalContext.current
+    val soundCues by CuePreferences.enabled.collectAsStateWithLifecycle()
     RoundPage {
         item { Heading(stringResource(R.string.setup_title)) }
         item { Body(stringResource(R.string.setup_hint), muted = true) }
-        item { Input(stringResource(R.string.endpoint_name), label, { label = it.take(32) }) }
         item {
-            Input(stringResource(R.string.endpoint_url), url, {
-                if (it != url) accepted = false
-                url = it.take(2048)
+            Input(stringResource(R.string.endpoint_name), draft.label, {
+                draft.label =
+                    it.take(32)
+            })
+        }
+        item {
+            Input(stringResource(R.string.endpoint_url), draft.url, {
+                if (it != draft.url) draft.accepted = false
+                draft.url = it.take(2048)
             }, KeyboardType.Uri)
         }
         item {
-            Toggle(stringResource(R.string.local_network), local) {
-                local = !local
-                accepted =
+            Toggle(stringResource(R.string.local_network), draft.local) {
+                draft.local = !draft.local
+                draft.accepted =
                     false
             }
         }
         if (cleartext) {
             item { Body(stringResource(R.string.cleartext_warning)) }
             item {
-                Toggle(stringResource(R.string.cleartext_accept), accepted) {
-                    accepted =
-                        !accepted
+                Toggle(stringResource(R.string.cleartext_accept), draft.accepted) {
+                    draft.accepted =
+                        !draft.accepted
                 }
             }
         }
-        if (showToken) {
+        if (draft.showToken) {
             item {
-                Input(stringResource(R.string.access_token), token, {
-                    token = it.take(2048)
+                Input(stringResource(R.string.access_token), draft.token, {
+                    draft.token = it.take(2048)
                 }, KeyboardType.Password)
             }
         } else {
             item {
-                Secondary(stringResource(R.string.access_token), onClick = { showToken = true })
+                Secondary(stringResource(R.string.access_token), onClick = {
+                    draft.showToken = true
+                })
             }
         }
         item {
             Secondary(
                 stringResource(
-                    when (transport) {
+                    when (draft.transport) {
                         TransportPreference.AUTO -> R.string.transport_auto
                         TransportPreference.RELAY -> R.string.transport_phone
                         TransportPreference.DIRECT -> R.string.transport_direct
                     }
                 ),
                 onClick = {
-                    transport =
+                    draft.transport =
                         TransportPreference.entries[
-                            (transport.ordinal + 1) %
+                            (draft.transport.ordinal + 1) %
                                 TransportPreference.entries.size
                         ]
                 }
             )
         }
-        if (transport == TransportPreference.RELAY &&
+        if (draft.transport == TransportPreference.RELAY &&
             cleartext
         ) {
             item { Body(stringResource(R.string.relay_tls_required)) }
@@ -357,13 +403,26 @@ private fun SetupPage(
             Primary(
                 stringResource(R.string.save_connect),
                 enabled =
-                !watch.saving && url.isNotBlank() && label.isNotBlank() &&
-                    (!cleartext || (local && accepted)) &&
-                    !(transport == TransportPreference.RELAY && cleartext)
-            ) { onSave(url, label, token, local, accepted && cleartext, transport) }
+                !watch.saving && draft.url.isNotBlank() && draft.label.isNotBlank() &&
+                    (!cleartext || (draft.local && draft.accepted)) &&
+                    !(draft.transport == TransportPreference.RELAY && cleartext)
+            ) {
+                onSave(
+                    draft.url,
+                    draft.label,
+                    draft.token,
+                    draft.local,
+                    draft.accepted && cleartext,
+                    draft.transport
+                )
+            }
         }
         item { Secondary(stringResource(R.string.profiles_title), profiles) }
         item { Secondary(stringResource(R.string.permissions), permissions) }
+        item { Secondary("Appearance", appearance) }
+        item {
+            Toggle("Recording sound cues", soundCues) { CuePreferences.set(context, !soundCues) }
+        }
         if (profile != null) item { Secondary(stringResource(R.string.back), onBack) }
         item { Secondary(stringResource(R.string.reset_setup), onReset) }
     }
@@ -439,14 +498,18 @@ private fun TextPage(
 }
 
 @Composable
-private fun ConversationPage(
+internal fun ConversationPage(
     watch: WatchState,
     service: GadgetService,
     connect: () -> Unit,
     startRecording: () -> Unit,
     settings: () -> Unit,
     type: () -> Unit,
-    profiles: () -> Unit
+    profiles: () -> Unit,
+    appearance: () -> Unit,
+    page: ProfilePage,
+    pageScroll: TransformingLazyColumnState,
+    jump: @Composable () -> Unit = {}
 ) {
     val connection = watch.connection
     val conversation = connection.conversation
@@ -465,29 +528,11 @@ private fun ConversationPage(
         ConnectionStatus.OFFLINE -> R.string.offline
         ConnectionStatus.ERROR -> R.string.connection_error
     }
-    val gesture = Modifier.voiceGesture(
-        paired && prompt == null,
-        startRecording,
-        service::finishRecording,
-        service::cancelRecording
-    )
-    val swipe = Modifier.pointerInput(prompt?.id, conversation.mode) {
-        if (prompt != null || conversation.mode == ConversationMode.LISTENING) return@pointerInput
-        var moved = 0f
-        var opened = false
-        detectHorizontalDragGestures(onDragStart = {
-            moved = 0f
-            opened = false
-        }) { change, delta ->
-            moved += delta
-            if (!opened && kotlin.math.abs(moved) > 72.dp.toPx()) {
-                opened = true
-                change.consume()
-                profiles()
-            }
-        }
-    }
-    RoundPage(gesture.then(swipe)) {
+    val promptScroll = remember(prompt?.id) { TransformingLazyColumnState() }
+    RoundPage(
+        topPadding = if (prompt == null) 28.dp else 40.dp,
+        state = if (prompt == null) pageScroll else promptScroll
+    ) {
         if (prompt != null) {
             item { Heading(stringResource(R.string.approval)) }
             item { Body(prompt.title) }
@@ -513,30 +558,44 @@ private fun ConversationPage(
             }
         } else {
             item {
-                Row(
+                Column(
                     Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    PetView(watch, compact = true)
-                    Column(
-                        Modifier.weight(1f),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            watch.profile?.label.orEmpty(),
-                            color = Accent,
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 2
+                    ProfileIdentity(
+                        page,
+                        watch.artwork[page.key],
+                        watch,
+                        true,
+                        modifier = Modifier.recordingPortrait(
+                            paired &&
+                                page.status ==
+                                dev.quantumink.hermesgadget.protocol.CatalogStatus.AVAILABLE &&
+                                (
+                                    !conversation.busy ||
+                                        conversation.mode == ConversationMode.LISTENING
+                                    ),
+                            conversation.mode == ConversationMode.LISTENING,
+                            startRecording,
+                            service::finishRecording,
+                            service::cancelRecording
                         )
-                        Text(
-                            stringResource(title),
-                            style = MaterialTheme.typography.titleMedium,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                    )
+                    Text(
+                        when {
+                            watch.screenNotice.isNotEmpty() -> "Check conversation"
+                            paired && conversation.mode == ConversationMode.LISTENING -> {
+                                stringResource(R.string.release_send)
+                            }
+                            paired && !conversation.busy -> stringResource(R.string.hold_talk)
+                            else -> stringResource(title)
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
+            if (watch.screenNotice.isNotEmpty()) item { Body(watch.screenNotice) }
             if (connection.status == ConnectionStatus.PAIRING) {
                 item {
                     Heading(
@@ -552,42 +611,6 @@ private fun ConversationPage(
                     }
                 }
             } else if (paired) {
-                if (conversation.mode in
-                    setOf(ConversationMode.READY, ConversationMode.LISTENING)
-                ) {
-                    item {
-                        val listening = conversation.mode == ConversationMode.LISTENING
-                        val actionLabel = stringResource(
-                            if (listening) {
-                                R.string.finish_recording
-                            } else {
-                                R.string.start_recording
-                            }
-                        )
-                        Row(
-                            Modifier.fillMaxWidth().semantics {
-                                role = Role.Button
-                                contentDescription = actionLabel
-                                onClick(actionLabel) {
-                                    if (listening) service.finishRecording() else startRecording()
-                                    true
-                                }
-                            },
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            VoiceMark(conversation.level, listening)
-                            Text(
-                                stringResource(
-                                    if (listening) R.string.release_send else R.string.hold_talk
-                                ),
-                                Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 2
-                            )
-                        }
-                    }
-                }
                 if (conversation.status.isNotEmpty()) {
                     item {
                         Body(conversation.status, muted = true)
@@ -664,23 +687,61 @@ private fun ConversationPage(
             } else {
                 item { Secondary(stringResource(R.string.disconnect), service::disconnect) }
             }
+            item {
+                Secondary("Refresh profiles", {
+                    service.refreshCatalog()
+                }, enabled = !watch.catalogRefreshing)
+            }
+            if (watch.catalogNotice.isNotBlank()) item { Body(watch.catalogNotice, muted = true) }
             item { Secondary(stringResource(R.string.profiles_title), profiles) }
             item { Secondary(stringResource(R.string.settings), settings) }
+            item {
+                Secondary(
+                    "Appearance",
+                    appearance,
+                    enabled = !watch.saving && conversation.prompt == null &&
+                        conversation.mode != ConversationMode.LISTENING
+                )
+            }
+            item { jump() }
         }
     }
 }
 
 @Composable
-private fun RoundPage(
+internal fun RoundPage(
     modifier: Modifier = Modifier,
+    topPadding: Dp = 40.dp,
+    state: TransformingLazyColumnState = rememberTransformingLazyColumnState(),
     content: TransformingLazyColumnScope.() -> Unit
 ) {
-    val state = rememberTransformingLazyColumnState()
-    AppScaffold(containerColor = Color.Black) {
+    AppScaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground,
+        timeText = {
+            val style = TimeTextDefaults.timeTextStyle(
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val first = state.layoutInfo.visibleItems.firstOrNull { it.index == 0 }
+            // AndroidX restores TimeText at idle even at the end of the list. Only the
+            // original top placement reserves its region; never paint over scrolled actions.
+            if (first != null && first.offset >= with(density) { topPadding.roundToPx() }) {
+                TimeText(modifier = Modifier.testTag("page-clock")) { time ->
+                    timeTextCurvedText(time, style)
+                }
+            }
+        }
+    ) {
         ScreenScaffold(
             state,
             modifier = modifier,
-            contentPadding = PaddingValues(horizontal = 36.dp, vertical = 40.dp)
+            contentPadding = PaddingValues(
+                start = 36.dp,
+                top = topPadding,
+                end = 36.dp,
+                bottom = 40.dp
+            )
         ) { padding ->
             TransformingLazyColumn(
                 state = state,
@@ -694,7 +755,7 @@ private fun RoundPage(
 }
 
 @Composable
-private fun Heading(value: String) {
+internal fun Heading(value: String) {
     Text(
         value,
         style = MaterialTheme.typography.titleLarge,
@@ -704,10 +765,14 @@ private fun Heading(value: String) {
 }
 
 @Composable
-private fun Body(value: String, muted: Boolean = false) {
+internal fun Body(value: String, muted: Boolean = false) {
     Text(
         value,
-        color = if (muted) Muted else Color(0xFFF0F3EB),
+        color = if (muted) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
         style = MaterialTheme.typography.bodyMedium,
         textAlign = TextAlign.Center,
         modifier = Modifier.fillMaxWidth()
@@ -715,14 +780,14 @@ private fun Body(value: String, muted: Boolean = false) {
 }
 
 @Composable
-private fun Primary(value: String, enabled: Boolean = true, onClick: () -> Unit) {
+internal fun Primary(value: String, enabled: Boolean = true, onClick: () -> Unit) {
     Button(onClick, Modifier.fillMaxWidth(), enabled = enabled) {
         Text(value, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     }
 }
 
 @Composable
-private fun Secondary(value: String, onClick: () -> Unit, enabled: Boolean = true) {
+internal fun Secondary(value: String, onClick: () -> Unit, enabled: Boolean = true) {
     FilledTonalButton(onClick, Modifier.fillMaxWidth(), enabled = enabled) {
         Text(value, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     }
@@ -745,15 +810,21 @@ private fun Input(
     val keyboardController = LocalSoftwareKeyboardController.current
     val singleLine = keyboard == KeyboardType.Uri || keyboard == KeyboardType.Password
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(label, color = Muted, style = MaterialTheme.typography.labelMedium)
+        Text(
+            label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium
+        )
         BasicTextField(
             value, changed,
             enabled = enabled,
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                .clip(RoundedCornerShape(16.dp)).background(Color(0xFF20251F)).padding(12.dp)
+                .clip(
+                    RoundedCornerShape(16.dp)
+                ).background(MaterialTheme.colorScheme.surfaceContainer).padding(12.dp)
                 .semantics { contentDescription = label },
             textStyle = TextStyle(
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = MaterialTheme.typography.bodyMedium.fontSize
             ),
             keyboardOptions = KeyboardOptions(keyboardType = keyboard, imeAction = ImeAction.Done),
@@ -770,55 +841,8 @@ private fun Input(
                 VisualTransformation.None
             },
             minLines = 1, maxLines = if (singleLine) 1 else 4,
-            cursorBrush = SolidColor(Accent)
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary)
         )
-    }
-}
-
-@Composable
-private fun VoiceMark(level: Float, listening: Boolean) {
-    Canvas(Modifier.size(48.dp)) {
-        drawCircle(Accent.copy(alpha = 0.18f), style = Stroke(3.dp.toPx()))
-        drawCircle(
-            Accent,
-            radius =
-            size.minDimension * (0.15f + if (listening) level * 0.24f else 0f)
-        )
-    }
-}
-
-private fun Modifier.voiceGesture(
-    enabled: Boolean,
-    start: () -> Unit,
-    finish: () -> Unit,
-    cancel: () -> Unit
-): Modifier = pointerInput(enabled) {
-    if (!enabled) return@pointerInput
-    val distance = 40.dp.toPx()
-    awaitEachGesture {
-        val down = awaitFirstDown()
-        val held = awaitLongPressOrCancellation(down.id) ?: return@awaitEachGesture
-        start()
-        var completed = false
-        var discarded = false
-        try {
-            while (true) {
-                val event = awaitPointerEvent(PointerEventPass.Initial)
-                val change = event.changes.firstOrNull { it.id == held.id } ?: break
-                if (!change.pressed) {
-                    if (!discarded) finish()
-                    completed = true
-                    break
-                }
-                if (!discarded && change.position.y - down.position.y > distance) {
-                    cancel()
-                    discarded = true
-                }
-                change.consume()
-            }
-        } finally {
-            if (!completed) cancel()
-        }
     }
 }
 
@@ -829,7 +853,7 @@ private fun CancelControl(cancel: (Boolean) -> Unit) {
     val current by rememberUpdatedState(cancel)
     Box(
         Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp))
-            .background(Color(0xFF20251F))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .semantics {
                 role = Role.Button
                 onClick(label) {

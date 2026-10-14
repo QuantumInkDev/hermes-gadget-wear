@@ -1,0 +1,357 @@
+{
+  "source": "d26e790c2060cdebd1b4b0aed79b934f438cfc0c",
+  "apk_sha256": "80aef071c8011dccc04875bfd9c0cac7d22938688b1cb2698a333dce96c4f5ba",
+  "test_apk_sha256": "30af7f783d90562c4dc1462ee4b07d1ecd0c235a61d9ca358e9ee54bd6e22bfb",
+  "runs": [
+    {
+      "name": "normal-core",
+      "methods": 24,
+      "font": "1.0",
+      "size": "Physical size: 1080x2400"
+    },
+    {
+      "name": "p320-f180",
+      "methods": 4,
+      "font": "1.8",
+      "size": "Physical size: 1080x2400\nOverride size: 840x1680"
+    },
+    {
+      "name": "p360-f130",
+      "methods": 4,
+      "font": "1.3",
+      "size": "Physical size: 1080x2400\nOverride size: 945x1890"
+    },
+    {
+      "name": "landscape-f130",
+      "methods": 4,
+      "font": "1.3",
+      "size": "Physical size: 1080x2400\nOverride size: 1680x840"
+    }
+  ],
+  "original_font": "1.0",
+  "restored_font": "1.0",
+  "original_size": "Physical size: 1080x2400",
+  "restored_size": "Physical size: 1080x2400",
+  "original_native_captures": true,
+  "synthetic_profiles_only": true,
+  "captures": [
+    {
+      "file": "courier-native-masks.png",
+      "sha256": "392536be25028549d8676708a3f2cf47105ba139279d4407a38b860cffc6adc2",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "PhoneMessagingGalleryTest"
+    },
+    {
+      "file": "picture-sheet-directory.png",
+      "sha256": "0386a5d49af57b3dd9cb3de057c2fb2af1f4491c8e98173a6c0e0d555243a31b",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "PhonePictureSheetTest"
+    },
+    {
+      "file": "picture-sheet-catalog.png",
+      "sha256": "c47b1160c5b7a4fdd732ee04335e8fd59c65cf52ce9fdbbfe8fdaf174cf5ca6e",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "PhonePictureSheetTest"
+    },
+    {
+      "file": "conversation-LIGHT.png",
+      "sha256": "7de269dc193b2b8fae60957ab92c1dfd73d0d587ea80d884b6c15ab51fd7f3d8",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "ConversationPresentationTest"
+    },
+    {
+      "file": "keyboard-LIGHT.png",
+      "sha256": "00a35737b36669c45f4751bc583cc895ac7c533cd3fd69565737d7777ac28ae8",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "ConversationPresentationTest"
+    },
+    {
+      "file": "speaking-LIGHT.png",
+      "sha256": "70033b6002e2d7838e9d921a7a4f39935852d5e44423565a50bafb6901c53cc8",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "ConversationPresentationTest"
+    },
+    {
+      "file": "settings-LIGHT.png",
+      "sha256": "1ef2c8745d194139699dca9f068599908aedd190451bb2983dc6329d634621ab",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "ConversationPresentationTest"
+    },
+    {
+      "file": "messaging-recording-LIGHT.png",
+      "sha256": "e9e698dcccc305a05845a8138292c9a5efe0806ca62c2f689e7b66692434f56b",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "PhoneMessagingGalleryTest"
+    },
+    {
+      "file": "directory-LIGHT.png",
+      "sha256": "e8db4e8e00640709186efe2d59498245ca958a6f20187697ecd28fc8a85f0396",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "DirectoryPresentationTest"
+    },
+    {
+      "file": "conversation-DARK.png",
+      "sha256": "182f6b631d626bf67e182ef57e6096e14e2a2700cc3f92fe3c6cb6187ddece42",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "ConversationPresentationTest"
+    },
+    {
+      "file": "keyboard-DARK.png",
+      "sha256": "9abee2d182980391dbe41974834fafdd52de8468f2498325ff1d0d73ae79f5be",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "ConversationPresentationTest"
+    },
+    {
+      "file": "speaking-DARK.png",
+      "sha256": "f779ccfe1baab6c7771d2ae6427d52d72537f502c1872f76bbca8dc3489dc0cf",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "ConversationPresentationTest"
+    },
+    {
+      "file": "settings-DARK.png",
+      "sha256": "42de403f57c2ed1ef87d57f61104ce757bfe79c9a7a6b7f9428a604e4a58edbd",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "ConversationPresentationTest"
+    },
+    {
+      "file": "messaging-recording-DARK.png",
+      "sha256": "a5d737d212e6dce599dfd91d9df5fcf5dee310a0d404d4832eb4e077da6104ee",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "PhoneMessagingGalleryTest"
+    },
+    {
+      "file": "directory-DARK.png",
+      "sha256": "6a516048960f25e5a634828c940ab8d4ec806c4df93d6fc9494c7fc927e82392",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "DirectoryPresentationTest"
+    },
+    {
+      "file": "conversation-MOONLIGHT.png",
+      "sha256": "9b325bf0551ffbecb5346acdf9a3ffb9814e6e78e563e1981ea844d15d6de1ae",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "ConversationPresentationTest"
+    },
+    {
+      "file": "keyboard-MOONLIGHT.png",
+      "sha256": "5a64be26e8d9051dda1d646ef2eaf50a259f2a7dfc19edcee8d8108925e566bb",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "ConversationPresentationTest"
+    },
+    {
+      "file": "speaking-MOONLIGHT.png",
+      "sha256": "c5a7f32e1e3bcf7ee9eec45ddb3cea7860b67bb39b6f6fa82a955e876ae97b19",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "ConversationPresentationTest"
+    },
+    {
+      "file": "settings-MOONLIGHT.png",
+      "sha256": "0121a1b913f280969c41b49684c6ea79ea4d20d9962945ac2f213c1db3d9d3eb",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "ConversationPresentationTest"
+    },
+    {
+      "file": "messaging-recording-MOONLIGHT.png",
+      "sha256": "700be532814cd6eb9472575dfda77960b2c348be9b779fb71b20a62d7d5b081a",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "PhoneMessagingGalleryTest"
+    },
+    {
+      "file": "directory-MOONLIGHT.png",
+      "sha256": "e68cd693a32a69db007704e56fbc930861938672d5ddf24a6b8825b483d123c9",
+      "width": 1080,
+      "height": 2400,
+      "scenario": "normal",
+      "native_method": "DirectoryPresentationTest"
+    },
+    {
+      "file": "picture-sheet-directory-p320-f180.png",
+      "sha256": "7a7297b8425c8bfc95fc8c6472d7ef56c6b011a09d574c5d94d6bcca2e26ea45",
+      "width": 840,
+      "height": 1680,
+      "scenario": "p320-f180",
+      "native_method": "PhonePictureSheetTest"
+    },
+    {
+      "file": "picture-sheet-catalog-p320-f180.png",
+      "sha256": "2ec7768a9054e3c0d237637f9463028eaf7410db4125c80a8d9191c22e80f484",
+      "width": 840,
+      "height": 1680,
+      "scenario": "p320-f180",
+      "native_method": "PhonePictureSheetTest"
+    },
+    {
+      "file": "keyboard-MOONLIGHT-p320-f180.png",
+      "sha256": "6173b0200c0ce5a5d6f0af4fa3817631cf53098e47f699f4b4eb0a1327e6f8b8",
+      "width": 840,
+      "height": 1680,
+      "scenario": "p320-f180",
+      "native_method": "ConversationPresentationTest"
+    },
+    {
+      "file": "messaging-recording-LIGHT-p320-f180.png",
+      "sha256": "9c523207843b84c9e60fd7fc774345758eed0000fd35a39fe05c15ebeaa7413c",
+      "width": 840,
+      "height": 1680,
+      "scenario": "p320-f180",
+      "native_method": "PhoneMessagingGalleryTest"
+    },
+    {
+      "file": "messaging-recording-DARK-p320-f180.png",
+      "sha256": "d6e66ee34fca6229ecf6293f4133d4614701cfca1d4c5efb31533c3f8d21f1b8",
+      "width": 840,
+      "height": 1680,
+      "scenario": "p320-f180",
+      "native_method": "PhoneMessagingGalleryTest"
+    },
+    {
+      "file": "messaging-recording-MOONLIGHT-p320-f180.png",
+      "sha256": "31258ea23f70f00160fb60a022e2bf73343dbcec8f8561484594a569f1e48728",
+      "width": 840,
+      "height": 1680,
+      "scenario": "p320-f180",
+      "native_method": "PhoneMessagingGalleryTest"
+    },
+    {
+      "file": "picture-sheet-directory-p360-f130.png",
+      "sha256": "9fc6c18f716d52ef74bf1e6826aeac91e00a82b2b4e0f8fd54afc7b3d3b8a35d",
+      "width": 945,
+      "height": 1890,
+      "scenario": "p360-f130",
+      "native_method": "PhonePictureSheetTest"
+    },
+    {
+      "file": "picture-sheet-catalog-p360-f130.png",
+      "sha256": "a0eaf0d1a3b7cd368cb801ce9eabeae208c7f10bbc7626fba3f7a45ed522c2da",
+      "width": 945,
+      "height": 1890,
+      "scenario": "p360-f130",
+      "native_method": "PhonePictureSheetTest"
+    },
+    {
+      "file": "keyboard-MOONLIGHT-p360-f130.png",
+      "sha256": "2fbe7f1166c103a18aee33412796850e75bf6fff1950a59b4ebbb21c7a7729dc",
+      "width": 945,
+      "height": 1890,
+      "scenario": "p360-f130",
+      "native_method": "ConversationPresentationTest"
+    },
+    {
+      "file": "messaging-recording-LIGHT-p360-f130.png",
+      "sha256": "695289ad33deb48dde5c33cc03ab1d78f599409836fd97fdb116eacb062fe700",
+      "width": 945,
+      "height": 1890,
+      "scenario": "p360-f130",
+      "native_method": "PhoneMessagingGalleryTest"
+    },
+    {
+      "file": "messaging-recording-DARK-p360-f130.png",
+      "sha256": "02fba28e9ec3fd46025ec1954bd23183cb2f2118097f43dc7bd38c8b66af94fb",
+      "width": 945,
+      "height": 1890,
+      "scenario": "p360-f130",
+      "native_method": "PhoneMessagingGalleryTest"
+    },
+    {
+      "file": "messaging-recording-MOONLIGHT-p360-f130.png",
+      "sha256": "0b6b9d27403cb49fc97267fa0c0f411fe9f0c646f0fbfed3f23caf605e1aaf89",
+      "width": 945,
+      "height": 1890,
+      "scenario": "p360-f130",
+      "native_method": "PhoneMessagingGalleryTest"
+    },
+    {
+      "file": "picture-sheet-directory-landscape-f130.png",
+      "sha256": "2663955273687e47690e46b5e18714e37260719473ebeabd55cf6a772410510c",
+      "width": 1680,
+      "height": 840,
+      "scenario": "landscape-f130",
+      "native_method": "PhonePictureSheetTest"
+    },
+    {
+      "file": "picture-sheet-catalog-landscape-f130.png",
+      "sha256": "2663955273687e47690e46b5e18714e37260719473ebeabd55cf6a772410510c",
+      "width": 1680,
+      "height": 840,
+      "scenario": "landscape-f130",
+      "native_method": "PhonePictureSheetTest"
+    },
+    {
+      "file": "keyboard-MOONLIGHT-landscape-f130.png",
+      "sha256": "0c0b9c4f6c7b820b02d3d450548a77f362841e3535928f6c6b7dc08973bf0c9c",
+      "width": 1680,
+      "height": 840,
+      "scenario": "landscape-f130",
+      "native_method": "ConversationPresentationTest"
+    },
+    {
+      "file": "messaging-recording-LIGHT-landscape-f130.png",
+      "sha256": "c9f325e8fd039427e9905aa01578cc3cab20ee226518b3ec3aa7f5da40a63e5c",
+      "width": 1680,
+      "height": 840,
+      "scenario": "landscape-f130",
+      "native_method": "PhoneMessagingGalleryTest"
+    },
+    {
+      "file": "messaging-recording-DARK-landscape-f130.png",
+      "sha256": "e38c3a6f953103135218aa5f868a5893dd9df424b03ef12baed6f944d4c25337",
+      "width": 1680,
+      "height": 840,
+      "scenario": "landscape-f130",
+      "native_method": "PhoneMessagingGalleryTest"
+    },
+    {
+      "file": "messaging-recording-MOONLIGHT-landscape-f130.png",
+      "sha256": "c603d8b013a9ca603306a4a1bbddd99f7a1efb9142dc346900915a377b7bc0a9",
+      "width": 1680,
+      "height": 840,
+      "scenario": "landscape-f130",
+      "native_method": "PhoneMessagingGalleryTest"
+    }
+  ],
+  "stock_tls": {
+    "source": "74a7ddfd1750c396adf83eed682f99f3ab414901",
+    "methods": 6,
+    "test_apk_sha256": "21a44bfe19c9d2168b59643d920926229aeaa1758afe101576319619ba387fa7",
+    "private_receipt": ".local/phone-messaging/acceptance/stock-tls.log"
+  }
+}

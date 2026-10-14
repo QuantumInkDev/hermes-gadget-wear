@@ -10,6 +10,7 @@ Baseline: Hermes Gadget SDK `v0.2.0`, commit `323e3303ab68981f810fc3208119cd8a22
 | Optional companion metadata and extra rows in one hatch normalization pass | Hermes Agent | Later-row registration tool implemented/tested; same-hatch generator change remains proposed |
 | Pending outbox on reconnect | Gadget SDK | [Bounded retention/deduplication proposal](pending-outbox.md); not implemented |
 | Profile discovery/select with multiplexed gateway | Gadget SDK / Hermes Agent | [V2 design proposal](profiles-v2.md) only; **DECISION** and upstream maintainer feedback before implementation |
+| Read-only watch catalog projection from host profile/avatar inventory | Hermes Agent / self-host catalog tooling | [Multi-box carousel design](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md) approved for isolated development; independent Gadget endpoints; live rollout requires review |
 
 Each SDK implementation must be a clean branch/PR series against the pinned baseline, with protocol docs, tests, extensions-off compatibility, and stock gadget coverage. Record actual branch/commit/PR links and maintainer responses here when created. A local proposal is not an upstream agreement. Never install an unreviewed extension into the maintainer's running Hermes environment as part of development.
 
@@ -18,3 +19,10 @@ M4 local branch `wear/optional-extensions`, first patch `feat: negotiate optiona
 M5 local SDK patch 2 `2bcdfc7` implements authenticated, opt-in profile pet delivery. [Pet documentation](pets.md) records the companion metadata proposal, original-fixture evidence, renderer fallback and registration-tool limits. No Hermes Agent generator change, real-profile delivery, upstream review, or live installation is claimed.
 
 M6 local SDK patch 3 `8a1d854` acknowledges optional client speech, sends bounded final reply text and a profile voice hint, deduplicates finals, respects voice-off, and suppresses automatic server synthesis for acknowledged client sessions. Default `enable_client_tts` is false. Stock clients and extension-off servers retain their speech behavior. Explicit voice attachments retain their existing server path. Actual Hermes adapter/profile integration, real provider output and phone/watch transport remain unverified. No upstream review or live installation is claimed.
+
+Carousel catalog implementation is an isolated standalone [publisher](../server/catalog/README.md),
+not a Gadget wire extension. Its five auth/projection/persistence/artwork tests pass without
+modifying stock SDK v0.2.0. The app's real three-stock-server and three-TLS-catalog tests pass;
+independent URLs and pairing keys remain the routing boundary. Proposed private per-box
+mappings, installation and rollback notes are prepared for owner review. No live deployment,
+new pairing, upstream PR or agreement is claimed. Existing SDK patch exports remain unchanged.

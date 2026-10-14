@@ -1,0 +1,139 @@
+{
+  "name": "Voice Q",
+  "author": "QuantumInk",
+  "license": "MIT (repository license)",
+  "origin": "Original geometric circle/Q-tail and three round-capped voice strokes, matching the approved native-client-preview.html Voice Q. No upstream or personal artwork.",
+  "geometry": {
+    "viewport": [
+      108,
+      108
+    ],
+    "circle": {
+      "center": [
+        52,
+        50
+      ],
+      "radius": 25
+    },
+    "tail": [
+      [
+        69,
+        69
+      ],
+      [
+        83,
+        83
+      ]
+    ],
+    "voice": [
+      [
+        42,
+        47,
+        42,
+        54
+      ],
+      [
+        52,
+        40,
+        52,
+        61
+      ],
+      [
+        62,
+        45,
+        62,
+        56
+      ]
+    ],
+    "strokeWidth": 6,
+    "transform": {
+      "scale": 0.72,
+      "pivot": [
+        54,
+        54
+      ]
+    },
+    "safeArea": {
+      "center": [
+        54,
+        54
+      ],
+      "radius": 33,
+      "maximumForegroundRadius": 31.69
+    }
+  },
+  "colors": {
+    "background": "#1D1F31",
+    "foreground": "#C8D3F5",
+    "signal": "#86E1FC",
+    "monochrome": "#FFFFFF"
+  },
+  "masters": [
+    "voice-q-foreground.svg",
+    "voice-q-background.svg",
+    "voice-q-monochrome.svg",
+    "voice-q-master.svg"
+  ],
+  "launcherDensities": [
+    {
+      "path": "client/src/main/res/mipmap-mdpi/ic_quantumink_relay.png",
+      "width": 48,
+      "height": 48,
+      "sha256": "5a7c32b8fb69cede1247bf259a0ec442ac77c3c85983ef9c023956ada71360cd"
+    },
+    {
+      "path": "client/src/main/res/mipmap-mdpi/ic_quantumink_relay_round.png",
+      "width": 48,
+      "height": 48,
+      "sha256": "4ed011817d2ad87e6281eb5b1d7c1e1388335a2c0aea02943b8c9f9cb56e4b9f"
+    },
+    {
+      "path": "client/src/main/res/mipmap-hdpi/ic_quantumink_relay.png",
+      "width": 72,
+      "height": 72,
+      "sha256": "d50154a89546490a254bc5cfd65accbd636b54c36d258c634809a26241348cae"
+    },
+    {
+      "path": "client/src/main/res/mipmap-hdpi/ic_quantumink_relay_round.png",
+      "width": 72,
+      "height": 72,
+      "sha256": "7e3e55196111b421b5d47e8e28eb7d5494096cc8d6e3014f34f746adb1a6ebe6"
+    },
+    {
+      "path": "client/src/main/res/mipmap-xhdpi/ic_quantumink_relay.png",
+      "width": 96,
+      "height": 96,
+      "sha256": "4e07c2337ef5ff6fe4e217b409c7e9cd00d7fc26db202e3d274e0b6af6ad30a3"
+    },
+    {
+      "path": "client/src/main/res/mipmap-xhdpi/ic_quantumink_relay_round.png",
+      "width": 96,
+      "height": 96,
+      "sha256": "16f988ebb78b6b311866f1a0ad1b826d93676436dfefafad167bfe498f7241d2"
+    },
+    {
+      "path": "client/src/main/res/mipmap-xxhdpi/ic_quantumink_relay.png",
+      "width": 144,
+      "height": 144,
+      "sha256": "bfe21e596914445ba16c2a5b31257ee740378dae70811bc3e65346c63400138b"
+    },
+    {
+      "path": "client/src/main/res/mipmap-xxhdpi/ic_quantumink_relay_round.png",
+      "width": 144,
+      "height": 144,
+      "sha256": "6f6f314bea31c4ae1554d0e2aae6f33c58cf0a486ab6f5f2c436a0a549a34e0f"
+    },
+    {
+      "path": "client/src/main/res/mipmap-xxxhdpi/ic_quantumink_relay.png",
+      "width": 192,
+      "height": 192,
+      "sha256": "4f9b945cd8425f32b72fc660ddc2d227fbddbd9db3f1aa8152bd4e4277c4e84a"
+    },
+    {
+      "path": "client/src/main/res/mipmap-xxxhdpi/ic_quantumink_relay_round.png",
+      "width": 192,
+      "height": 192,
+      "sha256": "a207214d0d452d2618ad1d420495611fca5134836c3de36e6a5ca85f4ad3c48a"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="4dp" android:theme="@style/HomeWidgetTheme"
+    android:background="@drawable/home_widget_background_system">
+    <LinearLayout android:id="@+id/home_widget_rows" android:layout_width="match_parent"
+        android:layout_height="match_parent" android:orientation="vertical" />
+    <TextView android:id="@+id/home_widget_recovery" android:layout_width="match_parent"
+        android:layout_height="match_parent" android:gravity="center" android:padding="8dp"
+        android:text="@string/home_widget_choose" android:textColor="?android:attr/textColorPrimary"
+        android:textSize="14sp" android:visibility="gone" />
+</LinearLayout>

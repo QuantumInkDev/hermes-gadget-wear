@@ -12,7 +12,10 @@ startup, cellular/VPN relay and the corrected Ultra decoder checks.
 
 1. Obtain the watch's current **connection** IP:port from the main Wireless debugging screen.
    Its pairing-dialog port/code is a different connection. Use the already approved device;
-   confirm model/form factor before operating it. Connect the phone with USB debugging.
+   confirm model/form factor before operating it. Use USB debugging or the phone's existing
+   paired wireless ADB connection. A working paired connection does not need a new pairing
+   code; if disconnected, use the current address/connection port on its main Wireless
+   debugging screen. The pairing-dialog port is separate.
 2. Inspect the installed watch package and compare its signing certificate with the local
    APK. Verify the watch/phone APK certificates match each other. CI debug APKs use a separate
    ephemeral signing identity; they cannot replace a locally enrolled installation safely.

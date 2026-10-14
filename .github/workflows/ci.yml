@@ -54,6 +54,9 @@ jobs:
       - name: Test optional codecs, pets, tools, and stock compatibility
         run: HERMES_AGENT_DIR="$PWD/.local/unavailable" .local/extension-venv/bin/python -m pytest .local/upstream/hermes-gadget-sdk-patched/tests/test_opus.py .local/upstream/hermes-gadget-sdk-patched/tests/test_pets.py .local/upstream/hermes-gadget-sdk-patched/tests/test_client_tts.py tools/tests/test_extend_pet.py .local/upstream/hermes-gadget-sdk-patched/tests/test_protocol.py .local/upstream/hermes-gadget-sdk-patched/tests/test_plugin_units.py -q
 
+      - name: Test isolated read-only catalog publisher
+        run: .local/extension-venv/bin/python -W error -m unittest discover -s server/catalog -p 'test_*.py' -v
+
   secrets:
     runs-on: ubuntu-latest
     steps:

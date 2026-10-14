@@ -18,16 +18,24 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.VibratorManager
 import android.provider.AlarmClock
+import dev.quantumink.hermesgadget.client.Cue
+import dev.quantumink.hermesgadget.client.CuePreferences
+import dev.quantumink.hermesgadget.client.OpusSupport
+import dev.quantumink.hermesgadget.client.PcmCapture
+import dev.quantumink.hermesgadget.client.PcmPlayback
+import dev.quantumink.hermesgadget.client.RecordingCues
 import dev.quantumink.hermesgadget.protocol.ConnectionObserver
 import dev.quantumink.hermesgadget.protocol.ConnectionState
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
 import dev.quantumink.hermesgadget.protocol.ConversationEffect
+import dev.quantumink.hermesgadget.protocol.ConversationMode
 import dev.quantumink.hermesgadget.protocol.ConversationState
 import dev.quantumink.hermesgadget.protocol.DeviceIdentity
 import dev.quantumink.hermesgadget.protocol.DirectConnection
 import dev.quantumink.hermesgadget.protocol.Endpoint
 import dev.quantumink.hermesgadget.protocol.PetEffect
 import dev.quantumink.hermesgadget.protocol.PetManifest
+import dev.quantumink.hermesgadget.protocol.RecordingFeedback
 import dev.quantumink.hermesgadget.protocol.TransportPath
 import dev.quantumink.hermesgadget.protocol.TransportPolicy
 import dev.quantumink.hermesgadget.protocol.TransportPreference
@@ -58,16 +66,28 @@ data class WatchState(
     val saving: Boolean = false,
     val setupError: String = "",
     val draft: String = "",
+    val catalog: List<dev.quantumink.hermesgadget.protocol.CatalogPage> = emptyList(),
+    val catalogRefreshing: Boolean = false,
+    val catalogNotice: String = "",
+    val selectedPage: String = "",
+    val artwork: Map<String, PageArtwork> = emptyMap(),
     val path: TransportPath = TransportPath.DIRECT,
     val selecting: Boolean = false,
     val transportNotice: String = "",
     val pet: PetAtlas? = null,
     val petCue: String = "",
+    val captureActive: Boolean = false,
+    val screenTurnStarted: Long? = null,
+    val screenNotice: String = "",
     val speaking: Boolean = false,
     val speechPending: Boolean = false,
     val playbackLevel: Float = 0f,
     val haptic: Long = 0
 ) {
+    val selectionLocked: Boolean get() = saving || captureActive ||
+        connection.conversation.prompt != null ||
+        connection.conversation.mode == ConversationMode.LISTENING ||
+        connection.conversation.busy
     override fun toString(): String = "WatchState(content=redacted)"
 }
 
@@ -90,6 +110,8 @@ class GadgetService : Service() {
     private val selectionEpoch = AtomicLong()
     private val epoch = AtomicLong()
     private val mediaLock = Any()
+    private val drafts = ProfileDrafts()
+    private lateinit var catalog: WatchCatalogController
     private val petWorker = java.util.concurrent.ThreadPoolExecutor(
         1,
         1,
@@ -103,6 +125,10 @@ class GadgetService : Service() {
     @Volatile private var petManifest: PetManifest? = null
     private lateinit var vault: IdentityVault
     private lateinit var capture: PcmCapture
+    private lateinit var recordingCues: RecordingCues
+    private var recordingFeedback: RecordingFeedback? = null
+
+    @Volatile private var captureToken: String? = null
     private lateinit var playback: PcmPlayback
 
     @Volatile private var connection: DirectConnection? = null
@@ -117,13 +143,43 @@ class GadgetService : Service() {
     private var destroyed = false
     private var savedIdentity: DeviceIdentity? = null
 
+    @Volatile private var pendingSetup: EndpointProfile? = null
+    private var rejectedCatalogNotice = ""
+    private var deferredCatalog:
+        Pair<List<dev.quantumink.hermesgadget.protocol.CatalogPage>, String>? = null
+
+    private fun rosterProfiles(): List<EndpointProfile> {
+        val profiles = mutableState.value.profiles
+        val pending = pendingSetup ?: return profiles
+        return profiles.filterNot { it.endpoint.url == pending.endpoint.url } + pending
+    }
+
     @Volatile private var opusReady = false
     private var advertisedActions: Set<String> = emptySet()
 
     override fun onCreate() {
         super.onCreate()
         capture = PcmCapture(this)
+        CuePreferences.initialize(this)
+        recordingCues = RecordingCues(this, watchLightHaptics = true)
         petCache = PetCache(this)
+        catalog = WatchCatalogController(
+            this,
+            petCache,
+            allowed = { pages ->
+                ProfilePages.merge(rosterProfiles(), pages).size <= 32
+            },
+            loaded = ::applyCatalog,
+            busy = { refreshing, notice ->
+                mutableState.update {
+                    it.copy(
+                        catalogRefreshing = refreshing,
+                        catalogNotice = rejectedCatalogNotice.ifBlank { notice }
+                    )
+                }
+            },
+            artwork = { artwork -> mutableState.update { it.copy(artwork = artwork) } }
+        )
         playback = PcmPlayback(
             this,
             onInterrupted = { connection?.report("Playback interrupted.") },
@@ -150,6 +206,14 @@ class GadgetService : Service() {
         )
         surfaceScope.launch {
             mutableState.collect { watch ->
+                // The service outlives ambient/activity composition replacement. Keep the
+                // approved roster/session projection until the same selection lock clears.
+                if (!watch.selectionLocked) {
+                    deferredCatalog?.let { pending ->
+                        deferredCatalog = null
+                        applyCatalog(pending.first, pending.second)
+                    }
+                }
                 WatchSurfaces.publish(this@GadgetService, watch)
                 val profile = watch.profile
                 if (profile != null && !watch.connection.conversation.busy &&
@@ -194,7 +258,8 @@ class GadgetService : Service() {
                         ) {
                             configure(saved.first!!, requireNotNull(saved.second))
                         }
-                        mutableState.update { it.copy(loading = false, profiles = saved.third) }
+                        mutableState.update { it.copy(profiles = saved.third) }
+                        catalog.start()
                     },
                     onFailure = {
                         mutableState.update {
@@ -230,6 +295,86 @@ class GadgetService : Service() {
         visible = true
         timerLauncher = timer
         brightness = screenBrightness
+        refreshCatalog(false)
+    }
+
+    fun refreshCatalog(force: Boolean = true) {
+        if (visible) catalog.refresh(force)
+    }
+
+    internal fun applyCatalog(
+        pages: List<dev.quantumink.hermesgadget.protocol.CatalogPage>,
+        selected: String
+    ) {
+        if (ProfilePages.merge(rosterProfiles(), pages).size > 32) {
+            rejectedCatalogNotice = "At most 32 pages are supported. Saved setup was kept. " +
+                "Remove unused pages on the phone and refresh."
+            mutableState.update {
+                it.copy(
+                    loading = false,
+                    catalogNotice = rejectedCatalogNotice
+                )
+            }
+            return
+        }
+        if (mutableState.value.selectionLocked) {
+            deferredCatalog = pages.toList() to selected
+            return
+        }
+        deferredCatalog = null
+        rejectedCatalogNotice = ""
+        mutableState.update {
+            it.copy(
+                loading = false,
+                catalogNotice = "",
+                catalog = pages,
+                selectedPage = it.selectedPage.ifBlank {
+                    selected
+                }
+            )
+        }
+        if (!::vault.isInitialized) return
+        storage.execute {
+            val profiles = runCatching {
+                vault.updateLabels(
+                    pages.mapNotNull { page ->
+                        page.profile.gadgetUrl?.let { it to page.profile.name }
+                    }.toMap()
+                )
+            }
+            main.post {
+                if (destroyed) return@post
+                profiles.onSuccess { updated ->
+                    mutableState.update { watch ->
+                        watch.copy(
+                            profiles = updated,
+                            profile = updated.singleOrNull {
+                                it.endpoint.url == watch.profile?.endpoint?.url
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun preparePages(keys: List<String>) {
+        val watch = mutableState.value
+        val pages = ProfilePages.merge(watch.profiles, watch.catalog)
+        catalog.prepare(keys.mapNotNull { key -> pages.singleOrNull { it.key == key } })
+    }
+
+    fun rememberPage(key: String) {
+        mutableState.update { it.copy(selectedPage = key) }
+        catalog.rememberPage(key)
+    }
+
+    private fun rememberActivePage() {
+        val watch = mutableState.value
+        val active = ProfilePages.merge(watch.profiles, watch.catalog).singleOrNull {
+            it.approved?.endpoint?.url == watch.profile?.endpoint?.url
+        }
+        if (active != null && watch.selectedPage != active.key) rememberPage(active.key)
     }
 
     fun hidden() {
@@ -237,8 +382,7 @@ class GadgetService : Service() {
         timerLauncher = null
         brightness?.invoke(null)
         brightness = null
-        capture.stop()
-        connection?.cancelRecording()
+        cancelRecording()
         if (!foreground && !textEditing) disconnect()
     }
 
@@ -268,6 +412,19 @@ class GadgetService : Service() {
             }
             return
         }
+        val profiles = mutableState.value.profiles.filterNot {
+            it.endpoint.url == profile.endpoint.url
+        } + profile
+        if (ProfilePages.merge(profiles, mutableState.value.catalog).size > 32) {
+            mutableState.update {
+                it.copy(
+                    setupError = "At most 32 pages are supported. " +
+                        "Remove unused pages before adding setup."
+                )
+            }
+            return
+        }
+        pendingSetup = profile
         mutableState.update { it.copy(saving = true, setupError = "") }
         storage.execute {
             val result = runCatching { vault.save(profile) to vault.profiles() }
@@ -277,9 +434,12 @@ class GadgetService : Service() {
                     onSuccess = { saved ->
                         configure(profile, saved.first)
                         mutableState.update { it.copy(saving = false, profiles = saved.second) }
+                        pendingSetup = null
+                        rememberActivePage()
                         ready()
                     },
                     onFailure = {
+                        pendingSetup = null
                         mutableState.update {
                             it.copy(saving = false, setupError = getString(R.string.storage_failed))
                         }
@@ -294,6 +454,7 @@ class GadgetService : Service() {
     fun removeProfile(url: String, ready: () -> Unit) = changeProfiles({
         val saved = vault.remove(url)
         petCache.remove(url)
+        drafts.remove(url)
         saved
     }, ready)
 
@@ -311,10 +472,20 @@ class GadgetService : Service() {
                 result.fold({ (saved, profiles) ->
                     if (saved == null) {
                         savedIdentity = null
-                        mutableState.value = WatchState(loading = false, profiles = profiles)
+                        mutableState.update {
+                            it.copy(
+                                profile = null,
+                                profiles = profiles,
+                                saving = false,
+                                draft = "",
+                                pet = null,
+                                connection = ConnectionState()
+                            )
+                        }
                     } else {
                         configure(saved.first, saved.second)
                         mutableState.update { it.copy(saving = false, profiles = profiles) }
+                        rememberActivePage()
                     }
                     ready()
                 }, {
@@ -461,6 +632,9 @@ class GadgetService : Service() {
 
     fun disconnect() {
         epoch.incrementAndGet()
+        recordingFeedback?.invalidate()
+        captureToken = null
+        mutableState.update { it.copy(captureActive = false) }
         selectionEpoch.incrementAndGet()
         mutableState.update {
             it.copy(
@@ -477,6 +651,7 @@ class GadgetService : Service() {
     }
 
     fun updateDraft(value: String) {
+        drafts.update(value)
         mutableState.update { it.copy(draft = value.take(4096)) }
     }
 
@@ -487,6 +662,7 @@ class GadgetService : Service() {
             mutableState.value.connection.conversation.prompt == null && active != null &&
             beginForeground(false)
         ) {
+            beginScreenTurn()
             active.text(value).whenComplete { accepted, failure ->
                 main.post {
                     releaseIdleForeground()
@@ -519,6 +695,18 @@ class GadgetService : Service() {
             if (destroyed || !foreground) return@postDelayed
             val watch = mutableState.value
             if (!watch.connection.conversation.busy && !watch.speaking && !watch.speechPending) {
+                mutableState.update {
+                    it.copy(
+                        screenTurnStarted = null,
+                        screenNotice = if (it.screenNotice ==
+                            SCREEN_LIMIT_NOTICE
+                        ) {
+                            ""
+                        } else {
+                            it.screenNotice
+                        }
+                    )
+                }
                 endForeground()
                 if (!visible) disconnect()
             }
@@ -537,14 +725,46 @@ class GadgetService : Service() {
             connection?.report(getString(R.string.microphone_permission_needed))
             return
         }
-        if (beginForeground(true)) connection?.startRecording()
+        if (mutableState.value.connection.conversation.mode ==
+            ConversationMode.LISTENING
+        ) {
+            return
+        }
+        if (beginForeground(true)) {
+            beginScreenTurn()
+            connection?.startRecording()
+        }
+    }
+
+    private fun beginScreenTurn() {
+        mutableState.update {
+            it.copy(screenTurnStarted = android.os.SystemClock.elapsedRealtime(), screenNotice = "")
+        }
+    }
+
+    fun screenLeaseExpired(started: Long?) {
+        mutableState.update {
+            if (started != null && it.screenTurnStarted == started &&
+                it.conversationInProgress && it.screenNotice.isEmpty()
+            ) {
+                it.copy(
+                    screenNotice = SCREEN_LIMIT_NOTICE
+                )
+            } else {
+                it
+            }
+        }
     }
 
     fun finishRecording() {
         if (!capture.finish()) connection?.finishRecording()
     }
     fun cancelRecording() {
-        capture.stop()
+        synchronized(mediaLock) {
+            captureToken = null
+            mutableState.update { it.copy(captureActive = false) }
+            capture.stop()
+        }
         connection?.cancelRecording()
     }
     fun cancel(newSession: Boolean = false) {
@@ -561,7 +781,10 @@ class GadgetService : Service() {
     }
 
     fun reset() {
+        deferredCatalog = null
         closeConnection()
+        drafts.clear()
+        catalog.reset()
         mutableState.update { it.copy(saving = true) }
         storage.execute {
             val result = runCatching {
@@ -614,6 +837,15 @@ class GadgetService : Service() {
         val path = if (pipe == null) TransportPath.DIRECT else TransportPath.RELAY
         savedIdentity = identity
         val version = epoch.incrementAndGet()
+        recordingFeedback?.invalidate()
+        captureToken = null
+        mutableState.update { it.copy(captureActive = false) }
+        val feedback = RecordingFeedback { finished ->
+            if (version == epoch.get() && visible) {
+                recordingCues.play(if (finished) Cue.FINISH else Cue.CANCEL)
+            }
+        }
+        recordingFeedback = feedback
         val actions = availableActions()
         advertisedActions = actions
         val sameEndpoint = mutableState.value.profile?.endpoint?.url == profile.endpoint.url
@@ -695,7 +927,29 @@ class GadgetService : Service() {
                         petCue("waving", version)
                     }
                     mutableState.update {
-                        if (version == epoch.get()) it.copy(connection = state) else it
+                        if (version == epoch.get()) {
+                            val interrupted = it.connection.conversation.busy &&
+                                state.status in
+                                setOf(
+                                    ConnectionStatus.OFFLINE,
+                                    ConnectionStatus.ERROR,
+                                    ConnectionStatus.RETRYING
+                                )
+                            it.copy(
+                                connection = state,
+                                screenNotice = if (interrupted) {
+                                    "Connection ended before the reply completed. Reconnect and try again."
+                                } else if (state.conversation.reply !=
+                                    it.connection.conversation.reply
+                                ) {
+                                    ""
+                                } else {
+                                    it.screenNotice
+                                }
+                            )
+                        } else {
+                            it
+                        }
                     }
                     if (TransportPolicy.canFallBack(profile.transport, path, state)) {
                         main.post {
@@ -781,6 +1035,8 @@ class GadgetService : Service() {
                                     connection?.cancelRecording()
                                 } else {
                                     val current = connection ?: return
+                                    feedback.begin(effect.token)
+                                    captureToken = effect.token
                                     capture.start(
                                         { bytes ->
                                             if (effect.format ==
@@ -800,11 +1056,47 @@ class GadgetService : Service() {
                                         format = effect.format,
                                         onHeader = { current.codecHeader(effect.token, it) },
                                         onLevel = { current.captureLevel(effect.token, it) },
-                                        onFinished = { current.finishRecording(effect.token) }
+                                        onFinished = {
+                                            if (version ==
+                                                epoch.get()
+                                            ) {
+                                                current.finishRecording(effect.token)
+                                            }
+                                        },
+                                        onStarted = {
+                                            synchronized(mediaLock) {
+                                                if (version == epoch.get() && visible &&
+                                                    captureToken == effect.token &&
+                                                    !mutableState.value.captureActive
+                                                ) {
+                                                    mutableState.update {
+                                                        it.copy(captureActive = true)
+                                                    }
+                                                    recordingCues.play(Cue.START)
+                                                }
+                                            }
+                                        },
+                                        onStopped = {
+                                            synchronized(mediaLock) {
+                                                if (version == epoch.get()) {
+                                                    if (captureToken == effect.token) {
+                                                        captureToken = null
+                                                        mutableState.update {
+                                                            it.copy(captureActive = false)
+                                                        }
+                                                    }
+                                                    feedback.stopped(effect.token)
+                                                }
+                                            }
+                                        }
                                     )
                                 }
                             }
+                            is ConversationEffect.RecordingOutcome ->
+                                feedback.outcome(effect.token, effect.finished)
                             ConversationEffect.CaptureStop -> {
+                                captureToken = null
+                                mutableState.update { it.copy(captureActive = false) }
                                 capture.stop()
                                 main.post {
                                     if (version == epoch.get() &&
@@ -830,8 +1122,19 @@ class GadgetService : Service() {
                             is ConversationEffect.Action -> main.post {
                                 if (version == epoch.get()) executeAction(effect, generation)
                             }
-                            is ConversationEffect.Haptic -> mutableState.update {
-                                if (version == epoch.get()) it.copy(haptic = it.haptic + 1) else it
+                            is ConversationEffect.Haptic -> if (effect !=
+                                ConversationEffect.Haptic.LISTEN_START &&
+                                effect != ConversationEffect.Haptic.LISTEN_END
+                            ) {
+                                mutableState.update {
+                                    if (version ==
+                                        epoch.get()
+                                    ) {
+                                        it.copy(haptic = it.haptic + 1)
+                                    } else {
+                                        it
+                                    }
+                                }
                             }
                             else -> Unit
                         }
@@ -849,7 +1152,7 @@ class GadgetService : Service() {
         mutableState.update {
             it.copy(
                 profile = profile,
-                draft = if (sameEndpoint) it.draft else "",
+                draft = drafts.select(profile.endpoint.url),
                 connection = ConnectionState(
                     conversation = ConversationState(reply = previousReply)
                 ),
@@ -1006,6 +1309,9 @@ class GadgetService : Service() {
     private fun closeConnection() {
         selectionEpoch.incrementAndGet()
         epoch.incrementAndGet()
+        recordingFeedback?.invalidate()
+        captureToken = null
+        mutableState.update { it.copy(captureActive = false) }
         speech?.close()
         speech = null
         textEditing = false
@@ -1024,6 +1330,7 @@ class GadgetService : Service() {
 
     override fun onDestroy() {
         destroyed = true
+        catalog.close()
         closeConnection()
         WatchSurfaces.publish(
             this,

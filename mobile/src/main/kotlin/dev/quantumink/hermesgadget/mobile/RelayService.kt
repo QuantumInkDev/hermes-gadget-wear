@@ -24,7 +24,6 @@ import dev.quantumink.hermesgadget.protocol.RelayStreams
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
-import java.util.concurrent.Semaphore
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -63,18 +62,43 @@ class RelayStopReceiver : BroadcastReceiver() {
 
 /** The Play Services listener receives only same-package/same-signature wearable channels. */
 class RelayService : WearableListenerService() {
+    @Volatile private var debugNetworkBlocked: Boolean? = null
+    private val debugNetwork = object : android.net.ConnectivityManager.NetworkCallback() {
+        override fun onBlockedStatusChanged(network: android.net.Network, blocked: Boolean) {
+            debugNetworkBlocked = blocked
+        }
+    }
+    private val debugEnabled: Boolean
+        get() = applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+
+    private fun debugFailure(stage: String, failure: Exception, started: Long) {
+        if (!debugEnabled) return
+        val errno = (failure.cause as? android.system.ErrnoException)?.errno
+        android.util.Log.d(
+            "HermesRelay",
+            "$stage: ${failure.javaClass.simpleName}; errno=$errno; " +
+                "elapsedMs=${android.os.SystemClock.elapsedRealtime() - started}; " +
+                "foreground=${foreground.get()}; networkBlocked=$debugNetworkBlocked"
+        )
+    }
     private val speechApi = ElevenLabsApi()
     private val speechCalls = ConcurrentHashMap<ChannelClient.Channel, okhttp3.Call>()
-    private val slots = Semaphore(2)
+    private val capacity = RelayCapacity()
     private val streams = ConcurrentHashMap<ChannelClient.Channel, RelayStreams>()
     private val pumps = ConcurrentHashMap<ChannelClient.Channel, DuplexPump>()
     private val workers = ThreadPoolExecutor(2, 2, 0, TimeUnit.MILLISECONDS, ArrayBlockingQueue(2))
+    private val catalogWorkers =
+        ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS, ArrayBlockingQueue(1))
     private val clock = Executors.newSingleThreadScheduledExecutor()
     private val foreground = AtomicBoolean(false)
     private val owned = ConcurrentHashMap<ChannelClient.Channel, () -> Unit>()
 
     override fun onCreate() {
         super.onCreate()
+        if (debugEnabled) {
+            getSystemService(android.net.ConnectivityManager::class.java)
+                .registerDefaultNetworkCallback(debugNetwork)
+        }
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(
                 "relay",
@@ -85,18 +109,26 @@ class RelayService : WearableListenerService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (streams.isEmpty() && pumps.isEmpty() && slots.availablePermits() == 2) stopSelf()
+        if (streams.isEmpty() && pumps.isEmpty() && capacity.idle) stopSelf()
         return START_NOT_STICKY
     }
 
     override fun onChannelOpened(channel: ChannelClient.Channel) {
+        val started = android.os.SystemClock.elapsedRealtime()
         val client = Wearable.getChannelClient(this)
+        val catalog =
+            channel.path == dev.quantumink.hermesgadget.protocol.ProfileCatalog.REFRESH_PATH
         val speech = channel.path == ClientSpeech.CHANNEL_PATH
-        if ((!speech && channel.path != RelayProtocol.CHANNEL_PATH) || !RelaySettings.enabled(
+        if ((!catalog && !speech && channel.path != RelayProtocol.CHANNEL_PATH) ||
+            !RelaySettings.enabled(
                 this
-            ) ||
-            !slots.tryAcquire()
+            )
         ) {
+            client.close(channel)
+            return
+        }
+        val lease = capacity.acquire(catalog)
+        if (lease == null) {
             client.close(channel)
             return
         }
@@ -109,12 +141,8 @@ class RelayService : WearableListenerService() {
                 RelaySettings.sessions.remove(channel)
                 owned.remove(channel)
                 client.close(channel)
-                slots.release()
-                if (slots.availablePermits() == 2) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    foreground.set(false)
-                    stopSelf()
-                }
+                lease.close()
+                releaseForegroundIfIdle()
             }
         }
         RelaySettings.sessions[channel] = release
@@ -124,10 +152,21 @@ class RelayService : WearableListenerService() {
             return
         }
         try {
-            workers.execute {
-                val deadline = clock.schedule({
-                    release()
-                }, if (speech) 75 else 15, TimeUnit.SECONDS)
+            val executor = if (catalog) catalogWorkers else workers
+            executor.execute {
+                val deadline = clock.schedule(
+                    {
+                        release()
+                    },
+                    if (speech) {
+                        75
+                    } else if (catalog) {
+                        20
+                    } else {
+                        15
+                    },
+                    TimeUnit.SECONDS
+                )
                 try {
                     val input = Tasks.await(client.getInputStream(channel), 5, TimeUnit.SECONDS)
                     val output = Tasks.await(
@@ -138,6 +177,23 @@ class RelayService : WearableListenerService() {
                     val pipe = RelayStreams(input, output, { client.close(channel) })
                     streams[channel] = pipe
                     check(!released.get())
+                    if (catalog) {
+                        val force = input.read() == 1
+                        check(!released.get() && RelaySettings.enabled(this))
+                        val pages = CatalogRepository.get(
+                            this
+                        ).refresh(force).get(15, TimeUnit.SECONDS)
+                        check(!released.get())
+                        val bytes = dev.quantumink.hermesgadget.protocol.ProfileCatalog.encodePages(
+                            pages
+                        ).toByteArray()
+                        val writer = java.io.DataOutputStream(output)
+                        writer.writeInt(bytes.size)
+                        writer.write(bytes)
+                        writer.flush()
+                        release()
+                        return@execute
+                    }
                     if (speech) {
                         val request = ClientSpeech.request(input)
                         val settings = TtsVault(this).selected(request.endpointId)
@@ -172,7 +228,8 @@ class RelayService : WearableListenerService() {
                             getString(R.string.relay_active)
                         )
                     }
-                } catch (_: Exception) {
+                } catch (failure: Exception) {
+                    debugFailure(if (catalog) "catalog" else "channel", failure, started)
                     RelaySettings.report(getString(R.string.relay_failed))
                     release()
                 } finally {
@@ -191,6 +248,14 @@ class RelayService : WearableListenerService() {
     ) {
         RelaySettings.sessions[channel]?.invoke()
         if (owned.isEmpty()) RelaySettings.report(getString(R.string.relay_idle))
+    }
+
+    @Synchronized private fun releaseForegroundIfIdle() {
+        if (capacity.idle) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            foreground.set(false)
+            stopSelf()
+        }
     }
 
     @Synchronized private fun beginForeground(): Boolean = try {
@@ -229,15 +294,21 @@ class RelayService : WearableListenerService() {
             foreground.set(true)
         }
         true
-    } catch (_: Exception) {
+    } catch (failure: Exception) {
+        debugFailure("foreground", failure, android.os.SystemClock.elapsedRealtime())
         RelaySettings.report(getString(R.string.relay_background_denied))
         false
     }
 
     override fun onDestroy() {
+        if (debugEnabled) {
+            getSystemService(android.net.ConnectivityManager::class.java)
+                .unregisterNetworkCallback(debugNetwork)
+        }
         owned.values.toList().forEach { it() }
         pumps.values.forEach { it.close() }
         workers.shutdownNow()
+        catalogWorkers.shutdownNow()
         clock.shutdownNow()
         speechApi.close()
         super.onDestroy()

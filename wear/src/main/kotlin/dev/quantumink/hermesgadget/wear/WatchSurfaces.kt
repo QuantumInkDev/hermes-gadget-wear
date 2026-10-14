@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.wear.tiles.TileService
 import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
+import dev.quantumink.hermesgadget.protocol.CatalogPage
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
 import dev.quantumink.hermesgadget.protocol.ConversationMode
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +26,10 @@ object WatchSurfaces {
     private var lastUpdate = 0L
     private val handler = Handler(Looper.getMainLooper())
     private var pending: Runnable? = null
+    private var tileInputs:
+        Triple<List<EndpointProfile>, List<CatalogPage>, Map<String, PageArtwork>>? = null
+    private var lastTileUpdate = 0L
+    private var pendingTiles: Runnable? = null
 
     @Synchronized fun publish(context: Context, watch: WatchState, force: Boolean = false) {
         val conversation = watch.connection.conversation
@@ -46,8 +51,12 @@ object WatchSurfaces {
         val previous = current.value
         current.value = next
         val now = android.os.SystemClock.elapsedRealtime()
-        val changed = previous.status != next.status || previous.reply != next.reply ||
-            previous.label != next.label
+        val inputs = Triple(watch.profiles, watch.catalog, watch.artwork)
+        val tileChanged = inputs != tileInputs
+        tileInputs = inputs
+        val changed =
+            tileChanged || previous.status != next.status || previous.reply != next.reply ||
+                previous.label != next.label
         if (!force && !changed) return
         if (force || now - lastUpdate >= 2000) {
             pending?.let(handler::removeCallbacks)
@@ -64,9 +73,35 @@ object WatchSurfaces {
             handler.postDelayed(requireNotNull(pending), 2000 - (now - lastUpdate))
         }
     }
+
+    @Synchronized fun requestTiles(context: Context) {
+        if (pendingTiles != null) return
+        val application = context.applicationContext
+        pendingTiles = Runnable {
+            synchronized(this) {
+                pendingTiles = null
+                lastTileUpdate = android.os.SystemClock.elapsedRealtime()
+                runCatching {
+                    TileService.getUpdater(application).requestUpdate(GadgetTileService::class.java)
+                }
+                runCatching {
+                    TileService.getUpdater(
+                        application
+                    ).requestUpdate(PinnedProfilesTileService::class.java)
+                }
+            }
+        }
+        handler.postDelayed(
+            requireNotNull(pendingTiles),
+            (
+                2000 -
+                    (android.os.SystemClock.elapsedRealtime() - lastTileUpdate)
+                ).coerceAtLeast(0)
+        )
+    }
     private fun refresh(context: Context) {
         lastUpdate = android.os.SystemClock.elapsedRealtime()
-        runCatching { TileService.getUpdater(context).requestUpdate(GadgetTileService::class.java) }
+        requestTiles(context)
         runCatching {
             ComplicationDataSourceUpdateRequester.create(
                 context,

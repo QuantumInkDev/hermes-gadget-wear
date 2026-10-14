@@ -1,10 +1,65 @@
 # Architecture
 
+Implemented baseline (2026-10-11): [multi-box profile carousel](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md).
+The phone merges independently refreshed read-only catalogs and synchronizes bounded
+portrait/status metadata; the watch retains separate TLS Gadget identities/connections.
+Catalog, swipe pages and ambient-safe review development are approved. No new live
+server installation or multiplexed routing is implied.
+
+## Native client implementation — 2026-10-12
+
+`client/Appearance` defines explicit semantic palettes; native phone/Wear adapters and
+independent device preferences apply them without wallpaper overrides. Phone presentation
+surfaces retain the existing repositories, independent phone identity vault, foreground
+conversation controller and secure production window. Waveform levels come from actual
+capture/playback and reset on cancel/stop/background/profile changes. A bounded transient
+history contains normalized levels only; no PCM is retained for animation. Screenshot hosts
+are non-exported, debug-only, synthetic fixtures.
+
+Phone refinement (2026-10-14): `VoiceMessageGesture` owns one press independently of meter
+and timer redraws. The shared composer uses hold/release/physical-left cancellation and
+accessible Start/Finish/Cancel; both visible Cancel and pointer release share the same
+terminal-action guard. Actual microphone startup supplies the elapsed-time origin. The
+streaming meter retains at most 24 normalized levels, clears when its surface leaves the
+session and uses the existing static motion/power fallback. `ProfilePictureSheet` serves
+both directory and catalog using stable profile keys, actual window bounds and a footer
+outside its scrolling body. The phone header uses the full approved name and scalable
+one-line text. Courier's adaptive layers keep existing resource names; density exports are
+art assets, while API29+ clients package the adaptive foreground/background and API33+ mono.
+
+`WatchNavigation` retains stable page keys, drafts and TransformingLazyColumn state. Picker
+Back restores rotary focus without remounting the conversation. `recordingPortrait` owns only
+the artwork hold after touch slop/long-press checks. Multi-pointer interruption, ACTION_CANCEL
+and disposal cancel owned capture; actual capture state drives rings, not touch-down.
+The card footer owns the full-width centered Jump to profile control; the portrait has no
+floating picker or microphone badge. Accessible profile actions retain selection locks.
+Watch recording feedback prefers a supported predefined tick, with primitive/amplitude/default
+fallbacks and system haptic settings retained. Phone recording feedback is unchanged.
+`ConversationScreenLease` uses elapsed realtime and a two-minute foreground-turn cap for
+FLAG_KEEP_SCREEN_ON. It never renews from meter/status updates or acquires a wake lock.
+
+`TilePinStore` atomically persists Focus, four deduplicated slots, monotonic revision and
+accepted request receipts. Field-specific local mutations preserve simultaneous phone edits.
+Phone configuration items carry stable keys, base revision and request ID across the existing
+associated Data Layer boundary. Stale edits return the current watch state; duplicate requests
+return their original acknowledgement. Pending/offline delivery is visible on the phone.
+`ProfileTileSnapshot` supplies bounded static resources; `ProfileTileLayout` renders one/four
+local shortcuts without network/audio work. `TileProfileLaunch` validates only stable keys,
+handles cold/warm binding, and visibly defers locked selection. Ambient takes precedence over
+all pending/unavailable launch routes. The existing Focus service component is preserved.
+
+See the [native acceptance record](demo/native-clients/README.md). Emulator transport returned
+Wearable.API API_UNAVAILABLE. Subsequent physical associated-watch snapshot readback matches
+the existing Focus revision, empty grid and all 19 profile keys; phone edit acknowledgement
+remains untested. Reducer/store/native-editor proofs do not replace that remaining transport
+gate. The OS power-saver ring case is explicitly capability-skipped; reduced
+motion is verified. Physical speech, sleep/reply receipt, tile addition and power cost remain open.
+
 ## Verified sources
 
 SDK `v0.2.0` resolves to commit `323e3303ab68981f810fc3208119cd8a22e64af0`. Read in full: [protocol](https://github.com/Adolanium/hermes-gadget-sdk/blob/323e3303ab68981f810fc3208119cd8a22e64af0/docs/protocol.md), [Hermes integration](https://github.com/Adolanium/hermes-gadget-sdk/blob/323e3303ab68981f810fc3208119cd8a22e64af0/docs/hermes-integration.md), architecture, porting, faces, and tailscale-funnel in the same snapshot. Also reviewed the Linux client, simulator transport/conversation, devserver, Python protocol helpers/tests, firmware vectors, and hub handshake/audio routes. Pet evidence is pinned separately in [pets](pets.md).
 
-Corrections to the brief: `linux/client.py` now hosts the native C++ core through `NativeDevice`; it is not an independent pure-protocol client. Kotlin will implement the documented wire contract, using the Python protocol helpers and firmware vectors as the oracle. The stock adapter can auto-confirm a deliberate `session.new` within its confirmation window. Streaming `reply.delta.text` is cumulative.
+Corrections to the brief: `linux/client.py` now hosts the native C++ core through `NativeDevice`; it is not an independent pure-protocol client. Kotlin implements the documented wire contract, using the Python protocol helpers and firmware vectors as the oracle. The stock adapter can auto-confirm a deliberate `session.new` within its confirmation window. Streaming `reply.delta.text` is cumulative.
 
 ## Modules and boundaries
 
@@ -153,7 +208,7 @@ Hardware Data Layer, actual provider output/voice/quality and billing remain exp
 
 ## M7 design plan
 
-V1 stores at most eight endpoint profiles. The watch's encrypted catalog contains each URL,
+V1 stores at most 32 endpoint profiles (original limit: eight). The watch's encrypted catalog contains each URL,
 label, access token and approved transport/cleartext policy; its encrypted active record
 remains compatible with the M2–M6 single-profile setup. Migration imports that record once
 and validates the existing endpoint identity before saving the catalog. Each URL has an
@@ -177,13 +232,13 @@ provide. Document the wire and migration questions; implementation and outreach 
 an explicit maintainer decision and upstream feedback. Real multiplexed behavior cannot be
 claimed from independent v1 endpoints or unit tests.
 
-## M8 design plan
+## Historical M8 design baseline
 
 Tile and short-text complication expose a local snapshot and launch the app; they never
 open sockets, start a microphone or synthesize speech in the background. Connection/pet
-state is process-local and becomes Offline after process death. An encrypted, bounded
-120-character last-reply excerpt survives process death for the active endpoint's Tile;
-it is isolated on profile switch and cleared by whole reset. A complication
+state is process-local and becomes Offline after process death. The original M8 tile used an
+encrypted, bounded 120-character last-reply snapshot, isolated on profile switch and cleared
+by whole reset. The native Focus/grid design supersedes that tile presentation. A complication
 shares only generic state with the selected watch face, never reply text, URLs or keys.
 Update on meaningful state changes with throttling; no periodic network polling.
 
@@ -203,3 +258,142 @@ a privacy URL or upload to a Play account. The internal track, Ultra battery/qua
 real relay/import/BYOK and Play review remain gates until their prerequisites are available.
 The pinned AndroidX Tiles/ProtoLayout/complication APIs and official ambient guidance were
 checked against current primary documentation before implementation.
+
+## Multi-source carousel implementation
+
+The standalone publisher projects owner mappings without opening a Gadget session. Catalog
+source credentials live only in the phone's separate AES-GCM vault. HTTPS/hostname checks,
+no redirects, source-bound asset paths, 32-profile/64 KiB envelopes and bounded fanout keep
+discovery separate from enrollment. Partial responses persist and publish independently; generation
+checks discard work invalidated by source edits. A conflicting or oversized merged source
+update becomes Attention with its prior cards retained; healthy sources continue. Owner order
+survives offline and withdrawn records. Catalog reachability is displayed separately from the Gadget connection status.
+
+The phone persists legacy owner-selected fallbacks separately from source metadata, preserving
+them through portrait-less refreshes and restarts. Explicit watch-specific overrides are stored
+in a separate encrypted record keyed by source/profile identity. Keep raw box portrait metadata
+beneath the effective override so a later refresh updates it and returning to the box picture
+can restore the latest cached image without another download. Overrides work on setup-needed
+cards and do not change URLs or pairing. Protect/cache both referenced images and retire only
+unreferenced choices on confirmed removal. Image ingestion
+enforces the 8 MiB limit while protecting committed fallbacks; final/failure cleanup removes
+unreferenced files. Owner-confirmed forgetting of a withdrawn catalog card recovers historical
+capacity; phone/watch endpoint setup and URL-scoped identity files remain independent.
+
+The phone publishes normalized portrait assets before the version-1 roster, then deletes
+only its own unreferenced portrait Data Items. Replacement metadata must succeed first;
+other nodes and namespaces remain untouched. Publication has a shared five-second deadline.
+The isolated direct-TLS publisher installs accepted-socket timeouts before handshaking and
+allows at most four request workers. The phone answers an on-demand bounded refresh channel. The watch restores its separate encrypted roster/selection before rendering/connection
+effects or requesting remote refresh. It keeps a
+verified atomic portrait cache and approved URL vault; metadata cannot enroll a new URL.
+Only selected and adjacent artwork is prepared on bounded workers. The settled approved
+page selects one URL-scoped conversation; recording/approval disables page changes and
+prior epoch guards reject old callbacks. Memory-only drafts are bounded per URL. Navigation
+and unfinished setup fields are activity-owned above ambient replacement. The selected
+foreground pet crossfades in a fixed area, while ambient uses its static monochrome outline.
+Portraits use a 160 dp square inside a fixed 160 by 168 dp artwork frame, doubling their
+original 80 dp diameter. The frame keeps that size through the round page's text gutters;
+names and controls remain below it in the scrollable page. Pets retain their existing
+96 by 104 dp canvas centered in that frame. Portrait conversation/discovery pages use 28 dp
+top padding to center the enlarged circle beneath the clock; approval/setup screens keep
+their existing 40 dp top padding.
+There are no new periodic idle/ambient discovery timers. Real paired-device portrait/catalog transfer, per-profile cellular TLS replies and controlled
+catalog outage/return are recorded in [physical results](physical-results.md). Whole-box power
+transitions, physical speech/pets, radio and battery acceptance remain separate from the
+[synthetic demo](demo/carousel/README.md).
+
+## Approved independent phone client — 2026-10-12
+
+The [follow-up design](superpowers/specs/2026-10-12-client-usability-design.md) adds a
+phone-owned DirectConnection session beside the opaque watch relay. A separate Android
+Keystore vault namespaces phone Gadget identities by canonical endpoint; catalog credentials
+and watch identities never enter it. Shared Android PCM/Opus adapters move out of the watch
+module into a small Android client library, leaving the protocol module pure JVM.
+
+The phone's retained conversation model owns a single current socket and epoch-guards its
+callbacks. Leaving/locking the foreground conversation closes that socket and stops its
+audio while leaving RelayService alone. The directory groups stable source/profile keys
+and persists owner sorting in the catalog vault, publishing the same flattened order to
+the watch. Portrait lookup uses the existing effective, hash-addressed local cache.
+Watch page list state is activity-owned and keyed by stable page; prompt lists are separate.
+These are approved component boundaries; passing implementation evidence belongs in progress.
+
+
+Recording cue implementation lives in the shared Android `client` module. Capture readiness
+is reported after AudioRecord starts; buffered samples spanning the cue are discarded before
+frames are forwarded. Recorder release precedes stop/finish callbacks; capture generation and
+connection epochs reject replaced-session callbacks. MediaCodec Opus remains the watch path;
+the initial phone path advertises PCM only. A bounded versioned Data Layer item replicates
+only the sound-enabled preference and timestamp, never endpoint or enrollment material.
+
+## Animated portrait overrides and recording outcomes
+
+GIF overrides retain the existing version-1 PNG roster. A separate optional
+`/hermes/animations/v1` manifest binds stable page keys to GIF hash, exact encoded length
+and PNG fallback hash; assets use `/hermes/animation-assets/v1/`. The protocol parser validates
+LZW pixels and bounded frame/timing data before Android decoding. Phone override metadata
+uses a new encrypted record without changing existing aliases or encryption AAD. Asset
+publication precedes manifest publication; failed publication keeps the prior GIF protected.
+One durable pending import, at most 256 KiB, is separate from the settled 32-file/8-MiB cache.
+After successful publication, unreferenced assets retire and the pending import is promoted.
+
+Watch cache admission is checked atomically with roster retirement/reset. Network fetches
+remain outside that lock; an expired admission cannot repopulate a retired page. The watch
+prepares selected/adjacent artwork, validates hash/length/fallback association, and decodes
+animation off the UI thread. Only the selected available resumed page runs an
+AnimatedImageDrawable. Reduced motion, power saver, previews and ambient retain static
+fallbacks. Endpoint pets remain higher priority than a portrait override.
+
+Recording feedback waits for both recorder shutdown and the token's accepted protocol outcome.
+Short captures, rejected sends and cancellation use cancellation feedback; the automatic
+recording limit uses completion feedback only after an accepted finish. Tokens and connection
+epochs suppress obsolete callbacks. Phone playback uses a player per stream and atomic,
+epoch/stream-guarded completion updates, so stopping/leaving a conversation does not acquire
+the session monitor from the playback monitor. Neither phone conversation teardown nor
+portrait import touches the independent watch relay or watch pairing records.
+
+## Phone home-screen portrait widgets
+
+Seven native providers share `HomeWidgetRenderer`, the Compose configuration activity
+and a serial local worker independent of watch Data Layer publication. Providers read
+only a bounded local roster projection and normalized static PNG derivatives, without
+opening discovery, identity vaults or Gadget sockets. Effective portrait changes and
+local roster commits enqueue widget publication before potentially blocking watch work.
+There is no periodic widget poll, service, recording or wake lock.
+
+`HomeWidgetStore` keeps up to 128 instance configs in one 1-MiB AtomicFile map, with
+provider/preset, ordered stable keys, appearance and CAS revision. Platform ID restoration
+commits from an original snapshot, including overlapping mappings, and invalidates stale
+editors. Legacy per-ID debug state migrates on successful save. A separate bounded roster
+contains only key/name/source/status/picture hash. No URL, token or pairing identity is
+stored in a widget. Content-addressed static derivatives are bounded to 8 MiB; adaptive
+RemoteViews variants share decoded bitmaps within min(1 MiB, one RGBA screen).
+
+Explicit immutable activity PendingIntents bind ID, slot, key and revision. Foreground
+validation checks provider ownership and current config/roster; the shared phone navigator
+uses lifecycle, cancellation and request-generation guards. A config-write epoch rejects
+concurrent stale lookups without main-thread file reads. Same-key endpoint changes resolve
+from the current catalog. A busy/approval state preserves its turn and requires a later
+manual Open requested bot action. Directory search, collapse, scroll and drafts survive
+return navigation. Widget editing and rendering do not modify watch tile pins or identities.
+
+API 31+ metadata/themes live in version-qualified resources. API 29–30 retains explicit
+size hints, brand day/night fallbacks and Settings-based reconfiguration. Actual launcher
+placement and runtime-specific limits remain acceptance gates, not inferred guarantees.
+
+## Phone composer refinement — 2026-10-14
+
+The composer owns one terminal gesture per profile/session, independent of changing level
+and timer values. Physical control order stays left-to-right for the requested left-cancel
+gesture; text entry retains its locale direction. A terminal-attempt revision reconciles
+capture failure and permission completion with accessible/keyboard starts. Permission never
+replays an old press. The capture adapter serializes actual AudioRecord startup against
+finish/cancel after slow initialization; model callbacks occur outside that gate's lock.
+
+The meter samples only a bounded transient history of normalized amplitude values, separate
+from playback and without storing PCM for visualization. Reduced motion/power saver uses a
+stationary baseline. In short keyboard windows, the conversation toolbar yields its space to
+the minimum composer and returns when the IME closes. Both profile-picture entry points use
+one window-bounded sheet with a scrolling body and independent Cancel footer. Courier layers
+retain the shared resource names; supported API 29+ builds package adaptive icons.

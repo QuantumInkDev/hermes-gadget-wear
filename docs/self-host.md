@@ -1,6 +1,9 @@
 # Self-host connection guide
 
-Status: direct typed and voice conversations have passed on the physical Ultra against real Hermes. Phone relay software is implemented; the actual phone/watch and off-network relay checks remain open.
+Status: direct typed/voice and phone-relayed TLS conversations have passed on the physical
+devices, including a controlled cellular/VPN request. Battery, speech-quality and broader
+interruption acceptance remain open. See [per-box and per-profile setup](profile-setup.md)
+for catalog discovery, individual listeners/pairing and watch-specific pictures.
 
 Follow the [physical-device runbook](device-testing.md) for compatible APK updates, TLS
 profile import, relay proof, interruptions and measured audio/battery acceptance.
@@ -71,6 +74,8 @@ Opting in sends reply text and the selected voice to the phone and ElevenLabs, w
 The provider documents native Opus output; the app validates Ogg/Opus packets without ffmpeg, with PCM16 selected if the watch codec is unavailable. Mock TLS provider tests and an original tone prove the software path. Real provider output, billing, perceived voice quality, background behavior and Data Layer delivery remain acceptance gates. See [ElevenLabs streaming API](https://elevenlabs.io/docs/api-reference/text-to-speech/stream) and [subscription API](https://elevenlabs.io/docs/api-reference/user/subscription/get).
 
 ## Multiple profiles
+
+Follow the complete [profile setup guide](profile-setup.md) for every box and profile.
 
 Each stock Hermes profile has its own adapter URL/port and enrollment store. Save it as a separate watch profile with an independent device key. Use Profiles or a horizontal swipe to choose it. Phone setup can be imported after watch review; it does not remotely switch the watch. See [profile management and gateway proposal](profiles-v2.md). Separate v1 endpoints are supported; the multiplexed v2 gateway remains a proposal.
 

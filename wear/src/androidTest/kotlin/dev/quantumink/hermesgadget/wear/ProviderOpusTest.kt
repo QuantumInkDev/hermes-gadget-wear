@@ -2,6 +2,7 @@ package dev.quantumink.hermesgadget.wear
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.quantumink.hermesgadget.client.OpusDecoder
 import dev.quantumink.hermesgadget.protocol.OggOpus
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

@@ -18,7 +18,7 @@ class MultiEndpointIntegrationTest {
     fun independentStockEndpointsPairAndReconnectWithTheirOwnIdentity() {
         val python = System.getenv("HERMES_GADGET_PYTHON").orEmpty()
         assumeTrue("Set stock Python for multi-endpoint test", python.isNotBlank())
-        val directories = List(2) { Files.createTempDirectory("gadget-profile-") }
+        val directories = List(3) { Files.createTempDirectory("gadget-profile-") }
         val processes = directories.map { directory ->
             ProcessBuilder(
                 python,
@@ -42,10 +42,11 @@ class MultiEndpointIntegrationTest {
                     .jsonObject.getValue("port").jsonPrimitive.int
                 Endpoint.parse("ws://localhost:$port/gadget", true, true)
             }
-            val identities = List(2) { DeviceIdentity.generate() }
+            val identities = List(3) { DeviceIdentity.generate() }
             assertNotEquals(identities[0].deviceId, identities[1].deviceId)
+            assertEquals(3, identities.map { it.deviceId }.distinct().size)
             for (round in 0..1) {
-                for (index in 0..1) {
+                for (index in 0..2) {
                     val states = LinkedBlockingQueue<ConnectionState>()
                     val observer = object : ConnectionObserver {
                         override fun effect(effect: ConversationEffect, generation: Long) = Unit

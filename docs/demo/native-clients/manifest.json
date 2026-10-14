@@ -1,0 +1,1563 @@
+{
+  "synthetic_only": true,
+  "security": "No production phone window captured; synthetic-only nonexported debug host. No personal art or endpoint.",
+  "assets": [
+    {
+      "file": "phone/directory-light.png",
+      "sha256": "3f8326af015b59af14d9d610b40ea261eb8ed3eb8dcd2505f842e075fb176e2d",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 2 actual native directory, unchanged; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/directory-light-large.png",
+      "sha256": "2e7d1919003e6884d27ef4ad535d7ad867f3f58e3d7d3e8622ab0d3b374dc1d8",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 2 actual native directory, unchanged; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/conversation-light.png",
+      "sha256": "44f1c0143e18f6dc4958f0ce621fddd8e41dcc82deb5c50c21e83c62fbbe187b",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/conversation-light-large.png",
+      "sha256": "ca5c5fc736f569f17f8ece42c75177c1d881f3419cc3c4d5320c6c5f7f750ee8",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/keyboard-light.png",
+      "sha256": "0b403a88dd80587aeaebeb95927d4b542e337e1ea00b0e96871cea59d0a6adaf",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/keyboard-light-large.png",
+      "sha256": "4828ffa17f793ee26298cf3eb9d9228f4a9ac961552c6ba71b557d4a58b81edb",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speaking-light.png",
+      "sha256": "48895e019f952d6d4df5b5ff131a57b35605e977d26429000b017e6fe447c52e",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speaking-light-large.png",
+      "sha256": "d34074cee7d3bd423686ce6c33afb0d3b43f6d8442b8afe4b553d68ee51f8dad",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/error-light.png",
+      "sha256": "6c507ccc3ad646ee378f23d1d112aa93d7d44b017b8b06d4274791f485761266",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/error-light-large.png",
+      "sha256": "fcca79c0385dde2e380d485d476b0da59057fdf2014b99fc099b37005514948f",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/watch-light.png",
+      "sha256": "28b0cf0add7e71d7d2d72accb518e9eb43eb1ae2707f7c10b844a8e832e06f8c",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/watch-light-large.png",
+      "sha256": "497ab0380218205e9e5ffac954ad23670ad01b05c2abcccb82ea9b6c04d2f86b",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/settings-light.png",
+      "sha256": "304d0c5c83e2409b44f92ae63b20d7f9922ea21a7837bfd0f03620d63c6c7a32",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/settings-light-large.png",
+      "sha256": "32511523858f4d466f78cfdaf3f434a1eebf3cb97aa60f9f4ee22a9bb348fa0e",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/boxes-light.png",
+      "sha256": "3790d20391a924943d1aa1c73f13c2cb85c3e510bf014d10116dd69cc44d0f71",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/boxes-light-large.png",
+      "sha256": "cee38dcca66c9d41fcfedbe796fb20343383e05b1249eb96f878b4e5a6f54986",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/manual-light.png",
+      "sha256": "d75352418504d4612ae2fe6595aec87851d9d5f553ab67bd2cc0214fe21d6283",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/manual-light-large.png",
+      "sha256": "1d26cb6b7d21d2ccde401f76b99e5f335c3029cb579d8ed72b0b8087606cdebf",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speech-light.png",
+      "sha256": "f2aa208047e73d0f2abe0f02fd32a804ec312c5b5d0fee12db5dbbb7f105491e",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speech-light-large.png",
+      "sha256": "a5d6aebf7823fde690ce6bf0d960bd9701a12a49a5981b30535ee09454c89418",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/directory-dark.png",
+      "sha256": "1b4cd28b54e9bf6378af14ac908007ef7586d747e079d5221c25b3535bd3a103",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 2 actual native directory, unchanged; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/directory-dark-large.png",
+      "sha256": "3443c6b8ed5b0b2a756bc3939644c3319f4d5a71db1f29552f541d73051b4c8d",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 2 actual native directory, unchanged; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/conversation-dark.png",
+      "sha256": "cb23f692a155d8b875194b44bbb521f1230bc7730430b3dbb89150b3691b56c6",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/conversation-dark-large.png",
+      "sha256": "9f6fd2d70d5642e0c033a0664fa9ad77bac514926cc6adc5da7b260961f977fb",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/keyboard-dark.png",
+      "sha256": "b2cd0d7df5e06463c9702ce151b1b64cc7807e5a835a695307fff213a39d3091",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/keyboard-dark-large.png",
+      "sha256": "26e780e84ea1c8346779f8d5c983f4c02183230681b19f407cef0cf341bb7d82",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speaking-dark.png",
+      "sha256": "08aaeb322d83b10c7c6a5078d7dcca255d5a32f5f77e3b74830e66ffc92a1cd7",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speaking-dark-large.png",
+      "sha256": "04edf634757f8e65580347b9f4504be83d2e336a49804870eb5767b0eb88e970",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/error-dark.png",
+      "sha256": "bb682b17bc2f1086d40e72c9cb68ea65ecef2fc79db6233d8d2b808bfd49cee9",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/error-dark-large.png",
+      "sha256": "7ff2f67cccda62726a53efcc2fb1684def39747f92b6ab1b74078d0f04c256d0",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/watch-dark.png",
+      "sha256": "48119983764090af933205022dabe2a7eeb78c31a9e574c3d2ab7d3eb807f642",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/watch-dark-large.png",
+      "sha256": "4f3cc06d3792b9b3b194a216f79498a100d5a699e77989055e5757db957c1005",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/settings-dark.png",
+      "sha256": "ec892c1de6e7f87bdeaea65b4f10671afbd8184867fc139f2c573e645e51dcfa",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/settings-dark-large.png",
+      "sha256": "dee922a8cdd1e7b5f43784ba11f991af20994aa60a3d8287e79b810b3120c5d7",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/boxes-dark.png",
+      "sha256": "b293083ee0ff4c350636e413209f3ab76844932b81df1ac52ab2364e9b494106",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/boxes-dark-large.png",
+      "sha256": "e07290e895ecd62195763b51d1897548c2eadb59eaf47f8cbc44ad8898875c73",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/manual-dark.png",
+      "sha256": "580212f368654359166c9ada2c55aa5cea2f0ed4f6befadd411a603c8554d8a6",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/manual-dark-large.png",
+      "sha256": "cba5cf9a25f05bf70360fa4ecc5c364619e645d758d5788a8b16311a36c0b752",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speech-dark.png",
+      "sha256": "d3a2c406b728d10e5c6bbfde8e696f117ffa4ebf707e0c90a8907e52b788f462",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speech-dark-large.png",
+      "sha256": "54a42dfa0d16c304ebe2d490d5503edefbc8cab85471d5231a33bdcecb089000",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/directory-moonlight.png",
+      "sha256": "3b81477118448fd76cfc8e7ffc37546451d72d0188eb51226ffc1f31f3bdbecf",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 2 actual native directory, unchanged; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/directory-moonlight-large.png",
+      "sha256": "86b34c3f2d6f40690d1e00fe94cabb312e07293288d0afa045fd8ac546e8a88a",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 2 actual native directory, unchanged; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/conversation-moonlight.png",
+      "sha256": "858b0a187b050bccf9e0279609b4bb167df13f1d210451a473d19e9f323cbba0",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/conversation-moonlight-large.png",
+      "sha256": "863f430caafd6402c2d78963f8e45f4ad2bd4ce339023561935a7bc9d6d462d5",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/keyboard-moonlight.png",
+      "sha256": "d30e8303a16ffea202392eac43f47fc7b2c9715bbadd72873d65890d3564fafe",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/keyboard-moonlight-large.png",
+      "sha256": "12d84677c43df5dab4645f8cae7d748ef0197c1d61c50afb6a971c7fa275ebc8",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speaking-moonlight.png",
+      "sha256": "268dd643211b2bfc54ce9fcafd4c230b314cb7d7a2419f69d8fbf211e2dcf3e7",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speaking-moonlight-large.png",
+      "sha256": "2590e1209b3a50ee5adb44fd179ebb0a8fdd8e011fbca32d88d5b4b2cf583f39",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/error-moonlight.png",
+      "sha256": "c5261a309bf964612eec674a38208e602da4cf5fd6bf904bb00cb08e2cb65791",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/error-moonlight-large.png",
+      "sha256": "827cf9f0d5d192650eb673fcf2256d4a150a1a9bc4d4ceb489b53932d98e0768",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/watch-moonlight.png",
+      "sha256": "fe289ebe91b71099349188de58e5d5ce7870c638d85002470c603d661729e877",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/watch-moonlight-large.png",
+      "sha256": "c3ccebbb74c87cbfe9561bfc2ce3601945e1fee6c4ba775f59f433213dadd0ad",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/settings-moonlight.png",
+      "sha256": "9be1bc44cd31265accdc734ae45342b834a080bae7626fa2d9f789ade36b414e",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/settings-moonlight-large.png",
+      "sha256": "109815ea37612522068343f0d8ca9f79f7f9ebcfc45e299c55648ac15f248f03",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/boxes-moonlight.png",
+      "sha256": "db58ee02adc8245a18539920a8a0d8d887e7ff03c0c015953bfc790d54092d2c",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/boxes-moonlight-large.png",
+      "sha256": "21dbb05210d04b4dc2a96198ccef5c93fc0d671f609f27acaa8e36528c96d25a",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/manual-moonlight.png",
+      "sha256": "c4bfca8b2a570be3a4b515ef1e35d1452deb1b9bace1bc6eb71c2561973d23a8",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/manual-moonlight-large.png",
+      "sha256": "4a6db050a606bc40add20d603eae6f5e45e7b5e9e20564441788d8231978477a",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speech-moonlight.png",
+      "sha256": "465845dbced2c3da99860c1e714e65fe788571369bf009ccf78024d12812f34d",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "phone/speech-moonlight-large.png",
+      "sha256": "20a14abcd6de7302091682d8f0eb6fa372584e846f6914576ecd4e98198005fe",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 7 native phone fixture; real system fontScale 1.8 and 320 dp when large"
+    },
+    {
+      "file": "appearance/wear-moonlight.png",
+      "sha256": "4f8da671134aebc2998955b9f1747f90fa5b51b69b569effdf059227d4d80057",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 1 reviewed native appearance chooser; unchanged"
+    },
+    {
+      "file": "appearance/mobile-moonlight.png",
+      "sha256": "1ce464f119cf1852377058e748a9b61aa920ce0ac758434506d9722412bd5489",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 1 reviewed native appearance chooser; unchanged"
+    },
+    {
+      "file": "appearance/wear-light.png",
+      "sha256": "8fa4d5b29f9a1a8c9a74973f68fca1342ed791cce70101273832d54aaad12349",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 1 reviewed native appearance chooser; unchanged"
+    },
+    {
+      "file": "appearance/mobile-light.png",
+      "sha256": "f76db28d71d48cf745f078951cbcc80b2b9f10fb211ec36ec70c9f984f7f3742",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 1 reviewed native appearance chooser; unchanged"
+    },
+    {
+      "file": "appearance/mobile-dark.png",
+      "sha256": "3274a855ec73bbb8736af024e3df89eeb50078b0a22dde2247422d4f35ff668a",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 1 reviewed native appearance chooser; unchanged"
+    },
+    {
+      "file": "appearance/wear-dark.png",
+      "sha256": "936676a4997b4279afd6820d47d33370dc98204d07c5ec91cf560564842c7660",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 1 reviewed native appearance chooser; unchanged"
+    },
+    {
+      "file": "phone/profile-details-large-narrow.png",
+      "sha256": "543438c39f4e34ac67900ec6a54316f7ab2bf67e5c81e084c6810f338bb81545",
+      "size": [
+        840,
+        2100
+      ],
+      "origin": "Task 2 native details; Task 7 strengthens Close-to-directory assertion"
+    },
+    {
+      "file": "recording/recording-light-large-font-scrolled.png",
+      "sha256": "d1f6942139f2f8e14ed1bbc42c403f82eb019b86966ad7927d1413bcd786d98c",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-light-1.png",
+      "sha256": "d1c815d259a0e41f828dc9174679fa44fd4177342879d04192356ddd4f968ea5",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-light-large-font.png",
+      "sha256": "c58f93518be9737a5b57eda60ead3e172c0dc7e9457294b4096c04d9dacd99d3",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-light-0.png",
+      "sha256": "3177cc892683e9bb2273f575611dae10148657b6ee2811757fe1a7aa3734bf86",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-light-2.png",
+      "sha256": "485b4aad5944851ad8f1e0e0a12f4af87a161909cbd47e4679e8bb9c2cb1e608",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-moonlight-0-phase2.png",
+      "sha256": "814fa0bfe361788a3c518523017874e99302b5b045df28a30fdb8d5fe2ebdd78",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-static-reduced-motion.png",
+      "sha256": "5ceb61f72eaac13508e62d06ee111d17978092b89cc1f4350371af4c5fd212ea",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-moonlight-large-font-scrolled.png",
+      "sha256": "557fe449b74ef726c919f89d534e1a5d800b1e88949fd65202d3befa6830789b",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-dark-2.png",
+      "sha256": "21296112232222fd7588594d197f7b610ccfd2511003661340a512b354cad4dc",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-dark-1.png",
+      "sha256": "ee114ec1d7944757a03abb1932e5abd92131d67e5fab047f7b4764ab4dd477b9",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-dark-large-font-scrolled.png",
+      "sha256": "3b536cffb422a54f98a184d23a397b40e0ce3ded8d5ac1b8512e4fe9a35f79ca",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-dark-0.png",
+      "sha256": "98ef389eaab85836e50b85a47e6cd101823f1d9154d91e2006ef28a50daa368c",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-light-0-phase2.png",
+      "sha256": "12d71ed0addb29cd6b075672bba8290366a0e832f8ce1ec8bffadbacde326f55",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-dark-0-phase2.png",
+      "sha256": "fc0cba166c13897a85424086c27cb9b3943c2b297788e4ee97835089a11b6ca6",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-moonlight-1.png",
+      "sha256": "1ca45ccdb18fa00c08f66bdf3391b38aa3b433cf7770d59b0af5233760943599",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-moonlight-large-font.png",
+      "sha256": "417628419eb416b2181e2aea17ca6113f50b1ae5e06b76c6f244f45f7b85365f",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-moonlight-0.png",
+      "sha256": "7cbb74ca7592beb5d57310a85e53b30313f74a6f9830f5e566691734e9ea2d94",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-moonlight-2.png",
+      "sha256": "bffdd009034a6d0bd9d716c46dafb28b925460fe33fdc20625aae1d651df03bd",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "recording/recording-dark-large-font.png",
+      "sha256": "5a8bd357b816f72fedc1e539ec6f822ac3f5dd3ab0763d1c48725d3befeb1220",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native capture; static/GIF/pet external rings with no microphone badge"
+    },
+    {
+      "file": "phone-tiles/moonlight-1.0-pending.png",
+      "sha256": "ed21c74de322d8b6ce42c756dcf05adff98fe00858c09b43fe1d99f6b7f4aede",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/dark-1.3-pictures.png",
+      "sha256": "c2f57d6c47e6a49b968358059a65c338174b44bf14ad06fe8b60b79f46184b63",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/moonlight-1.3-pending.png",
+      "sha256": "b14cdd63d97125171af78bc0621a0eb2333f806b6e5d69c7249b104f2fc64119",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/moonlight-1.3-pictures.png",
+      "sha256": "f49f8f5eed406289ef5ecd808fa9b36ff036ab8cb8a22f21cfecde5e064957cf",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/light-1.0-pictures.png",
+      "sha256": "a1ba35671f09386294b75ff07dd52a62ec55991da69b7cb45b483c20512d12e2",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/dark-1.0-pictures.png",
+      "sha256": "44d28811f1560421175a8f4a7f17abd19e39571b3b24425d20465de414d46ac9",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/light-1.3-pending.png",
+      "sha256": "8cf0ea9828db73fc3d80074f52b5a236c0cd60f411959445e0e0e6ccc045d860",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/light-1.3-pictures.png",
+      "sha256": "4858b11fab036efe68b6651adf66098d189ccf7c38fe38ecbf15af82b24dd166",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/moonlight-1.0-pictures.png",
+      "sha256": "9d5d36ae918c15eef41294eaf1b8bf6e3962b5cae11e0c553debd92e3cfca3cd",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/dark-1.3-pending.png",
+      "sha256": "c763803df492192ff18b180513e612af7b391c3bb302d139215e15ae693f72fd",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/dark-1.0-pending.png",
+      "sha256": "8d5e5838e56e7ab83f8444673f79f0dad517165dc05494e99f540763b6575c57",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "phone-tiles/light-1.0-pending.png",
+      "sha256": "e71d174b43b554af72411ab1460bba9edd9beed7871f10401e39ac841b0b9af9",
+      "size": [
+        1080,
+        2400
+      ],
+      "origin": "Task 6 original synthetic native tile composer; unchanged"
+    },
+    {
+      "file": "tiles/tile-pinned-profiles.png",
+      "sha256": "a9a4910aee88805ed9447c958c4461bd1994684f8e3a7edc5512af6f9e8089a1",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 AndroidX TileRenderer with original face admitted via actual PortraitCache and production circular ProfileTileSnapshot.build; not physical launcher addition"
+    },
+    {
+      "file": "tiles/tile-focus.png",
+      "sha256": "7761de26464a155f37b3973bd328f45114d6ed1a071571cf605c3899efe8418a",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 7 AndroidX TileRenderer with original face admitted via actual PortraitCache and production circular ProfileTileSnapshot.build; not physical launcher addition"
+    },
+    {
+      "file": "watch/ambient.png",
+      "sha256": "3da7a3e4a9b82c250c0b6be4f9b5541b7b2cdcb0f0c15591913ddc2ffb272b87",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Task 4 native owned-emulator synthetic ambient; unchanged renderer, later actual-activity unavailable-route sleep/wake regression passed Task5"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.0-reply.png",
+      "sha256": "fcdc1b4e9e30e2f95e0c62b4883d7df5dd469be401c51804f3429018e063b4af",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/dark-1.3-end-padding.png",
+      "sha256": "dfe6bfa012f0cc6b42be8dcc26830fcaeb70902b507a049979f9170aa1a6a6cf",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-340/light-1.0-picker.png",
+      "sha256": "d7be375d6f75dc49092b5e7dd4dc76c79429cd0e4e5a77de1e55897f62d60317",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/dark-1.3-picker.png",
+      "sha256": "c541ebe96ebb3ffe041d745403f9fd4df623f57a45a786153a1312fd5df82f75",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/dark-1.3-reply.png",
+      "sha256": "ea40155fdcc3829b129e30e9726054149e1d22a5ead6e5344d0eb5b0b8f5d03b",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/light-1.3-portrait.png",
+      "sha256": "4e25b6caa9191bef917980d2704aedc532e80e12236c855b068d59edfe524b59",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.0-picker.png",
+      "sha256": "4a6727aa89b0d03a91320465384a5b8667a6c7e493450c51db6fdb488c547115",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.3-end-padding.png",
+      "sha256": "95d23aa12c85714b099ef0d2ec32aaa987ee34570a4a62f5d1bc317da326a68f",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-340/light-1.3-end-padding.png",
+      "sha256": "df31402aaaf9f216d181fc745bb21125524daf487a036edb1724145c1b8124ca",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.0-portrait.png",
+      "sha256": "d3504066b44e40287d9ea97e3651ee8120684bb15825321420f15e2e84c20360",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/dark-1.0-portrait.png",
+      "sha256": "ba19dec7d62d0f6b36dcdd78c6f769bbe87eb099ed388db71694240fd3f94d65",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/light-1.0-reply.png",
+      "sha256": "6d8fc5f27208f1ca6e8757b8ae169212c2e040c7420780dbf6bf9bd3733110c1",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/dark-1.3-portrait.png",
+      "sha256": "a4e5112454358fee9182360aea7d08c0a7ebd10cdd78144eda40b55d4108526b",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.3-portrait.png",
+      "sha256": "1633e32147d9b97d680d2ced0e497cc4a957527ee82789ada6fdad88ef11d30f",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/light-1.3-reply.png",
+      "sha256": "37fbca2301a2ac965d0b4fb2dbf919b0146a6212e7fe87f33d5234d5b3774d1c",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.0-end-padding.png",
+      "sha256": "d2086285123fdc38ecb4ae7712a1432491e5c913adf4f2aeda3ad108dd01fa39",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-340/light-1.0-end-padding.png",
+      "sha256": "4f8c91544043ac46b6f1c09c2b0e712db667d8b7541ea4a12b45b71223d0079e",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-340/dark-1.0-end-padding.png",
+      "sha256": "60fdf509d458dfea72412f342b99cc3448aaefdfb8106233c21f934d36d20c34",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.3-reply.png",
+      "sha256": "fc8ecdebfc6ba23f572ba7d7c4adc2a121be97cea9cb6a515037beb4cdbc50ea",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/dark-1.0-picker.png",
+      "sha256": "a22f3eadd2295f47d07b74b1fa31d6892cfafa858171f7dc5766e4b777ae4be2",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/moonlight-1.3-picker.png",
+      "sha256": "a10a88b769e096852e67db93a4f90b99d26936f9052e0cde3363c90573235e1b",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/dark-1.0-reply.png",
+      "sha256": "e131618cf0527e10b51dd912192374cded69f6a91e0648d1f38ad898960b9a95",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/light-1.0-portrait.png",
+      "sha256": "a2d42efcc5960635843a2da5ae9bdff9a74ee5b33a242ac4229385898ef54654",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-340/light-1.3-picker.png",
+      "sha256": "b71eb9435ce849c11742fc5e52ab40a8241b5a0ddfefd85ec40df6809931d5a6",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.0-reply.png",
+      "sha256": "7e04a24ef61be2a79a07ad081d0d837d180fbff64918f6c48e98ee7e4bfe692f",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/dark-1.3-end-padding.png",
+      "sha256": "cc18e02a311619fa9e0405255cb8f79adaea2f7d23aec5f664cddaf8964682b5",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-360/light-1.0-picker.png",
+      "sha256": "631811f7bbe23be1dd7a1f369f12f9f38eb013472cb04aa32bc157ef5f701afe",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/dark-1.3-picker.png",
+      "sha256": "1cddb6c8e990eb445b41f88c1d88fd9a00bf28e041e2c6bf2c8bf11d1335387d",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/dark-1.3-reply.png",
+      "sha256": "1f0ccf399f26689670410810a120e9880e5dfe00c272a156da4ab5a125da50d2",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/light-1.3-portrait.png",
+      "sha256": "a8fbbe0c09c94d47732f274cb58f91375b0a240f1cf4566a7568ae44746f3ed5",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.0-picker.png",
+      "sha256": "02b299a9da4756caf1a599ecf12a26706f1c7b65ec425e0fe2cd29dd636086fe",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.3-end-padding.png",
+      "sha256": "f836b6ce3af86d80ab32c47e3822b86666bb461bb88ee68f185ae223e27e0296",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-360/light-1.3-end-padding.png",
+      "sha256": "1f2977beaeec76ba3de3e1ac7c58dc8f58333f46ce57f54d96bf3e61a0b94875",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.0-portrait.png",
+      "sha256": "b59841d4707f6f8cc5010fc375394c3173482ab98c1c1d319e2ee6f893fcff50",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/dark-1.0-portrait.png",
+      "sha256": "1c02e7907b1fe47f2a25200c71d51bd1176c961da61f93fb70cb497fc8321eaf",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/light-1.0-reply.png",
+      "sha256": "584e3db54cfff97bf9dc85b090005d3b6ece986525fb7a7be3f98f849a1ebcda",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/dark-1.3-portrait.png",
+      "sha256": "2902fdcb6908d39a0fe0695263067617df0899914155fd8ed2f6f725f4016ca6",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.3-portrait.png",
+      "sha256": "b368122831a6681ebc249a8d419ebc41e0ba44a465803c4e8e0daafa56040511",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/light-1.3-reply.png",
+      "sha256": "3a6641d9259af1a816b1c54fe012f402610790284ed8eeb0dcf87bb98da55582",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.0-end-padding.png",
+      "sha256": "714affd79d16f6e2a3a8b60b3ae4dd4198ad102474e5ed3074132ce8a314c901",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-360/light-1.0-end-padding.png",
+      "sha256": "de7b006d3dd86482f8a21cc120e432d020737fe13c34ec7b1b0aa2c78033faad",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-360/dark-1.0-end-padding.png",
+      "sha256": "25355ceed9d3a4e4e8108b25b17f42a8d61be9ce9f9a81dfc9d6aa2782131e50",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.3-reply.png",
+      "sha256": "1d20b8705f3f99018cb1f4fed2ca2800c8c3a68c682e76adf376389032472586",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/dark-1.0-picker.png",
+      "sha256": "8434f5b84ab30c00ae2a609e64607f40905d82d63e199ef9950bcaeac08bfb0c",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/moonlight-1.3-picker.png",
+      "sha256": "1c216e3adaebb06609a729f78393f4ce970d88f47a9d2ca550287fc55732a85a",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/dark-1.0-reply.png",
+      "sha256": "7c9fabd93cc823b4da37d36ceb8bb6ca17aca094f6c8d370cbf6d6001b273481",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/light-1.0-portrait.png",
+      "sha256": "bc48ecff88d5223d2281c8127563fd4df5ec9a5a641c0d013603ddfb35c92983",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-360/light-1.3-picker.png",
+      "sha256": "6f7120f25b9d1a9d7c8a22e2927c29e32938cec7986f218888ff5ee7498c90f8",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.0-reply.png",
+      "sha256": "22e87a457e8f42c7e8a8a7f31401fd818c3e24abf64c827412c55fca7b8cbdda",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/dark-1.3-end-padding.png",
+      "sha256": "9eb5987fca0aaf936a6abf37a0869c516c6517017c6d6ef8c75f189eb8e789d4",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-400/light-1.0-picker.png",
+      "sha256": "696d0882e05783465b69d00d3536ce0bdeed29bd1a91e909f64ef498cab68a11",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/dark-1.3-picker.png",
+      "sha256": "a0dc4cf11ded23578f3b31e8bce2db1108675172b06180e703213d8f4cf95205",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/dark-1.3-reply.png",
+      "sha256": "ac621ed7a544f155dc1272fa32f8eeef48bd7d81b165b5de846a20f284bad1f8",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/light-1.3-portrait.png",
+      "sha256": "cebae019ee6da879c0597e3ea80336e85a7e042db21f67f4f9d345a742d09eb3",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.0-picker.png",
+      "sha256": "605625cc88ac757d2e97d0aef09203d7e4907c87c0dc5ff7994ad59934eafd26",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.3-end-padding.png",
+      "sha256": "419b2c2b4f1931c541a51756329d8523582e1e347a284ee34936f1848772c3f3",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-400/light-1.3-end-padding.png",
+      "sha256": "cce088b1f080ff00f52c20281b0b031ac131970203540d7a09711ac9a5197d34",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.0-portrait.png",
+      "sha256": "a6e2805c0b81a90f931752fa18995ae67d9a85480451b353d2c20562f214f3ff",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/dark-1.0-portrait.png",
+      "sha256": "a40c5e120a61bd536fa743735abca04d72c643a5fa2288537e29909e5e55791e",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/light-1.0-reply.png",
+      "sha256": "4612d7a90adf46d2e8009397fed8d26e59a8c87e8932d1f52228be815eded082",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/dark-1.3-portrait.png",
+      "sha256": "9eea744b1df26f5fd1a345b89756d42ea0928ba2ebe69cb453f4a3249da3c65d",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.3-portrait.png",
+      "sha256": "7bee7443a893d1f74de091e4a1f112fc2fee36399aa80cba0c6cbdc83b4e7f7a",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/light-1.3-reply.png",
+      "sha256": "8433a9c7ee76d39c5585828abd99cea9fd7638a216a5ace9b634643c35aa16ed",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.0-end-padding.png",
+      "sha256": "56154c0dd923796ce01440c52d9c587486ef3e0e0cf8a6a2a36b28bd77269e6c",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-400/light-1.0-end-padding.png",
+      "sha256": "fe17c4efc95d3a83d9f4a366b465a29d05e1f85ca93c626512f761b65efaaee3",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-400/dark-1.0-end-padding.png",
+      "sha256": "fe4af5cdc43def4b2bf973fad992826a51005bf58c46260b0637a36ac5725e48",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks; full-width centered label"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.3-reply.png",
+      "sha256": "abbb7714971c3b25d2e964df8fd0ed050ac161b8e9080549a56ef1f02bcdd630",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/dark-1.0-picker.png",
+      "sha256": "b6721241e19c7b40c9844f84129592c13645d33c22c97365d778759425e7ebe7",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/moonlight-1.3-picker.png",
+      "sha256": "10c00e393f59bdee5faab3b306ba7dec22cffe94a140346bdcaa6ec55d20ea62",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/dark-1.0-reply.png",
+      "sha256": "a7eca1d76543d6a09a63e146380373f4ab37d157b7660a7b59e5773fbe5635e5",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/light-1.0-portrait.png",
+      "sha256": "982e23634a2f6e575a7403397b67f8d1022e35b6f1626cd7c455b7a2eb599519",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    },
+    {
+      "file": "watch/density-400/light-1.3-picker.png",
+      "sha256": "2e6cc843483c80994eda6ba259c6d46ab507c8cb2245a4b8e718387a2f09ec4b",
+      "size": [
+        480,
+        480
+      ],
+      "origin": "Owner portrait correction native export; unobscured art, footer profile jump, retained scroll/picker/locks"
+    }
+  ]
+}

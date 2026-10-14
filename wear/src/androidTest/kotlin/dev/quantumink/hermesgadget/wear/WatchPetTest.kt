@@ -30,6 +30,8 @@ class WatchPetTest {
 
     @Test
     fun petDeliveryCacheAndLegacyFallbackThroughActualService() {
+        val companion = InstrumentationRegistry.getArguments().getString("syntheticCompanion") ==
+            "true"
         val endpoint = InstrumentationRegistry.getArguments()
             .getString("syntheticEndpoint").orEmpty()
         assumeTrue("Supply a synthetic localhost devserver", endpoint.startsWith("ws://localhost:"))
@@ -75,21 +77,32 @@ class WatchPetTest {
                 service.save(endpoint, "Synthetic pet test", "", true, true) { service.connect() }
             }
             waitUntil { service.state.value.connection.status == ConnectionStatus.PAIRED }
-            waitUntil { service.state.value.pet != null }
+            waitUntil {
+                service.state.value.pet != null &&
+                    (!companion || service.state.value.pet?.rows?.containsKey("talking") == true)
+            }
             val atlas = requireNotNull(service.state.value.pet)
-            assertEquals("Sample robot", atlas.name)
+            assertEquals(if (companion) "Carousel robot 1" else "Sample robot", atlas.name)
             assertEquals(6, atlas.rows.getValue("idle").size)
             assertEquals(4, atlas.rows.getValue("waving").size)
             assertEquals(96, atlas.rows.getValue("idle").first().width)
             assertEquals(104, atlas.rows.getValue("idle").first().height)
             assertEquals(
-                "review",
+                if (companion) "listening" else "review",
                 dev.quantumink.hermesgadget.protocol.PetStates.row("listening", atlas.rows.keys)
             )
             assertEquals(
-                "idle",
+                if (companion) "talking" else "idle",
                 dev.quantumink.hermesgadget.protocol.PetStates.row("talking", atlas.rows.keys)
             )
+            if (companion) {
+                assertEquals(6, atlas.rows.getValue("listening").size)
+                assertEquals(3, atlas.rows.getValue("talking").size)
+                assertEquals(6, atlas.rows.getValue("sleeping").size)
+                assertEquals(2, dev.quantumink.hermesgadget.protocol.PetStates.mouth(0.2f, 0))
+                assertEquals(1, dev.quantumink.hermesgadget.protocol.PetStates.mouth(0.04f, 1))
+                assertEquals(0, dev.quantumink.hermesgadget.protocol.PetStates.mouth(0f, 2))
+            }
             val restored = PetCache(context).load(endpoint)
             assertEquals(6, restored?.rows?.get("idle")?.size)
             assertEquals(null, PetCache(context).load(endpoint + "-different"))

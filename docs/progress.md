@@ -1,5 +1,424 @@
 # Progress
 
+## Image-only 1×1 shortcut — 2026-10-14
+
+At the owner's request, a configured Focus widget with available artwork shows only the
+image; the portrait fills the former caption space. Full name/source remain accessible.
+Missing-art/recovery labels and larger-widget captions are retained. Four native Focus
+exports are refreshed with per-asset provenance. The existing native mismatch check now
+requires the hidden caption and full accessible name. Twelve affected native methods and
+strict full checks/all four APKs pass (133 JVM tests /38 reports, no failures/errors/skips).
+Build `acfe414` is installed, preserving all 104 baseline files, 18 identities, 55 art files,
+timeout, widget configuration and seven providers. The phone was locked during the final
+visual check; native verification and preserving installation are proven, physical visual
+readback awaits unlock. Private records remain in `.local/widget-image-only/`.
+
+## Nova widget sizing correction — 2026-10-14
+
+The owner's configured 1×1 Nova widget showed recovery because the launcher's advertised
+portrait height exceeded its actual content height; Android selected the short landscape
+fallback. A minimum supported responsive layout and separate undersize recovery now bridge
+that gap, within the existing sixteen-variant/bitmap limits. Two regressions fail then pass.
+
+Strict full checks and all four APK builds pass (133 JVM tests /38 reports, no failures,
+errors or skips). Twelve affected native host/render methods pass without assumptions,
+including the actual size mismatch, all seven presets/four appearances at minimum/undersize,
+existing geometry/night and bitmap sharing. A separate launch fixture's safety skip is not
+counted. [Fix notes and limitations](widget-host-sizing-fix.md).
+
+Phone build `b264796` is installed with matching signer/hash and current backups. All 104
+baseline files, 18 identities, 55 artwork files, timeout and seven providers are preserved.
+The actual existing widget displays its selected portrait/caption, its PendingIntent matches
+the selection and a tap opens Talk/Chat. Its configuration is unchanged; no resize, replacement,
+pairing or send was needed. The phone is back on its launcher. Personal captures stay ignored.
+
+## Phone messaging and Courier — 2026-10-14
+
+The approved refinement is implemented: Quantum Relay for Hermes Agents leads smaller
+section headings; the inline mic uses hold/release/physical-left cancellation and a bounded
+real-level waveform/timer. Accessible Start/Finish/Cancel remains available. Both picture
+entry points use one native sheet with a separate Cancel footer. Original Courier A has
+adaptive color and OS-themed layers; the three existing app themes are retained.
+
+Warning-strict full checks, formatting/lint and all four APK builds pass: **133 JVM tests
+across 38 XML reports**, zero failures/errors/skips. Final native acceptance passes **42
+executions /30 distinct methods**: 24 combined composer/picture/gallery/conversation/directory
+methods, four methods in each of three font/window scenarios and six independent stock TLS
+audio/vault methods. Windows cover 320×640 dp/font1.8, 360×720/font1.3 and 640×320/font1.3,
+with all three themes and keyboard states. Original emulator font/window settings are restored.
+
+One fresh whole-feature review found three Important issues, no Critical/Minor findings.
+The single corrective pass covers delayed mic startup after release, failed accessible/
+permission starts and physical-left cancellation in RTL. Failing-then-passing regressions
+and the green suite are recorded in the [review](phone-messaging-review.md). Large-text
+hierarchy and short-window keyboard overlap were also reproduced and corrected. Fixture
+withdrawal timing, stale accessibility trees, held injected pointers and idle/IME timing
+are documented separately; failed receipts are retained and not counted as passes.
+
+The [native gallery](demo/phone-messaging/README.md) contains **39 original synthetic PNGs**
+with source/APK/test-APK hashes. Recording layout levels are synthetic; actual capture,
+playback, cancellation, permission completion and independent identities pass against two
+isolated stock TLS Gadget servers. Demo: hold the inline mic, release to send, slide left
+to discard, or type and tap Send. Open Watch picture for the separate full-width Cancel footer.
+
+Phone build `d26e790` is installed through the existing paired wireless ADB transport.
+Current APK/data backups, matching certificate and installed APK SHA-256 are verified:
+`80aef071c8011dccc04875bfd9c0cac7d22938688b1cb2698a333dce96c4f5ba`.
+All **102 baseline files, 18 identities and 54 artwork files** are unchanged. The original
+five-minute timeout and seven registered widget providers remain. No app UI was launched
+or captured; no reset, enrollment or new pairing occurred. The watch remains at `f35bf59`.
+
+Physical speech/gesture comfort, away replies, widget/tile placement, quantitative power
+and existing signing/privacy/Play gates remain separate owner/release checks. Keep PR #1
+draft. Private receipts, failed runs and the closed execution ledger stay ignored under
+`.local/phone-messaging/`.
+
+## Clear watch portraits and centered footer — 2026-10-13
+
+The owner's correction removes the floating profile menu and microphone badge from the
+watch artwork. Jump to profile is the final card control, with its label centered across the
+full button. Horizontal swipes, accessible profile selection, stable scroll/drafts, recording
+locks, external rings and original portrait geometry remain. A supported device-tuned tick
+replaces the attenuated recording cue; the owner confirms both start and finish are noticeable.
+
+Warning-strict checks pass 116 JVM tests / 33 XML reports and all four APK builds. Eleven
+distinct affected native methods pass, including configured three-server horizontal and
+vertical carousel regressions. Initial fixture failures and missing-server assumption skips
+were resolved; skipped cases are not counted as passes. Full theme/font/density geometry
+covers 18 scenarios, followed by 18 centered-footer cases. The native gallery refreshes
+91 watch/recording exports; unchanged captures retain their earlier provenance.
+
+Preserving physical watch updates verify matching signer/installed APK hash and unchanged
+78 baseline files, 19 identities and 29 artwork files. The final `f35bf59` build shows the
+clear first view and footer jump control. Original timeout, appearance and tile pins remain;
+the owned bridge is stopped. Demo note: hold the unobscured portrait, release after the two
+ticks, swipe profiles or scroll to the centered Jump to profile control. Fresh away replies,
+speech, microphone contamination, extended haptic comfort and quantitative power remain gates.
+
+## Phone home widgets — 2026-10-13
+
+The approved seven rows × columns presets are implemented with final review corrections through `5a9a459`: 1×1, 2×2,
+2×4, 1×4, 4×4, 1×5 and 2×5. Separate instances have stable-key bot choices/order,
+static effective portraits, OS appearance by default and explicit Light/Dark/Moonlight.
+Exact-profile taps open foreground Talk/Chat without connecting, recording or pairing.
+Busy/approval deferral, stale/withdrawn recovery and independent drafts are guarded.
+
+Strict checks pass 125 JVM tests / 35 XML reports with zero failures/errors/skips, warning-strict
+lint/format and all four APKs. Thirty-two affected widget/navigation/presentation native methods,
+one blocked-watch publication check and five actual stock TLS audio/vault methods pass.
+The host geometry matrix covers 112 font/direction/orientation/size cases. Adaptive size
+variants share the sixteen-picture bitmap budget after parcel/service delivery. Editor
+recreation, stale CAS edits and configuration races have failing-then-passing regressions.
+Initial missing fixture environment assumptions were corrected; skipped runs are not passes.
+
+The [native widget gallery](demo/home-widgets/README.md) contains 29 source/APK-bound original
+synthetic PNGs. Demo: add a preset from the launcher, choose bots and order, select appearance,
+save and tap a portrait for that exact Talk/Chat profile. Reconfigure in Settings → Home
+screen widgets. A five-column launcher grid is required for the two five-column presets.
+
+The final whole-feature review found three Important items; one corrective pass addresses
+the restore-chain collision and native busy/theme coverage. No Critical/Minor items were found.
+The [review record](phone-home-widgets-review.md) retains all decisions and test limits.
+On 2026-10-14, a preserving update installed the matching-signer widget APK on the phone
+using its existing paired wireless ADB transport. The backed-up APK and app data, installed
+APK hash and unchanged 101 baseline files are verified: 18 identities, 54 artwork files and
+five-minute timeout preserved. All seven providers are registered. No app UI was launched;
+One UI placement, custom ordering/taps, wallpaper/night changes and reboot remain open. API 29–30 runtime is
+unavailable. The wallpaper capability probe could not preserve the existing emulator image,
+so no wallpaper change was attempted; two real palette changes are not claimed. Existing
+watch physical build remains unchanged; the phone update preserves its identity/artwork/timeout state.
+
+## Native client software acceptance — 2026-10-12
+
+The approved native clients are implemented: Portrait studio/Voice Q, three themes,
+box/profile organization, independent phone Talk/Chat/waveforms, swipe-first watch picker,
+portrait recording/rings/light haptics, bounded foreground reply visibility and one/four tiles.
+Tasks 1–6 and 8 and Task 7 software acceptance have clean scoped reviews. Whole-branch review
+found four Important issues and one Minor at `ccb2953`; one fix wave `c248b03` resolves all five,
+and the single scoped re-review finds no new Critical/Important breakage. The
+[review record](native-client-review.md) explains corrections and source-bound validation.
+
+Final strict checks: 116 JVM tests / 33 XML reports, zero failures/errors/skips, all four
+APK builds and warnings as failures. Final native receipts: 34 passing executions / 32
+methods, no failure/skip in those receipts; 18 density/theme/font scenarios. The
+[native gallery](demo/native-clients/README.md) contains 173 original synthetic captures,
+with 72 clock-affected exports refreshed and unchanged images retaining reviewed provenance.
+
+Physical watch `c248b03` delivery verifies matching certificate/APK and unchanged 19 identities
+plus 75 protected baseline files at installation. Normal UI selected Moonlight and configured
+Focus for the current profile, revision 1; grid favorites remain unspecified. Original
+15-second timeout is retained and the 340×340-pixel portrait position is unchanged. Physical
+phone also received `c248b03` on 2026-10-13 after current APK/data backups and matching certificate/hash
+checks: all 99 baseline files unchanged at installation, including 18 independent identities
+and 18 GIFs. Normal UI selected Moonlight, opened directory/Settings/Talk/Chat and returned to
+Profiles; all identities and 54 artwork files remain unchanged afterward. Five-minute timeout
+is retained. The associated watch returned its existing Focus revision 1, empty four-slot grid
+and 19 profile keys. Snapshot readback is verified; edit acknowledgement is not. Owned debugging
+bridges and the exact temporary phone grant were removed. Prior owner GIF assignments remain
+verified, without reimport or publication. No live phone turn or microphone capture was tested.
+
+Associated phone edit acknowledgement/system tile placement/every target, final-build speech,
+haptic strength/mic contamination, away reply/sleep receipt and quantitative Light/GIF/audio/
+battery tests remain open. OS power saver is a capability skip; reduced motion passes.
+Historical server-generated replies do not prove watch receipt. Keep the PR draft.
+
+Demo note: compare the native three-theme gallery, keyboard/large text, watch portrait/
+picker/reply and static Focus/grid; hold the physical watch portrait for the next owner speech
+trial. Personal endpoints/art and device preservation receipts remain ignored.
+
+## Client usability follow-up — 2026-10-12
+
+The owner confirmed all three phone box groups, pictures and Talk/Chat are present, then requested
+clearer collapse/grouping, top-text contrast and the title **Quantum Relay for Hermes**.
+Box headers now have a full-row action, machine icon, count, catalog status and chevron;
+expanded profile cards sit within their box panel. Reorder arrows are mode-specific, and
+search explains why matching sections remain open. Stable keys and saved order are retained.
+
+The contrast regression reproduced a 1.15:1 inherited black foreground on the custom dark
+Scaffold background. The shared phone shell explicitly provides onSurface, measuring 14.05:1.
+Six owned-phone presentation/order tests pass: contrast, independent accessible expansion and
+four existing directory-order/picture regressions. Strict full checks and both app/instrumentation
+builds pass with warnings as errors; JVM reports still total 105 with zero failures/errors/skips.
+Refinement `b724231` is installed on both actual devices after certificate/hash checks and
+backups. Phone protected files/preferences (42, including 36 PNGs) and all watch identity/
+portrait hashes (19/18) are unchanged. Original watch timeout is restored. The maintainer
+reopened the physical phone app and confirms the box headers are clearer to expand/collapse
+and the top text is readable. Phone speech/cues and GIF power observations remain open.
+
+
+The maintainer approved the [phone/watch follow-up design](superpowers/specs/2026-10-12-client-usability-design.md),
+including QuantumInk Relay branding, recording cues, grouped/custom-ordered phone profiles,
+independent foreground phone conversations and bounded GIF overrides. The approved software
+is implemented. Strict checks, lint/format and all debug/instrumentation APK builds pass with
+warnings as errors; JVM reports contain 105 tests and zero failures/errors/skips.
+
+The phone groups/searches profiles by box, persists custom box/profile order, displays effective
+pictures inline and provides separate Profiles/Watch/Settings navigation with an original icon.
+Phone Talk/Chat creates independent TLS identities only after explicit reviewed Connect.
+Three owned-phone stock TLS/vault tests pass: fresh text/PCM responses, reconnect, separate
+endpoints/drafts, speaking/Stop state and controlled playback completion overlapping exit.
+Leaving the conversation stops its socket/audio while preserving relay settings. Nineteen
+phone directory/repository/storage tests pass, including full GIF capacity and retained vaults.
+
+Bounded GIF overrides import through the native picker, normalize a first-frame PNG and
+replicate optional hash/length/fallback-bound metadata/assets alongside the unchanged v1 roster.
+One pending import survives failed publication/restart without evicting the published GIF.
+Fourteen owned-Wear tests pass: actual frame changes on selected/unapproved cards,
+static/reduced-motion/pet behavior, ambient monochrome fallback, retirement/admission races,
+recording boundaries, codecs and existing surfaces. Exact-frame checks sample source-pixel
+interiors rather than the enlarged checkerboard's blended boundary.
+
+Fresh Astra whole-branch review found six Important issues and one ambient contract mismatch.
+All seven were corrected and regraded clean; [review resolutions](client-usability-review.md)
+record failing-then-passing cases and the reviewer’s read-only limits. Recording cues now join
+recorder shutdown with the accepted protocol outcome, covering short release, automatic limit
+completion and rejected sends. Actual phone speech, cue audibility/contamination and animated
+watch battery cost remain physical observation gates. The final watch build is installed with
+matching certificate and APK hash, all 19 identity ciphertexts and 18 portrait hashes unchanged,
+and its original timeout restored. The final phone app is also installed with matching
+certificate and verified APK hash. All 39 protected app files, including 36 portrait PNGs,
+and both preferences remain unchanged. Owner phone UI observation passes; speech remains pending;
+no live phone pairing or physical microphone test was initiated. GitHub Android, extensions
+and secrets checks passed for code `cea12b5` and delivery docs `de620f4`.
+
+The reported watch scroll reset was reproduced: the pager's progress flag replaced its
+active vertical list with a static preview during nested scrolling. The settled conversation
+now stays mounted, with activity-owned list state per stable profile and explicit Wear focus
+groups. Compact 48 dp chevrons flank the page count instead of truncated word buttons.
+Prompt lists use independent state. Strict checks and debug/instrumentation builds pass;
+both owned-emulator scenarios pass: touch scrolling/control interaction, cancelled drag,
+profile return and metadata refresh; and three-profile draft isolation, recording/approval
+locks, rotary input, arrows and ambient/setup recovery. Tests wait for visible UI changes
+after reducer events and rotary input rather than relying on fixed render delays. The Wear
+pager-wrapper experiment was removed after a post-approval gesture regression; the existing
+foundation pager uses the documented custom Wear focus hierarchy. Physical update follows.
+
+## Larger watch portraits and live device setup — 2026-10-12
+
+The maintainer reports that the fresh hold-to-talk check passed on one profile from each
+of the three boxes: visible transcript, answer and the profile's spoken voice. This is a
+functional speech pass by maintainer report. Network/lock conditions, quantitative latency,
+STT/codec quality, lip sync and battery were not separately measured. CI for code commit
+`628de74` passed all Android, extensions and secret checks.
+
+The maintainer requested circular portraits twice as large. Portraits now render at 160 dp
+instead of 80 dp, within a 160 by 168 dp fixed artwork frame. The Ultra accessibility bounds
+measure 340 by 340 pixels and the actual screenshot shows the whole round portrait. The
+follow-up placement request reduces portrait-page top padding from 40 to 28 dp: measured
+bounds move upward 25 pixels, centering the image at y=239 on the 480-pixel display. Names
+and controls remain below it in the scrollable page; pet rendering retains its existing canvas.
+Strict full checks and both debug builds pass with warnings as errors: 71 JVM tests, no
+failures/errors/skips. The matching-signature watch update preserves all 19 identity
+ciphertexts; its installed APK hash matches the local build. Personal art/screenshots are ignored.
+
+All three sources were entered through the physical phone UI. All 18 supplied round
+256 by 256 PNGs were chosen through the native picker, then verified against the actual
+normalized phone cache and watch content hashes. All 17 new endpoints were reviewed on the
+watch, approved through their correct profile-specific stock CLI, and observed Ready on
+Phone relay with watch TLS. The existing root endpoint also reached Ready; the original two
+identity ciphertexts remain unchanged. No identity or portrait cache was seeded.
+
+A read-only phone diagnostic passed authenticated default-trust HTTPS to all three catalogs
+on validated cellular/Tailscale with Wi-Fi off and USB debugging only. A profile that returned
+a provider rate-limit error before the pause now returned its fresh exact marker. A second
+fresh reply passed with the phone keyguard showing and no relay foreground service before
+watch app startup. All 18 profiles returned fresh markers with the phone keyguard showing on the same cellular
+TLS path: 12, four and two per source. A controlled outage of the owned Mac catalog job
+retained the selected page, 19-page order and portrait; refresh after return restored source
+availability. The exact job/routes and picture references were preserved. This exercises
+catalog failure rather than whole-box power loss. Phone Wi-Fi and both original screen
+timeouts are restored; root Automatic is verified. See [physical results](physical-results.md).
+Do not infer physical speech, radio throughput, battery,
+live optional pets/Opus, signing or Play acceptance from typed replies.
+
+
+## Phone text contrast correction — 2026-10-11
+
+The maintainer reported black text over the dark companion background. The shared activity
+now uses a Material Surface with an explicit light content color, so profile, discovery and
+speech instructions inherit readable text. Strict checks and the phone APK build passed;
+the JVM reports contain 71 tests with zero failures/errors/skips. The matching-signature
+update preserved existing app storage, and the maintainer confirmed the text is readable
+on the physical phone. Portrait selection and live watch setup continue below.
+
+## Portrait overrides and authorized live setup — 2026-10-11
+
+The maintainer requested a private export of all portraits and an exact regeneration prompt,
+box-imported pictures with a per-profile watch override, setup of the missing conversation
+profiles, and publication instructions. The ignored pack contains 18 byte-identical originals,
+a hash manifest and ZIP; the prompt specifies 1024×1024 RGBA masters and exact 256×256
+RGBA watch PNGs, transparent round framing, safe face/headgear bounds, no text and a 256 KiB limit.
+
+The phone's encrypted source/profile overrides retain the latest imported box portrait beneath
+the chosen watch image. Native Picture options offers the system picker and Use box picture.
+Tests cover refresh/offline/restart, overrides before URL setup, duplicated profile IDs across
+boxes, withdrawal cleanup, returning to the latest box image and unchanged endpoint setup.
+Strict full checks/debug APK builds pass with warnings as errors; 71 JVM tests and all 12
+owned API 37 phone storage/repository/portrait instrumentation tests pass. The live local
+catalog and picture-choice dialog were also exercised through native phone UI.
+
+The requested setup authorizes the previously prepared live rollout. Three independent HTTPS
+catalogs now serve 12, four and two profiles and all 18 authenticated portraits; unauthenticated
+reads return 401 and unknown assets 404. Every stock SDK v0.2.0 profile now has its own listener
+and verified explicit WSS mapping. All 18 loopback upgrades and default-trust WSS upgrades from
+the respective boxes pass; this is transport evidence, not enrollment or physical speech.
+The root macOS managed Gadget pin was scoped to the default profile, and the Windows managed
+plugin allow-lists now include Gadget while preserving other entries. Normal Windows gateway
+restarts drained cleanly. Existing default service/route and approved device records remain.
+
+Catalog and conversation policy additions are restricted to the owner's exact box addresses
+and ports, validated and published with the current ETag. Existing TLS routes remain and
+Funnel stays off. Windows catalog state/assets have explicit owner SID permissions; jobs
+start at login and continue while locked. All personal values, art, logs and rollback material
+remain ignored. [Setup guide](profile-setup.md) explains what users need once per box and
+once per profile, managed settings, TLS/access, catalogs, pictures and independent pairing.
+
+Demo note: source entry, all 18 round overrides and real watch delivery now pass, as recorded
+in the 2026-10-12 continuation above. All 17 new endpoints completed normal watch review and
+profile-specific approval. Fresh locked-phone cellular conversation startup also passed.
+Controlled catalog outage/return now passes. Whole-box power transitions, physical
+speech/pets, battery and publication gates remain open.
+
+## Approved multi-box carousel — 2026-10-11
+
+The maintainer requests horizontal swipe pages for profiles across three intermittently
+available boxes, showing profile pictures first and pets/additional animations as they
+become available. The [design proposal](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md)
+was approved alongside PRD/architecture/pet updates. Discovery uses
+read-only profile/avatar metadata while conversation pairing remains independent per
+Gadget URL. App and isolated publisher implementation is now software verified on
+`feature/multi-box-profile-carousel`; live deployment and real-box acceptance remain open.
+
+The phone stores three HTTPS sources and catalog-only credentials encrypted, independently
+merges bounded responses, retains offline/withdrawn cards and owner ordering, and syncs
+normalized content-addressed portraits. Source edits invalidate stale requests. Manual
+phone setup and photo selection remain available. The watch keeps approved setup and keys
+separate from discovered metadata, displays stable swipe pages, preserves endpoint drafts,
+and requires review for new URLs. Selected foreground pets crossfade into a fixed artwork
+area; cached neighbors/offline pages stay static. Activity-owned review/page memory survives
+ambient composition replacement. Setup capacity is 32 without changing existing key records.
+
+Validation: strict full checks/builds and both debug/instrumentation APKs passed with warnings
+as errors; 69 JVM tests (57 protocol, ten phone, two watch), zero failures/errors/skips.
+Six isolated publisher Python tests passed. Three real TLS HTTP fixtures verify credential
+scope, default-trust refusal, independent auth/offline states and stable withdrawal/return.
+Three stock SDK processes verify independent pairing/reconnect. Owned API 37 instrumentation
+passed phone vault/photo checks, watch cache/label enrollment preservation, actual swipe,
+accessible Next, vertical/rotary scrolling, recording/approval switch protection, separate
+drafts/identities, actual ambient/wake review restoration, fixed artwork placement and
+selected-only movement. Original draft/profile/lifecycle and companion/base-only pet
+regressions passed. The publisher suite is included in CI. The fresh branch review identified eight important
+orchestration/retention issues; each now has a regression observed failing then passing.
+[Review resolutions](carousel-review.md) records startup ordering, stationary artwork,
+source conflict isolation/partial publication, TLS handshake deadlines, replicated portrait
+cleanup, ingestion quotas, owner fallback persistence and confirmed withdrawn-card retirement.
+The related manual-ID changed-URL downgrade is also covered. Final phone storage/repository
+instrumentation passes 8/8; startup, stationary portrait, changed URL, companion carousel and
+original profile switching each pass on the owned watch emulator. Both local APK signatures
+verify against the existing local debug certificate.
+
+Demo note: [three-source original artwork and actual emulator captures](demo/carousel/README.md).
+The new catalog Data/Channel Layer path has not yet been exercised between real paired
+phone/watch devices; the carousel test seeds an isolated watch cache. Private read-only
+inventories and proposed per-box mappings/installation/rollback notes are prepared under
+ignored maintainer storage. Only the previously approved conversation URL is mapped; other
+URLs and owner artwork remain review steps. No live service, personal artwork, credentials,
+ACL/Serve policy or existing enrollment was changed. Physical three-box TLS relay, source
+loss/recovery, background delivery, artwork/lip sync and battery remain acceptance gates.
+
+## Requested carousel PR review follow-up — 2026-10-11
+
+The maintainer-requested review of draft PR #1 found four additional Important defects.
+Each was reproduced then fixed: oversized restored roster and combined manual-setup
+capacity; independent catalog admission/execution alongside relay and speech; an absolute
+TLS/HTTP publisher deadline; and owner-confirmed fallback-photo retirement with preserved
+saved/offline references. [Resolutions](carousel-review.md) and the
+[follow-up plan](superpowers/plans/2026-10-11-carousel-review-followup.md) record the scope.
+Strict full checks/builds pass with warnings as errors: 71 JVM tests, zero failures/errors/
+skips; seven publisher tests; ten owned-phone storage/repository instrumentation tests.
+Owned-watch overflow recovery, manual setup at capacity and the original three-page
+swipe/draft/recording/approval regression pass independently against synthetic SDK servers.
+
+The authorized physical pass now installed the matching-signature review-fix build on both
+personal devices. After the maintainer supplied a refreshed local debugging address, an
+isolated ADB server connected without interrupting phone USB debugging. The installed watch
+APK hash matches the local artifact; both existing identity ciphertexts remain unchanged.
+The watch received the phone's manual TLS profile card, swiped between its two approved
+profiles, retained selection through sleep/wake and restored an unsent TLS draft after a
+profile round trip. One explicit typed request received its exact real-server reply through
+Phone relay with watch-owned TLS. The phone's denied API 37 local-network permission was
+restored through the companion enable flow. Automatic transport was verified by reopening
+settings; the original 15-second watch timeout is restored and the submitted test draft is
+cleared. See the [physical report](physical-results.md). Live three-box catalog/portrait
+delivery, manual vertical/rotary usability and the remaining release matrix stay open.
+No new endpoint pairing or live catalog deployment was performed.
+
+## Live catalog rollout preparation — 2026-10-11
+
+The [rollout preparation plan](superpowers/plans/2026-10-11-catalog-rollout-review.md)
+now has three concrete private source packages: explicit stable-ID mappings, references to
+existing portraits, hash-checked offline Pillow wheels, a dedicated credential generated
+only at installation, owner-context job definitions and guarded publication/removal controls.
+The proposed catalog-only tailnet grant passes the provider's validation endpoint; it has
+not been applied. Current listener/Serve observations are recorded privately, and publication
+refuses drift instead of replacing existing routes. New conversation URLs remain unmapped.
+
+Validation: five private package tests pass with warnings as errors, including actual
+isolated macOS installation, authenticated catalog/portrait reads, launchd startup and removal,
+input preservation, and refusal of tampered packages, existing directories, occupied ports or
+changed publication configuration. The isolated job/LaunchAgent was removed and its port
+released. Both proposed Windows definitions parse on their respective hosts with all required
+task cmdlets available; actual Windows job startup remains untested. Seven publisher tests
+pass. All private portrait exports meet dimension/length/hash/metadata limits. Source
+profile/config/portrait hashes and Serve configuration are unchanged after preparation.
+
+Demo note: the private portrait review is rendered in the implementation thread and stored
+with the ignored rollout packages. It is an export preview, not a real-watch artwork result.
+No live catalog, policy, Gadget configuration, enrollment or optional SDK patch was changed.
+Next is the approved design's concrete live publication/artwork review, followed by real
+phone/watch catalog delivery and source loss/return. Setup-needed profiles still require
+independently reviewed Gadget endpoints and pairing; speech/battery/Play gates remain open.
+
 ## Repository bootstrap — 2026-10-05
 
 Prepared a public MIT repository with a README, the project brief, project-specific agent instructions, and development/secret ignores. The brief's maintainer-only section is stored locally under the ignored `.local/` directory.
@@ -186,3 +605,125 @@ Maintainer voice demo — 2026-10-06: the maintainer reports that the physical w
 | M8: Tile, complication, ambient, battery, internal testing | Software/emulator and unsigned bundles verified; Ultra battery/signing/Play gates open |
 
 Next: execute the real-device and publisher checklist in [release preparation](release.md). Keep untested hardware gates open and record each new physical observation separately. Relay TLS and direct cleartext decisions are resolved. Multiplexed gateway v2 remains proposal-only pending decision and upstream feedback.
+
+
+## Recording cues and independent phone client checkpoint — 2026-10-12
+
+Shared `client` Android adapters replace the watch-only PCM/MediaCodec classes; protocol stays
+Android-free. Recording starts before the readiness cue, queued cue-time audio is discarded,
+and finish/cancel cues follow recorder release. Permission failure emits no success cue.
+Sound follows notification volume, silent/DND policy and the explicit synchronized preference;
+short haptics remain available. Old capture completion cannot publish after replacement.
+
+Six owned-Wear capture/codec tests pass. Replacement regression first failed with the guard
+removed, then passed with it restored. Strict check/lint/build passes with warnings as errors;
+physical cue audibility, tone contamination and speech quality remain owner observation gates.
+The watch scroll/control update was installed with matching certificates and preserve-data
+hash checks: 19 identities and 18 portrait files unchanged, scrolling stable, Server settings
+reachable, original timeout restored. Private backups/receipts are in `.local/client-usability/`.
+
+Phone client integration uses a new encrypted phone identity namespace and foreground-only
+DirectConnection. Two isolated stock TLS server/vault tests pass: explicit Connect pairing,
+separate identities/replies/drafts, authenticated reconnect, text, PCM capture, and shutdown
+without changing the relay setting. It does not auto-enroll live profiles. Final UI/storage
+regressions, actual phone voice observation and bounded GIF work remain in progress.
+
+
+Phone organization and original QuantumInk Relay branding are committed. The directory
+migration/reorder/empty-box/restart/override tests and prior repository tests pass: 13/13
+owned-phone tests. An observed dormant-manual/discovered-picture URL collision was fixed by
+keeping keyed picture records URL-free; encryption and artwork remain unchanged. Stock phone
+acceptance reran successfully with a fresh audio-upload response. The shared-audio watch
+carousel interaction scenario passed in 13.874 seconds. [Setup instructions](profile-setup.md)
+now cover independent phone pairing and foreground Talk/Chat. Physical phone STT/voice,
+full UI acceptance and animated-picture checks remain separate gates.
+
+
+## Approved native appearance checkpoint — 2026-10-12
+
+The maintainer approved Portrait Studio, original Voice Q, three independent appearances,
+the watch picker without Previous/Next and one/four-profile tiles. Shared tokens, durable
+appearance preferences, native phone/Wear adapters and original icon assets are committed
+(c3381bd). Strict full check/lint/build passes with warnings as errors: 107 JVM tests and
+11 owned-emulator appearance checks pass. Actual Light Scaffold/time/system-bar contrast
+regressions were reproduced before correction. Task-scoped review is running; complete
+native phone/watch layouts and tiles are subsequent tasks, not current physical evidence.
+
+Authorized physical phone enrollment paired eighteen profiles through normal reviewed
+stock approvals: twelve M5 Max, four GPU 5090 and two Win 11 ARM. All three default
+profiles returned fresh typed markers; the other fifteen had enrollment-only checks.
+GPU enrollment passed after the owner woke the box. Existing identity/art/preference hashes are unchanged; catalog pages refreshed and new
+independent phone identities were added. Original five-minute timeout is restored. Real
+phone speech/voice remains owner observation; prior watch speech is not substituted.
+The owner sees phone transcripts/tools/replies but expects ElevenLabs voice; a read-only
+audio probe found speaker media volume 0/15. Owner asked to raise media volume and retry.
+Real capture/playback waveforms with bounded levels, lifecycle guards, reduced-motion
+fallback and a muted-media hint are added to the approved Task 3 presentation work.
+
+Demo note: owned native theme chooser screenshots and actual contrast/persistence checks
+pass. Physical devices retain the previous preserving debug build; no server extension,
+power helper, release signature, merge or Play publication was performed.
+
+
+Native directory checkpoint — 2026-10-12: Task 1 review findings are resolved in838351c,
+with14 affected native tests, strict affected checks and debug-only host release exclusion.
+Scoped re-review is clean. Task 2 portrait rows, box groups, accessible options and native
+brand/navigation are committed0696683. Nineteen native and13 mobile JVM checks pass; the
+final directory rerun passes11 cases. Actual320dp/font1.8 native menu/details/vertical
+reachability checks pass with system settings restored. Scoped review is running; physical
+devices retain their prior debug build and later native conversation/watch/tile tasks remain.
+
+
+Native phone conversation checkpoint — 2026-10-12: f8de6c3 implements compact profile
+toolbar, connection details, reading/composer/voice controls, actual capture/playback
+waveforms, muted-media hint and grouped relay/settings/setup. Strict mobile checks
+pass; 13 JVM, five actual stock TLS/playback, five presentation, eight directory and
+seven appearance cases pass. Actual320dp/font1.8 all-theme keyboard/Send checks pass
+with settings restored. Scoped review is running. Owner confirms prior installed phone
+voice works after raising media volume; no server TTS/provider change was made.
+
+The supplied eighteen watch-256 GIFs are validated and matched to their profiles:
+256x256, eight frames, six seconds, transparent corners and maximum47,528 bytes. Native
+picker import/delivery is in progress; personal files/receipts stay ignored and originals
+unchanged. No redesigned physical installation or final GIF acceptance is claimed yet.
+
+
+Native watch picker checkpoint — 2026-10-12: Tasks 1–3 have clean scoped reviews.
+Task 4 removes visual Previous/Next controls and adds the stable-key picker and bounded
+page indicator. Review found a catalog-shrink crash; a failing native regression reproduced
+it before correction in 3a75fd5. All three affected native tests and strict Wear checks pass,
+including actual rotary input after dismissal. Scoped re-review is clean. Tile implementation,
+final whole-branch review and preserving physical native delivery remain in progress.
+
+
+Personal GIF verification — 2026-10-12: the maintainer completed the normal phone
+picture assignments. All eighteen saved GIFs match every decoded source frame, and
+the watch animation index associates each correct hash with its stable profile key.
+The selected watch portrait shows visible motion; nearby artwork is fetched in bounded
+groups of three. Existing identity/configuration bytes are preserved, temporary picker
+copies removed, and both original screen timeouts restored. Personal art and captures
+remain ignored. This verifies the prior installed build; native redesign delivery and
+quantitative GIF battery measurements remain separate gates.
+
+
+Profile tile checkpoint — 2026-10-12: eadcf42 adds bounded durable CAS pins, static
+Focus/four-profile providers, local pin editing and stable-key cold/warm launch routing.
+Six affected JVM and eighteen distinct native checks pass, including real activity/service
+launches and recording/approval/busy deferral. Review found an unavailable-route ambient
+regression; d44e968 fixes it with actual Light/Dark sleep/wake output coverage. Strict
+Wear checks and scoped re-review pass. Phone pin configuration/synchronization and final
+whole-branch review/delivery are next. Physical tile addition, taps and battery remain open.
+
+
+Safe dog-walk checkpoint — 2026-10-12: all eighteen owner GIF assignments and stable
+watch profile mappings are verified, selected-watch motion is visible, and both original
+screen timeouts are restored. No physical operation or child task remains running.
+Physical devices retain b724231, so walk observations exercise the existing GIF/relay
+build; redesigned layouts and tiles await delivery.
+
+Task 6 native phone tile configuration/sync is implemented at 5aa0d3b, with twenty-two
+affected JVM tests, five native cases and strict affected checks passing. Scoped review
+requires a fix for stale watch editor fields overwriting accepted phone edits. Resume
+the original implementer for fix round 1 and a fresh scoped re-review before Task 7.
+Actual associated Data Layer delivery remains open after the owned-emulator API_UNAVAILABLE
+probe. No final native physical, battery or release acceptance is claimed.

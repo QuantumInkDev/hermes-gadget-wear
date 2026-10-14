@@ -48,6 +48,12 @@ android {
     buildFeatures {
         compose = true
     }
+    sourceSets.getByName(
+        "androidTest"
+    ).assets.directories.add(rootProject.file("protocol/src/test/resources/gif").path)
+    sourceSets.getByName(
+        "test"
+    ).resources.directories.add(rootProject.file("protocol/src/test/resources").path)
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -61,6 +67,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":client"))
     implementation(project(":protocol"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
@@ -78,4 +85,5 @@ dependencies {
     testImplementation(libs.okhttp.tls)
     androidTestImplementation(libs.android.test.runner)
     androidTestImplementation(libs.android.test.junit)
+    androidTestImplementation(libs.okhttp.tls)
 }

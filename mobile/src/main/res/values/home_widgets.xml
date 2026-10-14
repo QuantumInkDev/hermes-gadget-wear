@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="HomeWidgetTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:colorBackground">#EDF0F8</item><item name="android:textColorPrimary">#1D263D</item>
+        <item name="android:colorAccent">#345FC8</item>
+    </style>
+</resources>

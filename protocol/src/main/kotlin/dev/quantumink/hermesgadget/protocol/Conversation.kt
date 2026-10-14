@@ -66,6 +66,7 @@ sealed interface ConversationEffect {
     data class SendBinary(val frame: BinaryFrame) : ConversationEffect
     data class CaptureStart(val token: String, val format: String = "pcm16") : ConversationEffect
     data object CaptureStop : ConversationEffect
+    data class RecordingOutcome(val token: String, val finished: Boolean) : ConversationEffect
     data class PlaybackStart(val rate: Int, val opusHeader: ByteArray? = null) : ConversationEffect
     class PlaybackData(bytes: ByteArray) : ConversationEffect {
         val bytes = bytes.copyOf()
@@ -149,6 +150,7 @@ class Conversation(
     }
 
     fun disconnected(): List<ConversationEffect> {
+        val recording = upload?.token
         paired = false
         turn = null
         upload = null
@@ -164,7 +166,8 @@ class Conversation(
             picture = null,
             level = 0f
         )
-        return listOf(ConversationEffect.CaptureStop, ConversationEffect.PlaybackStop)
+        return listOf(ConversationEffect.CaptureStop, ConversationEffect.PlaybackStop) +
+            recording?.let { listOf(ConversationEffect.RecordingOutcome(it, false)) }.orEmpty()
     }
 
     fun receive(message: Message, now: Long): List<ConversationEffect> {
@@ -502,6 +505,7 @@ class Conversation(
                     input.bytes / 32
                 )
             },
+            ConversationEffect.RecordingOutcome(input.token, true),
             ConversationEffect.Haptic.LISTEN_END
         )
     }
@@ -659,7 +663,8 @@ class Conversation(
                 put("id", input.token)
                 put("stream", input.stream)
                 put("reason", reason)
-            }
+            },
+            ConversationEffect.RecordingOutcome(input.token, false)
         )
     }
 

@@ -1,0 +1,83 @@
+{
+  "original": true,
+  "personal_art": false,
+  "generator": "tools/carousel_fixtures.py",
+  "base_preserved_by_registration": true,
+  "files": [
+    {
+      "path": "box-1/base.png",
+      "sha256": "fd21ee83decfec43718eee52a8626fde3c4cfcb86d9e46eabc871f85c881b39d",
+      "bytes": 26360
+    },
+    {
+      "path": "box-1/companion-input.png",
+      "sha256": "2a6f77e8fe591db80b33e8a1a376095c4a5b67ed1fa61ab4f57e56158d34ef6f",
+      "bytes": 7288
+    },
+    {
+      "path": "box-1/companion.png",
+      "sha256": "71dd8c8a161283139648f7625bd14846e0cb6b738241fc7f43f09d0a861fadee",
+      "bytes": 7261
+    },
+    {
+      "path": "box-1/pet.json",
+      "sha256": "3442760a736e521df4d0313f17f5043428f182f10c3666959bb47489636d86ba",
+      "bytes": 341
+    },
+    {
+      "path": "box-1/portrait.png",
+      "sha256": "05831809b7ec340f6292836e6a09456640ef36b79ef75f2dd09b261ea1db1529",
+      "bytes": 927
+    },
+    {
+      "path": "box-2/base.png",
+      "sha256": "ce106b82ac8348632334f46ad0d47edc2cd90d3e66de8c38e559d9adb5da44f7",
+      "bytes": 26404
+    },
+    {
+      "path": "box-2/companion-input.png",
+      "sha256": "c33b14e827eceb7849ca0cdff1fc807c7f193d342a5edd475bd75ff322a400ff",
+      "bytes": 7302
+    },
+    {
+      "path": "box-2/companion.png",
+      "sha256": "7ae96ef053aa11f7d5f69a2f9fb8a0f00a714bd6376d886364e21de3eac575c8",
+      "bytes": 7275
+    },
+    {
+      "path": "box-2/pet.json",
+      "sha256": "3442760a736e521df4d0313f17f5043428f182f10c3666959bb47489636d86ba",
+      "bytes": 341
+    },
+    {
+      "path": "box-2/portrait.png",
+      "sha256": "ad68c5b372d8b626443b92759a89d3c3bce0f444a09b92ae533c2c65a42314b8",
+      "bytes": 928
+    },
+    {
+      "path": "box-3/base.png",
+      "sha256": "0116af1400825765ae57bc28ac30620980c5c29a50834201013bb5eeeb7f0ae6",
+      "bytes": 26522
+    },
+    {
+      "path": "box-3/companion-input.png",
+      "sha256": "4ad86f49e7ff4b780a4398efa3ef38513820688fd06c28336e537f00e0d16274",
+      "bytes": 7325
+    },
+    {
+      "path": "box-3/companion.png",
+      "sha256": "971408ff7973add72a132d1d7132b7f0594720441e9f362b84469ee7438b12d2",
+      "bytes": 7298
+    },
+    {
+      "path": "box-3/pet.json",
+      "sha256": "3442760a736e521df4d0313f17f5043428f182f10c3666959bb47489636d86ba",
+      "bytes": 341
+    },
+    {
+      "path": "box-3/portrait.png",
+      "sha256": "039644bacc5030a06a999417a4bc589200777b2e119bcff2a1dab3d36af26c67",
+      "bytes": 928
+    }
+  ]
+}

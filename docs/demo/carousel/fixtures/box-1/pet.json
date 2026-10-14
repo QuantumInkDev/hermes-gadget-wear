@@ -1,0 +1,22 @@
+{
+  "gadgetSheet": {
+    "spritesheetPath": "companion.png",
+    "rows": [
+      {
+        "name": "listening",
+        "index": 0,
+        "frames": 6
+      },
+      {
+        "name": "talking",
+        "index": 1,
+        "frames": 3
+      },
+      {
+        "name": "sleeping",
+        "index": 2,
+        "frames": 6
+      }
+    ]
+  }
+}

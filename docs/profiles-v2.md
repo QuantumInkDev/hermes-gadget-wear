@@ -3,17 +3,25 @@
 ## Shipping v1 setup
 
 Each profile uses its stock Gadget adapter URL/port, profile home, store and voice settings.
-The watch holds at most eight encrypted endpoint records with separate random device keys.
+The watch holds at most 32 encrypted endpoint records with separate random device keys.
 Switching stops capture/playback/client speech and the prior transport; prompts, reply and
-draft are cleared and the new profile authenticates independently. Its pet cache is scoped
+visible draft are replaced by the new profile's memory-only draft and it authenticates independently. Its pet cache is scoped
 by URL/hash. Shared or per-profile phone voice remains tied to that exact canonical URL.
 Removing watch setup retains that URL's identity until explicit Reset, avoiding an
 unannounced key rotation when re-adding. Revoke enrollment on the host separately.
 
-On the watch, swipe horizontally from a conversation without an approval/recording to open
-Profiles, or use its button. Scroll/rotary through names, select a profile, or Add profile.
+On the watch, swipe horizontally between stable profile pages, or use Previous/Next.
+Vertical/rotary scrolling stays inside the selected page. Recording or a live approval
+blocks switching. The Profiles button still opens explicit setup/import/removal controls.
 Settings edits the active profile. Changing a URL adds a distinct profile; remove the old
-record explicitly. Unsaved drafts are discarded on switching, and no input is replayed.
+record explicitly. Unsent drafts are retained per endpoint in bounded service memory and
+restored on return, without replay; process death clears them.
+
+The approved optional [multi-source catalog](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md)
+adds phone discovery and portraits using independent HTTPS catalog and WSS Gadget URLs.
+New or changed conversation URLs require watch setup review and pairing. Missing endpoints
+show setup-needed cards. Live server publication and actual catalog Data Layer acceptance
+remain review/hardware gates.
 
 The phone's Hermes profiles page saves encrypted URLs, names, access tokens and transport
 policy. Save and send publishes setup to the same-package/same-signature paired watch.
