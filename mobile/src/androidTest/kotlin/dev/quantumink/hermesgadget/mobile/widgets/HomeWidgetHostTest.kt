@@ -32,6 +32,134 @@ import org.junit.Test
 
 /** Actual platform host inflation, with its external launcher padding excluded explicitly. */
 class HomeWidgetHostTest {
+    @Test fun existingHostsReinflateForSystemNightWhileExplicitPalettesStayFixed() {
+        assertTrue(android.os.Build.MODEL.startsWith("sdk_"))
+        val modes = context.getSystemService(android.app.UiModeManager::class.java)
+        val original = modes.nightMode
+        val appearance = dev.quantumink.hermesgadget.client.AppearancePreferences(
+            context
+        ).mode.value
+        val host = WidgetHostFixture(context)
+        val directory = File(context.cacheDir, "widget-night-${UUID.randomUUID()}")
+        val views = mutableMapOf<WidgetAppearance, AppWidgetHostView>()
+        val published = mutableMapOf<WidgetAppearance, RemoteViews>()
+        val observed = mutableMapOf<WidgetAppearance, MutableList<List<Int>>>()
+        val automation = instrumentation.uiAutomation
+        automation.adoptShellPermissionIdentity("android.permission.MODIFY_DAY_NIGHT_MODE")
+        fun night(value: Int) {
+            automation.adoptShellPermissionIdentity("android.permission.MODIFY_DAY_NIGHT_MODE")
+            modes.setNightMode(value)
+            val expected = if (value == android.app.UiModeManager.MODE_NIGHT_YES) {
+                Configuration.UI_MODE_NIGHT_YES
+            } else {
+                Configuration.UI_MODE_NIGHT_NO
+            }
+            val deadline = android.os.SystemClock.uptimeMillis() + 5000
+            while (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK !=
+                expected &&
+                android.os.SystemClock.uptimeMillis() < deadline
+            ) {
+                android.os.SystemClock.sleep(40)
+            }
+            assertEquals(
+                expected,
+                context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+            )
+        }
+        fun background(view: View): Int {
+            val image = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888)
+            val drawable = view.findViewById<View>(android.R.id.background).background
+            drawable.setBounds(0, 0, 32, 32)
+            drawable.draw(Canvas(image))
+            return image.getPixel(16, 16).also { image.recycle() }
+        }
+        try {
+            night(android.app.UiModeManager.MODE_NIGHT_NO)
+            val profiles =
+                listOf(
+                    WidgetProfile("studio:orbit", "Orbit", "Studio", CatalogStatus.OFFLINE, null)
+                )
+            instrumentation.runOnMainSync {
+                WidgetAppearance.entries.forEach { mode ->
+                    val id = host.bind(HomeWidgetPreset.FOCUS)
+                    val remote = HomeWidgetRenderer.render(
+                        context,
+                        id,
+                        WidgetConfig(HomeWidgetPreset.FOCUS, listOf("studio:orbit"), mode),
+                        profiles,
+                        HomeWidgetPictures(directory),
+                        57f,
+                        102f
+                    )
+                    published[mode] = remote
+                    views[mode] = hosted(
+                        host,
+                        id,
+                        context,
+                        remote,
+                        57,
+                        102
+                    )
+                }
+            }
+            listOf(
+                android.app.UiModeManager.MODE_NIGHT_NO,
+                android.app.UiModeManager.MODE_NIGHT_YES
+            ).forEach { mode ->
+                night(mode)
+                instrumentation.runOnMainSync {
+                    views.forEach { (appearance, view) ->
+                        val before = view.findViewById<TextView>(R.id.home_widget_name)
+                        // Retain this host and its published RemoteViews across the actual OS change.
+                        // Drop the old content before reapplying, as a host configuration rebuild does.
+                        view.updateAppWidget(null)
+                        view.updateAppWidget(requireNotNull(published[appearance]))
+                        val caption = view.findViewById<TextView>(R.id.home_widget_name)
+                        assertTrue("Host must actually reinflate", caption !== before)
+                        assertEquals(
+                            mode == android.app.UiModeManager.MODE_NIGHT_YES,
+                            caption.resources.configuration.uiMode and
+                                Configuration.UI_MODE_NIGHT_MASK ==
+                                Configuration.UI_MODE_NIGHT_YES
+                        )
+                        observed.getOrPut(appearance) { mutableListOf() } +=
+                            listOf(
+                                background(view),
+                                caption.currentTextColor,
+                                view.findViewById<TextView>(
+                                    R.id.home_widget_initials
+                                ).currentTextColor
+                            )
+                    }
+                }
+            }
+            val system = requireNotNull(observed[WidgetAppearance.SYSTEM])
+            (0..2).forEach {
+                assertTrue(
+                    "System surface/text/accent must change",
+                    system[0][it] != system[1][it]
+                )
+            }
+            listOf(
+                WidgetAppearance.LIGHT,
+                WidgetAppearance.DARK,
+                WidgetAppearance.MOONLIGHT
+            ).forEach {
+                assertEquals(observed[it]?.get(0), observed[it]?.get(1))
+            }
+            assertEquals(
+                appearance,
+                dev.quantumink.hermesgadget.client.AppearancePreferences(context).mode.value
+            )
+        } finally {
+            automation.adoptShellPermissionIdentity("android.permission.MODIFY_DAY_NIGHT_MODE")
+            modes.setNightMode(original)
+            automation.dropShellPermissionIdentity()
+            host.close()
+            directory.deleteRecursively()
+        }
+    }
+
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
     private val sizes = listOf(

@@ -16,6 +16,24 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HomeWidgetStoreTest {
+    @Test fun occupiedTerminalPreservesTheWholeRestoreChainAndIndependentMoves() {
+        val root = directory()
+        try {
+            val store = HomeWidgetStore(root)
+            (1..4).forEach { id ->
+                store.save(id, WidgetConfig(HomeWidgetPreset.FOCUS, listOf("a:bot$id")), 0)
+            }
+            store.restore(intArrayOf(1, 2, 4), intArrayOf(2, 3, 5), HomeWidgetPreset.FOCUS)
+            assertEquals("a:bot1", store.config(1)?.slots?.single())
+            assertEquals("a:bot2", store.config(2)?.slots?.single())
+            assertEquals("a:bot3", store.config(3)?.slots?.single())
+            assertEquals("a:bot4", store.config(5)?.slots?.single())
+            assertNull(store.config(4))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     @Test fun restoreMapsOverlappingOldAndNewIdsFromTheOriginalSnapshot() {
         val root = directory()
         try {

@@ -43,11 +43,21 @@ class HomeWidgetStore(private val directory: File) {
         require((oldIds + newIds).all { it > 0 })
         require(oldIds.distinct().size == oldIds.size && newIds.distinct().size == newIds.size)
         val before = configs()
-        val moves = oldIds.zip(newIds).filter { (old, new) ->
+        var moves = oldIds.zip(newIds).filter { (old, new) ->
             before[old]?.preset == preset && (
                 new !in before ||
                     (new in oldIds && before[new]?.preset == preset)
                 )
+        }
+        // Removing a blocked terminal move can make earlier overlapping moves unsafe too.
+        // Prune to a fixed point before assigning anything from the original snapshot.
+        while (true) {
+            val relocated = moves.map { it.first }.toSet()
+            val safe = moves.filter { (old, new) ->
+                old == new || new !in before || new in relocated
+            }
+            if (safe.size == moves.size) break
+            moves = safe
         }
         val after = before.toMutableMap()
         moves.forEach { (old, new) ->

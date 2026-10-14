@@ -7,14 +7,19 @@ import dev.quantumink.hermesgadget.mobile.CatalogRepository
 import dev.quantumink.hermesgadget.mobile.CatalogVault
 import dev.quantumink.hermesgadget.mobile.MainActivity
 import dev.quantumink.hermesgadget.mobile.PhoneConversation
+import dev.quantumink.hermesgadget.mobile.PhoneConversationState
 import dev.quantumink.hermesgadget.mobile.ProfileVault
 import dev.quantumink.hermesgadget.mobile.RelaySettings
 import dev.quantumink.hermesgadget.protocol.CatalogPage
 import dev.quantumink.hermesgadget.protocol.CatalogProfile
 import dev.quantumink.hermesgadget.protocol.CatalogSource
 import dev.quantumink.hermesgadget.protocol.CatalogStatus
+import dev.quantumink.hermesgadget.protocol.ConnectionStatus
+import dev.quantumink.hermesgadget.protocol.ConversationMode
+import dev.quantumink.hermesgadget.protocol.Prompt
 import java.io.File
 import java.security.MessageDigest
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
@@ -25,6 +30,28 @@ class HomeWidgetLaunchTest {
     private val context get() = instrumentation.targetContext
     private fun phone(activity: MainActivity) =
         ViewModelProvider(activity)[PhoneConversation::class.java]
+
+    @Suppress("UNCHECKED_CAST")
+    private fun state(activity: MainActivity): MutableStateFlow<PhoneConversationState> =
+        PhoneConversation::class.java.getDeclaredField("mutable").apply {
+            isAccessible = true
+        }.get(phone(activity)) as MutableStateFlow<PhoneConversationState>
+    private fun waitUntil(condition: () -> Boolean) {
+        val until = SystemClock.uptimeMillis() + 5000
+        while (!condition() && SystemClock.uptimeMillis() < until) SystemClock.sleep(30)
+        assertTrue(condition())
+    }
+    private fun pending(activity: MainActivity): WidgetLaunchRequest? =
+        MainActivity::class.java.getDeclaredMethod("getPendingWidget").apply {
+            isAccessible = true
+        }.invoke(activity) as WidgetLaunchRequest?
+    private fun openEnabled(): Boolean? {
+        var node = WidgetUi.find("Open requested bot") ?: return null
+        while (!node.isClickable) {
+            node = node.parent ?: error("Pending action has no accessible target")
+        }
+        return node.isEnabled
+    }
     private fun awaitKey(activity: MainActivity, key: String) {
         val until = SystemClock.uptimeMillis() + 5000
         while (phone(activity).state.value.page?.key != key &&
@@ -74,7 +101,13 @@ class HomeWidgetLaunchTest {
                     CatalogStatus.OFFLINE,
                     1
                 )
-            }
+            } + CatalogPage(
+                "lab",
+                "Lab",
+                CatalogProfile("nova", "Nova", "wss://lab.example.invalid/nova", null),
+                CatalogStatus.OFFLINE,
+                1
+            )
         )
         CatalogRepository.get(context).savedPages()
         val host = WidgetHostFixture(context)
@@ -82,7 +115,10 @@ class HomeWidgetLaunchTest {
         val store = HomeWidgets.store(context)
         val config = store.save(
             id,
-            WidgetConfig(HomeWidgetPreset.FOUR, listOf("studio:orbit", "lab:orbit", null, null)),
+            WidgetConfig(
+                HomeWidgetPreset.FOUR,
+                listOf("studio:orbit", "lab:orbit", "lab:nova", null)
+            ),
             0
         )
         var activity: MainActivity? = null
@@ -111,6 +147,86 @@ class HomeWidgetLaunchTest {
             SystemClock.sleep(500)
             instrumentation.waitForIdleSync()
             assertEquals(version, phone(activity).state.value.sessionVersion)
+            val nova = HomeWidgets.profilePendingIntent(context, id, 2, "lab:nova", config.revision)
+            val baseline = phone(activity).state.value
+            val prompt =
+                Prompt("synthetic-approval", "Synthetic approval", "Keep this prompt", 0, null)
+            val locked = listOf(
+                baseline.copy(sending = true),
+                baseline.copy(speaking = true),
+                baseline.copy(
+                    connection = baseline.connection.copy(status = ConnectionStatus.PAIRING)
+                ),
+                baseline.copy(
+                    connection = baseline.connection.copy(
+                        conversation = baseline.connection.conversation.copy(busy = true)
+                    )
+                ),
+                baseline.copy(
+                    connection = baseline.connection.copy(
+                        conversation = baseline.connection.conversation.copy(
+                            mode = ConversationMode.LISTENING
+                        )
+                    )
+                ),
+                baseline.copy(
+                    connection = baseline.connection.copy(
+                        conversation = baseline.connection.conversation.copy(
+                            mode = ConversationMode.THINKING
+                        )
+                    )
+                ),
+                baseline.copy(
+                    connection = baseline.connection.copy(
+                        conversation = baseline.connection.conversation.copy(prompt = prompt)
+                    )
+                )
+            )
+            locked.forEach { turn ->
+                // Inject only the observable controller boundary; no socket/mic or identity side effect.
+                // Actual phone capture/playback is covered by the separate stock TLS fixture.
+                instrumentation.runOnMainSync { state(activity).value = turn }
+                lab.send()
+                WidgetUi.await("Bot switch pending")
+                assertEquals(turn.sessionVersion, phone(activity).state.value.sessionVersion)
+                assertEquals(
+                    turn.connection.conversation.prompt,
+                    phone(activity).state.value.connection.conversation.prompt
+                )
+                assertEquals("studio:orbit", phone(activity).state.value.page?.key)
+                assertEquals(false, openEnabled())
+                instrumentation.runOnMainSync { state(activity).value = baseline }
+                waitUntil { openEnabled() == true }
+                SystemClock.sleep(150)
+                assertEquals("studio:orbit", phone(activity).state.value.page?.key)
+                WidgetUi.click("Open requested bot")
+                awaitKey(activity, "lab:orbit")
+                studio.send()
+                awaitKey(activity, "studio:orbit")
+                assertEquals("Keep Studio draft", phone(activity).state.value.draft)
+            }
+            val idle = phone(activity).state.value
+            instrumentation.runOnMainSync { state(activity).value = idle.copy(speaking = true) }
+            lab.send()
+            waitUntil { pending(activity)?.key == "lab:orbit" }
+            nova.send()
+            waitUntil { pending(activity)?.key == "lab:nova" }
+            instrumentation.runOnMainSync { state(activity).value = idle }
+            waitUntil { openEnabled() == true }
+            WidgetUi.click("Open requested bot")
+            awaitKey(activity, "lab:nova")
+            studio.send()
+            awaitKey(activity, "studio:orbit")
+            val beforeDismiss = phone(activity).state.value
+            instrumentation.runOnMainSync {
+                state(activity).value = beforeDismiss.copy(speaking = true)
+            }
+            lab.send()
+            WidgetUi.await("Bot switch pending")
+            WidgetUi.click("Dismiss")
+            instrumentation.runOnMainSync { state(activity).value = beforeDismiss }
+            waitUntil { pending(activity) == null }
+            assertEquals("studio:orbit", phone(activity).state.value.page?.key)
             val changed = vault.pages().map { page ->
                 if (page.key !=
                     "studio:orbit"
