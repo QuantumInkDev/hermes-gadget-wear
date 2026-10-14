@@ -1,6 +1,7 @@
 package dev.quantumink.hermesgadget.mobile
 
 import android.app.Application
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import dev.quantumink.hermesgadget.client.Cue
 import dev.quantumink.hermesgadget.client.PcmCapture
@@ -35,6 +36,7 @@ data class PhoneConversationState(
     val sending: Boolean = false,
     val speaking: Boolean = false,
     val playbackLevel: Float = 0f,
+    val recordingStartedAt: Long? = null,
     val mediaMuted: Boolean = false,
     val visible: Boolean = false,
     val error: String = ""
@@ -72,6 +74,7 @@ class PhoneConversation @JvmOverloads constructor(
     private var capture: PcmCapture? = null
     private var playback: PcmPlayback? = null
     private var recordingFeedback: RecordingFeedback? = null
+    private var recordingToken: String? = null
     private val cues = RecordingCues(application)
 
     @Synchronized fun open(
@@ -145,6 +148,8 @@ class PhoneConversation @JvmOverloads constructor(
                     val socket = connection ?: return@synchronized
                     when (effect) {
                         is ConversationEffect.CaptureStart -> {
+                            recordingToken = effect.token
+                            mutable.update { it.copy(recordingStartedAt = null) }
                             feedback.begin(effect.token)
                             microphone.start(
                                 onFrame = { bytes ->
@@ -167,12 +172,27 @@ class PhoneConversation @JvmOverloads constructor(
                                 },
                                 onStarted = {
                                     synchronized(this@PhoneConversation) {
-                                        if (active(version)) cues.play(Cue.START)
+                                        if (active(version) && recordingToken == effect.token) {
+                                            mutable.update {
+                                                it.copy(
+                                                    recordingStartedAt = SystemClock.uptimeMillis()
+                                                )
+                                            }
+                                            cues.play(Cue.START)
+                                        }
                                     }
                                 },
                                 onStopped = {
                                     synchronized(this@PhoneConversation) {
-                                        if (active(version)) feedback.stopped(effect.token)
+                                        if (active(version)) {
+                                            if (recordingToken == effect.token) {
+                                                recordingToken = null
+                                                mutable.update {
+                                                    it.copy(recordingStartedAt = null)
+                                                }
+                                            }
+                                            feedback.stopped(effect.token)
+                                        }
                                     }
                                 },
                                 onFinished = {
@@ -184,7 +204,11 @@ class PhoneConversation @JvmOverloads constructor(
                         }
                         is ConversationEffect.RecordingOutcome ->
                             feedback.outcome(effect.token, effect.finished)
-                        ConversationEffect.CaptureStop -> microphone.stop()
+                        ConversationEffect.CaptureStop -> {
+                            recordingToken = null
+                            mutable.update { it.copy(recordingStartedAt = null) }
+                            microphone.stop()
+                        }
                         is ConversationEffect.PlaybackStart -> {
                             playback?.stop()
                             val stream = ++playbackVersion
@@ -320,10 +344,14 @@ class PhoneConversation @JvmOverloads constructor(
     }
 
     @Synchronized fun finishRecording() {
+        recordingToken = null
+        mutable.update { it.copy(recordingStartedAt = null) }
         if (mutable.value.visible && capture?.finish() != true) connection?.finishRecording()
     }
 
     @Synchronized fun cancelRecording() {
+        recordingToken = null
+        mutable.update { it.copy(recordingStartedAt = null) }
         capture?.stop()
         connection?.cancelRecording()
     }
@@ -346,6 +374,7 @@ class PhoneConversation @JvmOverloads constructor(
 
     @Synchronized fun hide() {
         ++epoch // Invalidate observers before stopping adapters or closing the socket.
+        recordingToken = null
         recordingFeedback?.invalidate()
         recordingFeedback = null
         capture?.stop()
@@ -362,6 +391,7 @@ class PhoneConversation @JvmOverloads constructor(
             sending = false,
             speaking = false,
             playbackLevel = 0f,
+            recordingStartedAt = null,
             connection = ConnectionState(conversation = ConversationState(reply = reply))
         )
     }

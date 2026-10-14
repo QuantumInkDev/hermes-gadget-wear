@@ -7,6 +7,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
@@ -14,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
 /** A live amplitude envelope, never a recording or fabricated moving signal. */
 @Composable
@@ -21,7 +28,20 @@ internal fun AudioWaveform(level: Float, label: String, modifier: Modifier = Mod
     val context = LocalContext.current
     val static = !ValueAnimator.areAnimatorsEnabled() ||
         context.getSystemService(PowerManager::class.java).isPowerSaveMode
-    val bounded = if (level.isFinite()) level.coerceIn(0f, 1f) else 0f
+    val currentLevel by rememberUpdatedState(level)
+    val history = remember(label) { AudioLevelHistory(24) }
+    var levels by remember(label) { mutableStateOf(emptyList<Float>()) }
+    LaunchedEffect(label, static) {
+        history.clear()
+        levels = emptyList()
+        if (!static) {
+            while (true) {
+                history.add(currentLevel)
+                levels = history.snapshot()
+                delay(50)
+            }
+        }
+    }
     val color = MaterialTheme.colorScheme.primary
     val quiet = MaterialTheme.colorScheme.outline
     Canvas(
@@ -40,11 +60,11 @@ internal fun AudioWaveform(level: Float, label: String, modifier: Modifier = Mod
                 StrokeCap.Round
             )
         } else {
-            val count = 31
+            val count = 24
             repeat(count) { index ->
                 val x = (index + .5f) * size.width / count
-                val envelope = 1f - kotlin.math.abs(index - count / 2f) / count
-                val height = (size.height * bounded * envelope).coerceAtLeast(2.dp.toPx())
+                val sample = levels.getOrNull(index - (count - levels.size)) ?: 0f
+                val height = (size.height * sample).coerceAtLeast(2.dp.toPx())
                 drawLine(
                     color,
                     Offset(x, center - height / 2),

@@ -1,37 +1,39 @@
 package dev.quantumink.hermesgadget.mobile
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import android.os.SystemClock
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.disabled
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
 import dev.quantumink.hermesgadget.protocol.ConversationMode
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun ConversationControls(
@@ -49,17 +51,24 @@ internal fun ConversationControls(
     val conversation = state.connection.conversation
     val listening = conversation.mode == ConversationMode.LISTENING
     val paired = state.connection.status == ConnectionStatus.PAIRED
-    val ready = paired && !state.sending && (!conversation.busy || listening)
-    val start by rememberUpdatedState(record)
-    val finish by rememberUpdatedState(finishRecording)
-    val cancel by rememberUpdatedState(cancelRecording)
-    Column(modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (state.speaking || listening) {
-            AudioWaveform(
-                if (listening) conversation.level else state.playbackLevel,
-                if (listening) "Microphone" else "Response"
-            )
+    val ready = state.visible && paired && !state.sending && (!conversation.busy || listening)
+    val owner = state.sessionVersion to state.profile?.endpoint?.url
+    val distance = with(LocalDensity.current) { 64.dp.toPx() }
+    val gesture = remember(owner, distance) { VoiceMessageGesture(distance) }
+    var holding by remember(owner) { mutableStateOf(false) }
+    val recording = holding || listening
+    var now by remember { mutableLongStateOf(SystemClock.uptimeMillis()) }
+    LaunchedEffect(recording, state.recordingStartedAt) {
+        while (recording) {
+            now = SystemClock.uptimeMillis()
+            delay(200)
         }
+    }
+    Column(
+        modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        if (state.speaking && !recording) AudioWaveform(state.playbackLevel, "Response")
         if (state.mediaMuted) {
             Text(
                 "Media volume is muted. Use your volume buttons to hear replies.",
@@ -67,108 +76,101 @@ internal fun ConversationControls(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        OutlinedTextField(
-            state.draft,
-            draft,
-            label = { Text("Message") },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !listening,
-            minLines = 1,
-            maxLines = 4,
-            shape = RoundedCornerShape(20.dp)
-        )
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        if (!recording && (state.speaking || conversation.busy)) {
             if (state.speaking) {
-                TextButton(stopVoice, Modifier.weight(1f)) { Text("Stop voice") }
-            } else if (listening) {
-                TextButton(cancelRecording, Modifier.weight(1f)) { Text("Cancel recording") }
-            } else if (conversation.busy) {
-                TextButton(cancelTurn, Modifier.weight(1f), enabled = paired) {
-                    Text("Cancel turn")
-                }
+                TextButton(stopVoice) { Text("Stop voice") }
             } else {
-                Spacer(Modifier.weight(1f))
-            }
-            Button(
-                send,
-                modifier = Modifier.weight(1f).semantics { contentDescription = "Send message" },
-                enabled =
-                paired && !conversation.busy && !state.sending && state.draft.isNotBlank()
-            ) {
-                Text(if (state.sending) "Sending…" else "Send")
+                TextButton(cancelTurn, enabled = paired) { Text("Cancel turn") }
             }
         }
-        if (!keyboardVisible || listening) {
-            Box(
-                Modifier.fillMaxWidth().heightIn(min = 64.dp)
-                    .background(
-                        if (ready) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainer
-                        },
-                        RoundedCornerShape(24.dp)
-                    )
-                    .semantics {
-                        role = Role.Button
-                        if (!ready) disabled()
-                        onClick(if (listening) "Finish recording" else "Start recording") {
-                            if (ready) {
-                                if (listening) finish() else start()
-                                true
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            if (recording) {
+                Row(
+                    Modifier.weight(1f).heightIn(min = 56.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    IconButton({
+                        if (gesture.cancel() != null) cancelRecording()
+                        holding = false
+                    }) {
+                        Icon(painterResource(R.drawable.ic_voice_cancel), "Cancel recording")
+                    }
+                    Column {
+                        val elapsed = state.recordingStartedAt?.let {
+                            ((now - it) / 1000).coerceAtLeast(0)
+                        }
+                        Text(
+                            if (elapsed ==
+                                null
+                            ) {
+                                "0:00"
                             } else {
-                                false
-                            }
-                        }
-                    }.pointerInput(ready) {
-                        if (ready) {
-                            awaitEachGesture {
-                                val down = awaitFirstDown()
-                                down.consume()
-                                start()
-                                var ended = false
-                                try {
-                                    while (!ended) {
-                                        val event = awaitPointerEvent()
-                                        val change = event.changes.firstOrNull { it.id == down.id }
-                                        if (change == null || change.isConsumed ||
-                                            change.position.y - down.position.y > 60.dp.toPx()
-                                        ) {
-                                            cancel()
-                                            ended = true
-                                        } else if (!change.pressed) {
-                                            finish()
-                                            ended = true
-                                        }
-                                        change?.consume()
-                                    }
-                                } finally {
-                                    if (!ended) cancel()
-                                }
-                            }
-                        }
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    if (listening) "Listening · release to send" else "Hold to talk",
-                    color = if (ready) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
+                                "%d:%02d".format(elapsed / 60, elapsed % 60)
+                            },
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                        Text(
+                            if (elapsed == null) "Starting…" else "Recording",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    key(owner) {
+                        AudioWaveform(
+                            if (state.recordingStartedAt == null) 0f else conversation.level,
+                            "Microphone",
+                            Modifier.weight(1f)
+                        )
+                    }
+                }
+            } else {
+                OutlinedTextField(
+                    state.draft,
+                    draft,
+                    placeholder = { Text("Message…") },
+                    modifier = Modifier.weight(1f),
+                    minLines = 1,
+                    maxLines = 4,
+                    shape = RoundedCornerShape(24.dp)
+                )
+            }
+            if (!recording && state.draft.isNotBlank()) {
+                FilledIconButton(
+                    send,
+                    Modifier.size(56.dp).semantics { contentDescription = "Send message" },
+                    enabled = ready && !conversation.busy
+                ) {
+                    Icon(painterResource(R.drawable.ic_voice_send), null)
+                }
+            } else {
+                VoiceRecordButton(
+                    owner,
+                    gesture,
+                    ready,
+                    recording,
+                    record,
+                    finishRecording,
+                    cancelRecording,
+                    {
+                        holding =
+                            it
                     }
                 )
             }
-
-            Text(
-                "Drag down to cancel.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
+        Text(
+            when {
+                recording -> "Slide left to cancel · release to send"
+                state.draft.isNotBlank() -> ""
+                else -> "Hold to talk · slide left to cancel"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
