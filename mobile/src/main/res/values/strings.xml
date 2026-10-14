@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Quantum Relay for Hermes</string>
+    <string name="app_name">Quantum Relay for Hermes Agents</string>
     <string name="privacy_note">No account with us. No hosted backend. No analytics.</string>
     <string name="relay_channel">Watch relay</string>
     <string name="relay_idle">Ready for your watch</string>

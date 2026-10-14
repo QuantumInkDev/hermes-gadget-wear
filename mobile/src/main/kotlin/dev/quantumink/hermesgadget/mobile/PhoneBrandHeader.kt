@@ -1,47 +1,45 @@
 package dev.quantumink.hermesgadget.mobile
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Icon
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import dev.quantumink.hermesgadget.client.R as ClientR
+import androidx.compose.ui.unit.sp
 
-/** A compact, scalable native app bar shared by phone destinations. */
+/** Full, scalable one-line name. Large fonts can scroll without losing the complete title. */
 @Composable
 fun PhoneBrandHeader(
-    title: String = "Quantum Relay",
-    subtitle: String = "for Hermes",
+    title: String = "Quantum Relay for Hermes Agents",
     actions: @Composable () -> Unit = {}
 ) {
-    Row(
-        Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Icon(
-            painterResource(ClientR.drawable.quantumink_relay_monochrome),
-            null,
-            Modifier.size(40.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        val size = when {
+            maxWidth >= 380.dp -> 22.sp
+            maxWidth >= 328.dp -> 20.sp
+            else -> 18.sp
         }
-        actions()
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                title,
+                Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontSize = size,
+                    lineHeight = size * 1.35f,
+                    fontWeight = FontWeight.SemiBold
+                ),
+                maxLines = 1,
+                softWrap = false
+            )
+            actions()
+        }
     }
 }

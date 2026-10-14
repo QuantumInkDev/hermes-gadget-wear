@@ -85,7 +85,7 @@ internal fun CatalogSettingsContent(
     ) { uri ->
         val key = photoKey
         photoKey = null
-        if (uri != null && key != null) {
+        if (uri != null && key != null && repository.pages.value.any { it.key == key }) {
             work {
                 val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
                     val output = java.io.ByteArrayOutputStream()
@@ -219,35 +219,20 @@ internal fun CatalogSettingsContent(
                 dismissButton = { Button(onClick = { retiring = null }) { Text("Cancel") } }
             )
         }
-        picturePage?.let { page ->
-            androidx.compose.material3.AlertDialog(
-                onDismissRequest = { picturePage = null },
-                title = { Text("Picture for ${page.profile.name}") },
-                text = {
-                    Text(
-                        "Keep the imported box picture or choose one " +
-                            "just for this watch profile. " +
-                            "A watch picture stays selected when the box refreshes. " +
-                            "The box's original is unchanged."
-                    )
+        pages.singleOrNull { it.key == picturePage?.key }?.let { page ->
+            ProfilePictureSheet(
+                repository,
+                page,
+                busy,
+                dismiss = { picturePage = null },
+                choose = {
+                    picturePage = null
+                    photoKey = page.key
+                    photo.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
                 },
-                confirmButton = {
-                    Button(enabled = !busy, onClick = {
-                        picturePage = null
-                        photoKey = page.key
-                        photo.launch(
-                            PickVisualMediaRequest(PickVisualMedia.ImageOnly)
-                        )
-                    }) { Text("Choose watch picture") }
-                },
-                dismissButton = {
-                    Column {
-                        Button(enabled = !busy, onClick = {
-                            picturePage = null
-                            work { repository.useBoxPicture(page.key) }
-                        }) { Text("Use box picture") }
-                        Button(onClick = { picturePage = null }) { Text("Cancel") }
-                    }
+                restore = {
+                    picturePage = null
+                    work { repository.useBoxPicture(page.key) }
                 }
             )
         }

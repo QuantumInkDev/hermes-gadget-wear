@@ -31,7 +31,7 @@ import dev.quantumink.hermesgadget.client.CuePreferences
 @Composable
 fun PhoneSettingsPage(context: Context, navigate: (String) -> Unit) {
     val soundCues by CuePreferences.enabled.collectAsStateWithLifecycle()
-    Text("Settings", style = MaterialTheme.typography.headlineLarge)
+    Text("Settings", style = MaterialTheme.typography.titleMedium)
     Text("Make yourself at home.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
         Column {
@@ -82,9 +82,10 @@ fun PhoneSettingsPage(context: Context, navigate: (String) -> Unit) {
             }
         }
     }
-    Text("About Quantum Relay for Hermes", style = MaterialTheme.typography.titleMedium)
+    Text("About Quantum Relay for Hermes Agents", style = MaterialTheme.typography.titleMedium)
     Text(
-        "Quantum Relay for Hermes is an independent QuantumInk companion for Gadget SDK v0.2.0. " +
+        "Quantum Relay for Hermes Agents is an independent QuantumInk companion " +
+            "for Gadget SDK v0.2.0. " +
             "Not affiliated with or endorsed by Nous Research. " +
             "Hermes and Nous Research names and marks belong to their owners. " +
             "The Voice Q icon is original QuantumInk artwork.",

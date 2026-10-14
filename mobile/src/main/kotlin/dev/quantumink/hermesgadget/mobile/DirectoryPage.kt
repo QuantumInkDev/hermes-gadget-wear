@@ -127,7 +127,7 @@ internal fun DirectoryContent(
     val photo = rememberLauncherForActivityResult(PickVisualMedia()) { uri ->
         val key = photoKey
         photoKey = null
-        if (uri != null && key != null) {
+        if (uri != null && key != null && repository.pages.value.any { it.key == key }) {
             work {
                 val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
                     val output = ByteArrayOutputStream()
@@ -199,7 +199,7 @@ internal fun DirectoryContent(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Your profiles", style = MaterialTheme.typography.headlineLarge)
+                        Text("Your profiles", style = MaterialTheme.typography.titleMedium)
                         Text(
                             "A conversation, one tap away.",
                             style = MaterialTheme.typography.bodyMedium,
@@ -385,39 +385,19 @@ internal fun DirectoryContent(
         }
     }
     pages.singleOrNull { it.key == pictureKey }?.let { page ->
-        AlertDialog(
-            onDismissRequest = { pictureKey = null },
-            title = { Text("Picture for ${page.profile.name}") },
-            text = {
-                Text(
-                    "Choose the picture shown for this profile on your watch and phone. Your choice survives a box refresh."
-                )
+        ProfilePictureSheet(
+            repository,
+            page,
+            busy,
+            dismiss = { pictureKey = null },
+            choose = {
+                photoKey = page.key
+                pictureKey = null
+                photo.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
             },
-            confirmButton = {
-                TextButton(enabled = !busy, onClick = {
-                    photoKey = page.key
-                    pictureKey = null
-                    photo.launch(PickVisualMediaRequest(PickVisualMedia.ImageOnly))
-                }) { Text("Choose picture") }
-            },
-            dismissButton = {
-                Column {
-                    TextButton(enabled = !busy, onClick = {
-                        pictureKey = null
-                        work { repository.useBoxPicture(page.key) }
-                    }) {
-                        Text(
-                            if (page.sourceId ==
-                                "manual"
-                            ) {
-                                "Use default picture"
-                            } else {
-                                "Use box picture"
-                            }
-                        )
-                    }
-                    TextButton(onClick = { pictureKey = null }) { Text("Cancel") }
-                }
+            restore = {
+                pictureKey = null
+                work { repository.useBoxPicture(page.key) }
             }
         )
     }
