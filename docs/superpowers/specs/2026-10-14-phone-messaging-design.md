@@ -3,7 +3,8 @@
 Status: approved by the maintainer, 2026-10-14, including **A: Courier**. The maintainer selected **hold to
 record, release to send, slide left to cancel**, and requested a waveform while recording.
 Those choices, the layout and the replacement icon direction are approved.
-This document and its mockup describe a proposal, not an installed native update.
+This document records the approved design; implementation, verified delivery and retained
+acceptance gates are recorded in [progress](../../progress.md). The mockup is design evidence.
 
 ## Problem and scope
 

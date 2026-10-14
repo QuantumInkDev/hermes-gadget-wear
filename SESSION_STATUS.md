@@ -1,8 +1,8 @@
-<!-- Current continuation: centered watch footer delivered at f35bf59; owner confirms both recording ticks. Phone widget build 5a9a459 is installed wirelessly; prior Focus readback was revision 1 and 19 keys. Seven phone home-widget layouts are implemented and software-verified; physical placement remains; grid favorites, away replies and system tile checks remain open. -->
+<!-- Current continuation: Courier phone refinement installed at d26e790; 102 baseline files /18 identities /54 artwork files preserved. Watch f35bf59 unchanged. Software checks and native gallery complete; owner speech/gesture and existing release gates remain. -->
 # Session status
 
 Quantum Relay for Hermes native redesign is implemented and reviewed: Portrait studio,
-original Voice Q, Light/Dark/Electronic Moonlight, grouped/custom-ordered phone profiles,
+the earlier Voice Q (superseded on the phone by Courier), Light/Dark/Electronic Moonlight, grouped/custom-ordered phone profiles,
 independent Talk/Chat with real capture/playback waveforms, swipe-first watch picker,
 portrait Hold to talk with outward rings/light haptics, a bounded two-minute foreground
 screen-on lease and one/four-profile tiles.
@@ -68,15 +68,26 @@ files are unchanged, including 18 identities and 54 artwork files. The original 
 timeout remains. All seven widget providers are registered. No app UI was launched or
 captured, and no new pairing, enrollment or network grant was needed. Private receipts are
 under `.local/home-widgets/phone-delivery/`; `latest.json` identifies this delivery.
-The owner supplied phone usability feedback. A focused [proposed design](docs/superpowers/specs/2026-10-14-phone-messaging-design.md)
-and [interactive mockup](docs/superpowers/specs/2026-10-14-phone-messaging-mockup.html) are prepared.
-The selected phone gesture is hold to record, release to send, slide left to cancel, with
-a live microphone waveform. The proposal also makes Quantum Relay for Hermes Agents the
-single-line leading title, reduces section headings, replaces both picture dialogs with a
-shared sheet and presents two original replacement icons. Design/icon approval is pending;
-no native code, launcher assets or physical device was changed for this feedback yet.
-The mockup passed a batched wide-composer, narrow Light picture-sheet and icon inspection,
-with no console errors or page overflow. This is design evidence, not native acceptance.
+The owner approved the [phone refinement](docs/superpowers/specs/2026-10-14-phone-messaging-design.md)
+and selected original Courier A. It is implemented through `d26e790`: compact inline
+hold/release/physical-left-cancel, bounded real-level history, accessible Start/Finish/Cancel,
+full-name title hierarchy and a shared picture sheet with a separate Cancel footer. Slow
+capture startup, failed accessible starts/permission completion and RTL cancellation were
+corrected after one fresh review. Strict checks pass 133 JVM tests /38 reports, with no
+failures/errors/skips and all four APKs; 42 final native executions /30 distinct methods pass, including six stock TLS audio/vault
+methods and all three font/window scenarios. [Native gallery](docs/demo/phone-messaging/README.md):
+39 original synthetic captures with source/APK hashes. [Review](docs/phone-messaging-review.md)
+records all three Important corrections, fixture diagnostics and remaining physical limits.
+
+A matching-signer preserving phone update is installed wirelessly at `d26e790` on 2026-10-14.
+Current APK/data backups and installed APK hash are verified; all 102 baseline files are
+unchanged, including 18 identities and 54 artwork files. The five-minute timeout is unchanged
+and all seven widget providers are registered. No phone UI was launched or captured, no new
+pairing/enrollment was performed and the physical watch is unchanged. Private records are in
+`.local/phone-messaging/phone-delivery/latest.json`; the completed ledger is archived at
+`.local/phone-messaging/closed-sdd/2026-10-14-phone-messaging/`. Physical voice/gesture comfort remains an
+owner check; the native gallery uses synthetic data only.
+
 Remaining widget acceptance: physical One UI placement/order/exact taps/multiple instances/reboot,
 five-column grid support, real two-wallpaper changes and API29–30 runtime. System night
 changes and fixed-palette preservation pass on the owned emulator; original OS mode is restored.

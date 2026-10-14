@@ -4,8 +4,17 @@ Status: native client implementation and software acceptance, 2026-10-12. Hardwa
 
 ## Native client behavior — 2026-10-12
 
+Phone refinement approved 2026-10-14: **Quantum Relay for Hermes Agents** uses original
+Courier artwork, a single-line leading title above smaller destination headings and a
+compact inline text/voice composer. Hold the mic to record, release to send, or slide
+physically left to discard. A live amplitude stream/timer and accessible recording actions
+share the existing foreground conversation; playback keeps the profile's server voice.
+Directory and catalog share a picture sheet with a full-width Cancel footer. Light, Dark,
+Electronic Moonlight, per-profile pairing/drafts and existing watch artwork remain the basis.
+Verification and physical delivery are recorded in progress.md, not implied by design approval.
+
 The approved [native design](superpowers/specs/2026-10-12-native-client-design.md) is implemented:
-Quantum Relay for Hermes uses original Voice Q artwork and independently persisted Light,
+The earlier Quantum Relay for Hermes build introduced Voice Q artwork and independently persisted Light,
 Dark and Electronic Moonlight appearances. Existing installations default to Dark; ambient
 stays black and static. The phone provides Profiles, Watch and Settings, grouped searchable
 portraits, accessible profile details, foreground Talk/Chat, live capture/playback meters,

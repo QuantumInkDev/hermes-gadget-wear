@@ -381,3 +381,19 @@ return navigation. Widget editing and rendering do not modify watch tile pins or
 API 31+ metadata/themes live in version-qualified resources. API 29–30 retains explicit
 size hints, brand day/night fallbacks and Settings-based reconfiguration. Actual launcher
 placement and runtime-specific limits remain acceptance gates, not inferred guarantees.
+
+## Phone composer refinement — 2026-10-14
+
+The composer owns one terminal gesture per profile/session, independent of changing level
+and timer values. Physical control order stays left-to-right for the requested left-cancel
+gesture; text entry retains its locale direction. A terminal-attempt revision reconciles
+capture failure and permission completion with accessible/keyboard starts. Permission never
+replays an old press. The capture adapter serializes actual AudioRecord startup against
+finish/cancel after slow initialization; model callbacks occur outside that gate's lock.
+
+The meter samples only a bounded transient history of normalized amplitude values, separate
+from playback and without storing PCM for visualization. Reduced motion/power saver uses a
+stationary baseline. In short keyboard windows, the conversation toolbar yields its space to
+the minimum composer and returns when the IME closes. Both profile-picture entry points use
+one window-bounded sheet with a scrolling body and independent Cancel footer. Courier layers
+retain the shared resource names; supported API 29+ builds package adaptive icons.

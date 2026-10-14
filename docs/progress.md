@@ -1,5 +1,46 @@
 # Progress
 
+## Phone messaging and Courier — 2026-10-14
+
+The approved refinement is implemented: Quantum Relay for Hermes Agents leads smaller
+section headings; the inline mic uses hold/release/physical-left cancellation and a bounded
+real-level waveform/timer. Accessible Start/Finish/Cancel remains available. Both picture
+entry points use one native sheet with a separate Cancel footer. Original Courier A has
+adaptive color and OS-themed layers; the three existing app themes are retained.
+
+Warning-strict full checks, formatting/lint and all four APK builds pass: **133 JVM tests
+across 38 XML reports**, zero failures/errors/skips. Final native acceptance passes **42
+executions /30 distinct methods**: 24 combined composer/picture/gallery/conversation/directory
+methods, four methods in each of three font/window scenarios and six independent stock TLS
+audio/vault methods. Windows cover 320×640 dp/font1.8, 360×720/font1.3 and 640×320/font1.3,
+with all three themes and keyboard states. Original emulator font/window settings are restored.
+
+One fresh whole-feature review found three Important issues, no Critical/Minor findings.
+The single corrective pass covers delayed mic startup after release, failed accessible/
+permission starts and physical-left cancellation in RTL. Failing-then-passing regressions
+and the green suite are recorded in the [review](phone-messaging-review.md). Large-text
+hierarchy and short-window keyboard overlap were also reproduced and corrected. Fixture
+withdrawal timing, stale accessibility trees, held injected pointers and idle/IME timing
+are documented separately; failed receipts are retained and not counted as passes.
+
+The [native gallery](demo/phone-messaging/README.md) contains **39 original synthetic PNGs**
+with source/APK/test-APK hashes. Recording layout levels are synthetic; actual capture,
+playback, cancellation, permission completion and independent identities pass against two
+isolated stock TLS Gadget servers. Demo: hold the inline mic, release to send, slide left
+to discard, or type and tap Send. Open Watch picture for the separate full-width Cancel footer.
+
+Phone build `d26e790` is installed through the existing paired wireless ADB transport.
+Current APK/data backups, matching certificate and installed APK SHA-256 are verified:
+`80aef071c8011dccc04875bfd9c0cac7d22938688b1cb2698a333dce96c4f5ba`.
+All **102 baseline files, 18 identities and 54 artwork files** are unchanged. The original
+five-minute timeout and seven registered widget providers remain. No app UI was launched
+or captured; no reset, enrollment or new pairing occurred. The watch remains at `f35bf59`.
+
+Physical speech/gesture comfort, away replies, widget/tile placement, quantitative power
+and existing signing/privacy/Play gates remain separate owner/release checks. Keep PR #1
+draft. Private receipts, failed runs and the closed execution ledger stay ignored under
+`.local/phone-messaging/`.
+
 ## Clear watch portraits and centered footer — 2026-10-13
 
 The owner's correction removes the floating profile menu and microphone badge from the
