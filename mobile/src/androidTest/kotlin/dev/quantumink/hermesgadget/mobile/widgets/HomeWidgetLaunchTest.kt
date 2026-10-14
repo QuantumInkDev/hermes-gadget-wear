@@ -59,7 +59,17 @@ class HomeWidgetLaunchTest {
         ) {
             SystemClock.sleep(30)
         }
-        assertEquals(key, phone(activity).state.value.page?.key)
+        val unavailable = MainActivity::class.java.getDeclaredMethod("getWidgetUnavailable").apply {
+            isAccessible = true
+        }.invoke(activity)
+        assertEquals(
+            "Activity ${activity.lifecycle.currentState}, unavailable=$unavailable, " +
+                "intentValid=${HomeWidgetLaunch.parse(activity.intent)?.let {
+                    HomeWidgetLaunch.valid(context, it)
+                }}",
+            key,
+            phone(activity).state.value.page?.key
+        )
         instrumentation.waitForIdleSync()
     }
     private fun identities(): Map<String, String> {

@@ -38,7 +38,17 @@ product regression failures or passing acceptance.
 
 ## Evidence
 
-Final counts and source/APK-bound exports are in [the native gallery](demo/home-widgets/README.md)
+The corrected run passes 125 JVM tests across 35 reports with zero failures/errors/skips,
+all four APK builds, 32 affected widget/navigation/presentation native methods and the
+blocked-watch publication method. The independent stock TLS audio/vault run covers five
+more methods, giving 38 distinct native methods; the host matrix has 112 geometry cases.
+
+One combined native run failed its initial cold-launch selection. The failure did not
+reproduce in the 18-case controlled sequence or the final 32-case combined replay; diagnostic
+assertions now retain lifecycle, payload-validity and unavailable-state information. No
+product cause is assigned to that transient, and the failed receipt is retained.
+
+Final source/APK-bound exports are in [the native gallery](demo/home-widgets/README.md)
 and [progress](progress.md). Private raw commands, negative/positive instrumentation
 receipts, strict build logs, signer/hash checks and the staged delivery APK remain under
 ignored `.local/home-widgets/`. There is no personal art or endpoint in the public evidence.
