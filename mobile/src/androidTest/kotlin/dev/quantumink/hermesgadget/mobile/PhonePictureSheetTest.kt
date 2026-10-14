@@ -99,7 +99,12 @@ class PhonePictureSheetTest {
                         ui.show(destination = "profiles") { modifier ->
                             DirectoryContent(ui.context, repository, {}, {}, {}, modifier)
                         }
-                        ui.await { ui.find("Options for Orbit", true) != null }
+                        try {
+                            ui.scrollTo("Options for Orbit", description = true)
+                        } catch (error: IllegalStateException) {
+                            ui.capture("picture-options-unreachable")
+                            throw error
+                        }
                         ui.click("Options for Orbit", true)
                         ui.click("Watch picture")
                     }

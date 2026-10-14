@@ -84,165 +84,170 @@ internal fun ConversationContent(
     val paired = state.connection.status == ConnectionStatus.PAIRED
     var details by remember(state.profile?.endpoint?.url) { mutableStateOf(false) }
     val keyboard = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-    Column(modifier.fillMaxSize()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(back) {
-                Icon(painterResource(R.drawable.ic_back), "Back to profiles")
-            }
-            Text(
-                "Conversation",
-                Modifier.weight(1f).padding(horizontal = 8.dp),
-                style = MaterialTheme.typography.titleMedium
-            )
-            IconButton({ details = true }) {
-                Icon(painterResource(R.drawable.ic_more), "Connection details")
-            }
-        }
-        BoxWithConstraints(Modifier.weight(1f)) {
-            val controlsHeight = if (keyboard) maxHeight else maxHeight * .65f
-            Column(Modifier.fillMaxSize()) {
-                Column(
-                    Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val compactKeyboard = keyboard && maxHeight < 160.dp
+        Column(Modifier.fillMaxSize()) {
+            if (!compactKeyboard) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        page?.let {
-                            DirectoryPortrait(
-                                CatalogRepository.get(
-                                    androidx.compose.ui.platform.LocalContext.current
-                                ),
-                                it
-                            )
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                state.profile?.label.orEmpty(),
-                                style = MaterialTheme.typography.titleLarge
-                            )
-                            Text(
-                                when {
-                                    listening -> "Listening"
-                                    state.speaking -> "Speaking"
-                                    conversation.busy -> "Working"
-                                    paired -> "Ready to talk"
-                                    else -> state.connection.status.name.lowercase()
-                                        .replaceFirstChar {
-                                            it.uppercase()
-                                        }
-                                },
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                    IconButton(back) {
+                        Icon(painterResource(R.drawable.ic_back), "Back to profiles")
                     }
-                    if (state.connection.status == ConnectionStatus.OFFLINE ||
-                        state.connection.status == ConnectionStatus.ERROR
-                    ) {
-                        Text(
-                            "Connect to start a private phone conversation.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Button({
-                            details = true
-                        }, enabled = state.profile?.endpoint?.isTls == true) {
-                            Text("Connect this phone")
-                        }
-                        if (state.profile?.endpoint?.isTls !=
-                            true
-                        ) {
-                            Text("Phone conversations require a wss endpoint.")
-                        }
-                    }
-                    if (state.connection.pairingCode.isNotBlank()) {
-                        Text("Approve this phone on the selected box:")
-                        Text(state.connection.pairingCommand)
-                        Text("Pairing code: " + state.connection.pairingCode)
-                    }
-                    if (state.error.isNotBlank()) {
-                        Text(
-                            state.error,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                    if (state.connection.error.isNotBlank()) {
-                        Text(
-                            state.connection.error,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                    if (conversation.status.isNotBlank()) Text(conversation.status)
-                    if (conversation.notice.isNotBlank()) Text(conversation.notice)
-                    if (conversation.transcript.isNotBlank()) {
-                        Text("You said", style = MaterialTheme.typography.labelLarge)
-                        Text(conversation.transcript)
-                    }
-                    if (conversation.reply.isNotBlank()) {
-                        Text("Response", style = MaterialTheme.typography.labelLarge)
-                        Text(conversation.reply)
-                    }
-                    conversation.card?.let {
-                        Text(it.title, style = MaterialTheme.typography.titleMedium)
-                        Text(it.body)
-                    }
-                    conversation.picture?.let { picture ->
-                        val image = androidx.compose.runtime.remember(picture) {
-                            android.graphics.Bitmap.createBitmap(
-                                picture.argb(),
-                                picture.width,
-                                picture.height,
-                                android.graphics.Bitmap.Config.ARGB_8888
-                            )
-                        }
-                        androidx.compose.foundation.Image(
-                            image.asImageBitmap(),
-                            "Profile response image",
-                            Modifier.fillMaxWidth().heightIn(max = 320.dp)
-                        )
-                    }
-                    conversation.prompt?.let { prompt ->
-                        Text(prompt.title, style = MaterialTheme.typography.titleMedium)
-                        Text(prompt.text)
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button({
-                                answer(prompt.id, true)
-                            }, enabled = conversation.canAnswer) { Text("Approve") }
-                            Button({
-                                answer(prompt.id, false)
-                            }, enabled = conversation.canAnswer) { Text("Decline") }
-                        }
-                    }
-
-                    if (paired && conversation.reply.isBlank() &&
-                        conversation.transcript.isBlank() &&
-                        !conversation.busy && !listening
-                    ) {
-                        Text(
-                            "What would you like to work on?",
-                            style = MaterialTheme.typography.headlineSmall
-                        )
-                        Text(
-                            "Hold to talk, or write a message below.",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Text(
+                        "Conversation",
+                        Modifier.weight(1f).padding(horizontal = 8.dp),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    IconButton({ details = true }) {
+                        Icon(painterResource(R.drawable.ic_more), "Connection details")
                     }
                 }
-                Surface(
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                    color = MaterialTheme.colorScheme.surface
-                ) {
-                    ConversationControls(
-                        state, draft, send, record, finish, cancelRecording,
-                        stopVoice, cancelTurn, keyboard,
-                        Modifier.heightIn(
-                            max = controlsHeight
-                        ).verticalScroll(rememberScrollState())
-                    )
+            }
+            BoxWithConstraints(Modifier.weight(1f)) {
+                val controlsHeight = if (keyboard) maxHeight else maxHeight * .65f
+                Column(Modifier.fillMaxSize()) {
+                    Column(
+                        Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            page?.let {
+                                DirectoryPortrait(
+                                    CatalogRepository.get(
+                                        androidx.compose.ui.platform.LocalContext.current
+                                    ),
+                                    it
+                                )
+                            }
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    state.profile?.label.orEmpty(),
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                                Text(
+                                    when {
+                                        listening -> "Listening"
+                                        state.speaking -> "Speaking"
+                                        conversation.busy -> "Working"
+                                        paired -> "Ready to talk"
+                                        else -> state.connection.status.name.lowercase()
+                                            .replaceFirstChar {
+                                                it.uppercase()
+                                            }
+                                    },
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        if (state.connection.status == ConnectionStatus.OFFLINE ||
+                            state.connection.status == ConnectionStatus.ERROR
+                        ) {
+                            Text(
+                                "Connect to start a private phone conversation.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Button({
+                                details = true
+                            }, enabled = state.profile?.endpoint?.isTls == true) {
+                                Text("Connect this phone")
+                            }
+                            if (state.profile?.endpoint?.isTls !=
+                                true
+                            ) {
+                                Text("Phone conversations require a wss endpoint.")
+                            }
+                        }
+                        if (state.connection.pairingCode.isNotBlank()) {
+                            Text("Approve this phone on the selected box:")
+                            Text(state.connection.pairingCommand)
+                            Text("Pairing code: " + state.connection.pairingCode)
+                        }
+                        if (state.error.isNotBlank()) {
+                            Text(
+                                state.error,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        if (state.connection.error.isNotBlank()) {
+                            Text(
+                                state.connection.error,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        if (conversation.status.isNotBlank()) Text(conversation.status)
+                        if (conversation.notice.isNotBlank()) Text(conversation.notice)
+                        if (conversation.transcript.isNotBlank()) {
+                            Text("You said", style = MaterialTheme.typography.labelLarge)
+                            Text(conversation.transcript)
+                        }
+                        if (conversation.reply.isNotBlank()) {
+                            Text("Response", style = MaterialTheme.typography.labelLarge)
+                            Text(conversation.reply)
+                        }
+                        conversation.card?.let {
+                            Text(it.title, style = MaterialTheme.typography.titleMedium)
+                            Text(it.body)
+                        }
+                        conversation.picture?.let { picture ->
+                            val image = androidx.compose.runtime.remember(picture) {
+                                android.graphics.Bitmap.createBitmap(
+                                    picture.argb(),
+                                    picture.width,
+                                    picture.height,
+                                    android.graphics.Bitmap.Config.ARGB_8888
+                                )
+                            }
+                            androidx.compose.foundation.Image(
+                                image.asImageBitmap(),
+                                "Profile response image",
+                                Modifier.fillMaxWidth().heightIn(max = 320.dp)
+                            )
+                        }
+                        conversation.prompt?.let { prompt ->
+                            Text(prompt.title, style = MaterialTheme.typography.titleMedium)
+                            Text(prompt.text)
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                Button({
+                                    answer(prompt.id, true)
+                                }, enabled = conversation.canAnswer) { Text("Approve") }
+                                Button({
+                                    answer(prompt.id, false)
+                                }, enabled = conversation.canAnswer) { Text("Decline") }
+                            }
+                        }
+
+                        if (paired && conversation.reply.isBlank() &&
+                            conversation.transcript.isBlank() &&
+                            !conversation.busy && !listening
+                        ) {
+                            Text(
+                                "What would you like to work on?",
+                                style = MaterialTheme.typography.headlineSmall
+                            )
+                            Text(
+                                "Hold to talk, or write a message below.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                        color = MaterialTheme.colorScheme.surface
+                    ) {
+                        ConversationControls(
+                            state, draft, send, record, finish, cancelRecording,
+                            stopVoice, cancelTurn, keyboard,
+                            Modifier.heightIn(
+                                max = controlsHeight
+                            ).verticalScroll(rememberScrollState())
+                        )
+                    }
                 }
             }
         }

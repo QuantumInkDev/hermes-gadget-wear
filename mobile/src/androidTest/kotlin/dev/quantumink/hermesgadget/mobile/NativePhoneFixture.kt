@@ -101,6 +101,8 @@ internal class NativePhoneFixture : AutoCloseable {
     }
 
     fun find(text: String, description: Boolean = false): AccessibilityNodeInfo? {
+        // Lazy-list scrolls can retain the old virtual children in UiAutomation's cache.
+        if (android.os.Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation.clearCache()
         fun walk(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
             node ?: return null
             val value = if (description) node.contentDescription else node.text
@@ -132,7 +134,10 @@ internal class NativePhoneFixture : AutoCloseable {
             if (find(text, description) != null) return
             fun scroll(node: AccessibilityNodeInfo?): Boolean {
                 node ?: return false
-                if (node.isScrollable &&
+                // The brand title can scroll horizontally; it must not consume list scrolling.
+                if (node.isScrollable && node.actionList.any {
+                        it.id == AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_DOWN.id
+                    } &&
                     node.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
                 ) {
                     return true
