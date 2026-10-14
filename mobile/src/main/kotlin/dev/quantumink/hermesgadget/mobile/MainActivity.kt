@@ -4,6 +4,7 @@ import android.Manifest
 import android.companion.AssociationRequest
 import android.companion.BluetoothDeviceFilter
 import android.companion.CompanionDeviceManager
+import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.os.Build
@@ -32,8 +33,17 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import dev.quantumink.hermesgadget.client.AppearancePreferences
+import dev.quantumink.hermesgadget.mobile.widgets.HomeWidgetLaunch
+import dev.quantumink.hermesgadget.mobile.widgets.HomeWidgets
 import dev.quantumink.hermesgadget.mobile.widgets.HomeWidgetsPage
+import dev.quantumink.hermesgadget.mobile.widgets.LaunchDecision
+import dev.quantumink.hermesgadget.mobile.widgets.WidgetLaunchNotice
+import dev.quantumink.hermesgadget.mobile.widgets.WidgetLaunchRequest
+import dev.quantumink.hermesgadget.mobile.widgets.decideLaunch
+import dev.quantumink.hermesgadget.mobile.widgets.phoneSelectionLocked
+import dev.quantumink.hermesgadget.protocol.CatalogStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -55,10 +65,27 @@ class MainActivity : ComponentActivity() {
             .registerDefaultNetworkCallback(catalogNetwork)
     }
 
-    private var talkRequest: Job? = null
+    private var destination by mutableStateOf("profiles")
+    private var incomingWidget: WidgetLaunchRequest? = null
+    private var pendingWidget by mutableStateOf<WidgetLaunchRequest?>(null)
+    private var widgetUnavailable by mutableStateOf(false)
+    private var widgetEditId by mutableStateOf<Int?>(null)
+    private val navigation by lazy {
+        PhoneProfileNavigation(lifecycleScope, { key, widget ->
+            if (widget != null && !HomeWidgetLaunch.valid(this, widget)) {
+                null
+            } else {
+                val repository = CatalogRepository.get(this)
+                repository.savedPages()
+                repository.currentProfile(key)?.takeIf {
+                    it.first.status != CatalogStatus.WITHDRAWN
+                }
+            }
+        }, { page -> CatalogRepository.get(this).pages.value.any { it === page } })
+    }
 
     override fun onStop() {
-        talkRequest?.cancel()
+        navigation.cancel()
         started = false
         conversation.hide()
         getSystemService(android.net.ConnectivityManager::class.java)
@@ -120,15 +147,29 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         enabled = RelaySettings.enabled(this)
+        destination = savedInstanceState?.getString("phone_destination")?.takeIf {
+            it in
+                setOf(
+                    "profiles", "conversation", "watch", "settings", "tiles", "boxes",
+                    "manual", "speech", "appearance", "home-widgets"
+                )
+        } ?: "profiles"
+        if (savedInstanceState == null) {
+            receiveWidget(intent)
+        } else {
+            pendingWidget = HomeWidgetLaunch.restore(savedInstanceState.getBundle("pending_widget"))
+        }
+        lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                consumeWidget()
+            }
+        }
         setContent {
             val appearance = remember { AppearancePreferences(this@MainActivity) }
             val mode by appearance.mode.collectAsStateWithLifecycle()
             PhoneAppearance(mode) {
                 val phone by conversation.state.collectAsStateWithLifecycle()
                 val status by RelaySettings.status.collectAsStateWithLifecycle()
-                var destination by androidx.compose.runtime.saveable.rememberSaveable {
-                    mutableStateOf("profiles")
-                }
                 androidx.compose.runtime.LaunchedEffect(started, destination) {
                     if (destination == "conversation" && started && !phone.visible) {
                         phone.profile?.let { conversation.open(it, phone.page) }
@@ -138,7 +179,10 @@ class MainActivity : ComponentActivity() {
                 val directoryState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
                 val directoryScroll = androidx.compose.foundation.lazy.rememberLazyListState()
                 fun navigate(value: String) {
-                    talkRequest?.cancel()
+                    navigation.cancel()
+                    pendingWidget = null
+                    widgetUnavailable = false
+                    widgetEditId = null
                     if (destination == "conversation") conversation.hide()
                     destination = value
                 }
@@ -181,34 +225,30 @@ class MainActivity : ComponentActivity() {
                             padding
                         ).consumeWindowInsets(padding).imePadding()
                     ) {
+                        WidgetLaunchNotice(
+                            pendingWidget != null,
+                            widgetUnavailable,
+                            phoneSelectionLocked(phone),
+                            widgetEditId != null,
+                            { pendingWidget?.let { requestProfile(it.key, it) } },
+                            {
+                                widgetEditId?.let {
+                                    startActivity(HomeWidgets.editIntent(this@MainActivity, it))
+                                }
+                            },
+                            {
+                                pendingWidget = null
+                                widgetUnavailable = false
+                                widgetEditId = null
+                                navigation.cancel()
+                            }
+                        )
                         when (destination) {
                             "profiles" -> directoryState.SaveableStateProvider("profiles") {
                                 DirectoryPage(
                                     this@MainActivity,
                                     listState = directoryScroll,
-                                    onTalk = { page ->
-                                        talkRequest?.cancel()
-                                        talkRequest = lifecycleScope.launch {
-                                            val repository = CatalogRepository.get(
-                                                this@MainActivity
-                                            )
-                                            val resolved = withContext(Dispatchers.IO) {
-                                                runCatching {
-                                                    repository.currentProfile(page.key)
-                                                }.getOrNull()
-                                            }
-                                            if (resolved != null && started &&
-                                                lifecycle.currentState.isAtLeast(
-                                                    androidx.lifecycle.Lifecycle.State.RESUMED
-                                                ) &&
-                                                destination == "profiles" &&
-                                                repository.pages.value.any { it === resolved.first }
-                                            ) {
-                                                conversation.open(resolved.second, resolved.first)
-                                                destination = "conversation"
-                                            }
-                                        }
-                                    },
+                                    onTalk = { page -> requestProfile(page.key, null) },
                                     onBoxes = { navigate("boxes") },
                                     onManual = { navigate("manual") },
                                     modifier = Modifier.weight(1f)
@@ -261,6 +301,78 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        receiveWidget(intent)
+        window.decorView.post { consumeWidget() }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("phone_destination", destination)
+        pendingWidget?.let { outState.putBundle("pending_widget", HomeWidgetLaunch.bundle(it)) }
+        super.onSaveInstanceState(outState)
+    }
+
+    private fun receiveWidget(value: Intent) {
+        if (value.action != HomeWidgets.ACTION_OPEN) return
+        navigation.cancel()
+        incomingWidget = HomeWidgetLaunch.parse(value)
+        if (incomingWidget == null) {
+            pendingWidget = null
+            widgetUnavailable = true
+            widgetEditId = null
+        }
+    }
+
+    private fun consumeWidget() {
+        if (!started ||
+            !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        ) {
+            return
+        }
+        val request = incomingWidget ?: return
+        incomingWidget = null
+        requestProfile(request.key, request)
+    }
+
+    private fun requestProfile(key: String, widget: WidgetLaunchRequest?) {
+        val requestedFrom = destination
+        pendingWidget = null
+        widgetUnavailable = false
+        widgetEditId = null
+        navigation.request(key, widget, {
+            started && destination == requestedFrom &&
+                lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        }) { resolved ->
+            val state = conversation.state.value
+            val decision = if (widget == null) {
+                if (resolved == null) LaunchDecision.UNAVAILABLE else LaunchDecision.OPEN
+            } else {
+                decideLaunch(
+                    key,
+                    state.page?.key.takeIf {
+                        state.visible
+                    },
+                    phoneSelectionLocked(state),
+                    resolved != null
+                )
+            }
+            when (decision) {
+                LaunchDecision.IGNORE -> destination = "conversation"
+                LaunchDecision.DEFER -> pendingWidget = widget
+                LaunchDecision.UNAVAILABLE -> if (widget != null) {
+                    widgetUnavailable = true
+                    widgetEditId = widget.widgetId.takeIf { HomeWidgets.preset(this, it) != null }
+                }
+                LaunchDecision.OPEN -> resolved?.let {
+                    conversation.open(it.second, it.first)
+                    destination = "conversation"
                 }
             }
         }
