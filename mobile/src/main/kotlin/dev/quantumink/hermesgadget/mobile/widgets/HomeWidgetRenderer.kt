@@ -197,6 +197,14 @@ object HomeWidgetRenderer {
                     decoded.getOrPut(hash) { pictures.bitmap(hash, side) }
                 }
                 cell.setViewVisibility(
+                    R.id.home_widget_name,
+                    if (config.preset == HomeWidgetPreset.FOCUS && bitmap != null) {
+                        View.GONE
+                    } else {
+                        View.VISIBLE
+                    }
+                )
+                cell.setViewVisibility(
                     R.id.home_widget_picture,
                     if (bitmap ==
                         null

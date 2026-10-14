@@ -72,9 +72,13 @@ class HomeWidgetHostTest {
                     View.GONE,
                     view.findViewById<View>(R.id.home_widget_recovery).visibility
                 )
-                assertEquals("Orbit", view.findViewById<TextView>(R.id.home_widget_name).text)
+                assertEquals(
+                    View.GONE,
+                    view.findViewById<TextView>(R.id.home_widget_name).visibility
+                )
                 assertTrue(view.findViewById<ImageView>(R.id.home_widget_picture).drawable != null)
                 val cell = view.findViewById<View>(R.id.home_widget_cell)
+                assertEquals("Open Orbit · Studio", cell.contentDescription)
                 assertTrue(cell.hasOnClickListeners())
                 val minimum = 48 * context.resources.displayMetrics.density
                 assertTrue(cell.width >= minimum && cell.height >= minimum)
