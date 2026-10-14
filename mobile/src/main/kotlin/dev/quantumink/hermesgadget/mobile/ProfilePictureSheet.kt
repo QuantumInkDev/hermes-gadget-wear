@@ -24,9 +24,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import dev.quantumink.hermesgadget.protocol.CatalogPage
@@ -48,7 +49,8 @@ internal fun ProfilePictureSheet(
         focus.clearFocus()
         keyboard?.hide()
     }
-    val height = LocalConfiguration.current.screenHeightDp.dp * .8f
+    val window = LocalWindowInfo.current.containerSize
+    val height = with(LocalDensity.current) { window.height.toDp() * .8f }
     ModalBottomSheet(
         onDismissRequest = dismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),

@@ -220,7 +220,7 @@ internal fun ConversationContent(
 
                     if (paired && conversation.reply.isBlank() &&
                         conversation.transcript.isBlank() &&
-                        !conversation.busy
+                        !conversation.busy && !listening
                     ) {
                         Text(
                             "What would you like to work on?",

@@ -111,6 +111,8 @@ class PhonePictureSheetTest {
                         "Cancel is still crowded into the dialog's button slot: $bounds",
                         bounds.width() > width * .7
                     )
+                    assertTrue(bounds.bottom <= ui.context.resources.displayMetrics.heightPixels)
+                    ui.capture(if (catalog) "picture-sheet-catalog" else "picture-sheet-directory")
                     val before = vault.overrides()
                     ui.click("Cancel")
                     ui.await { ui.find("Cancel") == null }

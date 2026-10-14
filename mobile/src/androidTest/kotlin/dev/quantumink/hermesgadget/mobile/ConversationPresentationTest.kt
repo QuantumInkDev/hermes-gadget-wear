@@ -74,7 +74,7 @@ class ConversationPresentationTest {
                     }
                 }
                 render()
-                fixture.await { fixture.find("Hold to talk") != null }
+                fixture.await { fixture.find("Hold to record", description = true) != null }
                 fixture.capture("conversation-${mode.name}" + if (large) "-large" else "")
                 fixture.enter("A synthetic message")
                 fixture.capture("keyboard-${mode.name}" + if (large) "-large" else "")

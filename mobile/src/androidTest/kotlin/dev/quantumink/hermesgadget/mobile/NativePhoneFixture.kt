@@ -209,7 +209,12 @@ internal class NativePhoneFixture : AutoCloseable {
         SystemClock.sleep(150)
         val image = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
         val output = File(target.cacheDir, "task-3-captures").apply { mkdirs() }
-        File(output, "$name.png").outputStream().use {
+        File(
+            output,
+            "$name${InstrumentationRegistry.getArguments().getString(
+                "messaging_suffix"
+            ).orEmpty()}.png"
+        ).outputStream().use {
             image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
         }
         image.recycle()

@@ -12,8 +12,20 @@ server installation or multiplexed routing is implied.
 independent device preferences apply them without wallpaper overrides. Phone presentation
 surfaces retain the existing repositories, independent phone identity vault, foreground
 conversation controller and secure production window. Waveform levels come from actual
-capture/playback and reset on cancel/stop/background/profile changes; no animation samples
-are stored. Screenshot hosts are non-exported, debug-only, synthetic fixtures.
+capture/playback and reset on cancel/stop/background/profile changes. A bounded transient
+history contains normalized levels only; no PCM is retained for animation. Screenshot hosts
+are non-exported, debug-only, synthetic fixtures.
+
+Phone refinement (2026-10-14): `VoiceMessageGesture` owns one press independently of meter
+and timer redraws. The shared composer uses hold/release/physical-left cancellation and
+accessible Start/Finish/Cancel; both visible Cancel and pointer release share the same
+terminal-action guard. Actual microphone startup supplies the elapsed-time origin. The
+streaming meter retains at most 24 normalized levels, clears when its surface leaves the
+session and uses the existing static motion/power fallback. `ProfilePictureSheet` serves
+both directory and catalog using stable profile keys, actual window bounds and a footer
+outside its scrolling body. The phone header uses the full approved name and scalable
+one-line text. Courier's adaptive layers keep existing resource names; density exports are
+art assets, while API29+ clients package the adaptive foreground/background and API33+ mono.
 
 `WatchNavigation` retains stable page keys, drafts and TransformingLazyColumn state. Picker
 Back restores rotary focus without remounting the conversation. `recordingPortrait` owns only

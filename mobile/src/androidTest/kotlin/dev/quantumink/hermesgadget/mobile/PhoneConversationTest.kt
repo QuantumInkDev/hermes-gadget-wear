@@ -249,19 +249,19 @@ class PhoneConversationTest {
             await { model.state.value.draft.isEmpty() }
             ui.instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
             await { !model.state.value.speaking }
-            ui.await { ui.find("Hold to talk") != null }
+            ui.await { ui.find("Hold to record", description = true) != null }
             val talkBounds = android.graphics.Rect().also {
-                requireNotNull(ui.find("Hold to talk")).getBoundsInScreen(it)
+                requireNotNull(ui.find("Hold to record", description = true)).getBoundsInScreen(it)
             }
             val dragDistance = 80f * ui.context.resources.displayMetrics.density
             val downAt = android.os.SystemClock.uptimeMillis()
-            fun touch(action: Int, y: Float) {
+            fun touch(action: Int, x: Float) {
                 val event = android.view.MotionEvent.obtain(
                     downAt,
                     android.os.SystemClock.uptimeMillis(),
                     action,
-                    talkBounds.exactCenterX(),
-                    y,
+                    x,
+                    talkBounds.exactCenterY(),
                     0
                 ).apply {
                     source = android.view.InputDevice.SOURCE_TOUCHSCREEN
@@ -272,20 +272,20 @@ class PhoneConversationTest {
                     event.recycle()
                 }
             }
-            touch(android.view.MotionEvent.ACTION_DOWN, talkBounds.exactCenterY())
+            touch(android.view.MotionEvent.ACTION_DOWN, talkBounds.exactCenterX())
             await { model.state.value.connection.conversation.mode == ConversationMode.LISTENING }
-            touch(android.view.MotionEvent.ACTION_MOVE, talkBounds.exactCenterY() + dragDistance)
-            touch(android.view.MotionEvent.ACTION_UP, talkBounds.exactCenterY() + dragDistance)
+            touch(android.view.MotionEvent.ACTION_MOVE, talkBounds.exactCenterX() - dragDistance)
+            touch(android.view.MotionEvent.ACTION_UP, talkBounds.exactCenterX() - dragDistance)
             await { model.state.value.connection.conversation.mode != ConversationMode.LISTENING }
-            ui.click("Hold to talk")
+            ui.click("Hold to record", description = true)
             await { model.state.value.connection.conversation.mode == ConversationMode.LISTENING }
-            ui.click("Cancel recording")
+            ui.click("Cancel recording", description = true)
             await { model.state.value.connection.conversation.mode != ConversationMode.LISTENING }
             assertEquals(0f, model.state.value.connection.conversation.level)
-            ui.click("Hold to talk")
+            ui.click("Hold to record", description = true)
             await { model.state.value.connection.conversation.mode == ConversationMode.LISTENING }
             Thread.sleep(1500)
-            ui.click("Listening · release to send")
+            ui.click("Finish and send recording", description = true)
             await { model.state.value.speaking }
             ui.click("Stop voice")
             assertFalse(model.state.value.speaking)

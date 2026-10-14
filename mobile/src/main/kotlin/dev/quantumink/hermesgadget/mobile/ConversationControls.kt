@@ -163,14 +163,16 @@ internal fun ConversationControls(
                 )
             }
         }
-        Text(
-            when {
-                recording -> "Slide left to cancel · release to send"
-                state.draft.isNotBlank() -> ""
-                else -> "Hold to talk · slide left to cancel"
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        if (recording || state.draft.isBlank()) {
+            Text(
+                if (recording) {
+                    "Slide left to cancel · release to send"
+                } else {
+                    "Hold to talk · slide left to cancel"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
