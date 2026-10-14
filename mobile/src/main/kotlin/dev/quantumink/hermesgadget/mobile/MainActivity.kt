@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dev.quantumink.hermesgadget.client.AppearancePreferences
+import dev.quantumink.hermesgadget.mobile.widgets.HomeWidgetsPage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -240,6 +241,9 @@ class MainActivity : ComponentActivity() {
                                         navigate("settings")
                                     }
                                     "tiles" -> ProfileTilesPage { navigate("watch") }
+                                    "home-widgets" -> HomeWidgetsPage {
+                                        navigate("settings")
+                                    }
                                     "settings" -> PhoneSettingsPage(this@MainActivity, ::navigate)
                                     else -> WatchDashboard(
                                         enabled,

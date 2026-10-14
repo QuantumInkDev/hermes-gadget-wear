@@ -38,6 +38,12 @@ fun PhoneSettingsPage(context: Context, navigate: (String) -> Unit) {
             SettingsLink("Appearance", "Light, Dark or Electronic Moonlight") {
                 navigate("appearance")
             }
+            SettingsLink(
+                "Home screen widgets",
+                "Choose bots, arrange portraits and match your phone"
+            ) {
+                navigate("home-widgets")
+            }
             Row(
                 Modifier.fillMaxWidth().padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,

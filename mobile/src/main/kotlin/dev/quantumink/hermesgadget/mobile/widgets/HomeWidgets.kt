@@ -9,6 +9,7 @@ import android.net.Uri
 import dev.quantumink.hermesgadget.mobile.MainActivity
 import dev.quantumink.hermesgadget.protocol.CatalogPage
 import java.io.File
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -85,6 +86,20 @@ object HomeWidgets {
         val app = context.applicationContext
         val owned = ids.toSet().toIntArray()
         enqueue { updateNow(app, owned) }
+    }
+
+    fun save(context: Context, id: Int, draft: WidgetConfig): CompletableFuture<WidgetConfig> {
+        val result = CompletableFuture<WidgetConfig>()
+        val app = context.applicationContext
+        worker.execute {
+            runCatching {
+                require(preset(app, id) == draft.preset) { "Widget was removed." }
+                val saved = store(app).save(id, draft, draft.revision)
+                updateNow(app, intArrayOf(id))
+                saved
+            }.fold(result::complete, result::completeExceptionally)
+        }
+        return result
     }
 
     internal fun updateNow(context: Context, ids: IntArray) {

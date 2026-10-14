@@ -26,7 +26,7 @@ fun PhoneAppearance(mode: Appearance, content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = phoneColors(mode), content = content)
 }
 
-private fun phoneColors(mode: Appearance): ColorScheme {
+internal fun phoneColors(mode: Appearance): ColorScheme {
     val t = appearanceTokens(mode)
     return lightColorScheme(
         primary = Color(t.accent),
