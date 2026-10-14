@@ -1,8 +1,8 @@
 # Phone messaging, picture controls and identity refinement
 
-Status: proposed for maintainer review, 2026-10-14. The maintainer selected **hold to
+Status: approved by the maintainer, 2026-10-14, including **A: Courier**. The maintainer selected **hold to
 record, release to send, slide left to cancel**, and requested a waveform while recording.
-Those choices are settled. The new layout and replacement icon still need design approval.
+Those choices, the layout and the replacement icon direction are approved.
 This document and its mockup describe a proposal, not an installed native update.
 
 ## Problem and scope
