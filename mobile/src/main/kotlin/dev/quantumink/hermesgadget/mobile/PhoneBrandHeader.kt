@@ -33,7 +33,7 @@ fun PhoneBrandHeader(
                 Modifier.weight(1f).horizontalScroll(rememberScrollState()),
                 style = MaterialTheme.typography.titleLarge.copy(
                     fontSize = size,
-                    lineHeight = size * 1.35f,
+                    lineHeight = size * 1.5f,
                     fontWeight = FontWeight.SemiBold
                 ),
                 maxLines = 1,

@@ -31,7 +31,7 @@ class PhonePictureSheetTest {
             val titleBounds = Rect().also(requireNotNull(title)::getBoundsInScreen)
             val heading = Rect().also(requireNotNull(ui.find("Your profiles"))::getBoundsInScreen)
             assertTrue(
-                "Section heading still dominates the app name",
+                "Section heading still dominates the app name: $heading / $titleBounds",
                 titleBounds.height() > heading.height()
             )
         }
