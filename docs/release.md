@@ -48,6 +48,30 @@ not passed; reduced motion is verified. Keep this PR draft while hardware gates 
 publication/signing/privacy/Play prerequisites are assessed. Historical generated replies
 and synthetic delay tests do not establish the historical missing-reply cause.
 
+## Phone home-widget acceptance — 2026-10-13
+
+Seven phone presets use rows × columns: 1×1, 2×2, 2×4, 1×4, 4×4, 1×5 and 2×5.
+Each has independent bot selection/order and OS/Light/Dark/Electronic Moonlight appearance.
+Static effective portraits keep captions below the image. Taps resolve the exact current
+profile into foreground Talk/Chat, with normal explicit connection/record/send/pairing.
+The [native gallery](demo/home-widgets/README.md) binds 29 synthetic PNGs to source/APKs.
+
+Current software checks pass 125 JVM tests / 35 reports with no failures/errors/skips and
+all four APKs under warning-strict checks. Thirty-eight distinct native methods pass, including
+real stock TLS audio/vault regressions, plus 112 native host geometry scenarios. System night
+resources match Android's native theme, and fixed-theme caption contrasts pass. The separate
+wallpaper capability probe is not counted as two-palette acceptance: backup was unavailable,
+so the emulator wallpaper was untouched. API 29–30 runtime remains unavailable.
+
+One fresh whole-feature review found three Important items; the single corrective pass
+addresses all three, with no Critical/Minor items. See the [review record](phone-home-widgets-review.md).
+Physical install and One UI placement of all
+supported presets, two wallpaper/night changes, custom ordering, multiple instances, exact
+portrait taps and reboot remain open. Five-column acceptance requires a five-column host.
+The verified debug APK is staged privately for a preserving phone update; absent hardware
+is not replaced by emulator evidence. Watch tiles retain their independent configuration.
+Existing speech, power, publishing/signing/privacy and Play gates remain open.
+
 ## Artifacts and signing
 
 Run the strict checks from the README, then:

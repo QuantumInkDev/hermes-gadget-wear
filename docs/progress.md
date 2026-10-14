@@ -22,9 +22,35 @@ the owned bridge is stopped. Demo note: hold the unobscured portrait, release af
 ticks, swipe profiles or scroll to the centered Jump to profile control. Fresh away replies,
 speech, microphone contamination, extended haptic comfort and quantitative power remain gates.
 
-The newly requested seven phone home-widget sizes use rows × columns and OS theming.
-Their design is being prepared; no phone widget implementation or hardware acceptance is
-claimed here.
+## Phone home widgets — 2026-10-13
+
+The approved seven rows × columns presets are implemented with final review corrections through `5a9a459`: 1×1, 2×2,
+2×4, 1×4, 4×4, 1×5 and 2×5. Separate instances have stable-key bot choices/order,
+static effective portraits, OS appearance by default and explicit Light/Dark/Moonlight.
+Exact-profile taps open foreground Talk/Chat without connecting, recording or pairing.
+Busy/approval deferral, stale/withdrawn recovery and independent drafts are guarded.
+
+Strict checks pass 125 JVM tests / 35 XML reports with zero failures/errors/skips, warning-strict
+lint/format and all four APKs. Thirty-two affected widget/navigation/presentation native methods,
+one blocked-watch publication check and five actual stock TLS audio/vault methods pass.
+The host geometry matrix covers 112 font/direction/orientation/size cases. Adaptive size
+variants share the sixteen-picture bitmap budget after parcel/service delivery. Editor
+recreation, stale CAS edits and configuration races have failing-then-passing regressions.
+Initial missing fixture environment assumptions were corrected; skipped runs are not passes.
+
+The [native widget gallery](demo/home-widgets/README.md) contains 29 source/APK-bound original
+synthetic PNGs. Demo: add a preset from the launcher, choose bots and order, select appearance,
+save and tap a portrait for that exact Talk/Chat profile. Reconfigure in Settings → Home
+screen widgets. A five-column launcher grid is required for the two five-column presets.
+
+The final whole-feature review found three Important items; one corrective pass addresses
+the restore-chain collision and native busy/theme coverage. No Critical/Minor items were found.
+The [review record](phone-home-widgets-review.md) retains all decisions and test limits.
+Physical phone delivery and One UI placement,
+custom ordering/taps, wallpaper/night changes and reboot remain open. API 29–30 runtime is
+unavailable. The wallpaper capability probe could not preserve the existing emulator image,
+so no wallpaper change was attempted; two real palette changes are not claimed. Existing
+phone/watch physical builds and protected identity/artwork/timeout state remain unchanged.
 
 ## Native client software acceptance — 2026-10-12
 

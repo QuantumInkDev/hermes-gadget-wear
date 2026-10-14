@@ -1,4 +1,4 @@
-<!-- Current continuation: centered watch footer delivered at f35bf59; owner confirms both recording ticks. Phone c248b03 reads Focus revision 1 and 19 keys. Seven phone home-widget layouts are in design review; grid favorites, away replies and system tile checks remain open. -->
+<!-- Current continuation: centered watch footer delivered at f35bf59; owner confirms both recording ticks. Phone c248b03 reads Focus revision 1 and 19 keys. Seven phone home-widget layouts are implemented and software-verified; physical placement remains; grid favorites, away replies and system tile checks remain open. -->
 # Session status
 
 Quantum Relay for Hermes native redesign is implemented and reviewed: Portrait studio,
@@ -46,11 +46,33 @@ microphone recording was performed. Owned debugging bridges are stopped and the 
 temporary phone debugging grant was removed/read back. APKs, backups and receipts remain
 ignored under `.local/native-design/`; no persistent Mac power helper is installed.
 
-New requested work: phone home-screen portrait shortcuts in 1×1, 2×2, 2×4, 1×4, 4×4, 1×5
-and 2×5 layouts. The owner defines these as rows × columns, so 1×4 and 1×5 are horizontal.
-OS light/dark and wallpaper colors are required. Design review precedes widget implementation;
-see the [phone-home-widgets design](docs/superpowers/specs/2026-10-13-phone-home-widgets-design.md).
-No widget code is implemented yet.
+Phone home widgets are implemented and the final review corrections are complete through
+`5a9a459`. All seven rows × columns presets have independent bot selection/order, static
+effective portraits, system/fixed appearances and guarded exact-profile Talk/Chat launch.
+Strict checks pass 125 JVM tests / 35 reports, zero failures/errors/skips and all four APKs.
+The final combined native replay passes 32 methods; blocked-watch publication and five
+stock TLS audio/vault checks bring the total to 38 distinct native methods. There are 112
+host geometry scenarios and 29 raw synthetic exports in the [widget gallery](docs/demo/home-widgets/README.md).
+
+The one fresh whole-feature review found three Important items: restore-chain collision,
+actual busy/prompt navigation coverage and existing-host OS night reinflation. One corrective
+pass addresses all three; no Critical/Minor items or second review. The [review record](docs/phone-home-widgets-review.md)
+contains decisions, receipts and the initial non-reproducing combined-run cold-launch failure.
+The controlled 18-case sequence and final 32-case replay pass, with diagnostics retained.
+
+The matching-certificate debug APK is ready at
+`.local/home-widgets/delivery/quantum-relay-phone-widgets-debug.apk`. The phone is absent
+on all existing ADB servers; USB reconnection was requested. No physical update was attempted,
+so prior identity/art/timeout state and installed builds remain as recorded above. Remaining
+widget acceptance: physical One UI placement/order/exact taps/multiple instances/reboot,
+five-column grid support, real two-wallpaper changes and API29–30 runtime. System night
+changes and fixed-palette preservation pass on the owned emulator; original OS mode is restored.
+The wallpaper backup probe failed before any mutation, so two real palette changes are open.
+
+The completed [widget plan](docs/superpowers/plans/2026-10-13-phone-home-widgets.md) and public
+review record are the handoff. Private receipts/ledger are archived under `.local/home-widgets/`.
+Only the owned FinalFix emulator is stopped after verification; older AVDs/shared ADB servers
+are preserved. No phone/watch reset, new enrollment, merge or Play release was performed.
 
 Remaining gates: native owner observations; specified four favorites, Focus/grid system tile
 addition and every target launch; associated phone edit acknowledgement after verified
