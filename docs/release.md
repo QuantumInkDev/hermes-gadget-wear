@@ -65,11 +65,13 @@ so the emulator wallpaper was untouched. API 29–30 runtime remains unavailable
 
 One fresh whole-feature review found three Important items; the single corrective pass
 addresses all three, with no Critical/Minor items. See the [review record](phone-home-widgets-review.md).
-Physical install and One UI placement of all
-supported presets, two wallpaper/night changes, custom ordering, multiple instances, exact
-portrait taps and reboot remain open. Five-column acceptance requires a five-column host.
-The verified debug APK is staged privately for a preserving phone update; absent hardware
-is not replaced by emulator evidence. Watch tiles retain their independent configuration.
+The phone received the widget APK over its existing paired wireless ADB connection on
+2026-10-14. Current APK/data backups, matching signer and installed APK hash are verified;
+all 101 baseline files, 18 identities, 54 artwork files and five-minute timeout are unchanged.
+Seven providers are registered. No app UI was launched. One UI placement of all supported
+presets, two wallpaper/night changes, custom ordering, multiple instances, exact portrait
+taps and reboot remain open. Five-column acceptance requires a five-column host.
+Watch tiles retain their independent configuration.
 Existing speech, power, publishing/signing/privacy and Play gates remain open.
 
 ## Artifacts and signing

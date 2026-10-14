@@ -1,4 +1,4 @@
-<!-- Current continuation: centered watch footer delivered at f35bf59; owner confirms both recording ticks. Phone c248b03 reads Focus revision 1 and 19 keys. Seven phone home-widget layouts are implemented and software-verified; physical placement remains; grid favorites, away replies and system tile checks remain open. -->
+<!-- Current continuation: centered watch footer delivered at f35bf59; owner confirms both recording ticks. Phone widget build 5a9a459 is installed wirelessly; prior Focus readback was revision 1 and 19 keys. Seven phone home-widget layouts are implemented and software-verified; physical placement remains; grid favorites, away replies and system tile checks remain open. -->
 # Session status
 
 Quantum Relay for Hermes native redesign is implemented and reviewed: Portrait studio,
@@ -60,11 +60,16 @@ pass addresses all three; no Critical/Minor items or second review. The [review 
 contains decisions, receipts and the initial non-reproducing combined-run cold-launch failure.
 The controlled 18-case sequence and final 32-case replay pass, with diagnostics retained.
 
-The matching-certificate debug APK is ready at
-`.local/home-widgets/delivery/quantum-relay-phone-widgets-debug.apk`. The phone is absent
-on all existing ADB servers; USB reconnection was requested. No physical update was attempted,
-so prior identity/art/timeout state and installed builds remain as recorded above. Remaining
-widget acceptance: physical One UI placement/order/exact taps/multiple instances/reboot,
+The matching-certificate widget APK (`5a9a459`, SHA-256
+`82234bdf1662b29e662128c464dfe32c65e14b699804b4f2c094a23db7788102`) is physically
+installed on the phone over its existing paired wireless ADB transport (2026-10-14).
+Current APK/app data were backed up; signer and installed APK hash match. All 101 baseline
+files are unchanged, including 18 identities and 54 artwork files. The original five-minute
+timeout remains. All seven widget providers are registered. No app UI was launched or
+captured, and no new pairing, enrollment or network grant was needed. Private receipts are
+under `.local/home-widgets/phone-delivery/`; `latest.json` identifies this delivery.
+The owner has phone usability feedback to provide; the asynchronous question is pending.
+Remaining widget acceptance: physical One UI placement/order/exact taps/multiple instances/reboot,
 five-column grid support, real two-wallpaper changes and API29–30 runtime. System night
 changes and fixed-palette preservation pass on the owned emulator; original OS mode is restored.
 The wallpaper backup probe failed before any mutation, so two real palette changes are open.

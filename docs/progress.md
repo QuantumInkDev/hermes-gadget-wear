@@ -46,11 +46,14 @@ screen widgets. A five-column launcher grid is required for the two five-column 
 The final whole-feature review found three Important items; one corrective pass addresses
 the restore-chain collision and native busy/theme coverage. No Critical/Minor items were found.
 The [review record](phone-home-widgets-review.md) retains all decisions and test limits.
-Physical phone delivery and One UI placement,
-custom ordering/taps, wallpaper/night changes and reboot remain open. API 29–30 runtime is
+On 2026-10-14, a preserving update installed the matching-signer widget APK on the phone
+using its existing paired wireless ADB transport. The backed-up APK and app data, installed
+APK hash and unchanged 101 baseline files are verified: 18 identities, 54 artwork files and
+five-minute timeout preserved. All seven providers are registered. No app UI was launched;
+One UI placement, custom ordering/taps, wallpaper/night changes and reboot remain open. API 29–30 runtime is
 unavailable. The wallpaper capability probe could not preserve the existing emulator image,
 so no wallpaper change was attempted; two real palette changes are not claimed. Existing
-phone/watch physical builds and protected identity/artwork/timeout state remain unchanged.
+watch physical build remains unchanged; the phone update preserves its identity/artwork/timeout state.
 
 ## Native client software acceptance — 2026-10-12
 
