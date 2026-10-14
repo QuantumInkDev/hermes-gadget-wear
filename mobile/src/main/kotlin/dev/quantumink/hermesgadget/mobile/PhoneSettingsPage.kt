@@ -88,7 +88,7 @@ fun PhoneSettingsPage(context: Context, navigate: (String) -> Unit) {
             "for Gadget SDK v0.2.0. " +
             "Not affiliated with or endorsed by Nous Research. " +
             "Hermes and Nous Research names and marks belong to their owners. " +
-            "The Voice Q icon is original QuantumInk artwork.",
+            "The Courier icon is original QuantumInk artwork.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )

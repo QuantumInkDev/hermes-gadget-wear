@@ -1,15 +1,3 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-  <group android:pivotX="54" android:pivotY="54" android:scaleX="0.72" android:scaleY="0.72">
-    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF"
-        android:strokeWidth="6" android:strokeLineCap="round" android:strokeLineJoin="round"
-        android:pathData="M77,50A25,25 0,1 1,27 50A25,25 0,1 1,77 50Z" />
-    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF"
-        android:strokeWidth="6" android:strokeLineCap="round" android:strokeLineJoin="round"
-        android:pathData="M69,69L83,83" />
-    <path android:fillColor="#00000000" android:strokeColor="#FFFFFF"
-        android:strokeWidth="6" android:strokeLineCap="round" android:strokeLineJoin="round"
-        android:pathData="M42,47V54M52,40V61M62,45V56" />
-  </group>
-</vector>
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/courier_foreground" android:gravity="fill"
+    android:filter="true" android:tint="#FFFFFFFF" android:tintMode="src_in" />

@@ -1,0 +1,61 @@
+{
+  "approved": "2026-10-14, Courier A",
+  "origin": "original built-in image generation, no upstream or personal art",
+  "foreground_edit": "built-in image generation background removal from approved concept",
+  "themed_layer": "same padded foreground alpha, white src_in tint in Android bitmap drawable",
+  "export": "bash tools/courier-icons.sh, ImageMagick 7",
+  "files": [
+    {
+      "path": "docs/store-assets/courier/courier-foreground-master.png",
+      "sha256": "21eb951e203c3a04cf5850c3748b7d96889ea9a1d0a76c5083b6ae8eeb62e5ec"
+    },
+    {
+      "path": "docs/store-assets/courier/courier-512.png",
+      "sha256": "7f9fb46a1bdc07e6e9bf432fa126702cc8dcff00441d1e9b0848f154140800e8"
+    },
+    {
+      "path": "client/src/main/res/drawable-nodpi/courier_foreground.png",
+      "sha256": "4358bb98b4b062b20db0f2a094e1be87cf0f20d17d9ccc1f749d238fb71d24cb"
+    },
+    {
+      "path": "docs/store-assets/courier/legacy/hdpi/ic_quantumink_relay.png",
+      "sha256": "cb5ef6d7635a2d9cba2ce080d99d9eb24a44b5067b96e4c2882016aae22c093f"
+    },
+    {
+      "path": "docs/store-assets/courier/legacy/hdpi/ic_quantumink_relay_round.png",
+      "sha256": "a3279a24767ca4baa7fb462c57d6823f789e9aa8e5d4061c801b2fc9198b2d4c"
+    },
+    {
+      "path": "docs/store-assets/courier/legacy/mdpi/ic_quantumink_relay.png",
+      "sha256": "1f2a93194bed20caa0de14e18475b221c06118134c9b31d2e6e99b6f02261755"
+    },
+    {
+      "path": "docs/store-assets/courier/legacy/mdpi/ic_quantumink_relay_round.png",
+      "sha256": "3d78b5b965e6d38d5e63af2e4214baaddf20ccb0b17588e7980de338d637c196"
+    },
+    {
+      "path": "docs/store-assets/courier/legacy/xhdpi/ic_quantumink_relay.png",
+      "sha256": "1c59f5139cddae706846470215c5164d91b3f77b86cd39c089b08397e6146f7b"
+    },
+    {
+      "path": "docs/store-assets/courier/legacy/xhdpi/ic_quantumink_relay_round.png",
+      "sha256": "4afb51a1b8666f6ab40c1446fdfb424bd0c04b9ab7ca7b9791791ca5a4002b80"
+    },
+    {
+      "path": "docs/store-assets/courier/legacy/xxhdpi/ic_quantumink_relay.png",
+      "sha256": "a37e4460b797f728f0ca3f8f7bd5ec5122df011c465799ae250500f1bc0e11c5"
+    },
+    {
+      "path": "docs/store-assets/courier/legacy/xxhdpi/ic_quantumink_relay_round.png",
+      "sha256": "f5717df1e9523b7f7f38f7122a99bc045cf7405ef10b62b5db3657119206ab54"
+    },
+    {
+      "path": "docs/store-assets/courier/legacy/xxxhdpi/ic_quantumink_relay.png",
+      "sha256": "775e45b6b23c0a893d500e2380a7be1aa4d00901ae87c5e07bfd5d7245462608"
+    },
+    {
+      "path": "docs/store-assets/courier/legacy/xxxhdpi/ic_quantumink_relay_round.png",
+      "sha256": "5baf8b9344fe997656b97a11da744b65772883e6c68bc86de685fd7aabe29b25"
+    }
+  ]
+}
