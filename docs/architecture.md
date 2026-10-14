@@ -340,3 +340,32 @@ epochs suppress obsolete callbacks. Phone playback uses a player per stream and 
 epoch/stream-guarded completion updates, so stopping/leaving a conversation does not acquire
 the session monitor from the playback monitor. Neither phone conversation teardown nor
 portrait import touches the independent watch relay or watch pairing records.
+
+## Phone home-screen portrait widgets
+
+Seven native providers share `HomeWidgetRenderer`, the Compose configuration activity
+and a serial local worker independent of watch Data Layer publication. Providers read
+only a bounded local roster projection and normalized static PNG derivatives, without
+opening discovery, identity vaults or Gadget sockets. Effective portrait changes and
+local roster commits enqueue widget publication before potentially blocking watch work.
+There is no periodic widget poll, service, recording or wake lock.
+
+`HomeWidgetStore` keeps up to 128 instance configs in one 1-MiB AtomicFile map, with
+provider/preset, ordered stable keys, appearance and CAS revision. Platform ID restoration
+commits from an original snapshot, including overlapping mappings, and invalidates stale
+editors. Legacy per-ID debug state migrates on successful save. A separate bounded roster
+contains only key/name/source/status/picture hash. No URL, token or pairing identity is
+stored in a widget. Content-addressed static derivatives are bounded to 8 MiB; adaptive
+RemoteViews variants share decoded bitmaps within min(1 MiB, one RGBA screen).
+
+Explicit immutable activity PendingIntents bind ID, slot, key and revision. Foreground
+validation checks provider ownership and current config/roster; the shared phone navigator
+uses lifecycle, cancellation and request-generation guards. A config-write epoch rejects
+concurrent stale lookups without main-thread file reads. Same-key endpoint changes resolve
+from the current catalog. A busy/approval state preserves its turn and requires a later
+manual Open requested bot action. Directory search, collapse, scroll and drafts survive
+return navigation. Widget editing and rendering do not modify watch tile pins or identities.
+
+API 31+ metadata/themes live in version-qualified resources. API 29–30 retains explicit
+size hints, brand day/night fallbacks and Settings-based reconfiguration. Actual launcher
+placement and runtime-specific limits remain acceptance gates, not inferred guarantees.

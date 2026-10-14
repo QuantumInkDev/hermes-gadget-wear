@@ -21,6 +21,104 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HomeWidgetRenderTest {
+    @Test fun landscapeUsesItsOwnCaptionAndSafeContentHeight() {
+        val root = File(context.cacheDir, "widget-orientation-${UUID.randomUUID()}")
+        try {
+            val options = android.os.Bundle().apply {
+                putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 57)
+                putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 127)
+                putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 51)
+                putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 102)
+            }
+            val config = WidgetConfig(HomeWidgetPreset.FOCUS, listOf("a:one"))
+            val profiles =
+                listOf(
+                    WidgetProfile(
+                        "a:one",
+                        "A longer bot name",
+                        "Studio",
+                        CatalogStatus.AVAILABLE,
+                        null
+                    )
+                )
+            val views = HomeWidgetRenderer.adaptive(
+                context,
+                100,
+                config,
+                profiles,
+                HomeWidgetPictures(root),
+                options
+            )
+            val landscape = context.createConfigurationContext(
+                android.content.res.Configuration(context.resources.configuration).apply {
+                    orientation =
+                        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                }
+            )
+            val view = views.apply(landscape, FrameLayout(landscape))
+            val density = context.resources.displayMetrics.density
+            view.measure(
+                View.MeasureSpec.makeMeasureSpec((127 * density).toInt(), View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(
+                    (
+                        51 *
+                            density
+                        ).toInt(),
+                    View.MeasureSpec.EXACTLY
+                )
+            )
+            view.layout(0, 0, view.measuredWidth, view.measuredHeight)
+            assertEquals(1, view.findViewById<TextView>(R.id.home_widget_name).maxLines)
+            assertTrue(targets(view).single().height / density >= 48)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test fun systemNightThemeUsesTheActualSystemAccentInsteadOfTheFixedAppPalette() {
+        val root = File(context.cacheDir, "widget-colors-${UUID.randomUUID()}")
+        try {
+            val night = context.createConfigurationContext(
+                android.content.res.Configuration(context.resources.configuration).apply {
+                    uiMode =
+                        (uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK.inv()) or
+                        android.content.res.Configuration.UI_MODE_NIGHT_YES
+                }
+            )
+            val expected = android.view.ContextThemeWrapper(
+                night,
+                android.R.style.Theme_DeviceDefault_DayNight
+            )
+            val value = android.util.TypedValue()
+            assertTrue(expected.theme.resolveAttribute(android.R.attr.colorAccent, value, true))
+            val accent = if (value.resourceId !=
+                0
+            ) {
+                expected.getColor(value.resourceId)
+            } else {
+                value.data
+            }
+            val config = WidgetConfig(HomeWidgetPreset.FOCUS, listOf("a:one"))
+            val profiles =
+                listOf(WidgetProfile("a:one", "Orbit", "Studio", CatalogStatus.AVAILABLE, null))
+            val view = HomeWidgetRenderer.render(
+                night,
+                100,
+                config,
+                profiles,
+                HomeWidgetPictures(root),
+                57f,
+                102f
+            ).apply(night, FrameLayout(night))
+            assertEquals(
+                accent,
+                view.findViewById<TextView>(R.id.home_widget_initials).currentTextColor
+            )
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private fun all(view: View): List<View> = listOf(view) +
         if (view is ViewGroup) {

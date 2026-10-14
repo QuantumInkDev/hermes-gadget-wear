@@ -3,6 +3,8 @@ package dev.quantumink.hermesgadget.mobile.widgets
 import android.content.Intent
 import android.os.SystemClock
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import dev.quantumink.hermesgadget.mobile.CatalogRepository
 import dev.quantumink.hermesgadget.mobile.CatalogVault
 import dev.quantumink.hermesgadget.mobile.ProfileVault
@@ -18,6 +20,60 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class HomeWidgetEditorTest {
+    @Test fun recreationRetainsTheDraftAndAStaleEditorMustReload() = fixture { host ->
+        val id = host.bind(HomeWidgetPreset.FOCUS)
+        val store = HomeWidgets.store(context)
+        var activity: HomeWidgetConfigActivity? = null
+        try {
+            activity = open(id)
+            WidgetUi.await("Choose bots")
+            WidgetUi.click("Edit widget slot 1")
+            WidgetUi.click("Choose Orbit · Studio")
+            WidgetUi.click("Dark")
+            val original = activity
+            instrumentation.runOnMainSync { original.recreate() }
+            val until = SystemClock.uptimeMillis() + 5000
+            while (activity === original && SystemClock.uptimeMillis() < until) {
+                instrumentation.runOnMainSync {
+                    activity =
+                        ActivityLifecycleMonitorRegistry.getInstance()
+                            .getActivitiesInStage(Stage.RESUMED)
+                            .filterIsInstance<HomeWidgetConfigActivity>().firstOrNull {
+                                it !== original
+                            }
+                            ?: original
+                }
+                SystemClock.sleep(30)
+            }
+            assertTrue(activity !== original)
+            WidgetUi.await("Choose bots")
+            WidgetUi.click("Save widget")
+            finished(requireNotNull(activity))
+            val saved = requireNotNull(store.config(id))
+            assertEquals(listOf("studio:orbit"), saved.slots)
+            assertEquals(WidgetAppearance.DARK, saved.appearance)
+            activity = open(id)
+            WidgetUi.click("Edit widget slot 1")
+            WidgetUi.click("Choose Orbit · Lab")
+            val otherEdit = store.save(
+                id,
+                saved.copy(appearance = WidgetAppearance.LIGHT),
+                saved.revision
+            )
+            WidgetUi.click("Save widget")
+            WidgetUi.await("Reload widget settings")
+            assertEquals(otherEdit, store.config(id))
+            WidgetUi.click("Reload widget settings")
+            WidgetUi.click("Save widget")
+            finished(requireNotNull(activity))
+            assertEquals(listOf("studio:orbit"), store.config(id)?.slots)
+            assertEquals(WidgetAppearance.LIGHT, store.config(id)?.appearance)
+        } finally {
+            activity?.let { instrumentation.runOnMainSync { it.finish() } }
+            store.delete(id)
+        }
+    }
+
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
     private fun open(id: Int): HomeWidgetConfigActivity = instrumentation.startActivitySync(

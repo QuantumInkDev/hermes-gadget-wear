@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:initialLayout="@layout/home_widget_root" android:previewLayout="@layout/home_widget_preview_strip_four"
+    android:initialLayout="@layout/home_widget_root"
     android:previewImage="@mipmap/ic_quantumink_relay" android:description="@string/home_widget_strip_four"
     android:configure="dev.quantumink.hermesgadget.mobile.widgets.HomeWidgetConfigActivity"
-    android:targetCellWidth="4" android:targetCellHeight="1"
     android:minWidth="250dp" android:minHeight="56dp"
     android:minResizeWidth="192dp" android:minResizeHeight="48dp"
     android:resizeMode="horizontal|vertical" android:widgetCategory="home_screen"

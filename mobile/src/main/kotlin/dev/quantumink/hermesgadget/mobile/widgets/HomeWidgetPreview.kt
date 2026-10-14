@@ -62,11 +62,11 @@ internal fun HomeWidgetPreview(
             color = colors.surfaceContainerHigh,
             contentColor = colors.onSurface
         ) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 repeat(config.preset.rows) { row ->
                     Row(
                         Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         repeat(config.preset.columns) { column ->
                             val slot = row * config.preset.columns + column

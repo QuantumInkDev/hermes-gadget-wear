@@ -16,6 +16,58 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HomeWidgetStoreTest {
+    @Test fun restoreMapsOverlappingOldAndNewIdsFromTheOriginalSnapshot() {
+        val root = directory()
+        try {
+            val store = HomeWidgetStore(root)
+            store.save(1, WidgetConfig(HomeWidgetPreset.FOCUS, listOf("a:one")), 0)
+            store.save(2, WidgetConfig(HomeWidgetPreset.FOCUS, listOf("b:one")), 0)
+            val restored =
+                runCatching {
+                    store.restore(intArrayOf(1, 2), intArrayOf(2, 3), HomeWidgetPreset.FOCUS)
+                }
+            assertTrue(
+                "Valid platform restore mapping must survive overlapping ID sets",
+                restored.isSuccess
+            )
+            assertEquals("a:one", store.config(2)?.slots?.single())
+            assertEquals("b:one", store.config(3)?.slots?.single())
+            assertNull(store.config(1))
+            assertThrows(IllegalArgumentException::class.java) {
+                store.save(
+                    2,
+                    WidgetConfig(HomeWidgetPreset.FOCUS, listOf("b:one"), revision = 1),
+                    1
+                )
+            }
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test fun aFullCacheCanReplaceACorruptReferencedThumbnail() {
+        val root = directory()
+        try {
+            val source = File(root, "source.png")
+            val bitmap = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888)
+            bitmap.eraseColor(Color.RED)
+            source.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            bitmap.recycle()
+            val hash = MessageDigest.getInstance("SHA-256").digest(source.readBytes())
+                .joinToString("") { "%02x".format(it) }
+            val directory = File(root, "pictures").also { it.mkdirs() }
+            val hashes = (0..30).map { "%064x".format(it) }.toSet() + hash
+            hashes.forEach { File(directory, "$it.png").writeBytes(ByteArray(262144)) }
+            val cache = HomeWidgetPictures(directory)
+            cache.retain(hashes)
+            assertTrue(cache.prepare(hash, source))
+            assertNotNull(cache.bitmap(hash, 80))
+            assertTrue(directory.listFiles().orEmpty().sumOf { it.length() } <= 8L * 1024 * 1024)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     private fun directory() = File(
         InstrumentationRegistry.getInstrumentation().targetContext.cacheDir,
         "widget-test-${UUID.randomUUID()}"

@@ -100,3 +100,18 @@ These are requirements; implementation and physical acceptance are recorded sepa
 Follow M0–M8 from the brief. M0 delivers these design documents, runnable starter apps, a pure JVM module, reproducible wrapper/catalog, build/test/lint/format CI, and secret scanning. M1 adds wire models, framing, identity, handshake/heartbeat behavior, upstream vectors, and a JVM test using the actual SDK development server. M2 requires the maintainer's endpoint and approval plus a real hardware demo. M3–M8 retain the original measurements and release gates; unit tests alone never close them.
 
 Every milestone records exact checks and a short demo in [progress](progress.md). Claims of success must distinguish local tests, CI, emulator, real Hermes, and physical watch evidence.
+
+## Approved phone home widgets — 2026-10-13
+
+Seven portrait shortcut presets use rows × columns: 1×1, 2×2, 2×4, 1×4, 4×4,
+1×5 and 2×5. Each instance has its own stable-key bot slots, accessible ordering
+and appearance. Follow system uses OS colors/night mode; Light, Dark and Electronic
+Moonlight remain explicit per-widget choices. Portraits have captions below and no
+overlays; GIF overrides use their validated static fallback.
+
+A cell opens that exact profile's foreground Talk/Chat screen. Connect, recording,
+sending and pairing remain deliberate actions. Busy turns defer a different bot;
+withdrawn or stale targets offer editing rather than an index-based substitute.
+Five-column presets require a suitable launcher grid. Physical placement/theme and
+older-runtime acceptance are recorded separately in [release preparation](release.md).
+See the [approved widget specification](superpowers/specs/2026-10-13-phone-home-widgets-design.md).

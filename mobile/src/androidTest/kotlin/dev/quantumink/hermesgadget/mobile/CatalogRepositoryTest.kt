@@ -388,6 +388,19 @@ class CatalogRepositoryTest {
                 val refresh = repository.refresh(true)
                 assertTrue(entered.await(2, TimeUnit.SECONDS))
                 val page = repository.pages.value.single()
+                val deadline = android.os.SystemClock.uptimeMillis() + 2000
+                while (dev.quantumink.hermesgadget.mobile.widgets.HomeWidgets.store(context)
+                        .profiles().none { it.key == page.key } &&
+                    android.os.SystemClock.uptimeMillis() < deadline
+                ) {
+                    android.os.SystemClock.sleep(20)
+                }
+                assertEquals(
+                    "Local widget publication must finish while watch publication is blocked",
+                    page.key,
+                    dev.quantumink.hermesgadget.mobile.widgets.HomeWidgets.store(context)
+                        .profiles().single().key
+                )
                 val lookup = worker.submit<EndpointProfile?> { repository.profileFor(page) }
                 assertEquals(
                     "wss://a.example.invalid/gadget",

@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@android:id/background" android:layout_width="match_parent" android:layout_height="match_parent"
     android:orientation="vertical" android:padding="4dp" android:theme="@style/HomeWidgetTheme"
-    android:background="@drawable/home_widget_background_system" android:clipToOutline="true">
+    android:background="@drawable/home_widget_background_system">
     <LinearLayout android:id="@+id/home_widget_rows" android:layout_width="match_parent"
         android:layout_height="match_parent" android:orientation="vertical" />
     <TextView android:id="@+id/home_widget_recovery" android:layout_width="match_parent"

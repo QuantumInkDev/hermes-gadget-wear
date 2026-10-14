@@ -111,10 +111,84 @@ class HomeWidgetLaunchTest {
             SystemClock.sleep(500)
             instrumentation.waitForIdleSync()
             assertEquals(version, phone(activity).state.value.sessionVersion)
+            val changed = vault.pages().map { page ->
+                if (page.key !=
+                    "studio:orbit"
+                ) {
+                    page
+                } else {
+                    CatalogPage(
+                        page.sourceId,
+                        page.sourceLabel,
+                        CatalogProfile(
+                            "orbit",
+                            "Orbit",
+                            "wss://replacement.example.invalid/gadget",
+                            null
+                        ),
+                        CatalogStatus.AVAILABLE,
+                        2
+                    )
+                }
+            }
+            vault.savePages(changed)
+            CatalogRepository.get(context).savedPages()
+            studio.send()
+            val until = SystemClock.uptimeMillis() + 5000
+            while (phone(activity).state.value.profile?.endpoint?.url !=
+                "wss://replacement.example.invalid/gadget" &&
+                SystemClock.uptimeMillis() < until
+            ) {
+                SystemClock.sleep(30)
+            }
+            assertEquals(
+                "wss://replacement.example.invalid/gadget",
+                phone(activity).state.value.profile?.endpoint?.url
+            )
+            val repository = CatalogRepository.get(context)
+            val held = java.util.concurrent.CountDownLatch(1)
+            val release = java.util.concurrent.CountDownLatch(1)
+            val blocker = java.util.concurrent.Executors.newSingleThreadExecutor()
+            try {
+                blocker.submit {
+                    synchronized(repository) {
+                        held.countDown()
+                        release.await(5, java.util.concurrent.TimeUnit.SECONDS)
+                    }
+                }
+                assertTrue(held.await(2, java.util.concurrent.TimeUnit.SECONDS))
+                lab.send()
+                val blockedUntil = SystemClock.uptimeMillis() + 3000
+                fun lookupBlocked(): Boolean = Thread.getAllStackTraces().any { (thread, frames) ->
+                    thread.state == Thread.State.BLOCKED && frames.any { frame ->
+                        frame.className == CatalogRepository::class.java.name &&
+                            frame.methodName == "savedPages"
+                    }
+                }
+                while (!lookupBlocked() &&
+                    SystemClock.uptimeMillis() < blockedUntil
+                ) {
+                    SystemClock.sleep(20)
+                }
+                assertTrue("Lookup must reach the controlled repository boundary", lookupBlocked())
+                store.save(
+                    id,
+                    config.copy(slots = listOf("studio:orbit", null, null, null)),
+                    config.revision
+                )
+                release.countDown()
+                WidgetUi.await("Bot shortcut unavailable")
+                assertEquals("studio:orbit", phone(activity).state.value.page?.key)
+                WidgetUi.click("Dismiss")
+            } finally {
+                release.countDown()
+                blocker.shutdownNow()
+            }
+            val current = requireNotNull(store.config(id))
             store.save(
                 id,
-                config.copy(slots = listOf(null, "lab:orbit", null, null)),
-                config.revision
+                current.copy(slots = listOf(null, "lab:orbit", null, null)),
+                current.revision
             )
             lab.send()
             WidgetUi.await("Bot shortcut unavailable")

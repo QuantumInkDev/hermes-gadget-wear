@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.core.net.toUri
 import dev.quantumink.hermesgadget.mobile.MainActivity
 import dev.quantumink.hermesgadget.protocol.CatalogPage
 import java.io.File
@@ -122,23 +123,7 @@ object HomeWidgets {
             val value = preset(context, id) ?: return@forEach
             val config = store.config(id)?.takeIf { it.preset == value } ?: WidgetConfig(value)
             val options = manager.getAppWidgetOptions(id)
-            val width = options.getInt(
-                AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,
-                value.columns * 73 - 16
-            ).coerceAtLeast(1)
-            val height = options.getInt(
-                AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT,
-                value.rows * 118 - 16
-            ).coerceAtLeast(1)
-            val view = HomeWidgetRenderer.render(
-                context,
-                id,
-                config,
-                profiles,
-                cache,
-                width.toFloat(),
-                height.toFloat()
-            )
+            val view = HomeWidgetRenderer.adaptive(context, id, config, profiles, cache, options)
             val current = store.config(id)?.takeIf { it.preset == value } ?: WidgetConfig(value)
             if (current == config && preset(context, id) == value) manager.updateAppWidget(id, view)
         }
@@ -148,7 +133,7 @@ object HomeWidgets {
         context.packageName,
         "dev.quantumink.hermesgadget.mobile.widgets.HomeWidgetConfigActivity"
     )
-        .setData(Uri.parse("quantumrelay-widget://edit/$id"))
+        .setData("quantumrelay-widget://edit/$id".toUri())
         .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 

@@ -11,6 +11,60 @@ import dev.quantumink.hermesgadget.protocol.CatalogStatus
 import kotlin.math.sqrt
 
 object HomeWidgetRenderer {
+    /** Every size shares the exact same decoded bitmap objects and total budget. */
+    @Suppress("DEPRECATION")
+    fun adaptive(
+        context: Context,
+        id: Int,
+        config: WidgetConfig,
+        profiles: List<WidgetProfile>,
+        pictures: HomeWidgetPictures,
+        options: android.os.Bundle
+    ): RemoteViews {
+        val decoded = mutableMapOf<String, Bitmap?>()
+        fun at(width: Float, height: Float) = compose(
+            context,
+            id,
+            config,
+            profiles,
+            pictures,
+            width,
+            height,
+            decoded
+        )
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            val sizes = options.getParcelableArrayList<android.util.SizeF>(
+                android.appwidget.AppWidgetManager.OPTION_APPWIDGET_SIZES
+            ).orEmpty().filter {
+                it.width.isFinite() && it.height.isFinite() && it.width > 0 && it.height > 0
+            }.distinct().take(16)
+            if (sizes.isNotEmpty()) {
+                return RemoteViews(
+                    sizes.associateWith {
+                        at(it.width, it.height)
+                    }
+                )
+            }
+        }
+        val width = options.getInt(
+            android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,
+            config.preset.columns * 73 - 16
+        ).coerceAtLeast(1).toFloat()
+        val height = options.getInt(
+            android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT,
+            config.preset.rows * 118 - 16
+        ).coerceAtLeast(1).toFloat()
+        val wide = options.getInt(
+            android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH,
+            width.toInt()
+        ).coerceAtLeast(1).toFloat()
+        val short = options.getInt(
+            android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,
+            height.toInt()
+        ).coerceAtLeast(1).toFloat()
+        return RemoteViews(at(wide, short), at(width, height))
+    }
+
     fun render(
         context: Context,
         id: Int,
@@ -19,6 +73,26 @@ object HomeWidgetRenderer {
         pictures: HomeWidgetPictures,
         widthDp: Float,
         heightDp: Float
+    ): RemoteViews = compose(
+        context,
+        id,
+        config,
+        profiles,
+        pictures,
+        widthDp,
+        heightDp,
+        mutableMapOf()
+    )
+
+    private fun compose(
+        context: Context,
+        id: Int,
+        config: WidgetConfig,
+        profiles: List<WidgetProfile>,
+        pictures: HomeWidgetPictures,
+        widthDp: Float,
+        heightDp: Float,
+        decoded: MutableMap<String, Bitmap?>
     ): RemoteViews {
         require(id > 0 && widthDp.isFinite() && heightDp.isFinite())
         val root = RemoteViews(context.packageName, R.layout.home_widget_root)
@@ -40,8 +114,17 @@ object HomeWidgetRenderer {
                 }
             )
         }
-        val cellWidth = (widthDp - 8) / config.preset.columns
-        val cellHeight = (heightDp - 8) / config.preset.rows
+        val padding = if (widthDp / config.preset.columns >= 56 &&
+            heightDp / config.preset.rows >= 56
+        ) {
+            4
+        } else {
+            0
+        }
+        val pixels = (padding * context.resources.displayMetrics.density).toInt()
+        root.setViewPadding(android.R.id.background, pixels, pixels, pixels, pixels)
+        val cellWidth = (widthDp - 2 * padding) / config.preset.columns
+        val cellHeight = (heightDp - 2 * padding) / config.preset.rows
         root.removeAllViews(R.id.home_widget_rows)
         if (cellWidth < 48 || cellHeight < 48) {
             root.setViewVisibility(R.id.home_widget_rows, View.GONE)
@@ -60,7 +143,6 @@ object HomeWidgetRenderer {
         val metrics = context.resources.displayMetrics
         val budget = minOf(1024L * 1024, metrics.widthPixels.toLong() * metrics.heightPixels * 4)
         val side = sqrt(budget / (config.preset.capacity * 4.0)).toInt().coerceIn(16, 256)
-        val decoded = mutableMapOf<String, Bitmap?>()
         repeat(config.preset.rows) { row ->
             val line = RemoteViews(context.packageName, R.layout.home_widget_row)
             repeat(config.preset.columns) { column ->

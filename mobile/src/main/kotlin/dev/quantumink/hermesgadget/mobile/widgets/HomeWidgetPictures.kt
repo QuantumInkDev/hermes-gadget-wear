@@ -7,6 +7,8 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.util.AtomicFile
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
 import dev.quantumink.hermesgadget.protocol.ProfileCatalog
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -22,6 +24,8 @@ class HomeWidgetPictures(private val directory: File) {
             it.recycle()
             return true
         }
+        val corrupt = File(directory, "$hash.png")
+        if (corrupt.exists() && !corrupt.delete()) return false
         if (source == null) return false
         return runCatching {
             val bytes = boundedBytes(source) ?: return false
@@ -30,7 +34,7 @@ class HomeWidgetPictures(private val directory: File) {
             }
             if (actual != hash) return false
             val image = decode(bytes) ?: return false
-            val circle = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888)
+            val circle = createBitmap(256, 256)
             val canvas = Canvas(circle)
             canvas.clipPath(Path().apply { addCircle(128f, 128f, 128f, Path.Direction.CW) })
             val scale = minOf(256f / image.width, 256f / image.height)
@@ -86,7 +90,7 @@ class HomeWidgetPictures(private val directory: File) {
         require(validWidgetHash(hash) && side in 16..256)
         val image = boundedBytes(File(directory, "$hash.png"))?.let(::decode) ?: return null
         if (image.width == side && image.height == side) return image
-        return Bitmap.createScaledBitmap(image, side, side, true).also {
+        return image.scale(side, side).also {
             if (it !==
                 image
             ) {

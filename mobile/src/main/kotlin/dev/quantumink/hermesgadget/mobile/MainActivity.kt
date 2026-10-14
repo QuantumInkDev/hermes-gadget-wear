@@ -36,6 +36,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import dev.quantumink.hermesgadget.client.AppearancePreferences
 import dev.quantumink.hermesgadget.mobile.widgets.HomeWidgetLaunch
+import dev.quantumink.hermesgadget.mobile.widgets.HomeWidgetStore
 import dev.quantumink.hermesgadget.mobile.widgets.HomeWidgets
 import dev.quantumink.hermesgadget.mobile.widgets.HomeWidgetsPage
 import dev.quantumink.hermesgadget.mobile.widgets.LaunchDecision
@@ -343,13 +344,17 @@ class MainActivity : ComponentActivity() {
 
     private fun requestProfile(key: String, widget: WidgetLaunchRequest?) {
         val requestedFrom = destination
+        val widgetVersion = HomeWidgetStore.version()
         pendingWidget = null
         widgetUnavailable = false
         widgetEditId = null
         navigation.request(key, widget, {
             started && destination == requestedFrom &&
                 lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
-        }) { resolved ->
+        }) { candidate ->
+            val resolved = candidate.takeIf {
+                widget == null || widgetVersion == HomeWidgetStore.version()
+            }
             val state = conversation.state.value
             val decision = if (widget == null) {
                 if (resolved == null) LaunchDecision.UNAVAILABLE else LaunchDecision.OPEN
@@ -357,7 +362,9 @@ class MainActivity : ComponentActivity() {
                 decideLaunch(
                     key,
                     state.page?.key.takeIf {
-                        state.visible
+                        state.visible && resolved != null &&
+                            state.profile?.endpoint?.url == resolved.second.endpoint.url &&
+                            state.profile.accessToken == resolved.second.accessToken
                     },
                     phoneSelectionLocked(state),
                     resolved != null
