@@ -18,3 +18,10 @@ landscape recovery. This was absent from the earlier exact-size host matrix.
 
 No endpoint, pairing, conversation send, launcher grid/layout or personal artwork change
 is part of this fix. Phone launcher inspection is explicitly authorized by the owner.
+
+Completed at production source `b264796`. Two native regressions failed then passed;
+12 affected native methods and strict checks (133 JVM /38 reports, all four APKs) pass.
+The actual placed widget now shows its selected portrait, its PendingIntent matches that
+selection and tapping opens Talk/Chat. All 104 files are preserved at installation, with
+74 protected files/config unchanged after UI inspection. The phone is back on its launcher.
+See `docs/widget-host-sizing-fix.md` for measured cause, evidence and retained limits.

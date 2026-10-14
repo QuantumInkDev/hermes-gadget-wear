@@ -1,5 +1,22 @@
-<!-- Current continuation: Courier phone refinement installed at d26e790; 102 baseline files /18 identities /54 artwork files preserved. Watch f35bf59 unchanged. Software checks and native gallery complete; owner speech/gesture and existing release gates remain. -->
+<!-- Current continuation: Nova widget sizing fix b264796 is installed; the existing 1x1 portrait and Talk/Chat launch are verified. All 104 baseline files /18 identities /55 art files preserved. Watch f35bf59 unchanged. -->
 # Session status
+
+The configured Nova 1×1 widget recovery bug is fixed and physically verified at `b264796`.
+The renderer supplies supported-minimum and tiny-recovery variants alongside advertised
+sizes; this handles a host whose actual padded height is smaller than its reported height.
+The existing widget now shows its selected portrait/caption, its PendingIntent matches the
+saved profile and its tap opens Talk/Chat. The phone is returned to the launcher. All 104
+baseline files are unchanged at installation, including 18 identities and 55 artwork files;
+74 protected identity/artwork/config files remain unchanged after inspection. Timeout and
+seven providers are preserved. No widget recreation, resizing, pairing or sending occurred.
+
+Two RED-to-GREEN regressions and twelve affected native host/render methods pass. Strict
+checks/all four APKs pass 133 JVM tests /38 reports with no failures/errors/skips. A separate
+launch fixture refused to overwrite existing emulator setup and is not counted. See
+[fix notes](docs/widget-host-sizing-fix.md), the
+[plan](docs/superpowers/plans/2026-10-14-widget-host-sizing-fix.md) and private receipts under
+`.local/widget-launcher-fix/`. Personal launcher images remain private; the physical watch and
+remaining broader acceptance/release gates are unchanged. Keep PR #1 draft.
 
 Quantum Relay for Hermes native redesign is implemented and reviewed: Portrait studio,
 the earlier Voice Q (superseded on the phone by Courier), Light/Dark/Electronic Moonlight, grouped/custom-ordered phone profiles,

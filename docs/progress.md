@@ -1,5 +1,24 @@
 # Progress
 
+## Nova widget sizing correction — 2026-10-14
+
+The owner's configured 1×1 Nova widget showed recovery because the launcher's advertised
+portrait height exceeded its actual content height; Android selected the short landscape
+fallback. A minimum supported responsive layout and separate undersize recovery now bridge
+that gap, within the existing sixteen-variant/bitmap limits. Two regressions fail then pass.
+
+Strict full checks and all four APK builds pass (133 JVM tests /38 reports, no failures,
+errors or skips). Twelve affected native host/render methods pass without assumptions,
+including the actual size mismatch, all seven presets/four appearances at minimum/undersize,
+existing geometry/night and bitmap sharing. A separate launch fixture's safety skip is not
+counted. [Fix notes and limitations](widget-host-sizing-fix.md).
+
+Phone build `b264796` is installed with matching signer/hash and current backups. All 104
+baseline files, 18 identities, 55 artwork files, timeout and seven providers are preserved.
+The actual existing widget displays its selected portrait/caption, its PendingIntent matches
+the selection and a tap opens Talk/Chat. Its configuration is unchanged; no resize, replacement,
+pairing or send was needed. The phone is back on its launcher. Personal captures stay ignored.
+
 ## Phone messaging and Courier — 2026-10-14
 
 The approved refinement is implemented: Quantum Relay for Hermes Agents leads smaller
