@@ -46,5 +46,33 @@
                 <data android:scheme="wear" android:host="*" android:path="/hermes_tile_watch_v1" />
             </intent-filter>
         </service>
+        <receiver android:name=".widgets.FocusHomeWidget" android:exported="false" android:label="@string/home_widget_focus">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/home_widget_focus" />
+        </receiver>
+        <receiver android:name=".widgets.FourHomeWidget" android:exported="false" android:label="@string/home_widget_four">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/home_widget_four" />
+        </receiver>
+        <receiver android:name=".widgets.EightHomeWidget" android:exported="false" android:label="@string/home_widget_eight">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/home_widget_eight" />
+        </receiver>
+        <receiver android:name=".widgets.FourStripHomeWidget" android:exported="false" android:label="@string/home_widget_strip_four">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/home_widget_strip_four" />
+        </receiver>
+        <receiver android:name=".widgets.SixteenHomeWidget" android:exported="false" android:label="@string/home_widget_sixteen">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/home_widget_sixteen" />
+        </receiver>
+        <receiver android:name=".widgets.FiveStripHomeWidget" android:exported="false" android:label="@string/home_widget_strip_five">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/home_widget_strip_five" />
+        </receiver>
+        <receiver android:name=".widgets.TenHomeWidget" android:exported="false" android:label="@string/home_widget_ten">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/home_widget_ten" />
+        </receiver>
     </application>
 </manifest>

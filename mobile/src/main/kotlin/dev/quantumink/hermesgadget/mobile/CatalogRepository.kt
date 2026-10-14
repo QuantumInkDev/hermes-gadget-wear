@@ -123,7 +123,10 @@ class CatalogRepository internal constructor(
         val previous = vault.pages()
         val raw = combined(previous, false)
         if (previous.map { it.key } != raw.map { it.key }) vault.savePages(raw)
-        return combined(raw).also { mutablePages.value = it }
+        return combined(raw).also {
+            mutablePages.value = it
+            dev.quantumink.hermesgadget.mobile.widgets.HomeWidgets.publish(context, it)
+        }
     }
 
     @Synchronized fun saveSource(source: CatalogSource) {
@@ -362,6 +365,7 @@ class CatalogRepository internal constructor(
         version: Long = revision,
         refresh: CompletableFuture<List<CatalogPage>>? = null
     ): CompletableFuture<Unit> {
+        dev.quantumink.hermesgadget.mobile.widgets.HomeWidgets.publish(context, pages)
         val pictureAnimations = vault.animations().toMap()
         val completion = CompletableFuture<Unit>()
         lastPublication = completion

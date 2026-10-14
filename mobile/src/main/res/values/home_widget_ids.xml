@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="home_widget_cell" type="id" />
+    <item name="home_widget_portrait" type="id" />
+    <item name="home_widget_name" type="id" />
+</resources>
