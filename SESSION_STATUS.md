@@ -68,7 +68,15 @@ files are unchanged, including 18 identities and 54 artwork files. The original 
 timeout remains. All seven widget providers are registered. No app UI was launched or
 captured, and no new pairing, enrollment or network grant was needed. Private receipts are
 under `.local/home-widgets/phone-delivery/`; `latest.json` identifies this delivery.
-The owner has phone usability feedback to provide; the asynchronous question is pending.
+The owner supplied phone usability feedback. A focused [proposed design](docs/superpowers/specs/2026-10-14-phone-messaging-design.md)
+and [interactive mockup](docs/superpowers/specs/2026-10-14-phone-messaging-mockup.html) are prepared.
+The selected phone gesture is hold to record, release to send, slide left to cancel, with
+a live microphone waveform. The proposal also makes Quantum Relay for Hermes Agents the
+single-line leading title, reduces section headings, replaces both picture dialogs with a
+shared sheet and presents two original replacement icons. Design/icon approval is pending;
+no native code, launcher assets or physical device was changed for this feedback yet.
+The mockup passed a batched wide-composer, narrow Light picture-sheet and icon inspection,
+with no console errors or page overflow. This is design evidence, not native acceptance.
 Remaining widget acceptance: physical One UI placement/order/exact taps/multiple instances/reboot,
 five-column grid support, real two-wallpaper changes and API29–30 runtime. System night
 changes and fixed-palette preservation pass on the owned emulator; original OS mode is restored.
