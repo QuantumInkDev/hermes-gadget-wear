@@ -1,8 +1,8 @@
 # Quantum Relay for Hermes: phone home widgets
 
-Status: proposed for maintainer review on 2026-10-13. This is a concrete design, not an
-implementation or installation claim. The seven sizes, rows × columns convention and OS
-theming are requested by the maintainer. The native implementation begins after design approval.
+Status: approved by the maintainer on 2026-10-13, including all seven rows × columns layouts,
+per-widget selection/order, clear portraits, OS theming with explicit overrides and exact
+Talk/Chat launch. This is the implementation authority, not an installation claim.
 
 ## Purpose and layouts
 
