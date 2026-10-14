@@ -69,6 +69,7 @@ class PhoneConversationTest {
                 "phone first unique marker"
             )
         )
+        await { !model.state.value.connection.conversation.busy && !model.state.value.sending }
         model.startRecording()
         await { model.state.value.connection.conversation.mode == ConversationMode.LISTENING }
         Thread.sleep(900)
@@ -247,11 +248,27 @@ class PhoneConversationTest {
                 model.state.value.connection.conversation.reply.contains("Native composer marker")
             }
             await { model.state.value.draft.isEmpty() }
-            ui.instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
-            await { !model.state.value.speaking }
-            ui.await { ui.find("Hold to record", description = true) != null }
-            val talkBounds = android.graphics.Rect().also {
-                requireNotNull(ui.find("Hold to record", description = true)).getBoundsInScreen(it)
+            if (ui.instrumentation.uiAutomation.windows.any {
+                    it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_INPUT_METHOD
+                }
+            ) {
+                ui.instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+            }
+            await {
+                !model.state.value.speaking && !model.state.value.connection.conversation.busy &&
+                    !model.state.value.sending && model.state.value.visible
+            }
+            ui.instrumentation.waitForIdleSync()
+            android.os.SystemClock.sleep(300)
+            val talkBounds = android.graphics.Rect()
+            ui.await {
+                val button = ui.find("Hold to record", description = true)
+                if (button?.isEnabled == true) {
+                    button.getBoundsInScreen(talkBounds)
+                    true
+                } else {
+                    false
+                }
             }
             val dragDistance = 80f * ui.context.resources.displayMetrics.density
             val downAt = android.os.SystemClock.uptimeMillis()
