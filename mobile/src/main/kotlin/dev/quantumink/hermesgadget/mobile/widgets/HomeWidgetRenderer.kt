@@ -39,8 +39,17 @@ object HomeWidgetRenderer {
                 it.width.isFinite() && it.height.isFinite() && it.width > 0 && it.height > 0
             }.distinct().take(16)
             if (sizes.isNotEmpty()) {
+                // Hosts can grant less padded space than their advertised exact sizes.
+                // Keep a fitting minimum and a true undersize recovery, rather than letting
+                // Android's smallest-area fallback pick the other orientation's layout.
+                val responsive = (
+                    listOf(
+                        android.util.SizeF(1f, 1f),
+                        android.util.SizeF(config.preset.columns * 48f, config.preset.rows * 48f)
+                    ) + sizes
+                    ).distinct().take(16)
                 return RemoteViews(
-                    sizes.associateWith {
+                    responsive.associateWith {
                         at(it.width, it.height)
                     }
                 )

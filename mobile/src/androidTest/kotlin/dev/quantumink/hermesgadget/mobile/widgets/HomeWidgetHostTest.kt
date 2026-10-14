@@ -32,6 +32,119 @@ import org.junit.Test
 
 /** Actual platform host inflation, with its external launcher padding excluded explicitly. */
 class HomeWidgetHostTest {
+    @Test fun adaptiveMismatchUsesAConfiguredPortraitInsteadOfTheOtherOrientationsRecovery() {
+        val host = WidgetHostFixture(context)
+        val directory = File(context.cacheDir, "widget-size-mismatch-${UUID.randomUUID()}").apply {
+            mkdirs()
+        }
+        try {
+            val source = File(directory, "portrait.png")
+            instrumentation.context.assets.open("home-widget-portrait-1.png").use { input ->
+                source.outputStream().use(input::copyTo)
+            }
+            val hash = MessageDigest.getInstance("SHA-256").digest(source.readBytes())
+                .joinToString("") { "%02x".format(it) }
+            val pictures = HomeWidgetPictures(File(directory, "thumbs"))
+            assertTrue(pictures.prepare(hash, source))
+            val profiles = listOf(
+                WidgetProfile("studio:orbit", "Orbit", "Studio", CatalogStatus.AVAILABLE, hash)
+            )
+            val id = host.bind(HomeWidgetPreset.FOCUS)
+            val options = Bundle().apply {
+                putParcelableArrayList(
+                    AppWidgetManager.OPTION_APPWIDGET_SIZES,
+                    arrayListOf(SizeF(60.444443f, 76.8f), SizeF(126.22222f, 30.577778f))
+                )
+            }
+            instrumentation.runOnMainSync {
+                val remote = HomeWidgetRenderer.adaptive(
+                    context,
+                    id,
+                    WidgetConfig(HomeWidgetPreset.FOCUS, listOf("studio:orbit")),
+                    profiles,
+                    pictures,
+                    options
+                )
+                // Nova's actual padded content is shorter than its advertised portrait size.
+                val view = hosted(host, id, context, remote, 60, 66)
+                assertEquals(
+                    "Configured bot must survive the host mismatch",
+                    View.GONE,
+                    view.findViewById<View>(R.id.home_widget_recovery).visibility
+                )
+                assertEquals("Orbit", view.findViewById<TextView>(R.id.home_widget_name).text)
+                assertTrue(view.findViewById<ImageView>(R.id.home_widget_picture).drawable != null)
+                val cell = view.findViewById<View>(R.id.home_widget_cell)
+                assertTrue(cell.hasOnClickListeners())
+                val minimum = 48 * context.resources.displayMetrics.density
+                assertTrue(cell.width >= minimum && cell.height >= minimum)
+            }
+        } finally {
+            host.close()
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test fun responsiveMinimumAndUndersizeRecoveryKeepAllPresetsWithinTheVariantLimit() {
+        val host = WidgetHostFixture(context)
+        val directory = File(context.cacheDir, "widget-responsive-${UUID.randomUUID()}")
+        try {
+            HomeWidgetPreset.entries.forEach { preset ->
+                val profiles = (1..preset.capacity).map {
+                    WidgetProfile("studio:bot$it", "Bot $it", "Studio", CatalogStatus.OFFLINE, null)
+                }
+                val minimumWidth = preset.columns * 48
+                val minimumHeight = preset.rows * 48
+                val options = Bundle().apply {
+                    putParcelableArrayList(
+                        AppWidgetManager.OPTION_APPWIDGET_SIZES,
+                        ArrayList(
+                            (1..16).map {
+                                SizeF(minimumWidth + it * 10f, minimumHeight + it * 10f)
+                            }
+                        )
+                    )
+                }
+                WidgetAppearance.entries.forEach { mode ->
+                    val id = host.bind(preset)
+                    instrumentation.runOnMainSync {
+                        val remote = HomeWidgetRenderer.adaptive(
+                            context,
+                            id,
+                            WidgetConfig(preset, profiles.map { it.key }, mode),
+                            profiles,
+                            HomeWidgetPictures(directory),
+                            options
+                        )
+                        val view = hosted(host, id, context, remote, minimumWidth, minimumHeight)
+                        assertEquals(
+                            View.GONE,
+                            view.findViewById<View>(R.id.home_widget_recovery).visibility
+                        )
+                        val cells = descendants(view).filter { it.id == R.id.home_widget_cell }
+                        assertEquals(preset.capacity, cells.size)
+                        cells.forEachIndexed { slot, cell ->
+                            assertTrue(
+                                cell.contentDescription.toString().contains(profiles[slot].name)
+                            )
+                            val minimum = 48 * context.resources.displayMetrics.density
+                            assertTrue(cell.width >= minimum && cell.height >= minimum)
+                        }
+                        // An unadvertised size below the supported minimum still gets recovery.
+                        val tiny = hosted(host, id, context, remote, 30, 30)
+                        assertEquals(
+                            View.VISIBLE,
+                            tiny.findViewById<View>(R.id.home_widget_recovery).visibility
+                        )
+                    }
+                }
+            }
+        } finally {
+            host.close()
+            directory.deleteRecursively()
+        }
+    }
+
     @Test fun existingHostsReinflateForSystemNightWhileExplicitPalettesStayFixed() {
         assertTrue(android.os.Build.MODEL.startsWith("sdk_"))
         val modes = context.getSystemService(android.app.UiModeManager::class.java)
