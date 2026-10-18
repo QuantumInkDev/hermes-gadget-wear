@@ -1,5 +1,10 @@
 # Progress
 
+The [Android runtime matrix](android-test-matrix.md) records modern and minimum-version
+coverage by feature/source. Current physical inventory confirms phone Android 17/API 37
+and watch Android 16/API 36; modern owned emulators use API 37. API29 is the phone
+compatibility floor. Minimum Wear API33 expansion execution remains open.
+
 ## Expansion connectivity and first increments — 2026-10-18
 
 Both physical devices now have verified wireless ADB shell access on an isolated owned

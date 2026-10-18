@@ -10,6 +10,9 @@ device continuation, task inbox, Android sharing, custom prompt actions, walking
 rich replies, explicit handoff, diagnostics, supported remote wake, QR/migration).
 The one-port Gadget gateway proposal is excluded. A tool-managed goal is active for the
 full scope; do not reduce completion to a client-only subset or software-only evidence.
+The [runtime coverage matrix](docs/android-test-matrix.md) separates compatibility-floor
+checks from modern emulators and physical devices. Direct inventory confirms Android 17/
+API 37 on the phone and Android 16/API 36 on the watch; both apps target API 37.
 
 The owner asked for questions up front and will confirm wireless phone/watch connectivity
 before leaving. The initial eleven-question batch covers the proposed written design,
