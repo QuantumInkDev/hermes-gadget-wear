@@ -426,3 +426,13 @@ idle-only because the existing foreground conversation closes on activity depart
 Preview/Copy remain available while busy. Watch health stays inline below controls with
 Jump last and no implied telemetry transfer. Received protocol audio and actual native
 playback remain separately labeled. No report persists text, endpoints or raw errors.
+
+## Planned QR setup and configuration migration — 2026-10-18
+
+The focused [implementation plan](superpowers/plans/2026-10-18-setup-migration.md) uses
+Android-free strict metadata/archive codecs followed by native reviewed store operations.
+QR metadata is explicitly untrusted and short-lived; it never carries pairing/provider
+keys or authorizes a connection. A bounded authenticated passphrase-encrypted archive
+transfers allowlisted configuration/art/actions/widget templates, with native import
+journaling and collision review. Device identity and launcher placement stay local.
+This is a planned boundary, not an implemented or activated capability.

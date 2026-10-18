@@ -10,6 +10,12 @@ or physical pass is claimed.
 
 ## Current expansion verification — 2026-10-18
 
+QR setup/migration now has a focused format/native/acceptance plan. Pure format work
+starts independently; no transfer is implemented or installed yet. Continuity Task3
+has two reproduced final-delivery prerequisites scoped into its implementation. The
+M5 partial maintenance lease has clean review; its full driver awaits a genuine
+sample-observation producer and independent live bootstrap authority. No server changes.
+
 Latest integrated app source `dc1fb14` adds the independently reviewed playback-output
 and interruption foundation. Strict root checks pass: 11 client JVM cases, zero failures,
 errors or skips; affected lint/formatting and all four APK builds pass (200 tasks,
@@ -65,7 +71,12 @@ those three corrections in `80909ea`. Fix2 `404ad463` replaces the API30-only ph
 geometry calls; fresh review accepts that source correction and verifies preserved return
 of the authorized API29 fixture. One all-theme method passed, but the final maximum-text
 and real-keyboard run timed out at activity launch, then reported a system crash. Those
-runtime gates remain open; their cause is unproven. A Minor evidence-index entry is stale.
+runtime failures remain recorded; their cause is unproven. In a separately preserved
+API29 fixture, fix3 `71dc396` runs each missing method in its own instrumentation process:
+both pass. Fresh review accepts maximum-text copy/tail geometry and real viewport
+contraction/restoration at large font, plus the corrected evidence index, with no new
+findings. The keyboard screenshot contains no painted keys; typing/physical IME usability
+is not established. These passes do not resolve the original preservation finding.
 The original preservation finding stays open. Never use reinstall/uninstall/reset or regenerate an
 identity to bypass it. Explicit matching-signer `adb install -r`, recoverable backups and
 post-install byte checks are required; stop on errors rather than using uninstall fallback.

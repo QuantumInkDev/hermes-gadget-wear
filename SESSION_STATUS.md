@@ -69,7 +69,12 @@ those three corrections in `80909ea`. Fix2 `404ad463` replaces the API30-only ph
 geometry calls; fresh review accepts that source correction and verifies preserved return
 of the authorized API29 fixture. One all-theme method passed, but the final maximum-text
 and real-keyboard run timed out at activity launch, then reported a system crash. Those
-runtime gates remain open; their cause is unproven. A Minor evidence-index entry is stale.
+runtime failures remain recorded; their cause is unproven. In a separately preserved
+API29 fixture, fix3 `71dc396` runs each missing method in its own instrumentation process:
+both pass. Fresh review accepts maximum-text copy/tail geometry and real viewport
+contraction/restoration at large font, plus the corrected evidence index, with no new
+findings. The keyboard screenshot contains no painted keys; typing/physical IME usability
+is not established. These passes do not resolve the original preservation finding.
 The original preservation finding stays open. Never use reinstall/uninstall/reset or regenerate an
 identity to bypass it. Explicit matching-signer `adb install -r`, recoverable backups and
 post-install byte checks are required; stop on errors rather than using uninstall fallback.
@@ -98,7 +103,10 @@ revocation while waiting. Focused fixes require real-core barrier evidence and a
 review. Fix1 closes those three findings; its review found a further byte-budget pagination
 stall behind hidden carriers. Fix2 `67e3778` has sixteen focused cases passing on each
 core foundation. Fresh scoped review is clean: all four findings are addressed. The
-accepted core hooks now feed a fresh isolated Task3 SDK bridge owner. No new method is
+accepted core hooks now feed a fresh isolated Task3 SDK bridge owner. Real runner probes
+found two missing final-delivery seams: canonical display identity and ledger eligibility
+for ordinary slash-prefixed path text. The controller has scoped both producer corrections
+into Task3 before completing the bridge; initial failing probes remain recorded. No new method is
 enabled and no continuity source is installed on live servers.
 
 The accepted phone fixture has nine final native executions across API29/API37, zero
@@ -127,8 +135,18 @@ Read-only identity/topology and all twelve capability-OFF config checks are reco
 these do not prove idle state. Driver work returned a source-backed limitation: the
 status protocol cannot distinguish a fresh aggregate sample from a stale zero retained
 by unrelated status updates. Only the outer lease is implemented (68 partial-checkpoint
-cases); fresh review is checking it and the required next seam. The full phase driver
+cases); fresh review accepts that partial source only. A separate existing-status
+maintenance-observation producer is now being implemented in isolated runtime/clean
+clones. Its true sampling identity and strict source counts must be reviewed before the
+driver consumes them. Installing that prerequisite still needs independent pre-stop
+authority; the hook cannot bootstrap its own safety proof. The full phase driver
 and actual stock acceptance remain required. No install, drain, restart or capability activation follows from these checks.
+
+The [QR/migration plan](docs/superpowers/plans/2026-10-18-setup-migration.md) is prepared
+for independent implementation. Connection QR codes carry untrusted reviewed metadata,
+not credentials. Migration uses a bounded passphrase-encrypted archive and excludes
+identities, provider keys and history; native merge/recovery and fresh-device acceptance
+follow the pure format task. No transfer capability is implemented or installed yet.
 
 The [walking-audio foundation](docs/superpowers/plans/2026-10-18-walking-audio-foundation.md)
 has an accepted fix1 at `c60c8a3`, integrated as `dc1fb14` with passing strict root
