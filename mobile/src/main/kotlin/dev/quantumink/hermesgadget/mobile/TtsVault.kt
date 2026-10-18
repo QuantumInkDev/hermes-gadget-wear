@@ -37,14 +37,14 @@ class TtsVault(
         return endpoint + ".sealed"
     }
 
-    @Synchronized fun read(endpoint: String): SpeechSettings {
-        val file = AtomicFile(File(directory, name(endpoint)))
-        if (!file.baseFile.exists() &&
-            !File(directory, name(endpoint) + ".bak").exists()
-        ) {
-            return SpeechSettings(SpeechMode.SERVER, "", "")
+    fun read(endpoint: String): SpeechSettings = synchronized(lock) {
+        val base = File(directory, name(endpoint))
+        val backup = File(directory, name(endpoint) + ".bak")
+        if (!base.exists() && !backup.exists()) {
+            return@synchronized SpeechSettings(SpeechMode.SERVER, "", "")
         }
-        val encrypted = file.openRead().use {
+        // AtomicFile.openRead repairs/deletes files. Inspect without mutating corrupt evidence.
+        val encrypted = (if (backup.exists()) backup else base).inputStream().use {
             require(it.channel.size() in 30..4096)
             it.readBytes()
         }
@@ -55,7 +55,7 @@ class TtsVault(
         val bytes = cipher.doFinal(encrypted.copyOfRange(14, encrypted.size))
         try {
             val json = Json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject
-            return SpeechSettings(
+            return@synchronized SpeechSettings(
                 SpeechMode.valueOf(json.getValue("mode").jsonPrimitive.content),
                 json["key"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                 json["voice"]?.jsonPrimitive?.contentOrNull.orEmpty()
@@ -65,11 +65,12 @@ class TtsVault(
         }
     }
 
-    @Synchronized fun save(endpoint: String, settings: SpeechSettings) {
-        require(
-            endpoint == "shared" || File(directory, name(endpoint)).exists() ||
-                endpoints().size < 16
-        )
+    fun save(endpoint: String, settings: SpeechSettings) = synchronized(lock) {
+        val base = File(directory, name(endpoint))
+        val exists = base.exists() || File(directory, name(endpoint) + ".bak").exists()
+        require(endpoint == "shared" || exists || endpoints().size < 64)
+        // Validate before replacing an existing record, even when saving SERVER or deleting a key.
+        if (exists) read(endpoint)
         val bytes = buildJsonObject {
             put("mode", settings.mode.name)
             put("key", settings.key)
@@ -96,16 +97,17 @@ class TtsVault(
             bytes.fill(0)
         }
     }
-    fun endpoints(): List<String> = directory.listFiles().orEmpty().map {
-        it.name.removeSuffix(".sealed")
+    fun endpoints(): List<String> = synchronized(lock) {
+        directory.listFiles().orEmpty().filter { it.isFile }.mapNotNull {
+            sealedName.matchEntire(it.name)?.groupValues?.get(1)
+        }.distinct().sorted()
     }
-        .filter { it.matches(Regex("[a-f0-9]{64}")) }.take(16)
 
-    @Synchronized fun selected(endpoint: String): SpeechSettings {
+    fun selected(endpoint: String): SpeechSettings = synchronized(lock) {
         val profile = read(endpoint)
-        if (profile.mode == SpeechMode.SERVER) return profile
+        if (profile.mode == SpeechMode.SERVER) return@synchronized profile
         val shared = read("shared")
-        return SpeechSettings(
+        SpeechSettings(
             profile.mode,
             if (profile.mode ==
                 SpeechMode.SHARED
@@ -117,6 +119,11 @@ class TtsVault(
             profile.voice.ifEmpty { shared.voice }
         )
     }
+    companion object {
+        private val lock = Any()
+        private val sealedName = Regex("([a-f0-9]{64})\\.sealed(?:\\.bak)?")
+    }
+
     private fun key(): SecretKey {
         (store.getKey(alias, null) as? SecretKey)?.let { return it }
         check(directory.listFiles().isNullOrEmpty()) { "Speech vault key is unavailable." }

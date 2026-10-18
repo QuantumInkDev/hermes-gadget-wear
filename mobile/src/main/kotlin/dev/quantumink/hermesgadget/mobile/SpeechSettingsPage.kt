@@ -11,11 +11,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -23,200 +24,245 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.quantumink.hermesgadget.protocol.CatalogPage
 import dev.quantumink.hermesgadget.protocol.ClientSpeech
 import dev.quantumink.hermesgadget.protocol.Endpoint
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+
+internal class SpeechSettingsTarget(val page: CatalogPage, val endpoint: Endpoint) {
+    override fun toString(): String = "SpeechSettingsTarget(redacted)"
+}
 
 @Composable
 fun SpeechSettingsPage(context: Context, back: () -> Unit) {
-    var url by remember { mutableStateOf("") }
-    var sharedKey by remember { mutableStateOf("") }
-    var sharedVoice by remember { mutableStateOf("") }
-    var profileKey by remember { mutableStateOf("") }
-    var voice by remember { mutableStateOf("") }
-    var mode by remember { mutableStateOf(SpeechMode.SERVER) }
-    var status by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(true) }
+    SpeechSettingsPage(context, target = null, back = back)
+}
+
+@Composable
+internal fun SpeechSettingsPage(
+    context: Context,
+    target: SpeechSettingsTarget?,
+    available: Boolean = true,
+    permitted: () -> Boolean = { true },
+    providedSession: SpeechSettingsSession? = null,
+    back: () -> Unit
+) {
     val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) {
-        val saved = withContext(Dispatchers.IO) { runCatching { TtsVault(context).read("shared") } }
-        saved.fold({ sharedVoice = it.voice }, {
-            status =
-                context.getString(R.string.speech_operation_failed)
-        })
-        busy = false
+    val latestPermitted by rememberUpdatedState(permitted)
+    val latestAvailable by rememberUpdatedState(available)
+    val session = remember(context, scope, providedSession) {
+        providedSession ?: SpeechSettingsSession(
+            scope,
+            { TtsVault(context).read(it) },
+            { id, settings -> TtsVault(context).save(id, settings) },
+            { PhoneSpeech.publish(context, TtsVault(context)) },
+            { key -> ElevenLabsApi().use { it.quota(key).remaining } },
+            { latestAvailable && latestPermitted() }
+        )
     }
-    fun endpointId(): String {
-        val endpoint = Endpoint.parse(url.trim())
-        require(endpoint.isTls)
-        return ClientSpeech.endpointId(endpoint)
+    var url by remember { mutableStateOf("") }
+    var manualId by remember { mutableStateOf<String?>(null) }
+    var invalidUrl by remember { mutableStateOf(false) }
+    val endpoint = target?.let { ClientSpeech.endpointId(it.endpoint) } ?: manualId
+    val state by session.state.collectAsStateWithLifecycle()
+    var sharedKey by remember(endpoint, state.endpoint, state.sharedVersion) { mutableStateOf("") }
+    var sharedVoice by remember(endpoint, state.endpoint, state.sharedVersion) {
+        mutableStateOf(state.sharedVoice)
     }
-    fun work(clear: () -> Unit = {}, block: () -> String) {
-        if (busy) return
-        busy = true
-        scope.launch {
-            val result = withContext(Dispatchers.IO) { runCatching(block) }
-            status = result.getOrElse { context.getString(R.string.speech_operation_failed) }
-            if (result.isSuccess) clear()
-            busy = false
+    var profileKey by remember(endpoint, state.endpoint, state.profileVersion) {
+        mutableStateOf("")
+    }
+    var voice by remember(endpoint, state.endpoint, state.profileVersion) {
+        mutableStateOf(state.voice)
+    }
+    var mode by remember(endpoint, state.endpoint, state.profileVersion) {
+        mutableStateOf(state.mode)
+    }
+    val owner = LocalLifecycleOwner.current
+    DisposableEffect(session, owner, endpoint, available) {
+        fun resume() {
+            if (available && latestPermitted()) session.open(endpoint)
         }
-    }
-    fun quota(key: String): String {
-        if (key.isEmpty()) return context.getString(R.string.speech_key_missing)
-        return ElevenLabsApi().use { api ->
-            try {
-                val remaining = api.quota(key).remaining
-                if (remaining ==
-                    null
-                ) {
-                    context.getString(R.string.speech_quota_unknown)
-                } else {
-                    context.getString(R.string.speech_quota, remaining)
-                }
-            } catch (failure: SpeechFailure) {
-                failure.message.orEmpty()
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) resume()
+            if (event == Lifecycle.Event.ON_STOP) {
+                session.close()
+                sharedKey = ""
+                profileKey = ""
             }
         }
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Watch speech", style = MaterialTheme.typography.headlineLarge)
-        Text(
-            "Phone conversations use the voice configured on each Hermes box.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(stringResource(R.string.speech_disclosure))
-        SettingsSection {
-            Text("Shared provider", style = MaterialTheme.typography.titleMedium)
-            SpeechInput(R.string.speech_shared_key, sharedKey, {
-                sharedKey = it.take(256)
-            }, secret = true, enabled = !busy)
-            SpeechInput(R.string.speech_shared_voice, sharedVoice, {
-                sharedVoice = it.take(128)
-            }, enabled = !busy)
-            Button({
-                work({ sharedKey = "" }) {
-                    val vault = TtsVault(context)
-                    val old = vault.read("shared")
-                    vault.save(
-                        "shared",
-                        SpeechSettings(
-                            SpeechMode.SHARED,
-                            sharedKey.trim().ifEmpty {
-                                old.key
-                            },
-                            sharedVoice.trim()
-                        )
-                    )
-                    PhoneSpeech.publish(context, vault)
-                    context.getString(R.string.speech_saved)
-                }
-            }, enabled = !busy) { Text(stringResource(R.string.speech_save_shared)) }
-            TextButton({
-                work { quota(sharedKey.trim().ifEmpty { TtsVault(context).read("shared").key }) }
-            }, enabled = !busy) { Text(stringResource(R.string.speech_test_shared)) }
-            TextButton({
-                work {
-                    val vault = TtsVault(context)
-                    vault.save(
-                        "shared",
-                        SpeechSettings(SpeechMode.SHARED, "", vault.read("shared").voice)
-                    )
-                    PhoneSpeech.publish(context, vault)
-                    context.getString(R.string.speech_deleted)
-                }
-            }, enabled = !busy) { Text(stringResource(R.string.speech_delete_shared)) }
+        owner.lifecycle.addObserver(observer)
+        if (owner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) resume()
+        onDispose {
+            session.close()
+            sharedKey = ""
+            profileKey = ""
+            owner.lifecycle.removeObserver(observer)
         }
+    }
+    fun leave() {
+        session.close()
+        back()
+    }
+    if (!available) {
+        Text(stringResource(R.string.speech_unavailable))
+        TextButton(::leave) { Text(stringResource(R.string.speech_back)) }
+        return
+    }
+    val enabled = state.loaded && state.endpoint == endpoint && !state.busy && permitted()
+    val profileEnabled = enabled && endpoint != null
+    val labels = listOf(
+        stringResource(R.string.speech_mode_server),
+        stringResource(R.string.speech_mode_shared),
+        stringResource(R.string.speech_mode_profile)
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(stringResource(R.string.speech_title), style = MaterialTheme.typography.headlineSmall)
+        target?.let {
+            Text(it.page.profile.name, style = MaterialTheme.typography.titleLarge)
+            Text(it.page.sourceLabel, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.speech_profile_id, it.page.profile.id))
+        }
+        Text(stringResource(R.string.speech_disclosure))
+        TextButton(::leave) { Text(stringResource(R.string.speech_back)) }
+        if (state.busy) Text(stringResource(R.string.speech_working))
+        if (invalidUrl) Text(stringResource(R.string.speech_invalid_url))
+        SpeechStatus(state)
         SettingsSection {
-            Text("Profile voice", style = MaterialTheme.typography.titleMedium)
-            SpeechInput(R.string.speech_endpoint, url, {
-                url = it.take(2048)
-            }, uri = true, enabled = !busy)
-            val labels = listOf(
-                stringResource(R.string.speech_mode_server),
-                stringResource(R.string.speech_mode_shared),
-                stringResource(R.string.speech_mode_profile)
+            Text(
+                stringResource(R.string.speech_profile_title),
+                style = MaterialTheme.typography.titleMedium
             )
-            SettingsChoice("Voice source", labels[mode.ordinal], labels, !busy) {
-                mode =
-                    SpeechMode.entries[it]
+            if (target == null) {
+                Text(stringResource(R.string.speech_manual_help))
+                SpeechInput(R.string.speech_endpoint, url, {
+                    url = it.take(2048)
+                    manualId = null
+                    invalidUrl = false
+                    session.close()
+                    session.open(null)
+                }, uri = true)
+                TextButton({
+                    val parsed =
+                        runCatching { Endpoint.parse(url.trim()).also { require(it.isTls) } }
+                    invalidUrl = parsed.isFailure
+                    parsed.getOrNull()?.let { manualId = ClientSpeech.endpointId(it) }
+                }, enabled = url.isNotBlank() && !state.busy) {
+                    Text(stringResource(R.string.speech_load))
+                }
+            }
+            if (endpoint != null && state.loaded) {
+                Text(stringResource(R.string.speech_current_mode, labels[state.mode.ordinal]))
+                Text(
+                    stringResource(
+                        if (state.mode ==
+                            SpeechMode.SERVER
+                        ) {
+                            R.string.speech_server_ready
+                        } else if (state.ready) {
+                            R.string.speech_client_ready
+                        } else {
+                            R.string.speech_client_missing
+                        }
+                    )
+                )
+            }
+            SettingsChoice(
+                stringResource(R.string.speech_source),
+                labels[mode.ordinal],
+                labels,
+                profileEnabled
+            ) {
+                mode = SpeechMode.entries[it]
             }
             SpeechInput(R.string.speech_profile_voice, voice, {
                 voice = it.take(128)
-            }, enabled = !busy)
-            if (mode ==
-                SpeechMode.PROFILE
-            ) {
-                SpeechInput(R.string.speech_profile_key, profileKey, {
-                    profileKey =
-                        it.take(256)
-                }, secret = true, enabled = !busy)
+            }, enabled = profileEnabled)
+            if (mode == SpeechMode.PROFILE) {
+                SpeechInput(
+                    R.string.speech_profile_key,
+                    profileKey,
+                    {
+                        profileKey = it.take(256)
+                    },
+                    secret = true,
+                    enabled = profileEnabled
+                )
             }
-            TextButton({
-                if (!busy) {
-                    busy = true
-                    scope.launch {
-                        val result =
-                            withContext(Dispatchers.IO) {
-                                runCatching { TtsVault(context).read(endpointId()) }
-                            }
-                        result.fold({
-                            mode = it.mode
-                            voice = it.voice
-                            profileKey = ""
-                            status =
-                                context.getString(R.string.speech_loaded)
-                        }, {
-                            status =
-                                context.getString(R.string.speech_operation_failed)
-                        })
-                        busy = false
-                    }
-                }
-            }, enabled = !busy && url.isNotBlank()) { Text(stringResource(R.string.speech_load)) }
-            Button({
-                work({ profileKey = "" }) {
-                    val id = endpointId()
-                    val vault = TtsVault(context)
-                    val old = vault.read(id)
-                    vault.save(
-                        id,
-                        SpeechSettings(
-                            mode,
-                            profileKey.trim().ifEmpty {
-                                old.key
-                            },
-                            voice.trim()
-                        )
-                    )
-                    PhoneSpeech.publish(context, vault)
-                    context.getString(R.string.speech_saved)
-                }
-            }, enabled = !busy && url.isNotBlank()) {
+            Button({ session.saveProfile(mode, profileKey, voice) }, enabled = profileEnabled) {
                 Text(stringResource(R.string.speech_save_profile))
             }
-            TextButton(
-                { work { quota(TtsVault(context).selected(endpointId()).key) } },
-                enabled =
-                !busy && url.isNotBlank()
-            ) { Text(stringResource(R.string.speech_test_profile)) }
-            TextButton({
-                work {
-                    val id = endpointId()
-                    val vault = TtsVault(context)
-                    val old = vault.read(id)
-                    vault.save(id, SpeechSettings(old.mode, "", old.voice))
-                    PhoneSpeech.publish(context, vault)
-                    context.getString(R.string.speech_deleted)
-                }
-            }, enabled = !busy && url.isNotBlank()) {
+            TextButton({ session.checkQuota(false) }, enabled = profileEnabled) {
+                Text(stringResource(R.string.speech_test_profile))
+            }
+            TextButton({ session.deleteProfile() }, enabled = profileEnabled) {
                 Text(stringResource(R.string.speech_delete_profile))
             }
         }
-        if (status.isNotEmpty()) Text(status)
-        TextButton(back, enabled = !busy) { Text(stringResource(R.string.speech_back)) }
+        SettingsSection {
+            Text(
+                stringResource(R.string.speech_shared_title),
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                stringResource(
+                    if (state.sharedReady) {
+                        R.string.speech_shared_ready
+                    } else {
+                        R.string.speech_shared_missing
+                    }
+                )
+            )
+            SpeechInput(R.string.speech_shared_key, sharedKey, {
+                sharedKey = it.take(256)
+            }, secret = true, enabled = enabled)
+            SpeechInput(R.string.speech_shared_voice, sharedVoice, {
+                sharedVoice = it.take(128)
+            }, enabled = enabled)
+            Button({ session.saveShared(sharedKey, sharedVoice) }, enabled = enabled) {
+                Text(stringResource(R.string.speech_save_shared))
+            }
+            TextButton({ session.checkQuota(true, sharedKey) }, enabled = enabled) {
+                Text(stringResource(R.string.speech_test_shared))
+            }
+            TextButton({ session.deleteShared() }, enabled = enabled) {
+                Text(stringResource(R.string.speech_delete_shared))
+            }
+        }
+        TextButton(::leave) { Text(stringResource(R.string.speech_back)) }
     }
+}
+
+@Composable
+private fun SpeechStatus(state: SpeechSettingsState) {
+    val resource = when (state.notice) {
+        SpeechNotice.NONE -> return
+        SpeechNotice.LOADED -> R.string.speech_loaded
+        SpeechNotice.SAVED -> R.string.speech_saved
+        SpeechNotice.DELETED -> R.string.speech_deleted
+        SpeechNotice.SYNC_PENDING -> R.string.speech_sync_pending
+        SpeechNotice.FAILED -> R.string.speech_operation_failed
+        SpeechNotice.MISSING_KEY -> R.string.speech_key_missing
+        SpeechNotice.QUOTA -> if (state.remaining ==
+            null
+        ) {
+            R.string.speech_quota_unknown
+        } else {
+            R.string.speech_quota
+        }
+    }
+    Text(
+        if (state.notice == SpeechNotice.QUOTA &&
+            state.remaining != null
+        ) {
+            stringResource(resource, state.remaining)
+        } else {
+            stringResource(resource)
+        }
+    )
 }
 
 @Composable
@@ -233,9 +279,7 @@ private fun SpeechInput(
         changed,
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled,
-        label = {
-            Text(stringResource(label))
-        },
+        label = { Text(stringResource(label)) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(
             keyboardType = if (secret) {

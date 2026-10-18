@@ -20,8 +20,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -71,10 +73,14 @@ fun DirectoryPage(
     onBoxes: () -> Unit,
     onManual: () -> Unit,
     modifier: Modifier = Modifier,
-    listState: LazyListState = rememberLazyListState()
+    listState: LazyListState = rememberLazyListState(),
+    onSpeech: ((CatalogPage) -> Unit)? = null,
+    speechLocked: Boolean = false
 ) {
     val repository = remember(context.applicationContext) { CatalogRepository.get(context) }
-    DirectoryContent(context, repository, onTalk, onBoxes, onManual, modifier, listState)
+    DirectoryContent(
+        context, repository, onTalk, onBoxes, onManual, modifier, listState, onSpeech, speechLocked
+    )
 }
 
 @Composable
@@ -85,7 +91,9 @@ internal fun DirectoryContent(
     onBoxes: () -> Unit,
     onManual: () -> Unit,
     modifier: Modifier = Modifier,
-    listState: LazyListState = rememberLazyListState()
+    listState: LazyListState = rememberLazyListState(),
+    onSpeech: ((CatalogPage) -> Unit)? = null,
+    speechLocked: Boolean = false
 ) {
     val pages by repository.pages.collectAsStateWithLifecycle()
     val notice by repository.notice.collectAsStateWithLifecycle()
@@ -406,7 +414,10 @@ internal fun DirectoryContent(
             onDismissRequest = { detailKey = null },
             title = { Text(page.profile.name) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Text(page.sourceLabel)
                     Text(catalogStatus(page.status, page.sourceId == "manual"))
                     Text(
@@ -417,6 +428,19 @@ internal fun DirectoryContent(
                         "Catalog availability does not confirm a live Gadget connection " +
                             "or phone/watch pairing."
                     )
+                    onSpeech?.let { open ->
+                        TextButton(
+                            {
+                                detailKey = null
+                                open(page)
+                            },
+                            enabled =
+                            !busy && !speechLocked && page.status != CatalogStatus.WITHDRAWN &&
+                                profiles[page.key]?.endpoint?.isTls == true
+                        ) {
+                            Text("Speech providers")
+                        }
+                    }
                     if (page.status == CatalogStatus.WITHDRAWN) {
                         TextButton(enabled = !busy, onClick = {
                             detailKey = null

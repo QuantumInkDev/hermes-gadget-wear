@@ -268,7 +268,10 @@ internal fun ConversationContent(
                             "Audio and the phone connection stop when you leave this screen " +
                             "or lock the phone."
                     )
-                    Text("Replies use this profile’s configured server voice.")
+                    Text(
+                        "Server voice is the default. " +
+                            "Optional phone and watch speech is set in Speech providers."
+                    )
                     TextButton({
                         newSession()
                         details = false

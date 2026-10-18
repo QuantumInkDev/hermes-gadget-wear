@@ -67,6 +67,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private var destination by mutableStateOf("profiles")
+    private var speechTarget by mutableStateOf<SpeechSettingsTarget?>(null)
+    private var speechProfileKey by mutableStateOf<String?>(null)
+    private val speechNavigation by lazy {
+        PhoneProfileNavigation(lifecycleScope, { key, _ ->
+            CatalogRepository.get(this).currentProfile(key)
+        }, { page -> CatalogRepository.get(this).pages.value.any { it === page } })
+    }
     private var incomingAction: String? = null
     private var pendingAction by mutableStateOf<String?>(null)
     private var quickActionId by mutableStateOf<String?>(null)
@@ -93,6 +100,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         navigation.cancel()
+        speechNavigation.cancel()
         started = false
         conversation.hide()
         getSystemService(android.net.ConnectivityManager::class.java)
@@ -161,6 +169,7 @@ class MainActivity : ComponentActivity() {
                     "manual", "speech", "appearance", "home-widgets", "quick-actions"
                 )
         } ?: "profiles"
+        speechProfileKey = savedInstanceState?.getString("speech_profile_key")
         if (savedInstanceState == null) {
             if (!receiveAction(intent)) receiveWidget(intent)
         } else {
@@ -173,6 +182,12 @@ class MainActivity : ComponentActivity() {
             lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
                 consumeAction()
                 consumeWidget()
+                if (destination == "speech" && speechProfileKey != null && speechTarget == null) {
+                    withContext(Dispatchers.IO) {
+                        CatalogRepository.get(this@MainActivity).savedPages()
+                    }
+                    requestSpeech(null, speechProfileKey)
+                }
             }
         }
         setContent {
@@ -190,6 +205,14 @@ class MainActivity : ComponentActivity() {
                 val directoryState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
                 val directoryScroll = androidx.compose.foundation.lazy.rememberLazyListState()
                 fun navigate(value: String) {
+                    if (value in setOf("speech", "settings") &&
+                        speechSettingsLocked(conversation.state.value)
+                    ) {
+                        return
+                    }
+                    speechNavigation.cancel()
+                    speechTarget = null
+                    speechProfileKey = null
                     navigation.cancel()
                     pendingAction = null
                     incomingAction = null
@@ -207,6 +230,7 @@ class MainActivity : ComponentActivity() {
                     navigate(
                         when (destination) {
                             "conversation", "watch", "settings" -> "profiles"
+                            "speech" -> if (speechProfileKey == null) "settings" else "profiles"
                             "tiles" -> "watch"
                             else -> "settings"
                         }
@@ -288,7 +312,9 @@ class MainActivity : ComponentActivity() {
                                     onTalk = { page -> requestProfile(page.key, null) },
                                     onBoxes = { navigate("boxes") },
                                     onManual = { navigate("manual") },
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
+                                    onSpeech = { requestSpeech(it) },
+                                    speechLocked = speechSettingsLocked(phone)
                                 )
                             }
                             "quick-actions" -> androidx.compose.runtime.key(quickActionLaunch) {
@@ -320,8 +346,45 @@ class MainActivity : ComponentActivity() {
                                     "manual" -> ProfilesPage(this@MainActivity) {
                                         navigate("settings")
                                     }
-                                    "speech" -> SpeechSettingsPage(this@MainActivity) {
-                                        navigate("settings")
+                                    "speech" -> {
+                                        val repository =
+                                            remember { CatalogRepository.get(this@MainActivity) }
+                                        val pages by repository.pages.collectAsStateWithLifecycle()
+                                        val selected = speechTarget
+                                        val available =
+                                            speechProfileKey == null || selected != null &&
+                                                pages.any { it === selected.page } &&
+                                                selected.endpoint.isTls &&
+                                                selected.page.status != CatalogStatus.WITHDRAWN
+                                        SpeechSettingsPage(
+                                            this@MainActivity,
+                                            target = selected,
+                                            available = available,
+                                            permitted = {
+                                                started &&
+                                                    !speechSettingsLocked(
+                                                        conversation.state.value
+                                                    ) &&
+                                                    (
+                                                        speechProfileKey == null ||
+                                                            selected != null &&
+                                                            repository.pages.value.any {
+                                                                it ===
+                                                                    selected.page
+                                                            }
+                                                        )
+                                            }
+                                        ) {
+                                            navigate(
+                                                if (speechProfileKey ==
+                                                    null
+                                                ) {
+                                                    "settings"
+                                                } else {
+                                                    "profiles"
+                                                }
+                                            )
+                                        }
                                     }
                                     "appearance" -> AppearancePage(this@MainActivity) {
                                         navigate("settings")
@@ -372,6 +435,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("phone_destination", destination)
+        outState.putString("speech_profile_key", speechProfileKey)
         outState.putString("incoming_action", incomingAction)
         outState.putString("pending_action", pendingAction)
         outState.putString("quick_action_id", quickActionId)
@@ -473,7 +537,32 @@ class MainActivity : ComponentActivity() {
         requestProfile(request.key, request)
     }
 
+    private fun requestSpeech(
+        mounted: dev.quantumink.hermesgadget.protocol.CatalogPage?,
+        restoredKey: String? = null
+    ) {
+        if (speechSettingsLocked(conversation.state.value)) return
+        val key = mounted?.key ?: restoredKey ?: return
+        navigation.cancel()
+        val from = destination
+        speechNavigation.request(key, null, {
+            started && destination == from && !speechSettingsLocked(conversation.state.value) &&
+                lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        }) { resolved ->
+            if (resolved != null && (mounted == null || mounted === resolved.first) &&
+                resolved.first.status != CatalogStatus.WITHDRAWN && resolved.second.endpoint.isTls
+            ) {
+                navigation.cancel()
+                if (destination == "conversation") conversation.hide()
+                speechProfileKey = key
+                speechTarget = SpeechSettingsTarget(resolved.first, resolved.second.endpoint)
+                destination = "speech"
+            }
+        }
+    }
+
     private fun requestProfile(key: String, widget: WidgetLaunchRequest?) {
+        speechNavigation.cancel()
         val requestedFrom = destination
         val widgetVersion = HomeWidgetStore.version()
         pendingWidget = null

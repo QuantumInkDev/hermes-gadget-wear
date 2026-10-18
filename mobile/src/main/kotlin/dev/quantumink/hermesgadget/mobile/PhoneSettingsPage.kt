@@ -77,7 +77,10 @@ fun PhoneSettingsPage(context: Context, navigate: (String) -> Unit) {
             SettingsLink("Manual watch endpoints", "Review saved Gadget connections") {
                 navigate("manual")
             }
-            SettingsLink("Watch speech providers", "Voice and provider settings") {
+            SettingsLink(
+                "Speech providers for phone and watch",
+                "Select a profile in Profiles, or review a manual endpoint"
+            ) {
                 navigate("speech")
             }
         }
