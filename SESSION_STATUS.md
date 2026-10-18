@@ -45,11 +45,15 @@ and implementation activity do not establish live integration.
 Latest: outbox storage `d097717` is independently approved in the isolated SDK, with
 39 storage +30 stock/extension warning-strict passes. Grant/wire task 2 through `dbead4db`
 has clean spec/quality review after its cancellation correction; 119 affected grants/service
-and 30 compatibility checks pass warning-strict. Actual-core Task 3 is implemented through SDK `148e8d3` and now has independent
-spec/quality review in progress. Its actual clean-core and private-runtime runs each pass
-71 warning-strict checks; trusted context/durable recovery remain unaccepted until review
-and fresh public patch reapplication. Windows activation is still denied pending a real ACL
-verifier and host evidence.
+and 30 compatibility checks pass warning-strict. Actual-core Task 3 initial handoff through SDK `148e8d3` has 71 warning-strict checks
+per clean/private-runtime fixture. Independent review found two Important defects:
+registry load-completeness provenance after stock re-enrollment and queued/redirected
+marker/final-context coherence. The original implementer is in fix round 1/5 with actual
+socket/core regressions required. Trusted context/durable recovery remain unaccepted
+until fresh scoped review and public patch reapplication. Windows activation is still denied pending a real ACL
+verifier and host evidence. A focused
+[Windows storage plan](docs/superpowers/plans/2026-10-18-windows-relay-storage.md) records the native
+validator and both-host gates; it is not implemented or activated.
 No server capability is enabled.
 Actual-core finalizer recovery is a known Task 3 gate: a failed SendResult alone does
 not prevent the pinned core from releasing its marker. Do not enable the flag until
@@ -83,11 +87,14 @@ holds the body anchor fixed and renders only the generated mouth region, keeping
 body stability without rewriting source art. This is planned, not implemented. Kitana,
 Viper and Cthulhu remain queued after Akuma's production stage.
 The [phone audio plan](docs/superpowers/plans/2026-10-18-phone-optional-audio.md) has
-implementation `3f8d94e` with 162 JVM and 15 native passes; its original implementer is
-finishing the required Preparing voice/Stop UI seam before independent review. Watch
+implementation `3f8d94e` with 162 JVM and 15 native passes; `83f4ec2` completes the
+required Preparing voice/Stop UI seam with three focused native passes and a clean strict
+affected build. Independent full Task 1 review is active. Watch
 Portrait/Pet selection `a29268d` has 157 JVM passes, 24 native passes/one explicit Battery
-Saver emulator skip and a passing synthetic carousel scenario; independent review is
-active. Neither increment is integrated or installed on physical devices yet. SDK/core,
+Saver emulator skip and a passing synthetic carousel scenario. Review found one Important
+portrait-cache provenance defect; its original implementer is in fix round 1/5, preserving
+old art and adding real admission/cache coverage. Neither increment is integrated or
+installed on physical devices yet. SDK/core,
 watch and phone source ownership are disjoint. The canonical-history/task plan is written;
 implementation follows the reviewed core/outbox bridge.
 

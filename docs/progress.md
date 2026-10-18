@@ -62,12 +62,16 @@ errors or skips, strict checks, all four APKs and sequential formatting. These a
 bound software results, separate from worktree implementations and physical acceptance.
 
 Focused implementation handoffs: SDK/core finalizer integration through SDK `148e8d3`
-passes 71 warning-strict actual-core checks per clean/private-runtime fixture; independent
-review, public patch export/reapplication and Windows ACL activation support remain gates.
+passes 71 warning-strict actual-core checks per clean/private-runtime fixture. Independent
+review found two Important registry/turn-context defects; original-worker fix round 1/5,
+public patch export/reapplication and Windows ACL activation support remain gates. A focused
+[Windows storage plan](superpowers/plans/2026-10-18-windows-relay-storage.md) records the native
+validator and both-host gates; it is not implemented or activated.
 Watch Portrait/Pet `a29268d` has 157 JVM and 24 native passes/one explicit Battery Saver
-emulator skip plus synthetic carousel coverage; independent review is active. Phone audio
-`3f8d94e` has 162 JVM and 15 native passes; Preparing voice/Stop UI is being completed
-before review. These handoffs are not accepted live features or physical app deliveries.
+emulator skip plus synthetic carousel coverage; one Important portrait-provenance finding
+is in original-worker fix round 1/5. Phone audio `3f8d94e` has 162 JVM and 15 native
+passes; `83f4ec2` adds tested Preparing voice/Stop UI with three focused native passes
+and affected strict build/format success. Full Task 1 review is active. These handoffs are not accepted live features or physical app deliveries.
 
 Physical synthetic codec demo: each actual device passes the two existing production-code
 Opus encode/decode methods in a separate temporary app. The three-second fixture encodes
