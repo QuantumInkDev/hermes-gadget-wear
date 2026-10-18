@@ -5,23 +5,27 @@ import java.security.MessageDigest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.intOrNull
 
 /** Cell-space replacement region; source poses and anchor remain immutable. */
 class PetOverlay(val left: Int, val top: Int, val right: Int, val bottom: Int) {
     init {
-        require(left >= 0 && top >= 0 && right <= 192 && bottom <= 208)
+        // Establish ordered cell bounds before subtraction can overflow.
+        require(0 <= left && left < right && right <= 192)
+        require(0 <= top && top < bottom && bottom <= 208)
         require(right - left in 1..96 && bottom - top in 1..104)
     }
 
     companion object {
+        private val integerToken = Regex("-?(0|[1-9][0-9]*)")
+
         fun parse(raw: kotlinx.serialization.json.JsonElement): PetOverlay {
             val value = raw as? JsonObject ?: throw IllegalArgumentException("Invalid overlay")
             require(value.keys == setOf("anchor_frame", "rect"))
             fun integer(raw: kotlinx.serialization.json.JsonElement?): Int {
                 val number = raw as? JsonPrimitive
                 require(number != null && !number.isString)
-                return requireNotNull(number.intOrNull)
+                require(integerToken.matches(number.content))
+                return requireNotNull(number.content.toIntOrNull())
             }
             require(integer(value["anchor_frame"]) == 0)
             val rect = value["rect"] as? JsonArray

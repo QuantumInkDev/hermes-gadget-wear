@@ -91,7 +91,12 @@ class PetCache(context: Context) {
         }
     }
 
-    internal fun decode(sheet: PetSheet, bytes: ByteArray): Map<String, List<Bitmap>> {
+    /** The internal crop observer supports deterministic worker-failure ownership checks. */
+    internal fun decode(
+        sheet: PetSheet,
+        bytes: ByteArray,
+        inspectCrop: (Bitmap) -> Unit = {}
+    ): Map<String, List<Bitmap>> {
         require(
             bytes.size == sheet.bytes && bytes.size in 32..2097152 && hash(bytes) == sheet.sha256
         )
@@ -117,46 +122,50 @@ class PetCache(context: Context) {
                 var anchor: IntArray? = null
                 for (column in 0 until row.frames) {
                     val frame = Bitmap.createBitmap(bitmap, column * 192, row.index * 208, 192, 208)
-                    val pixels = IntArray(192 * 208)
-                    frame.getPixels(pixels, 0, 192, 0, 0, 192, 208)
-                    if (pixels.none { (it ushr 24) > 16 }) {
-                        frame.recycle()
-                        break
-                    }
-                    if (pixels.none { (it ushr 24) < 255 }) {
-                        frame.recycle()
-                        error("Opaque frame")
-                    }
-                    // Replace source pixels before nearest-neighbour sampling. Drawing over the
-                    // anchor would retain its closed mouth through transparent source pixels.
-                    row.overlay?.let { overlay ->
-                        require(
-                            sheet.kind == "companion" && row.name == "talking" && row.frames == 3
-                        )
-                        if (column == 0) {
-                            anchor = pixels.copyOf()
-                        } else {
-                            val fixed = requireNotNull(anchor).copyOf()
-                            for (y in overlay.top until overlay.bottom) {
-                                val offset = y * 192 + overlay.left
-                                pixels.copyInto(fixed, offset, offset, y * 192 + overlay.right)
+                    try {
+                        inspectCrop(frame)
+                        val pixels = IntArray(192 * 208)
+                        frame.getPixels(pixels, 0, 192, 0, 0, 192, 208)
+                        if (pixels.none { (it ushr 24) > 16 }) break
+                        require(pixels.any { (it ushr 24) < 255 }) { "Opaque frame" }
+                        // Replace source pixels before nearest-neighbour sampling. Drawing over the
+                        // anchor would retain its closed mouth through transparent source pixels.
+                        row.overlay?.let { overlay ->
+                            require(
+                                sheet.kind == "companion" && row.name == "talking" &&
+                                    row.frames == 3
+                            )
+                            if (column == 0) {
+                                anchor = pixels.copyOf()
+                            } else {
+                                val fixed = requireNotNull(anchor).copyOf()
+                                for (y in overlay.top until overlay.bottom) {
+                                    val offset = y * 192 + overlay.left
+                                    pixels.copyInto(fixed, offset, offset, y * 192 + overlay.right)
+                                }
+                                fixed.copyInto(pixels)
                             }
-                            fixed.copyInto(pixels)
                         }
-                    }
-                    val composed = if (row.overlay != null && column != 0) {
-                        Bitmap.createBitmap(pixels, 192, 208, Bitmap.Config.ARGB_8888)
-                    } else {
-                        frame
-                    }
-                    val scaled = try {
-                        composed.scale(96, 104, false)
+                        val scaled = if (row.overlay != null && column != 0) {
+                            val composed = Bitmap.createBitmap(
+                                pixels,
+                                192,
+                                208,
+                                Bitmap.Config.ARGB_8888
+                            )
+                            try {
+                                composed.scale(96, 104, false)
+                            } finally {
+                                composed.recycle()
+                            }
+                        } else {
+                            frame.scale(96, 104, false)
+                        }
+                        frames.add(scaled)
+                        prepared.add(scaled)
                     } finally {
-                        if (composed !== frame) composed.recycle()
                         frame.recycle()
                     }
-                    frames.add(scaled)
-                    prepared.add(scaled)
                 }
                 require(frames.isNotEmpty() && (row.name != "talking" || frames.size == 3))
                 row.name to frames.toList()

@@ -89,6 +89,74 @@ class PetTest {
         }
     }
 
+    @Test fun rejectsSignedExtremaOnBothAxesBeforeWidthArithmetic() {
+        val rectangles = listOf(
+            listOf(Int.MAX_VALUE, 100, Int.MIN_VALUE, 124),
+            listOf(80, Int.MAX_VALUE, 112, Int.MIN_VALUE)
+        )
+        for (rect in rectangles) {
+            org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+                PetOverlay(rect[0], rect[1], rect[2], rect[3])
+            }
+        }
+        assertEquals(192, PetOverlay(96, 104, 192, 208).right)
+        assertEquals(0, PetOverlay(0, 0, 96, 104).left)
+    }
+
+    @Test fun rejectsHorizontalOverflowInActualManifestParser() {
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            PetManifest.parse(
+                overlayManifest("""{"anchor_frame":0,"rect":[2147483647,100,-2147483648,124]}""")
+            )
+        }
+    }
+
+    @Test fun rejectsVerticalOverflowInActualManifestParser() {
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            PetManifest.parse(
+                overlayManifest("""{"anchor_frame":0,"rect":[80,2147483647,112,-2147483648]}""")
+            )
+        }
+    }
+
+    @Test fun requiresIntegerTokensForAnchor() {
+        for (token in listOf("0e0", "0E+0", "0e1", "0.0", "true", "false", "\"0\"")) {
+            org.junit.Assert.assertThrows(token, IllegalArgumentException::class.java) {
+                PetManifest.parse(
+                    overlayManifest("""{"anchor_frame":$token,"rect":[80,100,112,124]}""")
+                )
+            }
+        }
+        assertEquals(
+            80,
+            PetManifest.parse(
+                overlayManifest("""{"anchor_frame":0,"rect":[80,100,112,124]}""")
+            ).sheets[1].rows[0].overlay?.left
+        )
+    }
+
+    @Test fun requiresIntegerTokensForRectangle() {
+        for (token in listOf("8e1", "8E+1", "80e0", "80.0", "true", "\"80\"")) {
+            org.junit.Assert.assertThrows(token, IllegalArgumentException::class.java) {
+                PetManifest.parse(
+                    overlayManifest("""{"anchor_frame":0,"rect":[$token,100,112,124]}""")
+                )
+            }
+        }
+    }
+
+    @Test fun malformedOverlayWithdrawsPendingAssetWithoutEmittingAManifestOrLateAsset() {
+        val receiver = PetTransfers()
+        receiver.message(manifest(), 0)
+        receiver.message(message("asset.start"), 1)
+        val rejected =
+            overlayManifest("""{"anchor_frame":0,"rect":[80,2147483647,112,-2147483648]}""")
+        assertTrue(receiver.message(rejected, 2).isEmpty())
+        receiver.binary(BinaryFrame(4, 1, 0, data), 3)
+        assertTrue(receiver.message(message("asset.end"), 4).isEmpty())
+        assertTrue(receiver.message(manifest(), 5).single() is PetEffect.Manifest)
+    }
+
     @Test fun verifiesHashSequenceLengthAndExpiryBeforePromotion() {
         val receiver = PetTransfers()
         assertTrue(receiver.message(manifest(), 0).single() is PetEffect.Manifest)
