@@ -20,6 +20,23 @@ internal fun WatchState.withPresentationPet(endpoint: String, atlas: PetAtlas): 
 internal fun ProfilePage.presentationArtwork(watch: WatchState): PageArtwork? =
     watch.artwork[key]?.takeIf { watch.artworkIdentities[key] == presentationKey() }
 
+/** Preserve the verified byte owner through publication, including ambient's raw projection. */
+internal fun WatchState.withPublishedArtwork(incoming: Map<String, PageArtwork>): WatchState {
+    val expected = ProfilePages.merge(profiles, catalog).associate {
+        it.key to it.presentationKey()
+    }
+    val pictures = incoming.filter { (key, art) ->
+        (art.portrait == null && art.animation == null) ||
+            (art.portraitIdentity != null && art.portraitIdentity == expected[key])
+    }.mapValues { (_, art) ->
+        PageArtwork(art.portrait, null, art.animation, art.portraitIdentity)
+    }
+    val identities = pictures.mapNotNull { (key, art) ->
+        art.portraitIdentity?.let { key to it }
+    }.toMap()
+    return copy(artwork = pictures, artworkIdentities = identities)
+}
+
 internal fun ProfilePage.presentationPet(watch: WatchState): PetAtlas? {
     // PageArtwork has no endpoint provenance. Use only the service's captured cache identity.
     val cached = watch.presentationPets[presentationKey()]

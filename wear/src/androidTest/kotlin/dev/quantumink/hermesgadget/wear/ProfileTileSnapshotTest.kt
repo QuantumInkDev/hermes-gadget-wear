@@ -47,7 +47,8 @@ class ProfileTileSnapshotTest {
                 cache.store(
                     page.key,
                     PortraitDescriptor(sha, bytes.size, "/assets/$sha.png"),
-                    bytes
+                    bytes,
+                    page.presentationKey()
                 )
             }
             art(android.graphics.Color.RED)

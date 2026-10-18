@@ -58,7 +58,8 @@ class ProfileTileRenderTest {
         cache.store(
             "synthetic:alpha",
             PortraitDescriptor(sha, bytes.size, "/assets/$sha.png"),
-            bytes
+            bytes,
+            PresentationKey.of("synthetic:alpha", null)
         )
         val pages = listOf("alpha" to "Alpha", "beta" to "Beta").map { (key, label) ->
             CatalogPage(

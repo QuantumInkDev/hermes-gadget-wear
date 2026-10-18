@@ -127,7 +127,6 @@ class GadgetService : Service() {
         { task -> Thread(task, "pet-storage").apply { isDaemon = true } }
     )
     private val presentationArtEpoch = AtomicLong()
-    private var preparedArtworkIdentities = emptyMap<String, PresentationKey>()
     private lateinit var presentationStore: PresentationStore
     private lateinit var petCache: PetCache
 
@@ -189,13 +188,7 @@ class GadgetService : Service() {
                 }
             },
             artwork = { artwork ->
-                // Controller publishes only its latest prepare epoch on the main thread.
-                // Tag that projection before catalog keys or endpoints can be reused.
-                val identities = preparedArtworkIdentities.filterKeys { it in artwork }
-                val pictures = artwork.mapValues { (_, art) ->
-                    PageArtwork(art.portrait, null, art.animation)
-                }
-                mutableState.update { it.copy(artwork = pictures, artworkIdentities = identities) }
+                mutableState.update { it.withPublishedArtwork(artwork) }
             }
         )
         playback = PcmPlayback(
@@ -367,7 +360,7 @@ class GadgetService : Service() {
                 selectedPage = it.selectedPage.ifBlank {
                     selected
                 }
-            )
+            ).let { updated -> updated.withPublishedArtwork(updated.artwork) }
         }
         if (!::vault.isInitialized) return
         storage.execute {
@@ -438,7 +431,6 @@ class GadgetService : Service() {
                     key
             }
         }
-        preparedArtworkIdentities = prepared.associate { it.key to it.presentationKey() }
         val request = presentationArtEpoch.incrementAndGet()
         storage.execute {
             if (request != presentationArtEpoch.get()) return@execute

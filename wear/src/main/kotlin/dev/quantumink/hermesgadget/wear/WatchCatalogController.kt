@@ -24,12 +24,12 @@ class WatchCatalogController(
     private val allowed: (List<CatalogPage>) -> Boolean,
     private val loaded: (List<CatalogPage>, String) -> Unit,
     private val busy: (Boolean, String) -> Unit,
-    private val artwork: (Map<String, PageArtwork>) -> Unit
+    private val artwork: (Map<String, PageArtwork>) -> Unit,
+    private val portraits: PortraitCache = PortraitCache(File(context.filesDir, "portrait-cache"))
 ) : AutoCloseable {
     private val promotion = Any()
     private val main = Handler(Looper.getMainLooper())
     private val vault = WatchCatalogVault(context)
-    private val portraits = PortraitCache(File(context.filesDir, "portrait-cache"))
     private val animations = dev.quantumink.hermesgadget.client.AnimationCache(
         File(context.filesDir, "animation-cache")
     )
@@ -214,11 +214,9 @@ class WatchCatalogController(
             animations.protect(animationMetadata.values.map { it.sha256 }.toSet())
             val result = selected.associate { page ->
                 val descriptor = page.portrait
-                if (descriptor != null &&
-                    runCatching {
-                        portraits.currentHash(page.key)
-                    }.getOrNull() != descriptor.sha256
-                ) {
+                val identity = page.presentationKey()
+                var portrait = portraits.owned(page.key, identity, descriptor)
+                if (descriptor != null && portrait?.sha256 != descriptor.sha256) {
                     node?.let { phone ->
                         runCatching {
                             val admission = synchronized(promotion) {
@@ -231,17 +229,24 @@ class WatchCatalogController(
                                 }
                             }
                             if (admission != null) {
-                                portraits.fetchAndStore(page.key, descriptor, admission) {
-                                    remote.portrait(phone, descriptor)
+                                if (portraits.fetchAndStore(
+                                        page.key,
+                                        descriptor,
+                                        admission,
+                                        identity
+                                    ) {
+                                        remote.portrait(phone, descriptor)
+                                    }
+                                ) {
+                                    portrait?.bitmap?.recycle()
+                                    portrait = portraits.owned(page.key, identity, descriptor)
                                 }
                             }
                         }
                     }
                 }
                 val animation = animationMetadata[page.key]?.takeIf {
-                    it.fallbackSha256 == descriptor?.sha256 &&
-                        runCatching { portraits.currentHash(page.key) }.getOrNull() ==
-                        it.fallbackSha256
+                    portrait != null && it.fallbackSha256 == portrait.sha256
                 }?.let { metadata ->
                     animations.file(metadata) ?: node?.let { phone ->
                         runCatching {
@@ -260,11 +265,12 @@ class WatchCatalogController(
                 }
                 page.key to
                     PageArtwork(
-                        portraits.load(page.key),
+                        portrait?.bitmap,
                         page.approved?.let {
                             runCatching { pets.load(it.endpoint.url) }.getOrNull()
                         },
-                        animation
+                        animation,
+                        portrait?.identity
                     )
             }
             main.post { if (!closed.get() && request == artEpoch.get()) artwork(result) }

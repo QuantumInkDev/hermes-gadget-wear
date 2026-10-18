@@ -46,7 +46,9 @@ class ProfileTileSnapshot(
                     page.approved == null -> "Review"
                     else -> "Open"
                 }
-                val bitmap = key?.let(portraits::load)
+                val bitmap = page?.let {
+                    portraits.owned(it.key, it.presentationKey(), it.portrait)?.bitmap
+                }
                 val pixels = bitmap?.let {
                     try {
                         circle(it)
