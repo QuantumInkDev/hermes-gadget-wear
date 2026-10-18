@@ -33,7 +33,8 @@ data class ConnectionState(
     val pairingCode: String = "",
     val pairingCommand: String = "",
     val clientSpeech: Boolean = false,
-    val error: String = ""
+    val error: String = "",
+    val diagnostics: ConnectionDiagnosticsSnapshot = ConnectionDiagnosticsSnapshot()
 ) {
     override fun toString(): String = "ConnectionState(status=" + status + ", content=redacted)"
 }
@@ -89,6 +90,14 @@ class DirectConnection(
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
+    private val diagnosticTransport = if (connectionProxy ==
+        Proxy.NO_PROXY
+    ) {
+        DiagnosticTransport.DIRECT
+    } else {
+        DiagnosticTransport.PHONE_RELAY
+    }
+    private val diagnostics = ConnectionDiagnostics(diagnosticTransport)
     private val actions = WatchActions.manifest(availableActions)
     private fun offeredFormats(direction: String): Set<String> {
         val formats = (capabilities[direction] as? JsonObject)?.get("formats") as? JsonArray
@@ -98,7 +107,8 @@ class DirectConnection(
         availableActions,
         previousReply,
         microphoneFormats = offeredFormats("mic"),
-        speakerFormats = offeredFormats("speaker")
+        speakerFormats = offeredFormats("speaker"),
+        diagnostics = diagnostics
     )
     private val spoken = LinkedHashSet<String>()
     private var clientSpeech = false
@@ -247,6 +257,7 @@ class DirectConnection(
     private fun open() {
         if (!desired || stopped.get()) return
         generation++
+        diagnostics.reset(diagnosticTransport, now())
         val epoch = generation
         handshake = newHandshake()
         pets.clear()
@@ -271,6 +282,7 @@ class DirectConnection(
             object : WebSocketListener() {
                 override fun onOpen(webSocket: WebSocket, response: Response) = dispatch {
                     if (epoch != generation) return@dispatch
+                    diagnostics.connection(ConnectionStage.SOCKET_OPEN, now())
                     if (response.header("Sec-WebSocket-Protocol") != Protocol.SUBPROTOCOL) {
                         fail("Server does not speak Gadget v1.", false)
                     } else {
@@ -325,7 +337,7 @@ class DirectConnection(
                 }
                 override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = dispatch {
                     if (epoch == generation) {
-                        fail("Connection closed.", true)
+                        fail("Connection closed.", true, FailureCategory.DISCONNECTED)
                         publish()
                     }
                 }
@@ -342,7 +354,12 @@ class DirectConnection(
                                 public -> "Cleartext endpoint resolved outside the private network."
                                 else -> "Cannot reach the configured endpoint."
                             },
-                            !tls && !public
+                            !tls && !public,
+                            when {
+                                tls -> FailureCategory.TLS
+                                public -> FailureCategory.ADDRESS_POLICY
+                                else -> FailureCategory.REACHABILITY
+                            }
                         )
                         publish()
                     }
@@ -351,7 +368,11 @@ class DirectConnection(
     }
 
     private fun incoming(message: Message) {
-        handshake.receive(message, now()).forEach(::send)
+        val handshakeReplies = handshake.receive(message, now())
+        if (message.type == "challenge" && handshake.state == Handshake.State.AUTH_SENT) {
+            diagnostics.connection(ConnectionStage.AUTHENTICATING, now())
+        }
+        handshakeReplies.forEach(::send)
         if (handshake.state == Handshake.State.FAILED) {
             fail(
                 when (handshake.failureCode) {
@@ -359,7 +380,14 @@ class DirectConnection(
                     "auth_failed" -> "Device identity rejected. Check the host's enrollment."
                     else -> "Server rejected the protocol connection."
                 },
-                false
+                false,
+                if (handshake.failureCode in
+                    setOf("bad_token", "auth_failed")
+                ) {
+                    FailureCategory.AUTH
+                } else {
+                    FailureCategory.PROTOCOL
+                }
             )
             return
         }
@@ -378,7 +406,13 @@ class DirectConnection(
                         clientSpeechOffered && message.string("tts") == "client"
                 }
                 val paired = handshake.canSendConversation
-                effects(conversation.setPaired(paired))
+                effects(conversation.setPaired(paired, now()))
+                if (handshake.state in setOf(Handshake.State.PAIRED, Handshake.State.UNPAIRED)) {
+                    diagnostics.connection(
+                        if (paired) ConnectionStage.READY else ConnectionStage.PAIRING,
+                        now()
+                    )
+                }
                 state = state.copy(
                     status = if (paired) ConnectionStatus.PAIRED else ConnectionStatus.PAIRING,
                     clientSpeech = clientSpeech,
@@ -441,7 +475,11 @@ class DirectConnection(
         if (reconnectAt?.let { now() >= it } == true && desired) open()
         if (socket != null) {
             handshake.tick(now())
-            if (handshake.state == Handshake.State.FAILED) fail("Connection timed out.", true)
+            if (handshake.state ==
+                Handshake.State.FAILED
+            ) {
+                fail("Connection timed out.", true, FailureCategory.TIMEOUT)
+            }
             if (healthySince?.let { now() - it >= 20000 } == true) retryCount = 0
         }
         pets.tick(now())
@@ -459,14 +497,29 @@ class DirectConnection(
         publish()
     }
 
-    private fun fail(error: String, retry: Boolean) {
+    private fun fail(
+        error: String,
+        retry: Boolean,
+        category: FailureCategory = FailureCategory.PROTOCOL
+    ) {
         generation++
         socket?.cancel()
         socket = null
         handshake.close()
         pets.clear()
-        effects(conversation.disconnected())
+        effects(conversation.disconnected(now()))
         healthySince = null
+        diagnostics.connection(
+            if (desired &&
+                retry
+            ) {
+                ConnectionStage.RETRYING
+            } else {
+                ConnectionStage.FAILED
+            },
+            now(),
+            category
+        )
         if (desired && retry) {
             val base = (1000L shl retryCount.coerceAtMost(5)).coerceAtMost(30000)
             retryCount++
@@ -506,7 +559,8 @@ class DirectConnection(
         socket = null
         handshake.close()
         pets.clear()
-        effects(conversation.disconnected())
+        effects(conversation.disconnected(now()))
+        diagnostics.connection(ConnectionStage.OFFLINE, now())
         state =
             state.copy(
                 status = ConnectionStatus.OFFLINE,
@@ -538,7 +592,7 @@ class DirectConnection(
                     if (active == null || active.queueSize() > 32000 ||
                         !active.send(effect.frame.encode().toByteString())
                     ) {
-                        fail("Audio uplink could not keep up.", true)
+                        fail("Audio uplink could not keep up.", true, FailureCategory.OVERLOAD)
                         accepted = false
                         break
                     }
@@ -566,13 +620,16 @@ class DirectConnection(
 
     private fun send(message: Message): Boolean {
         if (socket?.send(message.encode()) == true) return true
-        fail("Connection cannot send.", true)
+        fail("Connection cannot send.", true, FailureCategory.DISCONNECTED)
         return false
     }
 
     private fun publish() {
         if (stopped.get()) return
-        state = state.copy(conversation = conversation.state.copy(busy = conversation.busy))
+        state = state.copy(
+            conversation = conversation.state.copy(busy = conversation.busy),
+            diagnostics = diagnostics.snapshot(now())
+        )
         if (state != published) {
             published = state
             observer.stateChanged(state)
@@ -592,7 +649,7 @@ class DirectConnection(
                     if (stopped.get()) {
                         rejected()
                     } else if (overloaded.getAndSet(false)) {
-                        fail("Connection exceeded its work limit.", false)
+                        fail("Connection exceeded its work limit.", false, FailureCategory.OVERLOAD)
                         publish()
                         rejected()
                     } else {
@@ -624,6 +681,7 @@ class DirectConnection(
         observer.effect(ConversationEffect.PlaybackStop, generation)
         observer.stateChanged(
             ConnectionState(
+                diagnostics = ConnectionDiagnosticsSnapshot(transport = diagnosticTransport),
                 conversation =
                 published?.conversation ?: ConversationState()
             )
