@@ -75,6 +75,16 @@ and affected strict build/format success. Full Task 1 review is clean with no fi
 phone audio is integrated as `5cdc8d1`/`1fd00e9`. Settings/capacity and physical delivery
 remain separate phone gates. These handoffs are not accepted live features or physical app deliveries.
 
+Reviewed phone audio root integration builds all four APKs with warning mode fail and
+passes sequential formatting. Profile-aware settings/64-entry vault Task 2 is active.
+Minimum-SDK quick-action checkpoint on a new owned API29 emulator: 13 methods executed,
+seven passed/six failed. Four fail only at the old SDK-model admission check; two fail
+at the test helper's unguarded UiAutomation.clearCache call. The API is available from
+[API34](https://developer.android.com/reference/android/app/UiAutomation#clearCache()).
+The focused test-helper correction is assigned without removing semantic assertions;
+API29 remains an open acceptance gate. Phone ADB is online but locked, so its positive
+profile-bound preview/shortcut/live UI checks remain pending, with no UI takeover.
+
 Physical synthetic codec demo: each actual device passes the two existing production-code
 Opus encode/decode methods in a separate temporary app. The three-second fixture encodes
 96,000 PCM payload bytes into 8,844 phone/8,905 watch Opus payload bytes. This is a single

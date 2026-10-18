@@ -100,6 +100,17 @@ installed on physical devices yet. SDK/core,
 watch and phone source ownership are disjoint. The canonical-history/task plan is written;
 implementation follows the reviewed core/outbox bridge.
 
+Phone audio integration `5cdc8d1`/`1fd00e9` builds all four APKs warning-strict and
+passes sequential formatting; source/APK-bound receipts are private. Task 2 profile-aware
+speech settings and the 64-endpoint vault boundary are active in a fresh isolated worktree.
+Root created a separate owned Android 10/API29 emulator for the minimum-SDK gate: 13
+quick-action native methods ran, seven passed and six failed at test-support boundaries
+(four legacy emulator-model guards, two unavailable accessibility-cache calls). These are
+not established product failures or a passing API29 suite. The speech-settings worker
+has a narrowly scoped test-helper correction, preserving all behavior/fresh-data guards;
+independent review and an actual API29 rerun remain required. The physical phone is
+reachable but locked, so no profile-bound physical UI action was attempted this turn.
+
 Physical codec checkpoint: the actual phone and watch each pass both existing Opus
 encode/decode tests using synthetic in-memory audio in an isolated temporary app built
 from exact production codec sources. Both original APK hashes, every baseline app-data
