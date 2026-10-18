@@ -40,7 +40,8 @@
     <string name="speech_delete_shared">Delete shared key</string>
     <string name="speech_endpoint">Manual server URL (wss)</string>
     <string name="speech_profile_key">Per-profile API key</string>
-    <string name="speech_profile_voice">Profile voice ID (blank uses shared or server hint)</string>
+    <string name="speech_profile_voice">Voice ID</string>
+    <string name="speech_profile_voice_hint">Blank uses the shared voice ID or the server voice hint.</string>
     <string name="speech_mode_server">Mode: server voice</string>
     <string name="speech_mode_shared">Mode: shared BYOK key</string>
     <string name="speech_mode_profile">Mode: per-profile BYOK key</string>

@@ -5,6 +5,8 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.AtomicFile
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -40,11 +42,19 @@ class TtsVault(
     fun read(endpoint: String): SpeechSettings = synchronized(lock) {
         val base = File(directory, name(endpoint))
         val backup = File(directory, name(endpoint) + ".bak")
-        if (!base.exists() && !backup.exists()) {
+        if (!present(base) && !present(backup)) {
             return@synchronized SpeechSettings(SpeechMode.SERVER, "", "")
         }
         // AtomicFile.openRead repairs/deletes files. Inspect without mutating corrupt evidence.
-        val encrypted = (if (backup.exists()) backup else base).inputStream().use {
+        readArtifact(if (present(backup)) backup else base, endpoint)
+    }
+
+    private fun present(file: File): Boolean =
+        Files.exists(file.toPath(), LinkOption.NOFOLLOW_LINKS)
+
+    private fun readArtifact(file: File, endpoint: String): SpeechSettings {
+        require(Files.isRegularFile(file.toPath(), LinkOption.NOFOLLOW_LINKS))
+        val encrypted = file.inputStream().use {
             require(it.channel.size() in 30..4096)
             it.readBytes()
         }
@@ -55,7 +65,7 @@ class TtsVault(
         val bytes = cipher.doFinal(encrypted.copyOfRange(14, encrypted.size))
         try {
             val json = Json.parseToJsonElement(bytes.toString(Charsets.UTF_8)).jsonObject
-            return@synchronized SpeechSettings(
+            return SpeechSettings(
                 SpeechMode.valueOf(json.getValue("mode").jsonPrimitive.content),
                 json["key"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                 json["voice"]?.jsonPrimitive?.contentOrNull.orEmpty()
@@ -67,10 +77,13 @@ class TtsVault(
 
     fun save(endpoint: String, settings: SpeechSettings) = synchronized(lock) {
         val base = File(directory, name(endpoint))
-        val exists = base.exists() || File(directory, name(endpoint) + ".bak").exists()
+        val backup = File(directory, name(endpoint) + ".bak")
+        val pending = File(directory, name(endpoint) + ".new")
+        val exists = present(base) || present(backup)
         require(endpoint == "shared" || exists || endpoints().size < 64)
-        // Validate before replacing an existing record, even when saving SERVER or deleting a key.
-        if (exists) read(endpoint)
+        // startWrite may restore .bak over base and truncate .new; finish/fail also mutate .new.
+        // Validate every present artifact before any of those operations, under the same lock.
+        listOf(base, backup, pending).filter(::present).forEach { readArtifact(it, endpoint) }
         val bytes = buildJsonObject {
             put("mode", settings.mode.name)
             put("key", settings.key)

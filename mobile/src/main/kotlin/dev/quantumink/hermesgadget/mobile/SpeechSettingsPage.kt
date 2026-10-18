@@ -180,7 +180,7 @@ internal fun SpeechSettingsPage(
             }
             SpeechInput(R.string.speech_profile_voice, voice, {
                 voice = it.take(128)
-            }, enabled = profileEnabled)
+            }, enabled = profileEnabled, supporting = R.string.speech_profile_voice_hint)
             if (mode == SpeechMode.PROFILE) {
                 SpeechInput(
                     R.string.speech_profile_key,
@@ -272,7 +272,8 @@ private fun SpeechInput(
     changed: (String) -> Unit,
     secret: Boolean = false,
     uri: Boolean = false,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    supporting: Int? = null
 ) {
     OutlinedTextField(
         value,
@@ -280,6 +281,7 @@ private fun SpeechInput(
         modifier = Modifier.fillMaxWidth(),
         enabled = enabled,
         label = { Text(stringResource(label)) },
+        supportingText = supporting?.let { hint -> { Text(stringResource(hint)) } },
         singleLine = true,
         keyboardOptions = KeyboardOptions(
             keyboardType = if (secret) {
