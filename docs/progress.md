@@ -72,8 +72,10 @@ Kitana has a selected compact base and a corrected six-pose idle strip. Direct e
 first rejected its tight, unequal generated spacing; lossless column repacking retains
 all source pixels and lets the real Hermes extractor/normalizer produce native/watch
 technical previews. Complete fans and six distinct poses are verified; final all-state
-registration, continuous motion and remaining animations are not accepted yet. No profile
-assignment changed. Viper and Cthulhu follow her.
+registration, continuous motion and remaining animations are not accepted yet. A side-view
+walk now has six complete wide/passing gait phases and technical native/watch previews;
+weaker earlier drafts remain rejected. No profile assignment changed. Viper and Cthulhu
+follow her.
 N1/N2 Task1 fix1 `c5ff24b` addresses the reviewed schema-constraint defect. It reports
 296 warning-strict SDK passes and 47 distinct actual-core passes; the latter had one
 initial subprocess timeout, followed by a separate 19-case pass with retries disabled.
@@ -82,7 +84,9 @@ result-depth inconsistency remains deferred for the consumer contract. Task1 Win
 separate gates. Fresh Task2 core review found three Important issues: simultaneous first
 route registration, omitted legitimate display history and receipt replay after grant
 revocation while waiting. Focused fixes require real-core barrier evidence and a fresh
-review. No new method is enabled or candidate integrated.
+review. Fix1 closes those three findings; its review found a further byte-budget pagination
+stall behind hidden carriers. Fix2 `67e3778` has sixteen focused cases passing on each
+core foundation and is under scoped review. No new method is enabled or candidate integrated.
 
 The approved phone follow-up has nine final native executions/five distinct methods
 on API29/API37, no skips, including settled-keyboard Save taps. The fixture integration
@@ -105,11 +109,14 @@ all five findings and read-only verification still matches installed before hash
 now has a concrete offline implementation plan: one maintenance lease, fresh drain proof,
 owned markers, planned shutdown, the accepted source helper and controlled recovery/start.
 Read-only identity/topology and all twelve capability-OFF config checks are recorded;
-these do not prove idle state. Driver implementation/review and actual stock acceptance
-remain required. No install, drain, restart or capability activation follows from these checks.
+these do not prove idle state. Isolated driver implementation is running; review and
+actual stock acceptance remain required. No install, drain, restart or capability activation follows from these checks.
 
 The [walking-audio foundation](superpowers/plans/2026-10-18-walking-audio-foundation.md)
-has a candidate at `c258998a` awaiting fresh review. All twelve audio behaviors have
+has a fix1 candidate at `c60c8a3` under scoped review. Initial review identified a lost
+interruption-notification race; its forced-order regression now passes on all three
+runtimes. A separate API29 Opus attempt timed out while launching its fixture, before
+playback; that failure remains recorded. All twelve original audio behaviors have
 passing native executions on API29/API33/API37; an earlier Wear startup timeout and an
 API29 Opus fixture skip remain recorded, with the corrected method passing separately.
 This does not complete larger walking controls, concise speech, Replay/More or physical
