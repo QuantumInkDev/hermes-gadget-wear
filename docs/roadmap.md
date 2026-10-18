@@ -1,0 +1,62 @@
+# Quantum Relay feature roadmap
+
+Updated 2026-10-18. The owner requested implementation of original feature backlog
+items 1–5 and all ten new ideas. All fifteen remain in scope until their individual
+acceptance contracts are met. The one-port/multiplexed Gadget gateway is excluded.
+
+Design: [fifteen-feature expansion](superpowers/specs/2026-10-18-relay-expansion-design.md).
+The owner approved the complete eleven-question batch, with one explicit amendment:
+build **Akuma only** as the personal pet proof of concept and a reusable pipeline for
+future custom pets. Staged live rollout/delegation, bounded provider testing and preserving
+device tests are authorized; actual device operations await wireless confirmation.
+
+## Feature ledger
+
+| ID | Feature | Starting point | Current state |
+| --- | --- | --- | --- |
+| O1 | Live per-profile Hermes pets | Isolated SDK delivery patch, watch renderer/cache and synthetic native coverage | Design proposed; real-profile rollout and physical acceptance open |
+| O2 | Akuma expressions/lip sync and reusable custom-pet pipeline | Companion registration tool, fallback/state mapping and synthetic sheets | Design approved; Akuma creation, real speech and visual acceptance open; other personal art excluded |
+| O3 | End-to-end optional Opus | Isolated SDK patch, watch codec and stock PCM fallback; synthetic payload evidence | Design proposed; actual live integration, speech comparison and power measurements open |
+| O4 | Optional phone ElevenLabs BYOK | Encrypted shared/per-profile vaults, isolated negotiation and provider fixture tests | Design proposed; real provider, phone/watch transport and usage verification open |
+| O5 | Reconnect outbox | Bounded-retention proposal only | New implementation and all acceptance open |
+| N1 | Durable history and phone/watch conversation continuation | In-memory per-profile drafts/replies; independent device conversations | New session/history integration and all acceptance open |
+| N2 | Cross-box task inbox and notifications | Current turn/tool status only | New authoritative task integration and all acceptance open |
+| N3 | Share text, links and supported attachments to an agent | Native picture picker exists for profile art, not conversation sharing | New implementation and all acceptance open |
+| N4 | Editable prompt actions and Android shortcuts | Exact-profile widgets/tiles already launch conversations | New prompt-action implementation and all acceptance open |
+| N5 | Walking mode | Existing portrait/inline hold-to-talk, waveform and audio playback | New mode/routing/concise-speech implementation and all acceptance open |
+| N6 | Structured reply cards and actions | Basic stock display/card/image support | New richer rendering/action implementation and all acceptance open |
+| N7 | Previewed agent handoff | Independent profile routing, no cross-agent context operation | New implementation and all acceptance open |
+| N8 | Connection/request-stage diagnostics and redacted reports | Existing connection/status and error UI | New consolidated diagnostics/reporting and all acceptance open |
+| N9 | Authenticated remote wake | No remote wake integration established | New implementation; sender and hardware capabilities need verification |
+| N10 | QR onboarding and safe configuration migration | Current manual review/import and encrypted setup/art stores | New reviewed QR/migration implementation and all acceptance open |
+
+## Planned workstream order
+
+1. Audit actual Hermes SDK/core/plugin interfaces and collect the decision batch.
+2. Finalize the umbrella design and focused implementation plans with acceptance evidence.
+3. Build authenticated optional server contracts, durable events/outbox and session/task
+   adapters. Keep stock peers usable with features off.
+4. Integrate real pets, registered expressions, negotiated Opus and opt-in client speech.
+5. Build history/continuity/task UI plus sharing, prompt actions, walking mode, rich cards
+   and explicit agent handoff against the real scoped contracts.
+6. Add request-stage diagnostics, supported remote wake and reviewed setup/migration.
+7. Complete independent review, staged authorized live rollout, native/device tests,
+   owner-observed speech/earbuds/art checks and measured audio/battery acceptance.
+
+Independent work may overlap after interfaces and file ownership are defined and the
+owner's decision permits delegation. The order does not remove any feature from scope.
+
+## Completion rules
+
+- Record designed, implemented, software verified, live integrated and physically accepted
+  separately, with source/build identifiers and the relevant receipt links.
+- Passing synthetic tests does not establish real sessions, task progress, provider voice,
+  pet lip sync, wake hardware or battery life.
+- Preserve independent phone/watch identities, signatures, custom art/GIF assignments,
+  themes and existing working profile behavior. Personal receipts stay in ignored .local/.
+- A hardware prerequisite or missing external API is an explicit dependency requiring a
+  supported implementation path; it does not turn an unfinished feature into a completed one.
+- The owner's report of several stable days covers the existing app only. It does not
+  accept these new features or silently close earlier targeted release gates.
+- Keep publication, upload-key changes, merging and the excluded gateway v2 separate from
+  the active feature goal. The release checklist remains a different checklist.

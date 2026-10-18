@@ -2,6 +2,19 @@
 
 Status: native client implementation and software acceptance, 2026-10-12. Hardware and release gates remain open. The [original brief](hermes-gadget-wear-prompt.md) remains the scope; verified corrections are recorded in [architecture](architecture.md) and [pets](pets.md).
 
+## Approved expansion — 2026-10-18
+
+The owner approved the fifteen-feature [expansion design](superpowers/specs/2026-10-18-relay-expansion-design.md)
+and [roadmap](roadmap.md), including staged server integration and preserving native updates.
+This adds real pets/optional audio/provider integration and reconnect retention; durable
+phone/watch conversations and task inbox; sharing, custom actions, walking mode, richer
+reply cards and explicit handoff; diagnostics, supported remote wake and QR/migration.
+History/task access defaults to Relay work and requires per-profile opt-in for other
+Hermes surfaces. Pet presentation is now explicitly selectable and initially preserves
+current portraits/GIFs, superseding automatic-pet-priority descriptions below.
+Personal companion artwork is limited to **Akuma**, with reusable tooling for future pets.
+Approval does not establish implementation, integration, physical or release acceptance.
+
 ## Native client behavior — 2026-10-12
 
 Phone refinement approved 2026-10-14: **Quantum Relay for Hermes Agents** uses original

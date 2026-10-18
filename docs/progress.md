@@ -1,5 +1,22 @@
 # Progress
 
+## Fifteen-feature expansion intake — 2026-10-18
+
+The owner reports several days of successful use and requests the five unfinished
+feature areas plus all ten proposed additions. The complete [roadmap](roadmap.md) and
+[proposed umbrella design](superpowers/specs/2026-10-18-relay-expansion-design.md)
+record scope, existing foundations, workstream order and separate software/live/physical
+acceptance. A tool-managed goal is active. The excluded one-port gateway remains separate.
+
+The owner answered the entire eleven-question batch: recommended choices approved, with
+personal pet work limited to **Akuma as the proof of concept** and reusable tooling for
+later custom pets. Staged rollout/delegation and bounded provider/device test scope are
+authorized. The owner will confirm wireless debugging before physical operations. This checkpoint changes docs
+only. No expansion feature is implemented or accepted, no device data is changed, and no
+live server restart/provider synthesis occurred. Baseline source discovery identifies
+actual Hermes session/history surfaces and the stock per-device Gadget chat boundary;
+integration verification remains necessary before claiming true device continuation.
+
 ## Image-only 1×1 shortcut — 2026-10-14
 
 At the owner's request, a configured Focus widget with available artwork shows only the

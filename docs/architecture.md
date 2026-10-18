@@ -1,5 +1,17 @@
 # Architecture
 
+## Approved expansion architecture — 2026-10-18
+
+The approved [fifteen-feature design](superpowers/specs/2026-10-18-relay-expansion-design.md)
+adds authenticated optional profile-scoped server capabilities behind the existing
+independent Gadget endpoints. Use actual Hermes session/run identities and lifecycle
+events for conversation continuation and tasks; transport session IDs are not canonical
+conversation IDs. Never expose dashboard administrative credentials to phone/watch clients.
+Keep old SDK peers usable with capability-off behavior. Outbox/history storage is bounded;
+phone text caches are encrypted. Staged reviewed integration is authorized, while physical
+operations await wireless confirmation. The [roadmap](roadmap.md) records acceptance.
+These are requirements, not a claim that the expansion is already implemented.
+
 Implemented baseline (2026-10-11): [multi-box profile carousel](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md).
 The phone merges independently refreshed read-only catalogs and synchronizes bounded
 portrait/status metadata; the watch retains separate TLS Gadget identities/connections.

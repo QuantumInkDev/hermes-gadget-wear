@@ -1,5 +1,16 @@
 # Pets: verified atlas contract and missing states
 
+## Approved live-pet proof of concept — 2026-10-18
+
+The owner approved live profile-pet integration but limits generated personal companion
+art to **Akuma only** in this pass. Build the complete reusable pipeline for future custom
+pets without generating or changing other personal pets. Preserve the original base atlas;
+use registered listening/talking/sleeping companions and validate actual playback mouth
+response and physical legibility. Per-profile Portrait/Pet selection initially preserves
+the current picture/GIF, superseding older automatic-pet-priority notes below. The approved
+[expansion design](superpowers/specs/2026-10-18-relay-expansion-design.md) and
+[roadmap](roadmap.md) track implementation and separate acceptance.
+
 Approved profile-page extension (2026-10-11): the [multi-box carousel design](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md)
 uses each profile's cached portrait until its validated pet is available, then crossfades
 to that pet. New listening/talking/sleeping poses remain a separate registered companion

@@ -1,5 +1,42 @@
-<!-- Current continuation: 1x1 portrait-only refinement acfe414 installed; 104 baseline files /18 identities /55 artwork files preserved. Native checks pass; phone was locked during final visual check. -->
+<!-- Current continuation: active 2026-10-18 fifteen-feature expansion goal; full design/rollout approved, Akuma-only pet POC; focused plans next, wireless confirmation pending. Preserve current enrolled builds/data. -->
 # Session status
+
+## Active expansion goal — 2026-10-18
+
+The owner reports several stable days with the existing apps and requests all fifteen
+features in the [feature roadmap](docs/roadmap.md): original backlog O1–O5 (pets,
+companion expressions, Opus, phone BYOK, reconnect outbox) plus N1–N10 (history and
+device continuation, task inbox, Android sharing, custom prompt actions, walking mode,
+rich replies, explicit handoff, diagnostics, supported remote wake, QR/migration).
+The one-port Gadget gateway proposal is excluded. A tool-managed goal is active for the
+full scope; do not reduce completion to a client-only subset or software-only evidence.
+
+The owner asked for questions up front and will confirm wireless phone/watch connectivity
+before leaving. The initial eleven-question batch covers the proposed written design,
+staged live rollout/delegation, history/task grants, retention, pet presentation/artwork,
+bounded existing-key ElevenLabs testing, notification privacy, walking audio, wake sender,
+physical test scope and optional action templates/exclusions. The owner answered all
+eleven: all recommendations approved, except generate/build **Akuma only** as the pet
+proof of concept; preserve other pets and build a reusable pipeline for future custom
+pets. Seed useful action templates with explicit profile selection. Staged server rollout,
+parallel implementation/review and up to ten ElevenLabs synthesis tests /2,500 characters
+are authorized. Device tests await the owner's wireless confirmation. No expansion
+implementation or paid provider/device operation has occurred at this checkpoint.
+
+The [umbrella design](docs/superpowers/specs/2026-10-18-relay-expansion-design.md)
+defines all fifteen acceptance contracts, recorded decisions and the workstream split.
+Next: focused implementation plans and reviewed implementation increments.
+Source discovery confirms that stock Gadget creates one chat per device, while current
+local Hermes has session browsing/timeline/maintenance surfaces. Continuation needs an
+actual authenticated session binding, not copied transcript text; task state must use
+real run/session events. The installed Hermes source is newer than the original snapshot;
+concrete adapter compatibility must be checked without exposing administrative APIs.
+
+Existing signed/enrolled phone/watch state remains unchanged. PR #1 is linked and remains
+draft. No merge, signing rotation or public release is part of the new goal. Older build
+and acceptance receipts below remain the baseline rather than evidence for new features.
+
+## Existing delivery baseline
 
 The owner requested an image-only 1×1 shortcut. Build `acfe414` hides the caption when the
 configured Focus portrait is available, giving that space to the image. The full name/source
