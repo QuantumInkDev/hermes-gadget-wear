@@ -67,6 +67,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private var destination by mutableStateOf("profiles")
+    private var incomingAction: String? = null
+    private var pendingAction by mutableStateOf<String?>(null)
+    private var quickActionId by mutableStateOf<String?>(null)
+    private var quickActionLaunch by mutableStateOf(0L)
+    private var quickActionNotice by mutableStateOf("")
+    private val quickActionStore by lazy { QuickActionStore(this) }
     private var incomingWidget: WidgetLaunchRequest? = null
     private var pendingWidget by mutableStateOf<WidgetLaunchRequest?>(null)
     private var widgetUnavailable by mutableStateOf(false)
@@ -152,16 +158,20 @@ class MainActivity : ComponentActivity() {
             it in
                 setOf(
                     "profiles", "conversation", "watch", "settings", "tiles", "boxes",
-                    "manual", "speech", "appearance", "home-widgets"
+                    "manual", "speech", "appearance", "home-widgets", "quick-actions"
                 )
         } ?: "profiles"
         if (savedInstanceState == null) {
-            receiveWidget(intent)
+            if (!receiveAction(intent)) receiveWidget(intent)
         } else {
             pendingWidget = HomeWidgetLaunch.restore(savedInstanceState.getBundle("pending_widget"))
+            incomingAction = savedInstanceState.getString("incoming_action")
+            pendingAction = savedInstanceState.getString("pending_action")
+            quickActionId = savedInstanceState.getString("quick_action_id")
         }
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                consumeAction()
                 consumeWidget()
             }
         }
@@ -181,6 +191,10 @@ class MainActivity : ComponentActivity() {
                 val directoryScroll = androidx.compose.foundation.lazy.rememberLazyListState()
                 fun navigate(value: String) {
                     navigation.cancel()
+                    pendingAction = null
+                    incomingAction = null
+                    quickActionId = null
+                    quickActionNotice = ""
                     pendingWidget = null
                     widgetUnavailable = false
                     widgetEditId = null
@@ -226,6 +240,28 @@ class MainActivity : ComponentActivity() {
                             padding
                         ).consumeWindowInsets(padding).imePadding()
                     ) {
+                        if (pendingAction != null) {
+                            androidx.compose.material3.Text(
+                                "An action is waiting. Finish the current turn or approval, then open its review.",
+                                Modifier.padding(horizontal = 20.dp)
+                            )
+                            androidx.compose.material3.TextButton({
+                                incomingAction = pendingAction
+                                pendingAction = null
+                                consumeAction()
+                            }, enabled = !phoneSelectionLocked(phone)) {
+                                androidx.compose.material3.Text("Open action review")
+                            }
+                            androidx.compose.material3.TextButton({ pendingAction = null }) {
+                                androidx.compose.material3.Text("Dismiss action")
+                            }
+                        }
+                        if (quickActionNotice.isNotBlank()) {
+                            androidx.compose.material3.Text(
+                                quickActionNotice,
+                                Modifier.padding(20.dp)
+                            )
+                        }
                         WidgetLaunchNotice(
                             pendingWidget != null,
                             widgetUnavailable,
@@ -253,6 +289,15 @@ class MainActivity : ComponentActivity() {
                                     onBoxes = { navigate("boxes") },
                                     onManual = { navigate("manual") },
                                     modifier = Modifier.weight(1f)
+                                )
+                            }
+                            "quick-actions" -> androidx.compose.runtime.key(quickActionLaunch) {
+                                QuickActionsScreen(
+                                    quickActionId,
+                                    phoneSelectionLocked(phone),
+                                    ::requestQuickAction,
+                                    { navigate("settings") },
+                                    Modifier.weight(1f)
                                 )
                             }
                             "conversation" -> ConversationPage(
@@ -285,7 +330,15 @@ class MainActivity : ComponentActivity() {
                                     "home-widgets" -> HomeWidgetsPage {
                                         navigate("settings")
                                     }
-                                    "settings" -> PhoneSettingsPage(this@MainActivity, ::navigate)
+                                    "settings" -> {
+                                        SettingsLink(
+                                            "Quick actions",
+                                            "Editable prompts and Android shortcuts"
+                                        ) {
+                                            navigate("quick-actions")
+                                        }
+                                        PhoneSettingsPage(this@MainActivity, ::navigate)
+                                    }
                                     else -> WatchDashboard(
                                         enabled,
                                         status,
@@ -310,18 +363,93 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        receiveWidget(intent)
-        window.decorView.post { consumeWidget() }
+        if (!receiveAction(intent)) receiveWidget(intent)
+        window.decorView.post {
+            consumeAction()
+            consumeWidget()
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("phone_destination", destination)
+        outState.putString("incoming_action", incomingAction)
+        outState.putString("pending_action", pendingAction)
+        outState.putString("quick_action_id", quickActionId)
         pendingWidget?.let { outState.putBundle("pending_widget", HomeWidgetLaunch.bundle(it)) }
         super.onSaveInstanceState(outState)
     }
 
+    private fun receiveAction(value: Intent): Boolean {
+        if (value.action != QuickActionShortcuts.ACTION_OPEN) return false
+        navigation.cancel()
+        incomingWidget = null
+        pendingWidget = null
+        widgetUnavailable = false
+        widgetEditId = null
+        incomingAction = QuickActionShortcuts.parse(value) ?: "missing"
+        return true
+    }
+
+    private fun consumeAction() {
+        if (!started ||
+            !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        ) {
+            return
+        }
+        val id = incomingAction ?: return
+        incomingAction = null
+        if (phoneSelectionLocked(conversation.state.value)) {
+            pendingAction = id
+            return
+        }
+        navigation.cancel()
+        conversation.hide()
+        pendingAction = null
+        quickActionNotice = ""
+        quickActionId = id
+        quickActionLaunch++
+        destination = "quick-actions"
+    }
+
+    private fun requestQuickAction(
+        reviewed: dev.quantumink.hermesgadget.protocol.QuickAction,
+        inputs: Map<String, String>
+    ) {
+        val key = reviewed.profileKey ?: return
+        if (phoneSelectionLocked(conversation.state.value)) {
+            quickActionNotice = "Finish the current turn or approval before using an action."
+            return
+        }
+        navigation.request(key, null, {
+            started && destination == "quick-actions" &&
+                lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        }) { resolved ->
+            val prompt = runCatching {
+                QuickActionNavigation.prompt(
+                    reviewed,
+                    inputs,
+                    quickActionStore.load(),
+                    resolved,
+                    conversation.state.value
+                )
+            }.getOrNull()
+            if (prompt == null || resolved == null) {
+                quickActionNotice =
+                    "Action or profile changed, is unavailable, or the conversation is locked. Reopen and review the action. Nothing was sent."
+            } else {
+                conversation.open(resolved.second, resolved.first)
+                conversation.draft(prompt)
+                quickActionId = null
+                quickActionNotice = ""
+                destination = "conversation"
+            }
+        }
+    }
+
     private fun receiveWidget(value: Intent) {
         if (value.action != HomeWidgets.ACTION_OPEN) return
+        pendingAction = null
+        incomingAction = null
         navigation.cancel()
         incomingWidget = HomeWidgetLaunch.parse(value)
         if (incomingWidget == null) {
