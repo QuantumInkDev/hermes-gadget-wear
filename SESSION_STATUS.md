@@ -36,7 +36,7 @@ or quarantined emulator was touched.
 
 The interrupted implementations are checkpointed without accepting unfinished code.
 Continuity Task3's fresh fix1 review closes the four original Important findings and the
-public UUID/report corrections. One new Important finding remains: disabling conversations
+public UUID/report corrections. That review found one further flaw: disabling conversations
 could falsely acknowledge unread shared outbox copies. Focused fix2 `a4a0c37` now has a
 clean fresh scoped review:13 new cases within114 distinct affected coverage. The Task3
 source-review gate is accepted; broad checks, queued-marker integration, later server

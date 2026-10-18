@@ -1,6 +1,6 @@
 # Upstream work
 
-Planned, not implemented or installed: an optional `maintenance_observation` runtime-status
+Source-reviewed, not installed or exported here: an optional `maintenance_observation` runtime-status
 object sampled only under an actually engaged external drain. The existing generic update
 timestamp can retain an old work count, so it cannot authorize the prepared rollout.
 The [isolated source plan](superpowers/plans/2026-10-18-maintenance-observation.md) requires
