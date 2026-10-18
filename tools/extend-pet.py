@@ -21,6 +21,8 @@ def opened(path):
 
 
 def extend(base_path: Path, companion_path: Path, output: Path):
+    if output.exists() or output.is_symlink():
+        raise ValueError('Output already exists; use a separate new path')
     base, source = opened(base_path), opened(companion_path)
     if base.width not in (1536, 1728) or base.height % 208 or not 1664 <= base.height <= 2496 or source.size != (1152, 624):
         raise ValueError('Expected base atlas and six-column, three-row companion input')
@@ -66,7 +68,8 @@ def extend(base_path: Path, companion_path: Path, output: Path):
             result.paste(cell, (column * 192, row * 208))
         rows.append({'name': name, 'index': row, 'frames': count})
     output.parent.mkdir(parents=True, exist_ok=True)
-    result.save(output, 'PNG')
+    with output.open('xb') as stream:
+        result.save(stream, 'PNG')
     return {'gadgetSheet': {'spritesheetPath': output.name, 'rows': rows}}
 
 

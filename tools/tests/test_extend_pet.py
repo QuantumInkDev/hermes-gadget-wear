@@ -53,3 +53,42 @@ def test_empty_clipped_and_drifting_rows_are_rejected(tmp_path):
         ImageDraw.Draw(image).rectangle((column * 192, 100, column * 192 + 24, 149), fill=(255, 190, 90, 255))
     image.save(source)
     with pytest.raises(ValueError, match='Clipped'): module.extend(base, source, tmp_path / 'out.png')
+
+
+@pytest.mark.parametrize('kind', ['base', 'source', 'existing', 'symlink', 'hardlink'])
+def test_callable_never_overwrites_existing_paths(tmp_path, kind):
+    base, source = tmp_path / 'base.png', tmp_path / 'input.png'
+    fixture(base, 1536, 1872, 100, [6] * 9)
+    fixture(source, 1152, 624, 50, [6, 3, 6])
+    output = tmp_path / 'out.png'
+    if kind == 'base': output = base
+    elif kind == 'source': output = source
+    elif kind == 'symlink': output.symlink_to(base)
+    elif kind == 'hardlink': output.hardlink_to(base)
+    else: output.write_bytes(b'existing')
+    before = base.read_bytes(), source.read_bytes(), output.read_bytes()
+    with pytest.raises(ValueError, match='exist|separate'):
+        module.extend(base, source, output)
+    assert before == (base.read_bytes(), source.read_bytes(), output.read_bytes())
+
+
+@pytest.mark.parametrize('width,rows', [(1536, 9), (1728, 8)])
+def test_preserves_supported_base_taxonomies(tmp_path, width, rows):
+    base, source, output = [tmp_path / name for name in ('base.png', 'in.png', 'out.png')]
+    fixture(base, width, rows * 208, 100, [6] * rows)
+    fixture(source, 1152, 624, 50, [6, 3, 6])
+    before = base.read_bytes()
+    module.extend(base, source, output)
+    assert base.read_bytes() == before
+    with Image.open(output) as result:
+        assert result.size == (1152, 624)
+
+
+def test_oversized_eleven_row_base_rejected_without_modification(tmp_path):
+    base, source = tmp_path / 'base.png', tmp_path / 'in.png'
+    fixture(base, 1536, 2288, 100, [6] * 11)
+    fixture(source, 1152, 624, 50, [6, 3, 6])
+    before = base.read_bytes()
+    with pytest.raises(ValueError, match='bounded'):
+        module.extend(base, source, tmp_path / 'out.png')
+    assert base.read_bytes() == before
