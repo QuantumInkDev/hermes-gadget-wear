@@ -18,9 +18,10 @@ sample-observation producer and independent live bootstrap authority. No server 
 
 The interrupted implementations are checkpointed without accepting unfinished code.
 Fresh isolated successors are resuming continuity Task3 and the QR/migration format;
-the committed maintenance-observation candidate (`1762a725` / `de9848db`) is under
-independent source/evidence review. Its original worker stopped before a completion
-report. No maintenance prerequisite, continuation method or migration feature is live.
+the committed maintenance-observation candidate (`1762a725` / `de9848db`) has an
+independent review requiring fixes. Unnecessary idle status writes and event-loop marker
+I/O are the two Important findings; a fresh implementer owns that correction and the
+smaller findings. The original worker stopped before a completion report. No maintenance prerequisite, continuation method or migration feature is live.
 
 Latest integrated app source `dc1fb14` adds the independently reviewed playback-output
 and interruption foundation. Strict root checks pass: 11 client JVM cases, zero failures,
