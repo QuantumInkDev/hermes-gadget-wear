@@ -20,6 +20,12 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
+interface SpeechSink {
+    fun start(format: String, header: ByteArray?)
+    fun packet(bytes: ByteArray)
+    fun finish()
+}
+
 class SpeechFailure(message: String) : Exception(message)
 data class SpeechQuota(val remaining: Long?)
 
@@ -28,7 +34,8 @@ class ElevenLabsApi internal constructor(
     private val origin: HttpUrl = "https://api.elevenlabs.io/".toHttpUrl(),
     client: OkHttpClient = OkHttpClient()
 ) : AutoCloseable {
-    private val client = client.newBuilder().proxy(Proxy.NO_PROXY).followRedirects(false)
+    private val client = client.newBuilder().dispatcher(okhttp3.Dispatcher())
+        .connectionPool(okhttp3.ConnectionPool()).proxy(Proxy.NO_PROXY).followRedirects(false)
         .followSslRedirects(
             false
         ).retryOnConnectionFailure(false).connectTimeout(10, TimeUnit.SECONDS)
@@ -81,6 +88,26 @@ class ElevenLabsApi internal constructor(
         output: OutputStream,
         onCall: (Call) -> Unit
     ) {
+        stream(
+            settings,
+            request,
+            object : SpeechSink {
+                override fun start(format: String, header: ByteArray?) {
+                    ClientSpeech.start(output, format, header)
+                }
+                override fun packet(bytes: ByteArray) = ClientSpeech.packet(output, bytes)
+                override fun finish() = ClientSpeech.finish(output)
+            },
+            onCall
+        )
+    }
+
+    fun stream(
+        settings: SpeechSettings,
+        request: SpeechRequest,
+        sink: SpeechSink,
+        onCall: (Call) -> Unit
+    ) {
         require(settings.mode != SpeechMode.SERVER && settings.key.isNotEmpty())
         val voice = settings.voice.ifEmpty { request.voice }
         if (!voice.matches(
@@ -116,20 +143,27 @@ class ElevenLabsApi internal constructor(
             checked(response.code)
             val body = requireNotNull(response.body)
             require(body.contentType()?.subtype != "json")
+            val limit = if (request.format == "opus") 4L * 1024 * 1024 else 3000L * 640
+            require(body.contentLength() <= limit)
             var frames = 0
             val started = System.nanoTime()
+            var header: ByteArray? = null
+            var begun = false
             fun packet(bytes: ByteArray) {
                 require(!call.isCanceled() && ++frames <= 3000)
                 val ahead = frames * 20000000L - (System.nanoTime() - started) - 200000000L
                 if (ahead > 0) TimeUnit.NANOSECONDS.sleep(ahead)
                 check(!call.isCanceled())
-                ClientSpeech.packet(output, bytes)
+                if (!begun) {
+                    sink.start(request.format, header)
+                    begun = true
+                }
+                sink.packet(bytes)
             }
             val input = body.byteStream()
             if (request.format == "opus") {
-                OggOpus.read(input, { ClientSpeech.start(output, "opus", it) }, ::packet)
+                OggOpus.read(input, { header = it }, ::packet)
             } else {
-                ClientSpeech.start(output, "pcm16")
                 while (true) {
                     val buffer = ByteArray(640)
                     var count = 0
@@ -145,7 +179,7 @@ class ElevenLabsApi internal constructor(
                 }
             }
             require(frames > 0)
-            ClientSpeech.finish(output)
+            sink.finish()
         }
     }
 }
