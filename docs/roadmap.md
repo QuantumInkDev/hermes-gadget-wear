@@ -10,6 +10,11 @@ build **Akuma only** as the personal pet proof of concept and a reusable pipelin
 future custom pets. Staged live rollout/delegation, bounded provider testing and preserving
 device tests are authorized; wireless access to both devices is now confirmed.
 
+Later artwork scope amendment: finish Akuma first, then create full Kitana, SF6 C. Viper
+and Cthulhu pets from scratch, including standard and watch companion states. Kitana has
+a regal walk and fan-cooling waiting loop; Cthulhu matches the existing profile portrait.
+Personal references and output remain private.
+
 ## Feature ledger
 
 | ID | Feature | Starting point | Current state |

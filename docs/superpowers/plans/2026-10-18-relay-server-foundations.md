@@ -578,6 +578,23 @@ and no-grant cases; use a synthetic event/source with no runner/provider call. T
 that a valid grant and opted-in session produces one durable record even if the
 WebSocket disappears before final delivery, then reconnect/read/ACK returns that exact
 record. Restart the adapter and SQLite connection and repeat. No provider calls.
+- [ ] Pin server-established authentication provenance on each real DeviceSession after
+successful HMAC/TOFU, never from client hello fields. Every relay request must compare that
+fingerprint with the current enrolled key/grant. Preserve the accepted turn's original
+enrollment through disconnected completion and recovery; re-enrollment under the same
+device ID cannot receive an old owner's final. Test this through actual sockets.
+- [ ] Add explicit DeviceStore load-health validation before authoritative owner
+reconciliation. Its stock missing/unreadable/malformed-to-empty fallback is not a verified
+empty registry. Validate enrollment record shape as well as JSON; unavailable authority
+denies the extension without erasing retained text. An intentional valid empty registry
+or explicit forget remains authoritative revocation.
+- [ ] Check raw relay-frame UTF-8 bytes and parser depth/RecursionError before dispatch,
+then enforce actual serialized outgoing envelope size. Parsed-object limits cannot
+reconstruct excess raw whitespace/escaping. Use the actual runner authorization callback;
+absence/unknown denies the optional extension. Bind service start/stop to its owning
+profile's private plugin-data directory. Windows must deny activation unless its actual
+private ACL and parent/reparse preflight succeed; simulated POSIX tests prove no Windows
+permission claim. Controller owns real-host ACL evidence and activation.
 - [ ] Add these methods to `HubDelegate`:
 
 ```python
@@ -634,6 +651,16 @@ terminal/delivery obligation survives that finalizer, using the actual core test
 composing its existing delivery ledger; if that needs a narrow upstream hook with this
 real consumer, export and review the core patch separately. No installed core edits.
 The final-text capture gate remains disabled until this is resolved and tested.
+
+The private actual-runtime snapshot is `.local/upstream/core-relay-runtime-snapshot`;
+it contains pre-existing tracked modifications absent from the clean pinned tree
+`.local/upstream/core-relay-compat`. Both are immutable baselines. Build writable synthetic
+fixtures from each and verify the hook against both. Export only the new hook delta,
+never the existing private runtime modifications. HEAD equality alone is insufficient.
+Integration may make narrowly tested internal capture-disposition/API adjustments to
+distinguish an intentional exclusion from unavailable authority; neither case may erase
+an unresolved canonical final-delivery obligation. Coordinate the final hook contract with
+the later continuity plan; no shared-session/history/task methods are added by this task.
 
 Add these lifecycle methods to GadgetAdapter, adapting the following capture sketch
 to the verified recovery mechanism rather than treating the sketch as complete code:
@@ -733,8 +760,10 @@ that only calls `edit_message(finalize=True)`; either route it through the same 
 final-delivery identity or leave capability disabled for that core. Test queued-chain
 `ledger_message_id`, two different same-text turns, lost socket, and a repeated final
 callback. Do not deduplicate by text alone or by connection epoch.
-- [ ] Run all SDK protocol/plugin unit tests and the three existing extension suites with
-warnings as errors; record exact counts/skips. Run actual isolated-core adapter tests
+- [ ] Run affected SDK protocol/plugin unit tests and the three existing extension suites
+with warnings as errors; record exact counts/skips. The unchanged broad SDK resource-leak
+baseline was already attempted and recorded in Task 1; do not repeatedly rerun or repair
+unrelated failures. Run actual isolated-core adapter tests
 with `HERMES_AGENT_DIR` pointing to the read-only isolated core source and temporary
 `HERMES_HOME`. Missing core import is a failure, not an accepted skip. Stock SDK remains
 unmodified; compare its unchanged hello/text/audio path in a separate fixture.

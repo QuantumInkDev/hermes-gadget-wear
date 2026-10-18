@@ -1,4 +1,4 @@
-<!-- Current continuation: active 2026-10-18 fifteen-feature expansion goal; full design/rollout approved, Akuma-only pet POC; wireless phone/watch confirmed, focused increments underway. Preserve current enrolled builds/data. -->
+<!-- Current continuation: active 2026-10-18 fifteen-feature expansion goal; full rollout approved; Akuma first, then authorized Kitana/Viper/Cthulhu; wireless phone/watch confirmed, focused increments underway. Preserve enrollments/artwork. -->
 # Session status
 
 ## Active expansion goal — 2026-10-18
