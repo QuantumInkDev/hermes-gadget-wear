@@ -1,4 +1,4 @@
-<!-- Current continuation: active 2026-10-18 fifteen-feature expansion goal; full design/rollout approved, Akuma-only pet POC; focused plans next, wireless confirmation pending. Preserve current enrolled builds/data. -->
+<!-- Current continuation: active 2026-10-18 fifteen-feature expansion goal; full design/rollout approved, Akuma-only pet POC; wireless phone/watch confirmed, focused increments underway. Preserve current enrolled builds/data. -->
 # Session status
 
 ## Active expansion goal — 2026-10-18
@@ -20,8 +20,19 @@ eleven: all recommendations approved, except generate/build **Akuma only** as th
 proof of concept; preserve other pets and build a reusable pipeline for future custom
 pets. Seed useful action templates with explicit profile selection. Staged server rollout,
 parallel implementation/review and up to ten ElevenLabs synthesis tests /2,500 characters
-are authorized. Device tests await the owner's wireless confirmation. No expansion
-implementation or paid provider/device operation has occurred at this checkpoint.
+are authorized. Wireless ADB shell access is now confirmed on both physical devices;
+the watch's debugging pairing was renewed with the owner's supplied dialog. This does
+not change Hermes enrollments. Device operations must use the isolated owned ADB server
+recorded privately in `.local/expansion/wireless-connectivity.json`; preserve other
+workers' emulators and ADB servers. No expansion app update or provider call has occurred.
+
+Quick actions are being implemented in an isolated child worktree. Reusable companion
+tooling at `c18b38e` passes 22 targeted Python tests, but its fresh review found two
+Important validation gaps (source bounds and clipping before grid padding); fix round 1
+is active. Both generated Akuma candidates are rejected, so no companion art is accepted.
+The [server contract](docs/relay-server-contract.md) and
+[focused outbox plan](docs/superpowers/plans/2026-10-18-relay-server-foundations.md)
+define the next server increment. These designs do not establish live integration.
 
 The [umbrella design](docs/superpowers/specs/2026-10-18-relay-expansion-design.md)
 defines all fifteen acceptance contracts, recorded decisions and the workstream split.

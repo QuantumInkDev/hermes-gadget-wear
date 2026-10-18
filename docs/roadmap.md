@@ -8,17 +8,17 @@ Design: [fifteen-feature expansion](superpowers/specs/2026-10-18-relay-expansion
 The owner approved the complete eleven-question batch, with one explicit amendment:
 build **Akuma only** as the personal pet proof of concept and a reusable pipeline for
 future custom pets. Staged live rollout/delegation, bounded provider testing and preserving
-device tests are authorized; actual device operations await wireless confirmation.
+device tests are authorized; wireless access to both devices is now confirmed.
 
 ## Feature ledger
 
 | ID | Feature | Starting point | Current state |
 | --- | --- | --- | --- |
-| O1 | Live per-profile Hermes pets | Isolated SDK delivery patch, watch renderer/cache and synthetic native coverage | Design proposed; real-profile rollout and physical acceptance open |
+| O1 | Live per-profile Hermes pets | Isolated SDK delivery patch, watch renderer/cache and synthetic native coverage | Design approved; real-profile rollout and physical acceptance open |
 | O2 | Akuma expressions/lip sync and reusable custom-pet pipeline | Companion registration tool, fallback/state mapping and synthetic sheets | Design approved; Akuma creation, real speech and visual acceptance open; other personal art excluded |
-| O3 | End-to-end optional Opus | Isolated SDK patch, watch codec and stock PCM fallback; synthetic payload evidence | Design proposed; actual live integration, speech comparison and power measurements open |
-| O4 | Optional phone ElevenLabs BYOK | Encrypted shared/per-profile vaults, isolated negotiation and provider fixture tests | Design proposed; real provider, phone/watch transport and usage verification open |
-| O5 | Reconnect outbox | Bounded-retention proposal only | New implementation and all acceptance open |
+| O3 | End-to-end optional Opus | Isolated SDK patch, watch codec and stock PCM fallback; synthetic payload evidence | Design approved; actual live integration, speech comparison and power measurements open |
+| O4 | Optional phone ElevenLabs BYOK | Encrypted shared/per-profile vaults, isolated negotiation and provider fixture tests | Design approved; real provider, phone/watch transport and usage verification open |
+| O5 | Reconnect outbox | Focused final-text retention plan and authenticated wire contract | Implementation, task-event retention and all acceptance open |
 | N1 | Durable history and phone/watch conversation continuation | In-memory per-profile drafts/replies; independent device conversations | New session/history integration and all acceptance open |
 | N2 | Cross-box task inbox and notifications | Current turn/tool status only | New authoritative task integration and all acceptance open |
 | N3 | Share text, links and supported attachments to an agent | Native picture picker exists for profile art, not conversation sharing | New implementation and all acceptance open |
