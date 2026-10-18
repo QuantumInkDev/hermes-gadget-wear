@@ -4,18 +4,19 @@
 
 Both physical devices now have verified wireless ADB shell access on an isolated owned
 server. The owner's watch debugging pairing was renewed; Hermes enrollment, application
-data and installed builds are unchanged. The approved physical test scope can proceed
-when reviewed builds are ready. Connection details are private under `.local/expansion/`.
+data are preserved. The reviewed quick-action phone update is installed as recorded
+below; the watch retains its baseline build. Connection details are private under
+`.local/expansion/`.
 
 Reusable companion staging tooling at `c18b38e`, corrected by `4b7acd9`, passes 29
 warning-strict targeted Python tests and synthetic SDK packaging parity. Seven new
 regressions reproduced the two Important input-validation defects before fixes;
 fresh scoped re-review accepts both fixes with no new findings. Two Akuma artwork candidates failed
 quality gates and are rejected. Tooling evidence does not complete the pet feature.
-Quick actions are underway in an isolated worktree; authenticated final-text recovery
+Quick actions are integrated and independently reviewed; authenticated final-text recovery
 has a [focused plan](superpowers/plans/2026-10-18-relay-server-foundations.md) and
 [wire contract](relay-server-contract.md). Its isolated storage implementation and typed
-[request diagnostics](superpowers/plans/2026-10-18-connection-diagnostics.md) are underway.
+[request diagnostics](superpowers/plans/2026-10-18-connection-diagnostics.md) have passed review.
 Read-only APK/data backups preserve 18 phone and 19 watch identity files plus current
 artwork/settings. No live expansion rollout is claimed.
 
@@ -33,10 +34,25 @@ Opus using 102 total input characters; the app's Ogg parser accepts the real Opu
 (233 packets). No key was saved, default voice changed, or native playback claimed.
 Eight calls and 2,398 characters remain in the authorized synthesis test allowance.
 
-Protocol diagnostics at `00def510` passes 106 warning-strict JVM tests/26 reports with
-no skips. Independent review found two P2 stage/replay edge cases; fix round 1 is active.
-The quick-action increment is also in fix round 1 for one stale preview-navigation P2.
-Neither pending-review increment is claimed ready for physical delivery.
+Protocol diagnostics through `d9313c8` passes 114 warning-strict JVM tests/27 reports,
+with no failures/errors/skips. Independent scoped review accepts the second fix round
+with no findings. Native diagnostics UI/export remains pending.
+
+Quick actions are integrated as `ed64905`, `5363cb0`, `c0568fe`. The stale preview fix
+has clean spec/quality review and recorded RED-to-GREEN native coverage. Source `27ad4e8`
+is installed on the phone with matching signer and APK hash; all 104 baseline files,
+18 identities, 55 artwork files, seven providers and five-minute timeout are unchanged.
+Demo path: Settings → Quick actions, choose a profile and inputs, preview, then open a
+draft. Physical UI/live-send and API29 acceptance remain open; no UI launch occurred
+while the phone was locked.
+
+Grant/wire task `aa081cd8` passes 151 targeted and 30 compatibility checks warning-strict;
+fresh review requires one P2 cancellation correction. Fix round 1 is dispatched.
+Actual-core recovery, transport provenance and live activation remain gated.
+
+Later owner instruction expands personal artwork after Akuma to Kitana, SF6 C. Viper
+and Cthulhu. All receive standard states plus listening/talking/sleeping companions;
+Kitana uses a regal walk and fan-cooling waiting loop. References and art stay private.
 
 ## Fifteen-feature expansion intake — 2026-10-18 (historical)
 

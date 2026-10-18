@@ -22,11 +22,11 @@ device tests are authorized; wireless access to both devices is now confirmed.
 | N1 | Durable history and phone/watch conversation continuation | In-memory per-profile drafts/replies; independent device conversations | New session/history integration and all acceptance open |
 | N2 | Cross-box task inbox and notifications | Current turn/tool status only | New authoritative task integration and all acceptance open |
 | N3 | Share text, links and supported attachments to an agent | Native picture picker exists for profile art, not conversation sharing | New implementation and all acceptance open |
-| N4 | Editable prompt actions and Android shortcuts | Exact-profile widgets/tiles already launch conversations | New prompt-action implementation and all acceptance open |
+| N4 | Editable prompt actions and Android shortcuts | Exact-profile widgets/tiles already launch conversations | Implemented/reviewed and preserving phone update installed; physical UI/live and API29 acceptance open |
 | N5 | Walking mode | Existing portrait/inline hold-to-talk, waveform and audio playback | New mode/routing/concise-speech implementation and all acceptance open |
 | N6 | Structured reply cards and actions | Basic stock display/card/image support | New richer rendering/action implementation and all acceptance open |
 | N7 | Previewed agent handoff | Independent profile routing, no cross-agent context operation | New implementation and all acceptance open |
-| N8 | Connection/request-stage diagnostics and redacted reports | Existing connection/status and error UI | New consolidated diagnostics/reporting and all acceptance open |
+| N8 | Connection/request-stage diagnostics and redacted reports | Existing connection/status and error UI | Typed protocol snapshots/export reviewed; native presentation/export and physical acceptance open |
 | N9 | Authenticated remote wake | No remote wake integration established | New implementation; sender and hardware capabilities need verification |
 | N10 | QR onboarding and safe configuration migration | Current manual review/import and encrypted setup/art stores | New reviewed QR/migration implementation and all acceptance open |
 

@@ -24,9 +24,10 @@ are authorized. Wireless ADB shell access is now confirmed on both physical devi
 the watch's debugging pairing was renewed with the owner's supplied dialog. This does
 not change Hermes enrollments. Device operations must use the isolated owned ADB server
 recorded privately in `.local/expansion/wireless-connectivity.json`; preserve other
-workers' emulators and ADB servers. No expansion app update or provider call has occurred.
+workers' emulators and ADB servers. The reviewed quick-action phone update is installed;
+two bounded provider probes have run, as recorded below.
 
-Quick actions are being implemented in an isolated child worktree. Reusable companion
+Quick actions are implemented, independently reviewed and integrated. Reusable companion
 tooling at `c18b38e`, corrected by `4b7acd9`, passes 29 warning-strict targeted Python
 tests. Seven regressions reproduced the two original Important findings before fixes;
 fresh scoped review accepts both fixes without new findings. Both generated Akuma
@@ -35,18 +36,32 @@ are verified for both devices (104 phone files, including 18 identity and 55 art
 78 watch files, including 19 identity and 29 art files). No app UI or setting was changed.
 The [server contract](docs/relay-server-contract.md) and
 [focused outbox plan](docs/superpowers/plans/2026-10-18-relay-server-foundations.md)
-define the next server increment. Its storage task is active in an isolated SDK.
-Typed protocol diagnostics is also underway from its
+define the next server increment. Its storage task is accepted in an isolated SDK.
+Typed protocol diagnostics is accepted from its
 [focused plan](docs/superpowers/plans/2026-10-18-connection-diagnostics.md). These designs
 and implementation activity do not establish live integration.
 
 Latest: outbox storage `d097717` is independently approved in the isolated SDK, with
-39 storage +30 stock/extension warning-strict passes; grant/wire task 2 is active.
+39 storage +30 stock/extension warning-strict passes. Grant/wire task 2 at `aa081cd8`
+passes 151 targeted +30 compatibility checks; independent review requests one P2
+cancellation correction. Fix round 1 is dispatched; no server capability is enabled.
 Actual-core finalizer recovery is a known Task 3 gate: a failed SendResult alone does
 not prevent the pinned core from releasing its marker. Do not enable the flag until
-durable canonical recovery is proven. Quick actions (isolated `88f2cd8`, `7f1076d`) and
-typed diagnostics (`00def510`) have fresh reviews and active first fix rounds (one and
-two P2 findings respectively). They are not yet accepted/delivered.
+durable canonical recovery is proven. Quick actions are integrated as `ed64905`,
+`5363cb0` and `c0568fe`; the stale preview-navigation fix has a clean scoped review.
+Source `27ad4e8` is installed on the phone with matching signer/hash: all 104 baseline
+files, 18 identities, 55 artwork files, seven widget providers and the five-minute
+timeout are preserved. No UI launch, pairing or live send occurred; the locked phone's
+physical UI/live acceptance remains open. Controls are under Settings → Quick actions.
+Typed diagnostics through `d9313c8` has clean spec/quality review after two fix rounds;
+114 protocol tests/27 reports pass with no failures/errors/skips. Native diagnostics
+presentation/export and physical validation remain pending.
+
+The owner has expanded the artwork scope after Akuma: create Kitana and SF6 C. Viper
+from scratch with full standard/watch states, followed by a Cthulhu pet matching the
+current profile portrait. Kitana's walk must be regal and her waiting loop should cool
+her with fans. References and generated personal assets remain private. The initial
+Akuma-only restriction below is historical; this explicit later authorization supersedes it.
 
 Two real ElevenLabs format probes pass (2 calls /102 characters; real Opus accepted by
 the app parser). Remaining allowance: 8 calls /2,398 characters. Credentials were read
@@ -62,7 +77,7 @@ actual authenticated session binding, not copied transcript text; task state mus
 real run/session events. The installed Hermes source is newer than the original snapshot;
 concrete adapter compatibility must be checked without exposing administrative APIs.
 
-Existing signed/enrolled phone/watch state remains unchanged. PR #1 is linked and remains
+Existing enrollments/artwork are preserved; the watch retains its prior build. PR #1 is linked and remains
 draft. No merge, signing rotation or public release is part of the new goal. Older build
 and acceptance receipts below remain the baseline rather than evidence for new features.
 

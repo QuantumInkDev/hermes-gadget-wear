@@ -16,9 +16,11 @@ initial decision batch. Routine implementation choices can now be made within it
    attachment copies, twenty-four-hour bounded server outbox. Canonical Hermes history
    retention is unchanged. Include deletion and optional encrypted history export.
 4. Per-profile Portrait/Pet selection initially preserves existing pictures/GIFs.
-5. **Generate/build Akuma only as the pet proof of concept.** Build a reusable pipeline
-   for later custom pets. Do not generate or modify the other profiles' personal pets;
-   future custom pets can be created from scratch. Preserve the original Akuma base art.
+5. **Complete Akuma as the pet proof of concept first.** The owner's later instruction
+   expands artwork to new Kitana, SF6 C. Viper and Cthulhu pets from scratch, each with
+   standard and watch companion states. Kitana walks regally and cools herself with
+   fans while waiting; Cthulhu matches the current profile portrait. This supersedes
+   the initial Akuma-only limit. Preserve original art and keep references/outputs private.
 6. Existing private ElevenLabs credentials may be used for at most ten short synthesis
    tests totaling at most 2,500 input characters. No new subscription/purchase. Server
    voices remain the default, with phone BYOK opt-in per profile.

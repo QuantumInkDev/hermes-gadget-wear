@@ -2,9 +2,13 @@
 
 ## Approved live-pet proof of concept — 2026-10-18
 
-The owner approved live profile-pet integration but limits generated personal companion
-art to **Akuma only** in this pass. Build the complete reusable pipeline for future custom
-pets without generating or changing other personal pets. Preserve the original base atlas;
+The owner initially limited personal artwork to Akuma. A later explicit instruction
+expands the queue **after Akuma** to Kitana, SF6 C. Viper and Cthulhu. Create the new
+pets from scratch with all standard states and watch listening/talking/sleeping states.
+Kitana should walk regally and cool herself with her fans while waiting. Cthulhu should
+match his existing profile portrait. Supplied references and personal outputs remain
+private; preserve existing artwork and profile assignments until validated replacements
+are deliberately selected. Build the complete reusable pipeline. Preserve the original base atlas;
 use registered listening/talking/sleeping companions and validate actual playback mouth
 response and physical legibility. Per-profile Portrait/Pet selection initially preserves
 the current picture/GIF, superseding older automatic-pet-priority notes below. The approved
