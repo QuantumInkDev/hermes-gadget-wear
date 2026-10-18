@@ -15,7 +15,9 @@ checks from modern emulators and physical devices. Direct inventory confirms And
 API 37 on the phone and Android 16/API 36 on the watch; both apps target API 37.
 
 The interrupted implementations are checkpointed without accepting unfinished code.
-Continuity Task3 continues in an isolated successor. Maintenance-observation fix2
+Continuity Task3 has finished in its isolated successor. Fresh combined review
+requires four Important delivery/lifecycle/compatibility fixes before acceptance.
+Maintenance-observation fix2
 (`7ecfa8a3` / `9fe6dccd`) has a clean fresh source review. All original findings and
 the first-engagement process-birth I/O gap are closed. Four affected files pass208
 cases with8 platform skips on each foundation. The earlier feature-only239 passes/
@@ -107,8 +109,20 @@ not authenticated delivery. The interactive twelve-state preview loads138 exact 
 native/watch frames at desktop/phone widths without overflow or errors. Continuous
 motion, Android decoder/playback and physical legibility/power remain separate gates.
 Original art, failed drafts and source hashes are retained privately; no assignment
-changed. Viper now has a selected canonical sprite; animation production is underway.
-Cthulhu follows using the existing private profile portrait.
+changed. Viper likewise has all twelve states and69 poses staged, with clean base
+validation, three distinct watch mouth poses and zero overlay changes outside the
+declared region. Its base/companion package sizes are2,009,945/513,719 bytes; two
+in-memory capability cases reassemble617 binary frames each with matching hashes.
+Its138-frame preview loads at desktop/phone widths without errors or overflow. These
+are technical packaging checks; Android decoding, authenticated delivery and physical
+acceptance remain open. Cthulhu also has all twelve states/69 poses staged. Its full
+detail desktop atlas is preserved; a separate watch base uses one shared pixel-grid
+reduction, with all54 active base frames matching their original96x104 samples.
+The actual SDK re-encodes the watch base/companion to1,053,696/792,130 bytes and
+reassembles452 binary frames per capability case. Three speech poses are distinct
+with zero changes outside the declared overlay. Its138-frame browser preview loads
+without errors or overflow. Android sampling/decoding and physical acceptance remain
+open; native192 detail is deliberately coarser only in the watch delivery base.
 N1/N2 Task1 fix1 `c5ff24b` addresses the reviewed schema-constraint defect. It reports
 296 warning-strict SDK passes and 47 distinct actual-core passes; the latter had one
 initial subprocess timeout, followed by a separate 19-case pass with retries disabled.

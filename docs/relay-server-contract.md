@@ -90,7 +90,10 @@ and a current explicit grant are required even after HMAC authentication.
 
 Only one of `result`/`error` appears. Unknown fields in v1 requests are rejected;
 unknown response fields may be ignored. `id` is `[A-Za-z0-9_-]{1,64}`. Public opaque
-IDs are UUID strings; cursors are server-issued base64url tokens of at most 512 bytes.
+IDs are canonical lowercase hyphenated UUID strings; cursors are server-issued
+base64url tokens of at most 512 bytes. A public admission ID represents the actual
+core UUID: format its 32-hex spelling canonically without allocating a replacement
+identity. Internal core receipts retain their original spelling and exact lookup key.
 No credentials or arbitrary error details appear in errors. JSON frame limit is
 64 KiB UTF-8, depth 8, at most 16 simultaneous extension operations per connection;
 rate limit 10 requests/second with burst 20. The first foundation has only small
@@ -102,9 +105,17 @@ current device grant. It is not a promise that all designed methods exist. Every
 request rechecks grants; client-cached capabilities confer no authority. Unadvertised
 methods return `unsupported`; expired/revoked grants return `permission_denied`.
 
+Conversation-capable discovery may add `server_time_ms` (UTC milliseconds) and
+`limits.dto_bytes=8192`, `limits.dto_depth=6`. These limits cover each complete
+serialized conversation response/event, using the actual JSON sender encoding.
+Legacy O5 keeps its separate 64-KiB response limit and existing text/page limits.
+Optional discovery fields confer no permission and old clients may ignore them.
+
 Common errors: `invalid_request`, `unsupported`, `permission_denied`, `not_found`,
 `profile_changed`, `stale_epoch`, `stale_binding`, `conflict`, `expired`, `busy`,
-`rate_limited`, `snapshot_required`, `temporarily_unavailable`, `unsupported_media`.
+`rate_limited`, `snapshot_required`, `temporarily_unavailable`, `unsupported_media`,
+`projection_too_large`. The latter refuses a body that cannot fit its bounded
+projection; it never authorizes truncation or successful delivery acknowledgment.
 Error responses may include only `retry_after_ms` (0–60000) and `snapshot_required`
 (boolean), where applicable. Foundation invalid-ID responses omit `id` (the stock JSON sender omits null values).
 
@@ -144,9 +155,11 @@ never survives reconnect. A late event from an old binding is discarded.
 Tool/reasoning/raw system rows are not exposed as messages.
 `Receipt = {request_id,admission_id,conversation_id,status,outcome,authority_epoch,
 execution_generation}`. Status is `queued|started|unknown|terminal`; outcome nullable.
-`Task = {task_id,conversation_id,admission_id,run_id,state,updated_at_ms,prompt?}`.
-`run_id` is an opaque mapped real core execution identity, never a client-generated
-busy indicator. State is `working|needs_input|finished|failed|unknown`; unknown remains
+`Task = {task_id,conversation_id,admission_id,run_id,state,updated_at_ms,prompt?,outcome?}`.
+`run_id` is null while queued before a real execution exists; otherwise it is an
+opaque mapped real core execution identity, never a client-generated busy indicator.
+Optional `outcome` is null before terminal settlement and reflects the actual
+terminal receipt afterwards. State is `working|needs_input|finished|failed|unknown`; unknown remains
 visibly uncertain instead of being misreported as failed. `prompt` contains opaque ID,
 kind `approval|clarify`, ≤4096-byte text, up to 8 ≤256-byte choices, generation and
 server expiry. An expired prompt is display-only. Response is `{choice:string}` with
@@ -155,6 +168,9 @@ clarification explicitly permitting free text. Approval responses never enter ou
 `Event = {event_id,conversation_id,binding_id,sequence,replay_epoch,kind,payload}`;
 kind is `message|task|prompt|conversation|gap`. Payload is its corresponding bounded
 DTO; gap payload is `{snapshot_required:true}`.
+Events are pulled through `relay.events.read`; this contract adds no unsolicited
+`relay.event` wire frame. Detach or subscription overflow invalidates the binding
+before any subsequent successful output under the socket send lock.
 
 Canonical message IDs derive from a persisted mapping of `(profile, transcript lineage,
 row ID)`; admission/task IDs map real core receipts. Event IDs are persisted projection
@@ -165,7 +181,12 @@ epoch mismatch rejects a new mutation; client refreshes attach, then queries the
 request receipt **before** deciding to retry. It never invents a new request ID merely
 because the socket changed. Never claim exactly-once external tool side effects.
 
-Requests use UUID `request_id`, retained by the client until resolved; text is 1–4000
+New durable mutation requests use UUIDv7 `request_id`, retained by the client until
+resolved. New IDs older than seven days or more than five minutes ahead of server
+time are refused. Creation/metadata requests use the ID timestamp for this replay-age
+bound; retained receipt reads can still recover an older accepted admission. Exact
+accepted replay does not become a new admission after submission expiry.
+Text is 1–4000
 Unicode scalar values and at most 16 KiB UTF-8. Client submission expiry must be after
 server time and no more than five minutes ahead. Plugin receipt key is `(profile,
 subject,device-key-generation,request_id)`; canonical payload digest includes operation,
