@@ -71,19 +71,29 @@ modifications are excluded. Existing broader-core SQLite resource-warning debt i
 claimed resolved. Native reconnect consumers, Windows verification and staged live
 activation remain gates. A focused
 [Windows storage plan](superpowers/plans/2026-10-18-windows-relay-storage.md) records the native
-validator and both-host gates; its isolated implementation is active, not activated.
+validator and both-host gates. First implementation `536dcba` has 338 distinct software
+passes and ten actual-Windows skips on Mac. Review plus both-host native execution finds
+system-root owner rejection and an unreadable reduced-token control. Each box ran ten
+methods, five errors/one failure, no skips; fixture/source-stage cleanup is verified.
+Original-worker fix round 1 preserves existing ACLs/disabled privileges. Nothing is activated.
 Watch Portrait/Pet `a29268d` plus provenance fix `1579d8c` has clean independent review,
 157 initial JVM/24 native passes, one explicit Battery Saver emulator skip and synthetic
 carousel coverage; the fix adds 11 focused JVM/21 native passes. Integrated as
 `dcc5ba4`/`b81564a`, it is installed on the watch with matching signer/hash and all 78
 baseline files, 19 identities, 29 artwork files, timeout and three tile/complication
 components preserved. No UI launch, pairing or live prompt occurred during installation;
-personal-art/live-pet/speech/Battery Saver observations remain open.
+Later physical UI inspection observes the unobstructed configured portrait, default
+Portrait selection, Portrait/Pet controls and Jump as the final footer. All 48 identity/
+art files and timeout remain unchanged; the watch returns to the launcher without a
+recording, pairing or prompt. Live-pet/speech/Battery Saver observations remain open.
 Phone audio `3f8d94e` has 162 JVM and 15 native
 passes; `83f4ec2` adds tested Preparing voice/Stop UI with three focused native passes
 and affected strict build/format success. Full Task 1 review is clean with no findings;
 phone audio is integrated as `5cdc8d1`/`1fd00e9`. Settings/capacity and physical delivery
-remain separate phone gates. Source approval does not establish full live feature acceptance.
+remain separate phone gates. Task 2 `5b73a3e` has 47 JVM/31 native executions and 36
+captures, but review requires corrupt sidecar preservation and a large-font label
+correction; original-worker fix round 1 is active. Separate mechanical support batch
+`0bcb6d4` is approved and integrated as `37aa867`. Source approval is not full live acceptance.
 
 Combined root `b81564a` passes 169 JVM tests/44 reports with zero failures/errors/skips,
 all four APK builds and sequential strict formatting. Structured-reply parser `be870de`
@@ -92,13 +102,15 @@ executes all Python fixtures: 137 protocol tests/28 reports pass without skips, 
 strict format/build checks. Native card/action presentation remains a separate task.
 
 Reviewed phone audio root integration builds all four APKs with warning mode fail and
-passes sequential formatting. Profile-aware settings/64-entry vault Task 2 is active.
+passes sequential formatting. Profile-aware settings/64-entry vault Task 2 is in fix round 1.
 Minimum-SDK quick-action checkpoint on a new owned API29 emulator: 13 methods executed,
 seven passed/six failed. Four fail only at the old SDK-model admission check; two fail
 at the test helper's unguarded UiAutomation.clearCache call. The API is available from
 [API34](https://developer.android.com/reference/android/app/UiAutomation#clearCache()).
 The focused test-helper correction is assigned without removing semantic assertions;
-API29 remains an open acceptance gate. Phone ADB is online but locked, so its positive
+The reviewed helper batch is integrated at `37aa867`, with affected strict builds/lint/
+format passing. All 13 N4 methods now pass on the owned API29 emulator without skips.
+Corrected Task 2 settings still needs review and its API29 run. Phone ADB is online but locked, so its positive
 profile-bound preview/shortcut/live UI checks remain pending, with no UI takeover.
 
 Physical synthetic codec demo: each actual device passes the two existing production-code

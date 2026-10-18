@@ -19,17 +19,17 @@ Personal references and output remain private.
 
 | ID | Feature | Starting point | Current state |
 | --- | --- | --- | --- |
-| O1 | Live per-profile Hermes pets | Isolated SDK delivery patch, watch renderer/cache and synthetic native coverage | Design approved; real-profile rollout and physical acceptance open |
-| O2 | Akuma expressions/lip sync and reusable custom-pet pipeline | Companion registration tool, fallback/state mapping and synthetic sheets | Design approved; Akuma creation, real speech and visual acceptance open; other personal art excluded |
-| O3 | End-to-end optional Opus | Isolated SDK patch, watch codec and stock PCM fallback; synthetic payload evidence | Design approved; actual live integration, speech comparison and power measurements open |
-| O4 | Optional phone ElevenLabs BYOK | Encrypted shared/per-profile vaults, isolated negotiation and provider fixture tests | Design approved; real provider, phone/watch transport and usage verification open |
-| O5 | Reconnect outbox | Reviewed bounded storage and grant/wire service | Actual-core final-delivery integration underway; native recovery, task events and live/physical acceptance open |
+| O1 | Live per-profile Hermes pets | Isolated SDK delivery patch, watch renderer/cache and synthetic native coverage | Reviewed Portrait/Pet selector installed; configured portrait/default/footer physically observed; real pet delivery and power acceptance open |
+| O2 | Akuma expressions/lip sync and reusable custom-pet pipeline | Reviewed companion tooling, fallback/state mapping and synthetic sheets | Fixed-body expression renderer in isolated implementation; Akuma art still rejected; Kitana/Viper/Cthulhu queued after accepted pipeline |
+| O3 | End-to-end optional Opus | Reviewed phone audio integration, SDK/watch codecs and stock PCM fallback | Synthetic production codecs pass on both physical devices; live negotiated playback, speech comparison and power measurements open |
+| O4 | Optional phone ElevenLabs BYOK | Reviewed phone audio path and encrypted shared/per-profile vaults | Two bounded provider format probes pass; profile-aware settings in fix round 1; live phone/watch playback and usage acceptance open |
+| O5 | Reconnect outbox | Reviewed durable storage/grants and actual-core hook v2; fresh public-patch reapplication passes | Windows native policy/fixture in fix round 1 after both-host failures; native drain/ACK, task events and live/physical acceptance open |
 | N1 | Durable history and phone/watch conversation continuation | In-memory per-profile drafts/replies; independent device conversations | New session/history integration and all acceptance open |
 | N2 | Cross-box task inbox and notifications | Current turn/tool status only | New authoritative task integration and all acceptance open |
 | N3 | Share text, links and supported attachments to an agent | Native picture picker exists for profile art, not conversation sharing | New implementation and all acceptance open |
-| N4 | Editable prompt actions and Android shortcuts | Exact-profile widgets/tiles already launch conversations | Implemented/reviewed/installed; physical entry/unbound guard/editor observed; profile-bound preview/shortcuts/live and API29 acceptance open |
+| N4 | Editable prompt actions and Android shortcuts | Exact-profile widgets/tiles already launch conversations | Implemented/reviewed/installed; physical entry/unbound guard/editor observed; all 13 API29 methods pass; profile-bound physical preview/shortcuts/live remain open |
 | N5 | Walking mode | Existing portrait/inline hold-to-talk, waveform and audio playback | New mode/routing/concise-speech implementation and all acceptance open |
-| N6 | Structured reply cards and actions | Basic stock display/card/image support | New richer rendering/action implementation and all acceptance open |
+| N6 | Structured reply cards and actions | Reviewed bounded parser integrated; 137 protocol tests including Python fixtures pass | Native cards, deliberate actions and physical acceptance remain open |
 | N7 | Previewed agent handoff | Independent profile routing, no cross-agent context operation | New implementation and all acceptance open |
 | N8 | Connection/request-stage diagnostics and redacted reports | Existing connection/status and error UI | Typed protocol snapshots/export reviewed; native presentation/export and physical acceptance open |
 | N9 | Authenticated remote wake | No remote wake integration established | New implementation; sender and hardware capabilities need verification |

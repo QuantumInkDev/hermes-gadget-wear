@@ -56,7 +56,12 @@ are unchanged; no private runtime changes are exported. Existing broader-core SQ
 resource-warning debt remains explicitly outside this passing selection. Windows
 activation is still denied pending a real ACL verifier and host evidence. A focused
 [Windows storage plan](docs/superpowers/plans/2026-10-18-windows-relay-storage.md) records the native
-validator and both-host gates; its isolated implementation is active, not activated.
+validator and both-host gates. First implementation `536dcba` has 338 distinct software
+passes and ten explicit Windows skips on Mac. Review and actual both-host runs find
+ancestor-owner rejection on normal system-drive roots; the restricted-token readable
+control also fails through private home ancestry. Each real gateway architecture ran
+ten methods, five errors/one failure, no skips, with fixture/source-stage cleanup verified.
+Original-worker fix round 1 preserves existing ACLs and disabled privileges. Nothing is activated.
 No server capability is enabled.
 The reviewed core hook retains durable final-delivery obligations instead of relying
 on a failed SendResult. Native reconnect drain/ACK consumers, Windows verification and
@@ -68,8 +73,8 @@ timeout are preserved. Installation itself launched no UI, pairing or live send.
 authorized unlocked-phone check opened Settings → Quick actions, verified that unbound
 review blocks transfer, and observed the editor fields. No action was saved/profile bound
 or message sent. All 73 identity/art files and the five-minute timeout remain unchanged;
-the phone returned to the launcher. Profile-bound preview/shortcuts/live and API29 gates
-remain open. A subsequent normal scroll reveals Cancel; its tap returns to quick actions
+the phone returned to the launcher. Profile-bound physical preview/shortcuts/live remain
+open; the passing API29 checkpoint is recorded below. A subsequent normal scroll reveals Cancel; its tap returns to quick actions
 without saving. Profiles is restored before returning to the launcher. All 73 protected
 identity/art files and the five-minute timeout remain unchanged after that check.
 Typed diagnostics through `d9313c8` has clean spec/quality review after two fix rounds;
@@ -94,27 +99,37 @@ implementation `3f8d94e` with 162 JVM and 15 native passes; `83f4ec2` completes 
 required Preparing voice/Stop UI seam with three focused native passes and a clean strict
 affected build. Independent full Task 1 review is clean (zero findings), and both
 commits are integrated as `5cdc8d1`/`1fd00e9`. Profile-aware settings/capacity is the
-next phone task; no new physical phone update has been installed. Watch
+next phone task; no new physical phone update has been installed. Task 2 `5b73a3e`
+has 47 JVM passes, 31 native executions and 36 source-bound captures on API37. Review
+requires corrupt AtomicFile sidecar preservation and a large-font label correction;
+original-worker fix round 1 is active. The separate test-support batch `0bcb6d4` has
+no review findings and is integrated as `37aa867`. Watch
 Portrait/Pet selection `a29268d`, corrected by `1579d8c`, is independently approved
 and integrated as `dcc5ba4`/`b81564a`. The provenance correction has 11 focused JVM and
 21 native passes; earlier coverage includes 157 JVM and 24 native passes, one explicit
 Battery Saver emulator skip and a passing synthetic carousel scenario. The preserving
 physical watch update is installed with matching signer/hash: all 78 baseline files,
 19 identities, 29 artwork files, timeout and three tile/complication components remain
-unchanged. Installation used no UI launch, pairing or live prompt; actual personal-art,
-live pet, speech and Battery Saver observations remain open. SDK/core,
+unchanged. Later UI inspection observes the configured portrait unobstructed, Portrait
+selected by default, Portrait/Pet controls and Jump as the final footer. All 48 identity/
+art files and the original timeout remain unchanged; the watch returns to the launcher.
+No recording, pairing or prompt was sent. Live pet, speech and Battery Saver observations
+remain open. SDK/core,
 watch and phone source ownership are disjoint. The canonical-history/task plan is written;
 implementation follows the reviewed core/outbox bridge.
 
 Phone audio integration `5cdc8d1`/`1fd00e9` builds all four APKs warning-strict and
 passes sequential formatting; source/APK-bound receipts are private. Task 2 profile-aware
-speech settings and the 64-endpoint vault boundary are active in a fresh isolated worktree.
+speech settings and the 64-endpoint vault boundary are in original-worker fix round 1.
 Root created a separate owned Android 10/API29 emulator for the minimum-SDK gate: 13
 quick-action native methods ran, seven passed and six failed at test-support boundaries
 (four legacy emulator-model guards, two unavailable accessibility-cache calls). These are
 not established product failures or a passing API29 suite. The speech-settings worker
 has a narrowly scoped test-helper correction, preserving all behavior/fresh-data guards;
-independent review and an actual API29 rerun remain required. The physical phone is
+the independently reviewed helper batch fixes those prerequisites. Root `37aa867`
+builds affected phone APKs/lint/format warning-strict; all 13 N4 methods now pass on
+the owned API29 emulator with no failures/skips. Task 2 settings still needs its
+corrected-source review/API29 run. The physical phone is
 reachable but locked, so no profile-bound physical UI action was attempted this turn.
 
 Physical codec checkpoint: the actual phone and watch each pass both existing Opus
