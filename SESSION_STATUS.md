@@ -14,7 +14,14 @@ The [runtime coverage matrix](docs/android-test-matrix.md) separates compatibili
 checks from modern emulators and physical devices. Direct inventory confirms Android 17/
 API 37 on the phone and Android 16/API 36 on the watch; both apps target API 37.
 
-Latest integrated app source `2284399` includes the independently approved native
+Latest integrated app source `dc1fb14` adds the independently reviewed playback-output
+and interruption foundation. Strict root checks pass: 11 client JVM cases, zero failures,
+errors or skips; affected lint/formatting and all four APK builds pass (200 tasks,
+60 executed). Actual-route observation and common terminal-reason handling preserve an
+accepted interruption when worker completion wins the callback ordering. This is not
+full walking mode or physical headset acceptance, and no new physical update was installed.
+
+Preceding app source `2284399` includes the independently approved native
 connection-health screens and explicit safe report export. Combined strict builds pass
 and all four debug/test APKs compile. Across the preserved initial/unit and enabled SDK
 runs, **211 distinct JVM cases /48 suites** pass, zero final failures/errors/skips. The
@@ -22,7 +29,7 @@ initial missing-environment skips and stale local speech-fixture startup failure
 recorded; the speech case passes against the accepted extension SDK. No source change
 was used to hide either setup issue.
 
-The physical phone now has this exact reviewed APK. Full before/after archives preserve
+The physical phone remains on the reviewed `2284399` APK. Full before/after archives preserve
 all 18 enrolled phone identities and 55 artwork files: no original file is missing,
 105/106 originals are byte-identical, and only the ordinary install marker differs.
 Its five-minute timeout is unchanged; no UI, pairing or live prompt was launched. The
@@ -90,7 +97,9 @@ route registration, omitted legitimate display history and receipt replay after 
 revocation while waiting. Focused fixes require real-core barrier evidence and a fresh
 review. Fix1 closes those three findings; its review found a further byte-budget pagination
 stall behind hidden carriers. Fix2 `67e3778` has sixteen focused cases passing on each
-core foundation and is under scoped review. No new method is enabled or candidate integrated.
+core foundation. Fresh scoped review is clean: all four findings are addressed. The
+accepted core hooks now feed a fresh isolated Task3 SDK bridge owner. No new method is
+enabled and no continuity source is installed on live servers.
 
 The accepted phone fixture has nine final native executions across API29/API37, zero
 skips, including large-font keyboard Save taps. The four-file fixture integration passes
@@ -115,11 +124,15 @@ all five findings and read-only verification still matches installed before hash
 now has a concrete offline implementation plan: one maintenance lease, fresh drain proof,
 owned markers, planned shutdown, the accepted source helper and controlled recovery/start.
 Read-only identity/topology and all twelve capability-OFF config checks are recorded;
-these do not prove idle state. Isolated driver implementation is running; review and
-actual stock acceptance remain required. No install, drain, restart or capability activation follows from these checks.
+these do not prove idle state. Driver work returned a source-backed limitation: the
+status protocol cannot distinguish a fresh aggregate sample from a stale zero retained
+by unrelated status updates. Only the outer lease is implemented (68 partial-checkpoint
+cases); fresh review is checking it and the required next seam. The full phase driver
+and actual stock acceptance remain required. No install, drain, restart or capability activation follows from these checks.
 
 The [walking-audio foundation](docs/superpowers/plans/2026-10-18-walking-audio-foundation.md)
-has a fix1 candidate at `c60c8a3` under scoped review. Initial review identified a lost
+has an accepted fix1 at `c60c8a3`, integrated as `dc1fb14` with passing strict root
+checks. Initial review identified a lost
 interruption-notification race; its forced-order regression now passes on all three
 runtimes. A separate API29 Opus attempt timed out while launching its fixture, before
 playback; that failure remains recorded. All twelve original audio behaviors have
