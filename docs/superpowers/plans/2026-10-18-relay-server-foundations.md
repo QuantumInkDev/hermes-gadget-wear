@@ -620,7 +620,18 @@ DeviceStore creation and before hub start, build the optional service:
                 grants, Outbox(directory / 'relay-outbox.sqlite3', now_ms))
 ```
 
-Add these methods to GadgetAdapter:
+Controller preflight found a concrete incompatibility in the sample below: pinned core
+`BasePlatformAdapter._process_message_background` calls `_release_turn_marker(event)`
+after `_send_final_text` even when the returned SendResult fails. Returning a failure
+from this sample's catch alone therefore does **not** preserve the marker. Do not copy
+that failure path as a completed implementation. Task 3 must first prove a durable
+terminal/delivery obligation survives that finalizer, using the actual core test. Prefer
+composing its existing delivery ledger; if that needs a narrow upstream hook with this
+real consumer, export and review the core patch separately. No installed core edits.
+The final-text capture gate remains disabled until this is resolved and tested.
+
+Add these lifecycle methods to GadgetAdapter, adapting the following capture sketch
+to the verified recovery mechanism rather than treating the sketch as complete code:
 
 ```python
     async def relay_welcome(self,session):
