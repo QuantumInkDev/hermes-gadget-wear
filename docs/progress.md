@@ -25,8 +25,10 @@ Minimum Wear investigation `4166885` has only three fixture changes: retain the 
 debug host across uiMode changes, explicitly scroll Pet into view, and restore saver
 before charger state. It establishes normal-power preconditions and passes all 26 affected
 API33 methods without skips, plus 11 Wear JVM tests and strict affected checks. No
-production animation defect was established; fresh source review/integration is pending.
-Phone minimum-runtime/settled Dark keyboard checks remain with the original worker.
+production animation defect was established. Fresh review is clean; the fixture is
+integrated as `e3afc20`. Phone test support `3ff89f6` is likewise approved and integrated
+as `e783611`. Root affected APK compilation, lint and formatting pass without warnings;
+Save has ordinary touchscreen evidence, while field input remains accessibility-driven.
 
 N6 native cards `6a04ace` has a failed preservation gate: a launcher reinstall was followed
 by loss of synthetic app-data baselines on two owned emulators. Exact responsible
@@ -34,9 +36,10 @@ suboperation is unproven; hashes/APKs do not restore app data or Keystore. Those
 are quarantined. Bounded archive/snapshot searches have not located exact identity bytes;
 physical devices were outside this task's operations. Review also requires phone checklist
 state to survive Full text/cards toggling, actual maximum-tail/large-font viewport proof,
-and correction of an invalid instrumentation-status probe. Original-worker fix1 addresses
-those source/evidence findings using separate authorized test devices; the original
-preservation finding stays open. Never use reinstall/uninstall/reset or regenerate an
+and correction of an invalid instrumentation-status probe. Fresh fix1 review accepts
+those three corrections in `80909ea`, but finds an API30-only phone geometry helper that
+cannot execute on API29. Original-worker fix2 is active on the authorized API29 fixture.
+The original preservation finding stays open. Never use reinstall/uninstall/reset or regenerate an
 identity to bypass it. Explicit matching-signer `adb install -r`, recoverable backups and
 post-install byte checks are required; stop on errors rather than using uninstall fallback.
 
@@ -48,13 +51,15 @@ the install marker changes). Art identity/continuous loops, authenticated art tr
 physical lip-sync/power remain open. No assignment changed. Kitana/Viper/Cthulhu remain
 queued behind accepted Akuma production art. N1/N2 Task1 private registry/grants/request
 journal implementation `0939b1e` reports 536 distinct passing software/actual-core cases
-and ten explicit Windows-only skips. Fresh independent review is active; the candidate
-is not integrated and no new method is enabled.
+and ten explicit Windows-only skips. Fresh review finds one Important schema-constraint
+validation flaw; original-worker fix1 is active. A Minor result-depth inconsistency is
+retained for consumer-contract review. No new method is enabled or candidate integrated.
 
-Phone test-support `3ff89f6` reports nine final native executions, five distinct methods,
-on API29/API37 with no skips, including large-font settled-keyboard Save taps. It and
-Wear fixture `4166885` are under fresh scoped review. N6 fix1 `80909ea` separately awaits
-review; new source/evidence checks cannot close the original preservation incident.
+The approved phone follow-up has nine final native executions/five distinct methods
+on API29/API37, no skips, including settled-keyboard Save taps. The fixture integration
+passes strict root checks (158 tasks, 25 executed). N8 native health views and explicit
+safe export are now implementing in an isolated worktree; no watch telemetry transfer
+is claimed. New source checks cannot close the original N6 preservation incident.
 
 M5 live-rollout preparation compares installed source with the reviewed baseline and
 retains stable private file/configuration/enrollment backups plus an unapplied package.
@@ -63,8 +68,10 @@ live file or listener changed. The repository Python3.11 environment passes 227 
 SDK checks; it is distinct from the running gateway's managed Python3.14.7 environment.
 That initial runtime labeling error is corrected. A separate private Python3.14.7 check
 with the actual selected gateway dependency versions also passes all 227 without skips;
-all 36 preflight target hashes still match. Actual-core/package review and controlled
-live rollout remain, with no installation or restart inferred from these checks.
+all 36 preflight target hashes still match. The canonical real-core recovery selection
+also passes 47 tests without failure/skip using that managed runtime and read-only
+dependencies. Package review and controlled rollout remain; no install/restart follows
+from isolated compatibility checks.
 
 ## Expansion connectivity and first increments — 2026-10-18
 

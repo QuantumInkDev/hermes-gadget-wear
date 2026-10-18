@@ -30,8 +30,10 @@ Minimum Wear investigation `4166885` has only three fixture changes: retain the 
 debug host across uiMode changes, explicitly scroll Pet into view, and restore saver
 before charger state. It establishes normal-power preconditions and passes all 26 affected
 API33 methods without skips, plus 11 Wear JVM tests and strict affected checks. No
-production animation defect was established; fresh source review/integration is pending.
-Phone minimum-runtime/settled Dark keyboard checks remain with the original worker.
+production animation defect was established. Fresh review is clean; the fixture is
+integrated as `e3afc20`. Phone test support `3ff89f6` is likewise approved and integrated
+as `e783611`. Root affected APK compilation, lint and formatting pass without warnings;
+Save has ordinary touchscreen evidence, while field input remains accessibility-driven.
 
 N6 native cards `6a04ace` has a failed preservation gate: a launcher reinstall was followed
 by loss of synthetic app-data baselines on two owned emulators. Exact responsible
@@ -39,9 +41,10 @@ suboperation is unproven; hashes/APKs do not restore app data or Keystore. Those
 are quarantined. Bounded archive/snapshot searches have not located exact identity bytes;
 physical devices were outside this task's operations. Review also requires phone checklist
 state to survive Full text/cards toggling, actual maximum-tail/large-font viewport proof,
-and correction of an invalid instrumentation-status probe. Original-worker fix1 addresses
-those source/evidence findings using separate authorized test devices; the original
-preservation finding stays open. Never use reinstall/uninstall/reset or regenerate an
+and correction of an invalid instrumentation-status probe. Fresh fix1 review accepts
+those three corrections in `80909ea`, but finds an API30-only phone geometry helper that
+cannot execute on API29. Original-worker fix2 is active on the authorized API29 fixture.
+The original preservation finding stays open. Never use reinstall/uninstall/reset or regenerate an
 identity to bypass it. Explicit matching-signer `adb install -r`, recoverable backups and
 post-install byte checks are required; stop on errors rather than using uninstall fallback.
 
@@ -53,14 +56,16 @@ the install marker changes). Art identity/continuous loops, authenticated art tr
 physical lip-sync/power remain open. No assignment changed. Kitana/Viper/Cthulhu remain
 queued behind accepted Akuma production art. N1/N2 Task1 private registry/grants/request
 journal implementation `0939b1e` has finished in its isolated frozen SDK. Its report
-records 536 distinct software/actual-core passes and ten explicit Windows-only skips;
-fresh independent spec/security/quality review is active. No new methods are enabled.
+records 536 distinct software/actual-core passes and ten explicit Windows-only skips.
+Fresh review finds one Important schema-constraint validation flaw and one deferred Minor
+result-depth inconsistency. Original-worker fix1 addresses schema validation; Windows
+Task1 execution and later real-core continuity remain separate gates. No methods enabled.
 
-Phone minimum-runtime test support `3ff89f6` reports nine final native executions across
-API29/API37, zero skips, including large-font keyboard Save taps. Wear fixture `4166885`
-and this one-file phone correction are under a fresh scoped review. N6 fix1 `80909ea`
-has a separate fresh review for checklist lifetime, maximum-tail geometry and the valid
-idle probe; the original synthetic-emulator preservation failure remains open.
+The accepted phone fixture has nine final native executions across API29/API37, zero
+skips, including large-font keyboard Save taps. The four-file fixture integration passes
+strict root checks (158 tasks, 25 executed). Native diagnostics Task2 is now implementing
+phone/watch health views and explicit safe report export in a fresh isolated worktree.
+Only typed allowlisted data is exported; watch telemetry transfer is outside that increment.
 
 Read-only M5 rollout preflight found one shared gateway process owns all fifteen Gadget
 listeners, so a per-profile capability rollout still needs a reviewed grouped restart.
@@ -69,8 +74,10 @@ source, configuration, enrollment or listener changed. The repository's historic
 Python3.11 environment passes 227 selected SDK checks, but the actual managed gateway
 uses Python3.14.7. The initial runtime label was corrected, and the separate actual-version
 selection now also passes all 227 checks without skips. All 36 preflight target hashes
-still match their before-state. Actual-core/package review, drain/restart and live
-capability checks remain; these SDK results are not deployment evidence.
+still match their before-state. A separate canonical real-core fixture run now passes
+47 tests with no failures/skips under that same managed runtime and read-only dependency
+set. Package review, drain/restart and live capability checks remain; these isolated
+results are not deployment evidence.
 
 The owner asked for questions up front and will confirm wireless phone/watch connectivity
 before leaving. The initial eleven-question batch covers the proposed written design,
