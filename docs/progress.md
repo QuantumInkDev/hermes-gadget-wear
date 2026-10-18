@@ -87,9 +87,9 @@ remain separate phone gates. Source approval does not establish full live featur
 
 Combined root `b81564a` passes 169 JVM tests/44 reports with zero failures/errors/skips,
 all four APK builds and sequential strict formatting. Structured-reply parser `be870de`
-has clean independent review and 23 new passing parser tests; its scoped protocol run
-has 132 passes/five explicit Python-fixture skips. Controller integration must run those
-fixtures; native card/action presentation remains a separate task.
+has clean independent review and is integrated as `73ca517`. Controller verification
+executes all Python fixtures: 137 protocol tests/28 reports pass without skips, with
+strict format/build checks. Native card/action presentation remains a separate task.
 
 Reviewed phone audio root integration builds all four APKs with warning mode fail and
 passes sequential formatting. Profile-aware settings/64-entry vault Task 2 is active.
@@ -118,7 +118,7 @@ Five separate-row Akuma generation calls preserve every original and retain priv
 listening/sleeping candidates; full-frame talking remains rejected. The
 [talking overlay plan](superpowers/plans/2026-10-18-pet-expression-overlays.md) moves exact
 body stability to deterministic native rendering while keeping raw source checks honest.
-It is not yet implemented. New pets follow Akuma's accepted production stage.
+Its isolated implementation is now active. New pets follow Akuma's accepted production stage.
 
 ## Fifteen-feature expansion intake — 2026-10-18 (historical)
 

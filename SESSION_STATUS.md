@@ -143,9 +143,11 @@ concrete adapter compatibility must be checked without exposing administrative A
 
 Combined root source `b81564a` passes 169 JVM tests/44 reports with zero failures,
 errors or skips, all four APK builds and sequential strict formatting. The reviewed
-structured-reply parser `be870de` is ready for integration; its five Python-fixture
-skips must be rerun with the controller's configured fixture environments. Native cards
-and deliberate platform actions are a separate task.
+structured-reply parser `be870de` is integrated as `73ca517`; its full root protocol
+run executes all Python fixtures and passes 137 tests/28 reports with no skips, strict
+format/build checks included. Native cards and deliberate platform actions are a separate
+task. The fixed-body pet expression renderer is now active in an isolated worktree;
+no new personal artwork is accepted or deployed.
 
 Existing enrollments/artwork are preserved; the watch has the reviewed selector update. PR #1 is linked and remains
 draft. No merge, signing rotation or public release is part of the new goal. Older build
