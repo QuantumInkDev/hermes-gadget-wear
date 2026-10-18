@@ -106,7 +106,7 @@ class PresentationSurfaceTest {
                     radio?.isSelected == true || radio?.isChecked == true
                 }
                 capture("${appearance.name.lowercase()}-portrait-footer")
-                click("Pet")
+                clickAfterScroll("Pet")
                 await { watch.value.presentation[page.presentationKey()] == PresentationMode.PET }
                 scrollTo(
                     "Pet unavailable or unsupported. Showing retained portrait or placeholder."

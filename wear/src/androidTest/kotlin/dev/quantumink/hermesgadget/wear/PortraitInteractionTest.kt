@@ -260,8 +260,10 @@ class PortraitInteractionTest {
             await { !power.isPowerSaveMode }
             await { nodes().any { it.stateDescription?.toString() == "Recording, outward rings" } }
         } finally {
-            shell("cmd battery reset")
+            // Wear API33 can refuse mode changes once the synthetic charger is restored.
             shell("cmd power set-mode " + if (original) "1" else "0")
+            shell("cmd battery reset")
+            assertEquals("Restore the original power policy", original, power.isPowerSaveMode)
         }
     }
 
