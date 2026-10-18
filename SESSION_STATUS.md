@@ -58,8 +58,11 @@ are quarantined. Bounded archive/snapshot searches have not located exact identi
 physical devices were outside this task's operations. Review also requires phone checklist
 state to survive Full text/cards toggling, actual maximum-tail/large-font viewport proof,
 and correction of an invalid instrumentation-status probe. Fresh fix1 review accepts
-those three corrections in `80909ea`, but finds an API30-only phone geometry helper that
-cannot execute on API29. Original-worker fix2 is active on the authorized API29 fixture.
+those three corrections in `80909ea`. Fix2 `404ad463` replaces the API30-only phone
+geometry calls; fresh review accepts that source correction and verifies preserved return
+of the authorized API29 fixture. One all-theme method passed, but the final maximum-text
+and real-keyboard run timed out at activity launch, then reported a system crash. Those
+runtime gates remain open; their cause is unproven. A Minor evidence-index entry is stale.
 The original preservation finding stays open. Never use reinstall/uninstall/reset or regenerate an
 identity to bypass it. Explicit matching-signer `adb install -r`, recoverable backups and
 post-install byte checks are required; stop on errors rather than using uninstall fallback.
@@ -69,17 +72,21 @@ Private Akuma overlay v4 passes an actual production decoder/PCM playback fixtur
 poses differing at 131 region pixels. Controller inspection confirms the corrected
 listening necklace and permits continued private asset production; continuous motion,
 authenticated art delivery and physical lip-sync/power remain open. No assignment changed.
-Kitana has a selected compact base and native/watch previews. Her first idle strip
-was rejected for a clipped fan; its targeted framing correction hit another image-service
-connection failure. No unfinished atlas or profile assignment is accepted. Viper and
-Cthulhu follow her.
+Kitana has a selected compact base and a corrected six-pose idle strip. Direct extraction
+first rejected its tight, unequal generated spacing; lossless column repacking retains
+all source pixels and lets the real Hermes extractor/normalizer produce native/watch
+technical previews. Complete fans and six distinct poses are verified; final all-state
+registration, continuous motion and remaining animations are not accepted yet. No profile
+assignment changed. Viper and Cthulhu follow her.
 N1/N2 Task1 fix1 `c5ff24b` addresses the reviewed schema-constraint defect. It reports
 296 warning-strict SDK passes and 47 distinct actual-core passes; the latter had one
 initial subprocess timeout, followed by a separate 19-case pass with retries disabled.
 Fresh scoped review accepts the fix with no new Critical/Important findings. The Minor
 result-depth inconsistency remains deferred for the consumer contract. Task1 Windows execution and real two-device continuity are
-separate gates. The fresh Task2 core admission/history owner is implementing isolated
-hooks; no new method is enabled or candidate integrated.
+separate gates. Fresh Task2 core review found three Important issues: simultaneous first
+route registration, omitted legitimate display history and receipt replay after grant
+revocation while waiting. Focused fixes require real-core barrier evidence and a fresh
+review. No new method is enabled or candidate integrated.
 
 The accepted phone fixture has nine final native executions across API29/API37, zero
 skips, including large-font keyboard Save taps. The four-file fixture integration passes
@@ -100,13 +107,21 @@ The actual-version isolated selection passes 227 SDK and 47 real-core tests with
 failure/skip. The 22-runtime-file helper has accepted fixes for operation ownership,
 durable journal setup and protected-manifest binding. All 53 offline cases pass; fresh re-review closes
 all five findings and read-only verification still matches installed before hashes. The
-bounded maintenance driver remains unimplemented and review-required before live execution.
-No install, drain, restart or capability activation follows from these checks.
+[bounded maintenance driver](docs/superpowers/plans/2026-10-18-m5-maintenance-driver.md)
+now has a concrete offline implementation plan: one maintenance lease, fresh drain proof,
+owned markers, planned shutdown, the accepted source helper and controlled recovery/start.
+Read-only identity/topology and all twelve capability-OFF config checks are recorded;
+these do not prove idle state. Driver implementation/review and actual stock acceptance
+remain required. No install, drain, restart or capability activation follows from these checks.
 
 The [walking-audio foundation](docs/superpowers/plans/2026-10-18-walking-audio-foundation.md)
-now has a fresh isolated implementation owner for actual output observation, interruption
-and old-playback callback fencing. This does not complete larger walking controls,
-concise speech, Replay/More or physical earbud acceptance.
+has a candidate at `c258998a` awaiting fresh review. All twelve audio behaviors have
+passing native executions on API29/API33/API37; an earlier Wear startup timeout and an
+API29 Opus fixture skip remain recorded, with the corrected method passing separately.
+This does not complete larger walking controls, concise speech, Replay/More or physical
+earbud acceptance. Separate existing N8 diagnostics on the fresh API29 fixture had five
+failures in eight executions (activity launch timeouts and an input-injection permission
+error), zero skips. Its cause is unproven and that minimum-runtime gate remains open.
 
 The owner asked for questions up front and will confirm wireless phone/watch connectivity
 before leaving. The initial eleven-question batch covers the proposed written design,
