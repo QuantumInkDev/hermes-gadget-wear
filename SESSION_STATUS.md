@@ -27,12 +27,18 @@ recorded privately in `.local/expansion/wireless-connectivity.json`; preserve ot
 workers' emulators and ADB servers. No expansion app update or provider call has occurred.
 
 Quick actions are being implemented in an isolated child worktree. Reusable companion
-tooling at `c18b38e` passes 22 targeted Python tests, but its fresh review found two
-Important validation gaps (source bounds and clipping before grid padding); fix round 1
-is active. Both generated Akuma candidates are rejected, so no companion art is accepted.
+tooling at `c18b38e`, corrected by `4b7acd9`, passes 29 warning-strict targeted Python
+tests. Seven regressions reproduced the two original Important findings before fixes;
+fresh scoped review accepts both fixes without new findings. Both generated Akuma
+candidates are rejected, so no companion art is accepted. Private APK/data backups
+are verified for both devices (104 phone files, including 18 identity and 55 art files;
+78 watch files, including 19 identity and 29 art files). No app UI or setting was changed.
 The [server contract](docs/relay-server-contract.md) and
 [focused outbox plan](docs/superpowers/plans/2026-10-18-relay-server-foundations.md)
-define the next server increment. These designs do not establish live integration.
+define the next server increment. Its storage task is active in an isolated SDK.
+Typed protocol diagnostics is also underway from its
+[focused plan](docs/superpowers/plans/2026-10-18-connection-diagnostics.md). These designs
+and implementation activity do not establish live integration.
 
 The [umbrella design](docs/superpowers/specs/2026-10-18-relay-expansion-design.md)
 defines all fifteen acceptance contracts, recorded decisions and the workstream split.

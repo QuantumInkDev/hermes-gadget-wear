@@ -7,13 +7,17 @@ server. The owner's watch debugging pairing was renewed; Hermes enrollment, appl
 data and installed builds are unchanged. The approved physical test scope can proceed
 when reviewed builds are ready. Connection details are private under `.local/expansion/`.
 
-Reusable companion staging tooling at `c18b38e` passes 22 warning-strict targeted Python
-tests and synthetic SDK packaging parity. Its independent review found two Important
-input-validation defects; fixes are in progress. Two Akuma artwork candidates failed
+Reusable companion staging tooling at `c18b38e`, corrected by `4b7acd9`, passes 29
+warning-strict targeted Python tests and synthetic SDK packaging parity. Seven new
+regressions reproduced the two Important input-validation defects before fixes;
+fresh scoped re-review accepts both fixes with no new findings. Two Akuma artwork candidates failed
 quality gates and are rejected. Tooling evidence does not complete the pet feature.
 Quick actions are underway in an isolated worktree; authenticated final-text recovery
 has a [focused plan](superpowers/plans/2026-10-18-relay-server-foundations.md) and
-[wire contract](relay-server-contract.md). No live expansion rollout is claimed.
+[wire contract](relay-server-contract.md). Its isolated storage implementation and typed
+[request diagnostics](superpowers/plans/2026-10-18-connection-diagnostics.md) are underway.
+Read-only APK/data backups preserve 18 phone and 19 watch identity files plus current
+artwork/settings. No live expansion rollout is claimed.
 
 ## Fifteen-feature expansion intake — 2026-10-18 (historical)
 
