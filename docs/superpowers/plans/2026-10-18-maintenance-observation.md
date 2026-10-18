@@ -32,7 +32,7 @@
 
 **Interfaces:**
 
-- `MaintenanceObserver.sample(runner, *, home: Path) -> dict` in `gateway/maintenance_observation.py`, called by the real external-drain watcher after engagement. One observer belongs to one gateway instance; injectable wall/monotonic clocks support deterministic tests. It runs count/identity validation on the owning loop, returns a bounded explicit scalar DTO, and never dispatches work or starts/stops anything.
+- `async MaintenanceObserver.sample(runner, *, home: Path) -> dict` in `gateway/maintenance_observation.py`, awaited by the real external-drain watcher after engagement. One observer belongs to one gateway instance; injectable wall/monotonic clocks support deterministic tests. It runs count/identity validation on the owning loop, returns a bounded explicit scalar DTO, and never dispatches agent work or starts/stops a service. Marker reads and process-birth filesystem probes run off that loop using the existing asyncio executor. At most one marker read is in flight per observer; a five-second read timeout or count-to-closing-read bracket expires the observation. Sample clocks are captured at counting, not after I/O.
 - Existing status gains optional `maintenance_observation`; absent means unsupported. Its valid version1 object contains `v:1`, `valid`, `instance_id`, `authority_epoch`, `pid`, `start_time`, `hermes_home`, `drain_principal`, `drain_marker_sha256`, `drain_requested_at`, `sequence`, `sampled_at_ms`, `sampled_monotonic_ns`, `counts`, and `active_total`.
 - `counts` has exactly five non-boolean, nonnegative integer fields: `agents`, `managed`, `cron`, `api`, `deferred`. They represent the real sources covered by canonical whole-gateway work accounting, including all served authorities. `active_total` is their exact sum. Do not duplicate managed work already represented as an agent; follow the real source's existing counting boundary.
 - A successful sample increments a per-instance sequence starting at1. Unrelated status writes never change observation fields. A failed or unverifiable sample publishes `valid:false`, fixed redacted error code, last successful sequence, and null count/total/sample-time fields; it cannot refresh a usable zero. No exception text, session identity, model/tool data, transcript or credential enters it.
@@ -59,3 +59,13 @@ No live action is part of Tasks1–2. Review the exact revised source package, p
 ## Preflight rulings
 
 Task1 owns producer/status/watcher schema together; Task2 consumes only its reviewed version. Task3 cannot use a capability not yet installed to authorize installing it. All three agree on capability-OFF and no-live-development boundaries. Each of the five review-focus inputs has an explicit Task1 test group. The existing user-approved scoped server development covers this isolated upstreamable change; no repeated approval question is required.
+
+Controller ruling after initial review: the sample interface may be asynchronous to fix
+the loop-blocking marker I/O finding. The existing bounded executor call is a technical
+read boundary, not a new worker service or an admission authority. Counts and identity
+checks remain on the owning loop, with stable marker checks around them and freshness
+fixed at the count. A timeout invalidates support; it does not pretend to cancel a
+blocked filesystem operation. Independent review must assess the pending-read bound.
+The unrelated SQLite cleanup fixture is a separate test-hygiene commit. Report the
+feature-only warning failures and the hygiene-enabled results separately; do not export
+the fixture as part of the observer or claim its passing run describes a different tree.

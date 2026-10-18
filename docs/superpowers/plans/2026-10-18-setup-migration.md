@@ -156,6 +156,12 @@ encrypted export and reviewed non-destructive import, with durable replay/import
   KDF/archive/decode work off the main thread. A source allocation estimate is not proof
   of low-memory usability. Read failures must use safe generic wording, not assert that
   every failure is a wrong password; never log raw URL-bearing construction exceptions.
+- [ ] Carry the source review's Minor platform questions into native validation: test
+  ownership when a non-standard collection exposes its own array on API29, and use
+  stable privately owned ciphertext through in-place decryption. Record the caller
+  no-concurrent-mutation contract. If the native collection copy aliases data, correct
+  the narrow format seam with an owned copy and a failing platform regression before
+  consuming it. Retain the initial source review's untested-platform qualification.
 - [ ] Run affected strict tests/lint/formatting/all four APK compilation, commit focused
   source/test/evidence and report. Controller obtains fresh combined review before integration.
 

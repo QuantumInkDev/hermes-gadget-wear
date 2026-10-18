@@ -10,18 +10,22 @@ or physical pass is claimed.
 
 ## Current expansion verification — 2026-10-18
 
-QR setup/migration now has a focused format/native/acceptance plan. Pure format work
-starts independently; no transfer is implemented or installed yet. Continuity Task3
-has two reproduced final-delivery prerequisites scoped into its implementation. The
+QR setup/migration Task1 pure format at`db515f4` has a clean fresh fix1 review:
+58 distinct format cases pass; protocol202 total has zero failures/errors and five
+inherited environment-gated skips. Native QR/store import/export and fresh-device gates
+remain incomplete. Continuity Task3 has two reproduced final-delivery prerequisites
+scoped into its implementation. The
 M5 partial maintenance lease has clean review; its full driver awaits a genuine
 sample-observation producer and independent live bootstrap authority. No server changes.
 
 The interrupted implementations are checkpointed without accepting unfinished code.
-Fresh isolated successors are resuming continuity Task3 and the QR/migration format;
-the committed maintenance-observation candidate (`1762a725` / `de9848db`) has an
-independent review requiring fixes. Unnecessary idle status writes and event-loop marker
-I/O are the two Important findings; a fresh implementer owns that correction and the
-smaller findings. The original worker stopped before a completion report. No maintenance prerequisite, continuation method or migration feature is live.
+Continuity Task3 continues in an isolated successor. Maintenance-observation fix1
+(`79a1e7ce` / `da2f963a`) is under fresh scoped review for idle-write and loop-I/O
+corrections. Its separate SQLite test-hygiene heads pass245 cases with8 platform
+skips on each foundation; feature-only runs retain239 passes,6 inherited warning
+failures and8 skips. These are different trees, not one green source-only result.
+The original worker's missing report is explicitly distinguished from the successor's
+verified report. No maintenance prerequisite or continuation method is live.
 
 Latest integrated app source `dc1fb14` adds the independently reviewed playback-output
 and interruption foundation. Strict root checks pass: 11 client JVM cases, zero failures,
@@ -93,14 +97,20 @@ Private Akuma overlay v4 passes an actual production decoder/PCM playback fixtur
 poses differing at 131 region pixels. Controller inspection confirms the corrected
 listening necklace and permits continued private asset production; continuous motion,
 authenticated art delivery and physical lip-sync/power remain open. No assignment changed.
-Kitana has a selected compact base and a corrected six-pose idle strip. Direct extraction
-first rejected its tight, unequal generated spacing; lossless column repacking retains
-all source pixels and lets the real Hermes extractor/normalizer produce native/watch
-technical previews. Complete fans and six distinct poses are verified; final all-state
-registration, continuous motion and remaining animations are not accepted yet. A side-view
-walk now has six complete wide/passing gait phases and technical native/watch previews;
-weaker earlier drafts remain rejected. No profile assignment changed. Viper and Cthulhu
-follow her.
+Kitana now has all twelve generated/extracted states: nine standard six-frame rows
+plus listening6/talking3/sleeping6. One actual Hermes normalization pass registers all
+69 poses, followed by the existing companion staging registration. The1536x1872 base
+passes validation with no warnings; both trailing base cells per row and the three
+unused talking cells are transparent. The declared mouth overlay keeps all native body
+pixels fixed; three mouth poses remain distinct at96x104. The SDK packages the base
+and companion below2MiB each, and in-memory sender/reassembly checks preserve their
+hashes while omitting overlay talking for unsupported capabilities. This is packaging,
+not authenticated delivery. The interactive twelve-state preview loads138 exact staged
+native/watch frames at desktop/phone widths without overflow or errors. Continuous
+motion, Android decoder/playback and physical legibility/power remain separate gates.
+Original art, failed drafts and source hashes are retained privately; no assignment
+changed. Viper now has a selected canonical sprite; animation production is underway.
+Cthulhu follows using the existing private profile portrait.
 N1/N2 Task1 fix1 `c5ff24b` addresses the reviewed schema-constraint defect. It reports
 296 warning-strict SDK passes and 47 distinct actual-core passes; the latter had one
 initial subprocess timeout, followed by a separate 19-case pass with retries disabled.
