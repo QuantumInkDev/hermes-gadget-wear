@@ -269,6 +269,17 @@ Depends on Task 1's exact bridge contract; can prepare core fixtures separately.
 
 Depends on Tasks 1–2 and O5's actual-core final-recovery hook acceptance.
 
+Source-backed amendment: Task3 preflight reproduced two missing producer seams. Its
+isolated owner may add narrowly scoped authenticated scalar canonical-final identity
+to exact receipt lookup and trusted final-delivery context, resolving the actual
+persisted-turn reference rather than content/time/latest-row guesses. Unrecoverable
+identity remains explicitly unavailable; no raw result is exposed. The same owner
+may align delivery-obligation eligibility with the actual command classifier so
+admitted ordinary `/tmp/...` text retains its final ledger, while real commands and
+ephemeral messages remain excluded. Review these core deltas together with the SDK
+bridge before integration. No installed source, live capability or broader core
+control change is authorized by this amendment.
+
 - [ ] Add `plugin/relay_core.py` (version-bound in-process adapter),
   `plugin/relay_conversations.py` and `plugin/relay_events.py`. Register capability names
   only when exact required hooks are present and tested. Expose create/attach/detach,
