@@ -438,6 +438,73 @@ class ConnectionDiagnosticsTest {
         assertTrue(diagnostics.snapshot(31000).stalled)
     }
 
+    @Test
+    fun historyLossDuringCaptureImmediatelyExportsUncertaintyAndPreservesLocalFinish() {
+        for (packetBeforeEviction in listOf(false, true)) {
+            val diagnostics = ConnectionDiagnostics()
+            diagnostics.reset(DiagnosticTransport.DIRECT, 0)
+            val conversation = Conversation(diagnostics = diagnostics)
+            conversation.setPaired(true)
+            repeat(128) {
+                conversation.receive(message("turn.start", "capture-boundary-$it"), it * 2L)
+                conversation.receive(message("turn.end", "capture-boundary-$it"), it * 2L + 1)
+            }
+            val capture = conversation.startRecording(1000)
+                .filterIsInstance<ConversationEffect.CaptureStart>().single()
+            if (packetBeforeEviction) conversation.capture(capture.token, ByteArray(640), 1001)
+            assertTrue(
+                conversation.receive(message("turn.start", "capture-live-1"), 1002).isEmpty()
+            )
+            assertTrue(
+                conversation.receive(message("turn.start", "capture-live-2"), 1003).isEmpty()
+            )
+            val evicted = diagnostics.snapshot(1003)
+            assertEquals(
+                if (packetBeforeEviction) RequestStage.UPLOADING else RequestStage.RECORDING,
+                evicted.requestStage
+            )
+            assertEquals(TurnCorrelation.HISTORY_LIMIT, evicted.turnCorrelation)
+            assertTrue(diagnostics.requestActive)
+            val exported = Json.parseToJsonElement(
+                ConnectionDiagnosticsReport.encode(evicted)
+            ).jsonObject
+            assertEquals(
+                "HISTORY_LIMIT",
+                exported.getValue("turnCorrelation").jsonPrimitive.content
+            )
+            assertFalse(exported.toString().contains("capture-live"))
+            repeat(if (packetBeforeEviction) 12 else 13) {
+                conversation.capture(capture.token, ByteArray(640), 1100L + it)
+            }
+            assertEquals(RequestStage.UPLOADING, diagnostics.snapshot(1200).requestStage)
+            assertEquals(TurnCorrelation.HISTORY_LIMIT, diagnostics.snapshot(1200).turnCorrelation)
+            val finished = conversation.finishRecording(2000, capture.token)
+            assertEquals(
+                listOf(ConversationEffect.RecordingOutcome(capture.token, true)),
+                finished.filterIsInstance<ConversationEffect.RecordingOutcome>()
+            )
+            assertEquals(
+                listOf("audio.end"),
+                finished.filterIsInstance<ConversationEffect.Send>()
+                    .map { it.message.type }
+            )
+            assertEquals(RequestStage.WAITING, diagnostics.snapshot(2000).requestStage)
+            conversation.receive(message("reply", "capture-live-2", "readable server reply"), 2001)
+            conversation.receive(message("turn.end", "capture-live-2"), 2002)
+            assertEquals("readable server reply", conversation.state.reply)
+            val waiting = diagnostics.snapshot(32000)
+            assertEquals(TurnCorrelation.HISTORY_LIMIT, waiting.turnCorrelation)
+            assertEquals(RequestStage.WAITING, waiting.requestStage)
+            assertTrue(waiting.stalled)
+            assertTrue(diagnostics.requestActive)
+            conversation.cancel(32001)
+            assertEquals(RequestStage.CANCELLED, diagnostics.snapshot(32001).requestStage)
+            assertFalse(diagnostics.requestActive)
+            assertFalse(diagnostics.snapshot(90000).stalled)
+            assertEquals(31001L, diagnostics.snapshot(90000).elapsedMillis)
+        }
+    }
+
     private fun message(type: String, turn: String, text: String? = null) = Message.create(
         type,
         buildJsonObject {

@@ -157,7 +157,7 @@ class Conversation(
         diagnostics.audio(false, now, interrupted = true)
         val recording = upload?.token
         paired = false
-        retireTurn()
+        retireTurn(now)
         upload = null
         playback = null
         image = null
@@ -182,7 +182,7 @@ class Conversation(
                 "turn.start" -> {
                     val id = text(message, "turn", 128)
                     if (id == turn || id in retiredTurns) return emptyList()
-                    if (turn != id) retireTurn()
+                    if (turn != id) retireTurn(now)
                     turn = id
                     if (upload == null && retiredHistoryTruncated) {
                         diagnostics.uncertainTurn(now)
@@ -242,7 +242,7 @@ class Conversation(
                             now
                         )
                     }
-                    retireTurn()
+                    retireTurn(now)
                     if (upload == null) {
                         state = state.copy(
                             mode = if (state.reply.isEmpty()) {
@@ -436,7 +436,7 @@ class Conversation(
             return emptyList()
         }
         val effects = cancelUpload("replaced") + listOf(ConversationEffect.PlaybackStop)
-        retireTurn()
+        retireTurn(now)
         startDiagnosticRequest(RequestStage.WAITING, now)
         playback = null
         state = state.copy(mode = ConversationMode.THINKING, status = "", transcript = "")
@@ -456,7 +456,7 @@ class Conversation(
         val stream = (inputCounter % 250 + 1).toInt()
         upload = Upload(token, stream, now, microphoneFormat)
         playback = null
-        retireTurn()
+        retireTurn(now)
         startDiagnosticRequest(RequestStage.RECORDING, now)
         state =
             state.copy(mode = ConversationMode.LISTENING, level = 0f, status = "", transcript = "")
@@ -590,7 +590,7 @@ class Conversation(
         val effects = cancelRecording(now)
         diagnostics.request(RequestStage.CANCELLED, now)
         diagnostics.audio(false, now, interrupted = true)
-        retireTurn()
+        retireTurn(now)
         playback = null
         state = state.copy(mode = ConversationMode.READY, status = "")
         return effects +
@@ -737,7 +737,7 @@ class Conversation(
     fun acceptsSpeech(message: Message): Boolean =
         paired && upload == null && state.prompt == null && matchesTurn(message)
 
-    private fun retireTurn() {
+    private fun retireTurn(now: Long) {
         turn?.let {
             if (it !in retiredTurns && retiredTurns.size == 128) {
                 retiredHistoryTruncated = true
@@ -746,6 +746,8 @@ class Conversation(
             retiredTurns.add(it)
         }
         turn = null
+        // History loss applies even while an otherwise normal local capture remains active.
+        if (retiredHistoryTruncated && diagnostics.requestActive) diagnostics.uncertainTurn(now)
     }
 
     private fun startDiagnosticRequest(stage: RequestStage, now: Long) {
