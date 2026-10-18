@@ -10,6 +10,7 @@ Baseline: Hermes Gadget SDK `v0.2.0`, commit `323e3303ab68981f810fc3208119cd8a22
 | Optional talking-region replacement and exact capability negotiation | Gadget SDK | Patch 5 reviewed/freshly reapplied; 89 affected compatibility checks pass; personal art/live/physical gates open |
 | Optional companion metadata and extra rows in one hatch normalization pass | Hermes Agent | Later-row registration tool implemented/tested; same-hatch generator change remains proposed |
 | Pending outbox on reconnect | Gadget SDK | Patch 4 implemented and independently reviewed; enrolled-key grants, bounded silent read/ACK and durable final capture; fresh export/host/live gates tracked in progress |
+| Native Windows private authority/storage validation | Gadget SDK | Patch6 reviewed/freshly reapplied;402 software checks and20 actual native method passes; installed-profile activation still gated |
 | Generic adapter final-delivery context and coherent queue/recovery handoff | Hermes Agent | [Clean core patch](../server/core-patches/README.md), hook version 2; 100 focused actual-core checks per clean/private-runtime fixture; no upstream agreement or live activation |
 | Profile discovery/select with multiplexed gateway | Gadget SDK / Hermes Agent | [V2 design proposal](profiles-v2.md) only; **DECISION** and upstream maintainer feedback before implementation |
 | Read-only watch catalog projection from host profile/avatar inventory | Hermes Agent / self-host catalog tooling | [Multi-box carousel design](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md) approved for isolated development; independent Gadget endpoints; live rollout requires review |
@@ -34,7 +35,8 @@ Independent review accepts the registry-completeness and queued/redirected prove
 corrections. Recovered text never triggers automatic speech, tool work or approvals.
 Fresh pinned-source reapplication passes 187 SDK and 100 actual-core warning-strict
 checks without skips; 265 SDK files and all 13 changed core files match reviewed source.
-Native Windows storage validation is a required follow-up; the current Windows gate
-remains closed. Private existing core modifications are excluded from the public delta.
+Native Windows verifier patch6 now passes fresh reapplication,402 affected software
+checks and10 native methods on each actual gateway architecture. Installed-profile
+preflight/grants/core checks and staged live activation remain separate gates. Private existing core modifications are excluded from the public delta.
 Earlier software/stock compatibility evidence is not a claim of full-core warning
 cleanliness, physical speech, continuity/task implementation or live deployment.

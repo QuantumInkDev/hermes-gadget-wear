@@ -8,34 +8,45 @@ no full minimum-Wear pass is claimed.
 
 ## Current expansion verification — 2026-10-18
 
-Current checkpoint: reviewed profile-aware phone settings and its artifact-preservation/
-large-font fix are integrated at `380d64c`. The combined strict root check passes **199
-JVM tests /46 XML reports**, zero failures/errors/skips, and all four APKs. Phone Task 2
-fix1 review has no findings. Root API29 checks have 30 initial passes, a corrected
-profile-navigation pass and the 12-state large-font geometry method passes. The broad
-large-font settings navigation method fails to find the key field; the original worker
-is investigating it and a settled Dark/keyboard visual gate. Nine older navigation
-methods still skip on a legacy emulator-name guard; N6 owns the narrow support correction.
-Do not label the entire API29 increment accepted yet.
+Current checkpoint: app source `14ea9f4` passes the combined strict root check: **206
+JVM tests /46 reports**, zero failures/errors/skips, and all four APKs. Public SDK patches
+1–6 freshly reapply to stock v0.2.0; all 274 combined Windows/pet source files match
+reviewed code. The Windows export passes 402 affected software checks, with ten explicit
+Windows-only skips on Mac. Both actual supported gateway interpreters separately pass
+all ten native methods each, zero failures/errors/skips: readable control succeeds,
+private status is exactly `0xC0000022`, privileges remain disabled, impersonation reverts,
+and source/fixture cleanup succeeds. This constrained-token probe establishes its stated
+leaf-DACL boundary, not another account's full-path access. No installed source, ACL,
+listener or optional live flag is changed. Per-installed-profile preflight, grants/core
+compatibility, native outbox consumers and live rollout remain required.
 
-A fresh owned minimum-Wear API33 run executes 27 methods: 22 pass and five fail. A
-focused retry passes the previously failed footer method, but rings and sprite motion
-remain static. The original worker is investigating actual system power/lifecycle state;
-no minimum-version animation pass is claimed. Existing API37 and physical receipts remain
-source-bound evidence, not substitutes for this gate.
+Minimum Wear investigation `4166885` has only three fixture changes: retain the injected
+debug host across uiMode changes, explicitly scroll Pet into view, and restore saver
+before charger state. It establishes normal-power preconditions and passes all 26 affected
+API33 methods without skips, plus 11 Wear JVM tests and strict affected checks. No
+production animation defect was established; fresh source review/integration is pending.
+Phone minimum-runtime/settled Dark keyboard checks remain with the original worker.
 
-Expression overlay fixes `50c3c0a` (app) / `46d61f0` (isolated SDK) pass fresh scoped
-re-review: all three findings addressed, no new findings. App integration `3862227`/`14ea9f4` and public SDK patch 5 freshly reapply: all265 SDK
-files match accepted source, patches1–4 unchanged,89 affected compatibility checks pass
-without skips. Combined root strict check206JVM/46reports/all4APKs passes. Private Akuma
-overlay candidate v4 is staged; raw full-frame differences remain failed, human/live/physical
-gates remain open. Windows fix2
-`0f4b0ad` passes scoped source review and 177 affected software checks with ten explicit
-Windows skips on Mac. Fresh reliable SFTP runs on both actual gateway architectures each
-execute ten methods: **nine pass, one fails, zero errors/skips**, fixture/source cleanup
-succeeds. The restricted probe fails during lazy UTF-16 codec lookup under impersonation,
-before the readable-control/private-denial assertion. This is not native acceptance or
-activation. Native structured cards are in isolated implementation from `380d64c`.
+N6 native cards `6a04ace` has a failed preservation gate: a launcher reinstall was followed
+by loss of synthetic app-data baselines on two owned emulators. Exact responsible
+suboperation is unproven; hashes/APKs do not restore app data or Keystore. Those emulators
+are quarantined. Bounded archive/snapshot searches have not located exact identity bytes;
+physical devices were outside this task's operations. Review also requires phone checklist
+state to survive Full text/cards toggling, actual maximum-tail/large-font viewport proof,
+and correction of an invalid instrumentation-status probe. Original-worker fix1 addresses
+those source/evidence findings using separate authorized test devices; the original
+preservation finding stays open. Never use reinstall/uninstall/reset or regenerate an
+identity to bypass it. Explicit matching-signer `adb install -r`, recoverable backups and
+post-install byte checks are required; stop on errors rather than using uninstall fallback.
+
+Private Akuma overlay v4 passes an actual production decoder/PCM playback fixture. All
+29,952 derived pixels are checked: zero outside-region changes; both open poses differ
+at131 region pixels and differ from each other. Original inputs, identities/art/stores and
+settings are unchanged; original APKs are restored (98/99 baseline files identical, only
+the install marker changes). Art identity/continuous loops, authenticated art transfer and
+physical lip-sync/power remain open. No assignment changed. Kitana/Viper/Cthulhu remain
+queued behind accepted Akuma production art. N1/N2 Task1 private registry/grants/request
+journal implementation is now running in an isolated frozen SDK; no methods are enabled.
 
 ## Expansion connectivity and first increments — 2026-10-18
 

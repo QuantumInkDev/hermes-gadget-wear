@@ -1,0 +1,2083 @@
+diff --git a/docs/relay-outbox.md b/docs/relay-outbox.md
+index f430f06..2f5717b 100644
+--- a/docs/relay-outbox.md
++++ b/docs/relay-outbox.md
+@@ -4,8 +4,10 @@
+ only with the matching Hermes final-delivery context hook (version 2). The default
+ is false. The owning profile stores private state under
+ `plugin_data_dir('gadget')`: `relay-grants.json` and `relay-outbox.sqlite3`. Paths and
+-host URLs cannot be supplied by clients. Windows activation is refused pending an
+-actual private ACL and parent/reparse verifier.
++host URLs cannot be supplied by clients. Windows has a fail-closed native NTFS
++privacy verifier. Deployment remains gated on independent code review and actual
++native validation with the supported interpreter on each host; no local POSIX or
++mocked API test establishes Windows support.
+ 
+ A paired connection must advertise `caps.relay: {"version": 1}` and have a current
+ explicit grant tied to its enrolled key, plus approval from the runner's real
+@@ -54,3 +56,133 @@ retention. Stop/start follows the owning adapter's lifecycle.
+ Validation is offline: actual pinned clean/runtime core imports, synthetic
+ loopback devices, process restart, and private temporary stores. No live-host,
+ provider, physical-device, Windows permission or public-release claim follows.
++
++
++## Windows storage requirements and controller validation
++
++The optional service lazily loads `windows_privacy.py`. Stock-disabled loads do
++not import Win32. The verifier derives the user SID from the process token and
++requires the private directory, enrollment/grant files, database and journal to
++be owned by that user, LocalSystem or built-in Administrators. These are the
++same three identities permitted in nonzero effective allow ACEs. Ownership is
++checked from the opened object against explicit SIDs, never an account name,
++environment variable or arbitrary default token owner. Administrators-owned
++objects are within this existing local trust boundary; ownership does not
++excuse a broad or malformed DACL. On the leaf directory this also applies
++to inheritable/inherit-only permissions, so new database/journal files cannot
++inherit outsider access. Explicit denies do not excuse a broad allow.
++
++Each existing ancestor through the filesystem root is separately inspected.
++Read/list/traverse and create-sibling rights alone are permitted there. Outsider
++DELETE, DELETE_CHILD, WRITE_DAC, WRITE_OWNER, write-EA or write-attributes rights
++are refused. Ancestor ownership must also be the process user, SYSTEM or built-in
++Administrators, with one exact ancestor-owner exception: Windows Modules Installer
++(TrustedInstaller), SID
++`S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464`.
++This accounts for standard system-drive ownership. It grants no new effective ACE
++permission and does not permit that SID to own or receive permissions on private
++leaves. Other service SIDs, near-matching SIDs and localized names confer no trust.
++Inherit-only ancestor ACEs do not confer rights on the pinned existing component;
++every descendant is independently inspected, including the private leaf's future
++inheritance. No existing/system ACL is repaired and no administrator bypass or
++assume-safe option exists.
++
++Only local fixed NTFS volumes and ordinary absolute DOS paths up to 240 characters
++are supported. Reparse points/junctions, multiple file hardlinks, streams, UNC,
++SUBST/alias paths, missing/null DACLs, conditional/object/unknown ACEs, unknown
++access bits and unresolved native queries are refused. Ordinary standard allow
++and deny ACEs are parsed with bounded counts and lengths. Future unsupported
++layouts require review, not an automatic exception.
++
++Authority reads pin every ancestor against rename and open the leaf without
++reparse following, denying write/delete sharing. Validation and bounded reads
++use that same handle. Grant shape, enrollment completeness, current key comparison
++and current-grant checks remain mandatory. A failed read never becomes an empty
++allowlist. Initial stock registry loading/writing stays unchanged; optional
++snapshot reads add the native boundary and retain the persistent incomplete marker.
++
++SQLite operations pin the private directory and database. Preexisting journals
++are inspected before opening SQLite; WAL/SHM state is unsupported and refused.
++Windows never chmods or rewrites an existing object's ACL. Creation inherits the
++checked private directory, and the newly created database is inspected. Every
++transaction writes the unchanged `user_version` to force a real rollback journal,
++then inspects its descriptor before payload code runs and again before commit.
++The journal may contain existing page data before its inspection, so directory
++inheritance is checked first; a later change by the current user or an administrator
++is within the stated trusted boundary. FULL durability, DELETE mode, size limits,
++identity/dedup, expiry and ACK behavior remain unchanged. An unsafe or failed check
++rolls back and raises a concise setup/service failure; it does not repair storage.
++
++Run the standalone synthetic fixture with the **actual gateway interpreter** from
++an extracted private source bundle; no package installation is needed:
++
++```powershell
++& $GatewayPython -I -W error .\tests\windows_privacy_native.py --parent $OwnedTestParent --receipt $NewReceiptPath
++if ($LASTEXITCODE -ne 0) { throw "Windows relay native privacy gate failed" }
++```
++
++The controller selects an existing local parent and a new private receipt path.
++Only a fresh randomly named child is modified and removed in `finally`. No live
++registry, service, endpoint, device, provider, account or installed permission is
++touched. The parent must satisfy the production ancestor policy. It need not be traversable
++by the test's restricted token: the probe uses one pinned directory handle scoped
++to the new fixture. Existing private user-home ancestry is not traversed by its
++restricted file opens. Unsafe temporary-directory ancestors remain unsupported;
++no existing/system ancestor ACL may be changed to accommodate the fixture.
++
++The runner exercises native private read/size checks, effective/inherited/null
++DACL denial, ancestor replacement, hardlinks/streams, junctions, same-object reads
++and replacement refusal, enrollment rotation with independent watch/phone keys,
++new database/active journal descriptors, rollback, restart/dedup/ACK and preserved
++unsafe bytes. Symlink creation may skip only when the OS refuses its privilege;
++junction/hardlink and every other mandatory check must pass. Injected native-query
++failure tests are identified separately from kernel access evidence.
++
++The negative access probe is a disposable subprocess using a restricted version
++of the same user's token, **not** a second account. Administrators is deny-only
++when present, Everyone is the sole restricting SID, and every privilege is disabled
++and checked, including traverse bypass. Before impersonation it opens only a
++new fixture-directory handle, with traversal/metadata rights and no delete sharing.
++Both files are siblings there. The directory's non-inheriting Everyone read/traverse
++ACE is part of fresh synthetic fixture creation; the private file's DACL remains
++user/SYSTEM/Administrators only. Existing parents and private DACLs are not relaxed.
++
++After impersonation, test-only `NtCreateFile` opens each single-component name
++relative to that same pinned handle, with identical read rights and synchronous,
++non-directory, no-reparse-follow options. Neither file is preopened. The control
++must return its expected bytes; the private open must return exact
++`STATUS_ACCESS_DENIED` (`0xC0000022`). Missing-file, path, pending or other native
++errors cannot satisfy the negative assertion. Every handle is closed; impersonation
++is reverted in `finally` before releasing the directory handle, and failed reversion
++terminates the disposable child. No privilege is enabled.
++
++This tests kernel enforcement of the private **file DACL** when the constrained
++caller is given a directory handle. It does not claim that a second account can
++traverse existing user-home ancestry. Production root-to-leaf privacy is checked
++separately, including a successful private-directory precondition before each native
++method and positive reads before the reparse/hardlink/broad-DACL negative fixtures.
++These preconditions prevent an unrelated ancestor failure from masquerading as a
++successful leaf denial. The source-bound controller rerun on both architectures
++remains mandatory.
++
++Each receipt records OS, interpreter/bitness, source hashes, the process user SID,
++and queried owner SIDs/classes for the fixture parent/root, each private test
++directory, database and active journal. Owner classes are derived from each
++opened object rather than assumed to match TokenUser. Assertions, skip reasons
++and cleanup are also recorded. Receipts contain local identity/path details
++and must remain private. A missing/failed native run blocks that host's activation.
++Controller review of both required hosts precedes export, installation, capability
++advertisement or restart. Running this fixture never enables the service.
++
++Native contracts: [CreateFileW and sharing](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew),
++[GetSecurityInfo ownership and allocation](https://learn.microsoft.com/en-us/windows/win32/api/aclapi/nf-aclapi-getsecurityinfo),
++[file access masks](https://learn.microsoft.com/en-us/windows/win32/fileio/file-access-rights-constants),
++[handle volume inspection](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getvolumeinformationbyhandlew),
++and [restricted tokens](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-createrestrictedtoken).
++
++
++The fixture's native relative-open ABI follows [NtCreateFile](https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntcreatefile),
++[OBJECT_ATTRIBUTES](https://learn.microsoft.com/en-us/windows/win32/api/ntdef/ns-ntdef-_object_attributes),
++[UNICODE_STRING](https://learn.microsoft.com/en-us/windows/win32/api/ntdef/ns-ntdef-_unicode_string),
++and [IO_STATUS_BLOCK](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ns-wdm-_io_status_block).
++The production module does not use the test-only NtCreateFile interface.
+diff --git a/plugin/adapter.py b/plugin/adapter.py
+index 4ec8adc..dbcf92b 100644
+--- a/plugin/adapter.py
++++ b/plugin/adapter.py
+@@ -189,7 +189,7 @@ class GadgetAdapter(BasePlatformAdapter, HubDelegate):
+         except (OSError, ssl.SSLError) as exc:
+             self._set_fatal_error("gadget_tls", f"Cannot load TLS certificate: {exc}", retryable=False)
+             return False
+-        if (self._enable_relay_outbox and os.name != 'nt'
++        if (self._enable_relay_outbox
+                 and getattr(BasePlatformAdapter, 'FINAL_DELIVERY_CONTEXT_VERSION', None) == 2):
+             from .relay_grants import Grants, private_directory
+             from .relay_outbox import Outbox, OutboxError
+diff --git a/plugin/relay_grants.py b/plugin/relay_grants.py
+index b731777..b882b08 100644
+--- a/plugin/relay_grants.py
++++ b/plugin/relay_grants.py
+@@ -4,8 +4,8 @@ A snapshot is authoritative only after every entry passes validation. Missing,
+ malformed or unreadable files must never be interpreted as an empty allowlist.
+ The caller must supply a DeviceStore whose enrollment load was validated: the
+ stock store's silent empty fallback on malformed input is not revocation authority.
+-Windows activation is deliberately refused until real-host private ACL preflight
+-is implemented; POSIX fixture success supplies no Windows privacy evidence.
++Windows uses a native private-object verifier; POSIX fixture success supplies
++no Windows privacy evidence.
+ """
+ 
+ import hashlib
+@@ -47,15 +47,17 @@ class Grants:
+         """
+         try:
+             if os.name == 'nt':
+-                raise ValueError()
+-            flags = os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0)
+-            descriptor = os.open(self.path, flags)
+-            with os.fdopen(descriptor, 'rb') as stream:
+-                info = os.fstat(stream.fileno())
+-                if (not stat.S_ISREG(info.st_mode) or info.st_size > 65536
+-                        or info.st_mode & 0o077 or info.st_uid != os.getuid()):
+-                    raise ValueError()
+-                raw = stream.read(65537)
++                from .windows_privacy import read_private_file
++                raw = read_private_file(self.path, 65536)
++            else:
++                flags = os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0) | getattr(os, 'O_NONBLOCK', 0)
++                descriptor = os.open(self.path, flags)
++                with os.fdopen(descriptor, 'rb') as stream:
++                    info = os.fstat(stream.fileno())
++                    if (not stat.S_ISREG(info.st_mode) or info.st_size > 65536
++                            or info.st_mode & 0o077 or info.st_uid != os.getuid()):
++                        raise ValueError()
++                    raw = stream.read(65537)
+             if len(raw) > 65536:
+                 raise ValueError()
+             data = json.loads(raw, object_pairs_hook=_unique)
+@@ -124,7 +126,7 @@ class Grants:
+ 
+ 
+ def private_directory(directory):
+-    """POSIX-only activation preflight; Windows requires an actual ACL verifier.
++    """Activation preflight; Windows uses handle-based NTFS/ACL inspection.
+ 
+     The caller supplies plugin_data_dir('gadget'), never a configured override.
+     Existing symlinks/reparse layouts cannot be made private by chmod of a target.
+@@ -132,7 +134,19 @@ def private_directory(directory):
+     from pathlib import Path
+     directory = Path(directory).absolute()
+     if os.name == 'nt':
+-        raise OutboxError('permission_denied')
++        from .windows_privacy import private_directory as inspect_directory, inspect_private_file
++        try:
++            inspect_directory(directory)
++            for name in ('devices.json', 'relay-grants.json', 'relay-outbox.sqlite3',
++                         'relay-outbox.sqlite3-journal'):
++                try:
++                    inspect_private_file(directory / name)
++                except FileNotFoundError:
++                    if name in ('devices.json', 'relay-grants.json'):
++                        raise
++            return directory
++        except OSError:
++            raise OutboxError('permission_denied') from None
+     for parent in (directory, *directory.parents):
+         info = parent.lstat()
+         if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
+diff --git a/plugin/relay_outbox.py b/plugin/relay_outbox.py
+index 0d3adb6..cfc126a 100644
+--- a/plugin/relay_outbox.py
++++ b/plugin/relay_outbox.py
+@@ -17,7 +17,7 @@ new work atomically instead of discarding unexpired deduplication evidence.
+ 
+ from __future__ import annotations
+ 
+-from contextlib import contextmanager
++from contextlib import contextmanager, ExitStack
+ import hashlib
+ import json
+ import os
+@@ -44,14 +44,15 @@ class Outbox:
+         self.path, self.now_ms = Path(path), now_ms
+         self.max_rows, self.max_device_bytes = max_rows, max_device_bytes
+         self.max_profile_bytes, self.ttl_ms = max_profile_bytes, ttl_ms
+-        self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+-        try:
+-            descriptor = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+-        except FileExistsError:
+-            pass
+-        else:
+-            os.close(descriptor)
+-        os.chmod(self.path, 0o600)
++        if os.name != 'nt':
++            self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
++            try:
++                descriptor = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
++            except FileExistsError:
++                pass
++            else:
++                os.close(descriptor)
++            os.chmod(self.path, 0o600)
+         with self.tx() as db:
+             db.execute('CREATE TABLE IF NOT EXISTS deliveries ('
+                        'seq INTEGER PRIMARY KEY, owner TEXT NOT NULL, event TEXT NOT NULL, '
+@@ -64,7 +65,12 @@ class Outbox:
+     @contextmanager
+     def tx(self):
+         db = None
++        guard = ExitStack()
+         try:
++            check_journal = None
++            if os.name == 'nt':
++                from .windows_privacy import guarded_database
++                check_journal = guard.enter_context(guarded_database(self.path))
+             db = sqlite3.connect(self.path, timeout=5)
+             db.row_factory = sqlite3.Row
+             db.execute('PRAGMA page_size=4096')
+@@ -81,8 +87,17 @@ class Outbox:
+             db.execute('PRAGMA secure_delete=ON')
+             db.execute('PRAGMA fullfsync=ON')
+             db.execute('BEGIN IMMEDIATE')
++            if check_journal is not None:
++                # A real page-one write opens the rollback journal even for a
++                # read-only request. No schema/authority state changes. Inspect
++                # the inherited descriptor BEFORE yielding to payload code.
++                version = db.execute('PRAGMA user_version').fetchone()[0]
++                db.execute(f'PRAGMA user_version={int(version)}')
++                check_journal()
+             yield db
+             db.execute('PRAGMA incremental_vacuum(128)').fetchall()
++            if check_journal is not None:
++                check_journal()
+             db.commit()
+         except sqlite3.Error as exc:
+             if db is not None:
+@@ -91,13 +106,20 @@ class Outbox:
+             if code in (sqlite3.SQLITE_FULL, sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
+                 raise OutboxError('busy') from exc
+             raise OutboxError('temporarily_unavailable') from exc
++        except OSError:
++            if db is not None:
++                db.rollback()
++            raise OutboxError('permission_denied') from None
+         except BaseException:
+             if db is not None:
+                 db.rollback()
+             raise
+         finally:
+-            if db is not None:
+-                db.close()
++            try:
++                if db is not None:
++                    db.close()
++            finally:
++                guard.close()
+ 
+     @staticmethod
+     def _string(value, maximum):
+diff --git a/plugin/store.py b/plugin/store.py
+index 4d97f87..33bb0cd 100644
+--- a/plugin/store.py
++++ b/plugin/store.py
+@@ -94,8 +94,12 @@ class DeviceStore:
+         with self._lock:
+             if not self._enrollment_complete:
+                 raise ValueError("enrollment registry was not loaded completely")
+-            with self._path.open('rb') as stream:
+-                raw = stream.read(1048577)
++            if os.name == 'nt':
++                from .windows_privacy import read_private_file
++                raw = read_private_file(self._path, 1048576)
++            else:
++                with self._path.open('rb') as stream:
++                    raw = stream.read(1048577)
+             if len(raw) > 1048576:
+                 raise ValueError("enrollment registry too large")
+             disk = self._validate_enrollment(json.loads(raw, object_pairs_hook=self._unique))
+diff --git a/plugin/windows_privacy.py b/plugin/windows_privacy.py
+new file mode 100644
+index 0000000..eaf576a
+--- /dev/null
++++ b/plugin/windows_privacy.py
+@@ -0,0 +1,346 @@
++"""Fail-closed, local NTFS privacy for the optional relay only.
++
++No permission mutation or account lookup. Ancestors are pinned against rename
++while an object is used; authority is read from that very inspected handle.
++Only ordinary allow/deny ACEs are supported. Denies are never credited to make
++an otherwise broad allow safe. Pure byte parsing is testable off Windows, but
++only native host runs can establish the kernel/ABI and inheritance contract.
++"""
++from contextlib import contextmanager, ExitStack
++import ctypes as C
++import ntpath
++import os
++import struct
++
++
++class PrivacyError(OSError):
++    def __init__(self):
++        super().__init__('private relay storage unavailable')
++
++
++# WinNT.h: standard/file rights and generic mappings (directories share bits).
++DELETE = 0x00010000
++READ_CONTROL = 0x00020000
++WRITE_DAC = 0x00040000
++WRITE_OWNER = 0x00080000
++SYNCHRONIZE = 0x00100000
++FILE_ALL_ACCESS = 0x001F01FF
++FILE_GENERIC_READ = READ_CONTROL | SYNCHRONIZE | 0x89
++FILE_GENERIC_WRITE = READ_CONTROL | SYNCHRONIZE | 0x116
++FILE_GENERIC_EXECUTE = READ_CONTROL | SYNCHRONIZE | 0xA0
++# Creating siblings (0x2/0x4) is not replacement of an existing protected name.
++ANCESTOR_CHANGE = DELETE | WRITE_DAC | WRITE_OWNER | 0x40 | 0x10 | 0x100
++INHERIT_ONLY = 0x08
++INHERIT = 0x03
++SYSTEM = b'\x01\x01\x00\x00\x00\x00\x00\x05' + struct.pack('<I', 18)
++ADMINISTRATORS = b'\x01\x02\x00\x00\x00\x00\x00\x05' + struct.pack('<II', 32, 544)
++# Windows Modules Installer's exact service SID. Ancestor OWNER only: no
++# wildcard service trust, no leaf ownership/grants, no effective ACE exemption.
++TRUSTED_INSTALLER = b'\x01\x06\x00\x00\x00\x00\x00\x05' + struct.pack(
++    '<6I', 80, 956008885, 3418522649, 1831038044, 1853292631, 2271478464)
++MAX_DESCRIPTOR = 131072
++
++
++def _sid(data, offset, end):
++    if offset < 0 or offset + 8 > end or data[offset] != 1:
++        raise PrivacyError()
++    count = data[offset + 1]
++    size = 8 + count * 4
++    if count > 15 or offset + size > end:
++        raise PrivacyError()
++    return data[offset:offset + size]
++
++
++def _mask(mask):
++    for generic, specific in ((0x80000000, FILE_GENERIC_READ),
++                              (0x40000000, FILE_GENERIC_WRITE),
++                              (0x20000000, FILE_GENERIC_EXECUTE),
++                              (0x10000000, FILE_ALL_ACCESS)):
++        if mask & generic:
++            mask = (mask & ~generic) | specific
++    # ACCESS_SYSTEM_SECURITY, MAXIMUM_ALLOWED, reserved bits: cannot establish
++    # their effect with this intentionally small verifier.
++    if mask & ~FILE_ALL_ACCESS:
++        raise PrivacyError()
++    return mask
++
++
++def validate_descriptor(data, user_sid, *, leaf, directory):
++    """Validate a bounded self-relative owner/DACL descriptor, not account names."""
++    if not 20 <= len(data) <= MAX_DESCRIPTOR or data[0:2] != b'\x01\x00':
++        raise PrivacyError()
++    control, owner, group, sacl, dacl = struct.unpack_from('<HIIII', data, 2)
++    # Only owner/group defaulting, DACL presence/defaulting/inheritance/protection
++    # and SELF_RELATIVE. Unexpected SACL/RM/control forms fail closed.
++    if (control & ~0x950F or not control & 0x8000 or not control & 4
++            or sacl or owner < 20 or not dacl or dacl < 20
++            or owner % 4 or dacl % 4):
++        raise PrivacyError()
++    allowed = {user_sid, SYSTEM, ADMINISTRATORS}
++    actual_owner = _sid(data, owner, len(data))
++    ancestor_owners = allowed | {TRUSTED_INSTALLER}
++    # Leaf ownership uses the same explicit local trust boundary as grants.
++    if actual_owner not in (allowed if leaf else ancestor_owners):
++        raise PrivacyError()
++    sid_spans = [(owner, owner + len(actual_owner))]
++    if group:
++        if group < 20 or group % 4:
++            raise PrivacyError()
++        group_sid = _sid(data, group, len(data))
++        sid_spans.append((group, group + len(group_sid)))
++    if dacl + 8 > len(data):
++        raise PrivacyError()
++    revision, reserved, size, count, reserved2 = struct.unpack_from('<BBHHH', data, dacl)
++    if (revision not in (2, 4) or reserved or reserved2 or size < 8
++            or size % 4 or dacl + size > len(data) or count > 4096):
++        raise PrivacyError()
++    if any(start < dacl + size and end > dacl for start, end in sid_spans):
++        raise PrivacyError()
++    pos, end = dacl + 8, dacl + size
++    for _ in range(count):
++        if pos + 8 > end:
++            raise PrivacyError()
++        kind, flags, length, access = struct.unpack_from('<BBHI', data, pos)
++        if length < 16 or length % 4 or pos + length > end or flags & ~0x1F:
++            raise PrivacyError()
++        # Callback/object/compound/conditional ACEs are unsupported, even if
++        # inherit-only: they can become effective on a newly created child.
++        if kind not in (0, 1):
++            raise PrivacyError()
++        identity = _sid(data, pos + 8, pos + length)
++        if len(identity) + 8 != length:
++            raise PrivacyError()
++        access = _mask(access)
++        effective = not flags & INHERIT_ONLY
++        future = directory and flags & INHERIT
++        if kind == 0 and identity not in allowed and access:
++            if (leaf and (effective or future)) or (not leaf and effective and access & ANCESTOR_CHANGE):
++                raise PrivacyError()
++        pos += length
++    # ACLs may reserve zeroed slack; nonzero trailing material is unsupported.
++    if any(data[pos:end]):
++        raise PrivacyError()
++
++
++def _path(value):
++    """Reject streams, device/UNC aliases, relative paths and Win32 trimming."""
++    value = os.fspath(value)
++    if not isinstance(value, str) or not value or '\x00' in value or len(value) > 240:
++        raise PrivacyError()
++    value = value.replace('/', '\\')
++    drive, tail = ntpath.splitdrive(value)
++    if len(drive) != 2 or drive[1] != ':' or not drive[0].isascii() or not drive[0].isalpha() or not tail.startswith('\\'):
++        raise PrivacyError()
++    parts = tail[1:].split('\\') if tail != '\\' else []
++    for part in parts:
++        base = part.split('.')[0].upper()
++        if (not part or part in ('.', '..') or part.endswith((' ', '.'))
++                or any(c in part for c in ':<>"|?*') or any(ord(c) < 32 for c in part)
++                or base in {'CON', 'PRN', 'AUX', 'NUL', 'CONIN$', 'CONOUT$'}
++                or base in {f'{p}{n}' for p in ('COM', 'LPT') for n in range(1, 10)}):
++            raise PrivacyError()
++    return drive.upper() + tail
++
++
++DWORD, BOOL, HANDLE, PTR = C.c_uint32, C.c_int32, C.c_void_p, C.c_void_p
++
++
++class _Info(C.Structure):
++    _fields_ = [(name, DWORD) for name in (
++        'attributes', 'created_low', 'created_high', 'access_low', 'access_high',
++        'written_low', 'written_high', 'volume', 'size_high', 'size_low',
++        'links', 'index_high', 'index_low')]
++
++
++class _SidAttributes(C.Structure):
++    _fields_ = [('sid', PTR), ('attributes', DWORD)]
++
++
++class _Native:
++    def __init__(self):
++        if os.name != 'nt' or not hasattr(C, 'WinDLL'):
++            raise PrivacyError()
++        self.k = C.WinDLL('kernel32', use_last_error=True)
++        self.a = C.WinDLL('advapi32', use_last_error=True)
++        def bind(lib, name, args, result):
++            fn = getattr(lib, name)
++            fn.argtypes, fn.restype = args, result
++            return fn
++        p32 = C.POINTER(DWORD)
++        pp = C.POINTER(PTR)
++        self.open = bind(self.k, 'CreateFileW', [C.c_wchar_p, DWORD, DWORD, PTR, DWORD, DWORD, HANDLE], HANDLE)
++        self.close = bind(self.k, 'CloseHandle', [HANDLE], BOOL)
++        self.info = bind(self.k, 'GetFileInformationByHandle', [HANDLE, C.POINTER(_Info)], BOOL)
++        self.type = bind(self.k, 'GetFileType', [HANDLE], DWORD)
++        self.volume = bind(self.k, 'GetVolumeInformationByHandleW', [HANDLE, C.c_wchar_p, DWORD, p32, p32, p32, C.c_wchar_p, DWORD], BOOL)
++        self.final = bind(self.k, 'GetFinalPathNameByHandleW', [HANDLE, C.c_wchar_p, DWORD, DWORD], DWORD)
++        self.drive = bind(self.k, 'GetDriveTypeW', [C.c_wchar_p], DWORD)
++        self.read = bind(self.k, 'ReadFile', [HANDLE, PTR, DWORD, p32, PTR], BOOL)
++        self.process = bind(self.k, 'GetCurrentProcess', [], HANDLE)
++        self.token = bind(self.a, 'OpenProcessToken', [HANDLE, DWORD, pp], BOOL)
++        self.token_info = bind(self.a, 'GetTokenInformation', [HANDLE, C.c_int32, PTR, DWORD, p32], BOOL)
++        self.security = bind(self.a, 'GetSecurityInfo', [HANDLE, C.c_int32, DWORD, pp, pp, pp, pp, pp], DWORD)
++        self.valid_sd = bind(self.a, 'IsValidSecurityDescriptor', [PTR], BOOL)
++        self.sd_size = bind(self.a, 'GetSecurityDescriptorLength', [PTR], DWORD)
++        self.free = bind(self.k, 'LocalFree', [PTR], PTR)
++        self.user = self._user()
++
++    def _user(self):
++        token = HANDLE()
++        if not self.token(self.process(), 0x0008, C.byref(token)):  # TOKEN_QUERY
++            raise PrivacyError()
++        try:
++            required = DWORD()
++            if self.token_info(token, 1, None, 0, C.byref(required)) or C.get_last_error() != 122:
++                raise PrivacyError()
++            if not C.sizeof(_SidAttributes) <= required.value <= 65536:
++                raise PrivacyError()
++            data = C.create_string_buffer(required.value)
++            if not self.token_info(token, 1, data, len(data), C.byref(required)) or required.value > len(data):
++                raise PrivacyError()
++            record = _SidAttributes.from_buffer(data)
++            offset = (record.sid or 0) - C.addressof(data)
++            if offset < C.sizeof(_SidAttributes):
++                raise PrivacyError()
++            return _sid(data.raw, offset, required.value)
++        finally:
++            self.close(token)
++
++    def descriptor(self, handle):
++        descriptor = PTR()
++        try:
++            if self.security(handle, 1, 0x00000005, None, None, None, None, C.byref(descriptor)):
++                raise PrivacyError()
++            if not descriptor or not self.valid_sd(descriptor):
++                raise PrivacyError()
++            length = self.sd_size(descriptor)
++            if not 20 <= length <= MAX_DESCRIPTOR:
++                raise PrivacyError()
++            return C.string_at(descriptor, length)
++        finally:
++            if descriptor:
++                self.free(descriptor)
++
++    @contextmanager
++    def opened(self, path, *, read=False, writable=False, deletable=False):
++        # No DELETE sharing pins every ancestor/DB against rename. Authority
++        # reads also deny WRITE sharing, excluding preexisting writer handles.
++        share = 1 | (2 if writable else 0) | (4 if deletable else 0)
++        access = READ_CONTROL | 0x80 | (0x80000000 if read else 0)
++        handle = self.open(path, access, share, None, 3, 0x02200000, None)
++        if handle in (None, C.c_void_p(-1).value):
++            error = C.get_last_error()
++            if error in (2, 3):
++                raise FileNotFoundError(error, 'private object missing')
++            raise PrivacyError()
++        try:
++            yield handle
++        finally:
++            self.close(handle)
++
++    def inspect(self, handle, path, *, leaf, directory):
++        info = _Info()
++        if not self.info(handle, C.byref(info)) or self.type(handle) != 1:
++            raise PrivacyError()
++        if (info.attributes & 0x400 or bool(info.attributes & 0x10) != directory
++                or (not directory and info.links != 1)):
++            raise PrivacyError()
++        flags, fs = DWORD(), C.create_unicode_buffer(32)
++        if (not self.volume(handle, None, 0, None, None, C.byref(flags), fs, len(fs))
++                or fs.value != 'NTFS' or not flags.value & 8
++                or self.drive(path[:3]) != 3):
++            raise PrivacyError()
++        final = C.create_unicode_buffer(32768)
++        length = self.final(handle, final, len(final), 0)  # normalized DOS volume
++        if not 0 < length < len(final) or not final.value.startswith('\\\\?\\'):
++            raise PrivacyError()
++        if ntpath.normcase(final.value[4:]) != ntpath.normcase(path):
++            raise PrivacyError()  # remote redirect, SUBST, alias or changed ancestor
++        validate_descriptor(self.descriptor(handle), self.user, leaf=leaf, directory=directory)
++        return info
++
++    def read_bytes(self, handle, maximum):
++        raw, read = C.create_string_buffer(maximum + 1), DWORD()
++        if not self.read(handle, raw, len(raw), C.byref(read), None) or read.value > maximum:
++            raise PrivacyError()
++        return raw.raw[:read.value]
++
++
++@contextmanager
++def _directory(native, path):
++    path = _path(path)
++    components = [path[:3]]
++    for component in path[3:].split('\\') if len(path) > 3 else []:
++        components.append(ntpath.join(components[-1], component))
++    with ExitStack() as stack:
++        for i, component in enumerate(components):
++            handle = stack.enter_context(native.opened(component, writable=True))
++            native.inspect(handle, component, leaf=i == len(components) - 1, directory=True)
++        yield path
++
++
++def private_directory(path):
++    native = _Native()
++    with _directory(native, path):
++        pass
++
++
++def read_private_file(path, maximum):
++    if type(maximum) is not int or not 0 < maximum <= 1048576:
++        raise PrivacyError()
++    path, native = _path(path), _Native()
++    with _directory(native, ntpath.dirname(path)):
++        with native.opened(path, read=True) as handle:
++            info = native.inspect(handle, path, leaf=True, directory=False)
++            if (info.size_high << 32 | info.size_low) > maximum:
++                raise PrivacyError()
++            raw = native.read_bytes(handle, maximum)
++            native.inspect(handle, path, leaf=True, directory=False)
++            return raw
++
++
++def _file(native, path, *, optional=False, deletable=False):
++    try:
++        with native.opened(path, writable=True, deletable=deletable) as handle:
++            native.inspect(handle, path, leaf=True, directory=False)
++    except FileNotFoundError:
++        if not optional:
++            raise
++
++
++def inspect_private_file(path):
++    path, native = _path(path), _Native()
++    with _directory(native, ntpath.dirname(path)):
++        _file(native, path)
++
++
++@contextmanager
++def guarded_database(path):
++    """Pin directory + database; caller closes SQLite before this guard exits.
++
++    Creation inherits a previously checked private directory DACL. The native
++    descriptor of the actual created object is still mandatory. No ACL repair.
++    """
++    path, native = _path(path), _Native()
++    with _directory(native, ntpath.dirname(path)):
++        # WAL/SHM are unsupported, even when private. Never let SQLite consume
++        # unchecked recovery state while switching back to DELETE journaling.
++        for suffix in ('-wal', '-shm'):
++            try:
++                _file(native, path + suffix)
++            except FileNotFoundError:
++                continue
++            raise PrivacyError()
++        _file(native, path + '-journal', optional=True, deletable=True)
++        try:
++            descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
++        except FileExistsError:
++            pass
++        else:
++            os.close(descriptor)
++        with native.opened(path, writable=True) as handle:
++            native.inspect(handle, path, leaf=True, directory=False)
++            def check_journal():
++                native.inspect(handle, path, leaf=True, directory=False)
++                _file(native, path + '-journal', deletable=True)
++            yield check_journal
+diff --git a/tests/test_windows_privacy.py b/tests/test_windows_privacy.py
+new file mode 100644
+index 0000000..a2efcf3
+--- /dev/null
++++ b/tests/test_windows_privacy.py
+@@ -0,0 +1,219 @@
++"""Pure parser / API doubles only; no native Windows acceptance on other OSes."""
++from contextlib import contextmanager
++import ctypes as C
++import struct
++from types import SimpleNamespace
++
++import pytest
++from hermes_gadget_plugin import windows_privacy as w
++
++USER = w.SYSTEM[:-4] + struct.pack('<I', 1001)
++OUTSIDER = w.SYSTEM[:-4] + struct.pack('<I', 1002)
++
++
++def ace(sid=USER, mask=w.FILE_ALL_ACCESS, flags=0, kind=0):
++    return struct.pack('<BBHI', kind, flags, 8 + len(sid), mask) + sid
++
++
++def descriptor(*entries, owner=USER, control=0x8004):
++    acl = struct.pack('<BBHHH', 2, 0, 8 + sum(map(len, entries)), len(entries), 0) + b''.join(entries)
++    return struct.pack('<BBHIIII', 1, 0, control, 20, 0, 0, 20 + len(owner)) + owner + acl
++
++
++def check(data, *, leaf=True, directory=True):
++    w.validate_descriptor(data, USER, leaf=leaf, directory=directory)
++
++
++@pytest.mark.parametrize('flags', [0, 1, 2, 3, 8 | 1, 8 | 2, 16, 16 | 3])
++def test_broad_effective_and_future_grants_denied(flags):
++    with pytest.raises(w.PrivacyError):
++        check(descriptor(ace(), ace(OUTSIDER, mask=1, flags=flags)))
++
++
++@pytest.mark.parametrize('identity', [USER, w.SYSTEM, w.ADMINISTRATORS])
++def test_only_leaf_trusted_grantees(identity):
++    check(descriptor(ace(identity, flags=3)))
++
++
++@pytest.mark.parametrize('mask', [w.DELETE, w.WRITE_DAC, w.WRITE_OWNER, 0x40, 0x10, 0x100,
++                                  0x40000000, 0x10000000, 0x02000000, 0x01000000, 0x200])
++def test_ancestor_replacement_and_unknown_rights_denied(mask):
++    with pytest.raises(w.PrivacyError):
++        check(descriptor(ace(), ace(OUTSIDER, mask)), leaf=False)
++
++
++@pytest.mark.parametrize('mask', [1, 2, 4, 8, 0x20, 0x80, w.READ_CONTROL, w.SYNCHRONIZE,
++                                  0x80000000, 0x20000000])
++def test_ancestor_traversal_and_sibling_creation_allowed(mask):
++    check(descriptor(ace(), ace(OUTSIDER, mask)), leaf=False)
++
++
++def test_ancestor_inheritance_separate_from_leaf():
++    data = descriptor(ace(), ace(OUTSIDER, flags=11))
++    check(data, leaf=False)
++    with pytest.raises(w.PrivacyError):
++        check(data)
++
++
++def test_leaf_unknown_owner_denied():
++    with pytest.raises(w.PrivacyError):
++        check(descriptor(ace(), owner=OUTSIDER))
++
++
++def test_ancestor_owner_can_rewrite_dacl():
++    with pytest.raises(w.PrivacyError):
++        check(descriptor(ace(), owner=OUTSIDER), leaf=False)
++
++
++@pytest.mark.parametrize('kind', [2, 3, 4, 5, 6, 9, 10, 17, 18, 255])
++def test_unknown_aces_even_inherit_only_denied(kind):
++    with pytest.raises(w.PrivacyError):
++        check(descriptor(ace(), ace(kind=kind, flags=11)))
++
++
++def test_deny_does_not_certify_broad_allow():
++    check(descriptor(ace(OUTSIDER, kind=1), ace()))
++    with pytest.raises(w.PrivacyError):
++        check(descriptor(ace(OUTSIDER, kind=1), ace(OUTSIDER)))
++
++
++@pytest.mark.parametrize('damage', ['missing', 'null', 'short', 'oversized', 'revision', 'control',
++    'offset', 'acl_size', 'acl_count', 'ace_size', 'sid_count', 'sid_revision', 'flags', 'slack'])
++def test_malformed_descriptors(damage):
++    data = bytearray(descriptor(ace()))
++    start = 20 + len(USER)
++    if damage == 'missing': struct.pack_into('<H', data, 2, 0x8000)
++    elif damage == 'null': struct.pack_into('<I', data, 16, 0)
++    elif damage == 'short': data = data[:19]
++    elif damage == 'oversized': data = b'x' * (w.MAX_DESCRIPTOR + 1)
++    elif damage == 'revision': data[0] = 2
++    elif damage == 'control': struct.pack_into('<H', data, 2, 4)
++    elif damage == 'offset': struct.pack_into('<I', data, 16, len(data) + 4)
++    elif damage == 'acl_size': struct.pack_into('<H', data, start + 2, 65532)
++    elif damage == 'acl_count': struct.pack_into('<H', data, start + 4, 4097)
++    elif damage == 'ace_size': struct.pack_into('<H', data, start + 10, 65532)
++    elif damage == 'sid_count': data[start + 17] = 255
++    elif damage == 'sid_revision': data[start + 16] = 2
++    elif damage == 'flags': data[start + 9] = 0x80
++    elif damage == 'slack':
++        data += b'ABCD'; struct.pack_into('<H', data, start + 2, len(data) - start)
++    with pytest.raises(w.PrivacyError): check(bytes(data))
++
++
++@pytest.mark.parametrize('path', ['x', 'C:x', r'\\server\share\file', r'\\?\C:\x',
++    'C:\\x:stream', 'C:\\x\\..\\y', 'C:\\x.\\y', 'C:\\x \\y', 'C:\\CON',
++    'C:\\COM1.txt', 'C:\\x\x00', 'C:\\x\\', 'C:\\x?'])
++def test_stream_remote_and_alias_paths_denied(path):
++    with pytest.raises(w.PrivacyError): w._path(path)
++
++
++class FakeNative:
++    def __init__(self):
++        self.opened_paths, self.closed, self.inspected = [], [], []
++        self.fail = None
++    @contextmanager
++    def opened(self, path, **kwargs):
++        handle = object()
++        self.opened_paths.append((path, kwargs, handle))
++        try: yield handle
++        finally: self.closed.append(handle)
++    def inspect(self, handle, path, **kwargs):
++        self.inspected.append((handle, path, kwargs))
++        if path == self.fail: raise w.PrivacyError()
++        return SimpleNamespace(size_high=0, size_low=4)
++    def read_bytes(self, handle, maximum):
++        assert handle is self.opened_paths[-1][2]
++        assert len(self.closed) == 0  # all ancestors still pinned
++        self.read_handle = handle
++        return b'safe'
++
++
++@pytest.mark.parametrize('failure', [None, 'C:\\', 'C:\\parent', 'C:\\parent\\private',
++                                    'C:\\parent\\private\\grants.json'])
++def test_same_handle_read_and_all_handles_closed(monkeypatch, failure):
++    native = FakeNative(); native.fail = failure
++    monkeypatch.setattr(w, '_Native', lambda: native)
++    if failure:
++        with pytest.raises(w.PrivacyError):
++            w.read_private_file(r'C:\parent\private\grants.json', 100)
++    else:
++        assert w.read_private_file(r'C:\parent\private\grants.json', 100) == b'safe'
++        assert native.read_handle is native.inspected[-1][0]
++        assert native.opened_paths[-1][1] == {'read': True}
++    assert native.closed == [x[2] for x in reversed(native.opened_paths)]
++
++
++@pytest.mark.parametrize('damage', ['reparse', 'hardlink', 'directory', 'type', 'api', 'volume', 'remote'])
++def test_native_object_metadata_denial_with_api_doubles(damage):
++    native = w._Native.__new__(w._Native)
++    def info(h, p):
++        obj = C.cast(p, C.POINTER(w._Info)).contents
++        obj.attributes = 0x400 if damage == 'reparse' else (0x10 if damage == 'directory' else 0)
++        obj.links = 2 if damage == 'hardlink' else 1
++        return damage != 'api'
++    def volume(h, a, b, c, d, flags, fs, size):
++        C.cast(flags, C.POINTER(w.DWORD)).contents.value = 8
++        fs.value = 'FAT32' if damage == 'volume' else 'NTFS'
++        return True
++    native.info, native.volume = info, volume
++    native.type = lambda _: 2 if damage == 'type' else 1
++    native.drive = lambda _: 4 if damage == 'remote' else 3
++    native.final = lambda *a: (_ for _ in ()).throw(AssertionError('should reject before final path'))
++    with pytest.raises(w.PrivacyError): native.inspect(1, r'C:\private\file', leaf=True, directory=False)
++
++
++@pytest.mark.parametrize('failure', ['get', 'invalid', 'size'])
++def test_security_allocation_freed_on_api_failure(failure):
++    native = w._Native.__new__(w._Native)
++    allocation = C.create_string_buffer(32)
++    freed = []
++    def security(*args):
++        C.cast(args[-1], C.POINTER(w.PTR)).contents.value = C.addressof(allocation)
++        return 5 if failure == 'get' else 0
++    native.security = security
++    native.valid_sd = lambda _: failure != 'invalid'
++    native.sd_size = lambda _: w.MAX_DESCRIPTOR + 1
++    native.free = lambda p: freed.append(p.value)
++    with pytest.raises(w.PrivacyError): native.descriptor(1)
++    assert freed == [C.addressof(allocation)]
++
++
++@pytest.mark.parametrize('failure', ['size', 'get', 'pointer', 'sid', None])
++def test_token_handle_closed_and_sid_pointer_bounded(monkeypatch, failure):
++    native = w._Native.__new__(w._Native)
++    closed = []
++    native.process = lambda: 50
++    def token(process, access, output):
++        C.cast(output, C.POINTER(w.HANDLE)).contents.value = 51
++        return True
++    native.token = token
++    native.close = lambda h: closed.append(h.value)
++    monkeypatch.setattr(C, 'get_last_error', lambda: 122, raising=False)
++    def info(token, kind, buf, size, required):
++        amount = C.cast(required, C.POINTER(w.DWORD))
++        amount.contents.value = 65537 if failure == 'size' else C.sizeof(w._SidAttributes) + len(USER)
++        if buf is None: return False
++        if failure == 'get': return False
++        record = w._SidAttributes.from_buffer(buf)
++        record.sid = C.addressof(buf) + (len(buf) + 1 if failure == 'pointer' else C.sizeof(w._SidAttributes))
++        if failure != 'pointer':
++            C.memmove(record.sid, b'x' * len(USER) if failure == 'sid' else USER, len(USER))
++        return True
++    native.token_info = info
++    if failure:
++        with pytest.raises(w.PrivacyError): native._user()
++    else: assert native._user() == USER
++    assert closed == [51]
++
++
++def test_native_abi_widths_are_explicit():
++    assert C.sizeof(w.DWORD) == C.sizeof(w.BOOL) == 4
++    assert C.sizeof(w._Info) == 52
++    assert C.sizeof(w._SidAttributes) == (16 if C.sizeof(w.PTR) == 8 else 8)
++
++
++def test_overlapping_owner_and_acl_is_malformed():
++    data = bytearray(descriptor(ace()))
++    # Header of ACL also resembles a short SID; it must not share SID storage.
++    struct.pack_into('<I', data, 16, 20)
++    with pytest.raises(w.PrivacyError): check(bytes(data))
+diff --git a/tests/test_windows_privacy_adapter.py b/tests/test_windows_privacy_adapter.py
+new file mode 100644
+index 0000000..3425d0d
+--- /dev/null
++++ b/tests/test_windows_privacy_adapter.py
+@@ -0,0 +1,38 @@
++"""Actual core/adapter control flow with simulated Windows denial; not ACL proof."""
++import asyncio
++import os
++from types import SimpleNamespace
++from unittest.mock import AsyncMock
++
++import pytest
++from test_relay_adapter import rig
++from gateway.platforms.base import SendResult
++from hermes_gadget_plugin import adapter as adapter_module, relay_grants
++from hermes_gadget_plugin import windows_privacy
++
++
++@pytest.mark.parametrize('enabled', [False, True])
++def test_windows_failed_privacy_keeps_stock_socket_and_speech(rig, monkeypatch, enabled):
++    calls = []
++    def deny(path):
++        calls.append(path)
++        raise windows_privacy.PrivacyError()
++    windows_os = SimpleNamespace(**{**vars(os), 'name': 'nt'})
++    monkeypatch.setattr(adapter_module, 'os', windows_os)
++    monkeypatch.setattr(relay_grants, 'os', windows_os)
++    monkeypatch.setattr(windows_privacy, 'private_directory', deny)
++    async def run():
++        adapter = await rig.start(enabled=enabled)
++        ws, welcome = await rig.socket()
++        assert welcome['paired'] and 'relay' not in welcome
++        assert adapter._relay_service is None
++        assert len(calls) == int(enabled)
++        send = AsyncMock(return_value=SendResult(success=True))
++        monkeypatch.setattr(adapter, '_send_with_retry', send)
++        event = adapter._event(adapter.hub.get(rig.device), 'stock-input', 'question')
++        result, owner = await adapter.send_final_ledgered(event, 'session', 'stock final', {}, reply_to=None)
++        assert result.success and owner is adapter
++        send.assert_awaited_once()
++        await ws.close()
++        await rig.close()
++    asyncio.run(run())
+diff --git a/tests/test_windows_privacy_fix1.py b/tests/test_windows_privacy_fix1.py
+new file mode 100644
+index 0000000..0384d5b
+--- /dev/null
++++ b/tests/test_windows_privacy_fix1.py
+@@ -0,0 +1,78 @@
++"""Observed-policy shapes, with personal SIDs replaced by synthetic identities.
++
++Both controller inventories have the same standard root/Users ACL shape. These
++are parser regressions, never Windows ACL evidence. Root masks/flags and the
++well-known TrustedInstaller owner are preserved; capability/account SIDs are
++synthetic while preserving outsider identity classes.
++"""
++import struct
++
++import pytest
++from hermes_gadget_plugin import windows_privacy as w
++from test_windows_privacy import USER, OUTSIDER, ace, descriptor, check
++
++
++def sid(authority, *parts):
++    return bytes([1, len(parts)]) + authority.to_bytes(6, 'big') + struct.pack('<' + 'I' * len(parts), *parts)
++
++
++TI = sid(5, 80, 956008885, 3418522649, 1831038044, 1853292631, 2271478464)
++AU, BU, WD = sid(5, 11), sid(5, 32, 545), sid(1, 0)
++CAPABILITY = sid(15, 3, 65536, 1, 2, 3, 4, 5, 6, 7, 8)
++
++
++def observed_root(*extra, owner=TI, auth_flags=0x0B):
++    return descriptor(ace(AU, 4), ace(AU, 0xE0010000, flags=auth_flags),
++        ace(w.SYSTEM, flags=3), ace(w.ADMINISTRATORS, flags=3),
++        ace(BU, 0x1200A9, flags=3), ace(CAPABILITY, 0x1000A1), *extra,
++        owner=owner, control=0x9404)
++
++
++def test_observed_drive_root_owner_and_inherit_only_ace_allowed():
++    check(observed_root(), leaf=False)
++
++
++def test_trustedinstaller_is_exact_ancestor_owner_only():
++    check(descriptor(ace(), owner=TI), leaf=False)
++    for data in (descriptor(ace(), owner=TI), descriptor(ace(TI)), descriptor(ace(TI, flags=11))):
++        with pytest.raises(w.PrivacyError): check(data)
++    # The exception changes ownership only, not effective ACE authorization.
++    with pytest.raises(w.PrivacyError):
++        check(descriptor(ace(TI), owner=TI), leaf=False)
++
++
++@pytest.mark.parametrize('owner', [OUTSIDER, sid(5, 80, 1, 2, 3, 4, 5),
++                                    TI[:-4] + struct.pack('<I', 2271478465)])
++def test_unknown_and_nearby_service_owners_remain_denied(owner):
++    with pytest.raises(w.PrivacyError): check(observed_root(owner=owner), leaf=False)
++
++
++@pytest.mark.parametrize('mask', [w.DELETE, w.WRITE_DAC, w.WRITE_OWNER, 0x40, 0x10, 0x100, 0x40000000])
++def test_observed_root_still_refuses_effective_outsider_replacement(mask):
++    with pytest.raises(w.PrivacyError): check(observed_root(ace(WD, mask)), leaf=False)
++
++
++def test_inherit_only_bit_is_not_an_ancestor_permission_waiver():
++    # Same observed AU mask, now effective on the pinned existing root: deny.
++    with pytest.raises(w.PrivacyError): check(observed_root(auth_flags=3), leaf=False)
++    # User ownership must not make inheritable broad permissions private.
++    with pytest.raises(w.PrivacyError): check(observed_root(owner=USER))
++
++
++def test_observed_users_profile_and_appdata_ancestors():
++    users = descriptor(ace(WD, 0xA0000000, flags=11), ace(WD, 0x1200A9),
++        ace(w.SYSTEM, flags=3), ace(w.ADMINISTRATORS, flags=3),
++        ace(BU, 0x1200A9), ace(BU, 0xA0000000, flags=11), ace(CAPABILITY, 0x100021),
++        owner=w.SYSTEM, control=0x9404)
++    profile = descriptor(ace(w.SYSTEM, flags=3), ace(w.ADMINISTRATORS, flags=3),
++        ace(USER, flags=3), ace(CAPABILITY, 0x100020), owner=w.SYSTEM, control=0x9004)
++    appdata = descriptor(ace(w.SYSTEM, flags=19), ace(w.ADMINISTRATORS, flags=19), ace(USER, flags=19))
++    for data in (users, profile, appdata): check(data, leaf=False)
++    check(appdata)
++
++
++def test_observed_temp_outsider_write_mask_stays_denied():
++    data = descriptor(ace(OUTSIDER, 0x1301BF, flags=3), ace(w.SYSTEM, flags=19),
++                      ace(w.ADMINISTRATORS, flags=19), ace(USER, flags=19), control=0x8404)
++    for leaf in (False, True):
++        with pytest.raises(w.PrivacyError): check(data, leaf=leaf)
+diff --git a/tests/test_windows_privacy_fix2.py b/tests/test_windows_privacy_fix2.py
+new file mode 100644
+index 0000000..d90acc1
+--- /dev/null
++++ b/tests/test_windows_privacy_fix2.py
+@@ -0,0 +1,85 @@
++"""Trusted-owner policy regressions; synthetic descriptors, not kernel evidence."""
++import struct
++
++import pytest
++from hermes_gadget_plugin import windows_privacy as w
++from test_windows_privacy import USER, OUTSIDER, ace, check, descriptor
++
++TRUSTED = [USER, w.SYSTEM, w.ADMINISTRATORS]
++OTHER_GROUP = w.ADMINISTRATORS[:-4] + struct.pack('<I', 545)
++OTHER_SERVICE = w.TRUSTED_INSTALLER[:-4] + struct.pack('<I', 2271478465)
++
++
++@pytest.mark.parametrize('owner', TRUSTED)
++@pytest.mark.parametrize('directory', [True, False])
++def test_trusted_owner_and_three_identity_dacl(owner, directory):
++    # Synthetic form of protected OICI directories / inherited ordinary files.
++    # Owner comes from the descriptor; the caller remains actual TokenUser.
++    flags = 3 if directory else 16
++    check(descriptor(*(ace(sid, flags=flags) for sid in TRUSTED), owner=owner),
++          directory=directory)
++
++
++@pytest.mark.parametrize('owner', [OUTSIDER, OTHER_GROUP, OTHER_SERVICE, w.TRUSTED_INSTALLER])
++@pytest.mark.parametrize('directory', [True, False])
++def test_other_owner_denied_even_with_private_dacl(owner, directory):
++    with pytest.raises(w.PrivacyError):
++        check(descriptor(*(ace(sid, flags=3) for sid in TRUSTED), owner=owner),
++              directory=directory)
++
++
++@pytest.mark.parametrize('owner', TRUSTED)
++@pytest.mark.parametrize('flags', [0, 16, 11])
++def test_trusted_owner_does_not_excuse_outsider_effective_or_future_access(owner, flags):
++    with pytest.raises(w.PrivacyError):
++        check(descriptor(ace(), ace(OUTSIDER, mask=1, flags=flags), owner=owner))
++
++
++@pytest.mark.parametrize('owner', TRUSTED)
++@pytest.mark.parametrize('damage', ['null', 'missing'])
++def test_trusted_owner_does_not_excuse_absent_dacl(owner, damage):
++    data = bytearray(descriptor(ace(), owner=owner))
++    if damage == 'null':
++        struct.pack_into('<I', data, 16, 0)
++    else:
++        struct.pack_into('<H', data, 2, 0x8000)
++    with pytest.raises(w.PrivacyError):
++        check(bytes(data))
++
++
++@pytest.mark.parametrize('owner,leaf,expected', [
++    (USER, True, 'TokenUser'), (w.SYSTEM, True, 'LocalSystem'),
++    (w.ADMINISTRATORS, True, 'Administrators'),
++    (w.TRUSTED_INSTALLER, False, 'TrustedInstaller'),
++    (OUTSIDER, True, None), (w.TRUSTED_INSTALLER, True, None),
++])
++def test_native_owner_receipt_uses_queried_descriptor_and_closes_handle(owner, leaf, expected):
++    from contextlib import contextmanager
++    from types import SimpleNamespace
++    import windows_privacy_native as probe
++
++    calls = []
++    @contextmanager
++    def opened(path, **options):
++        assert path == 'synthetic-path' and options == {'writable': True}
++        calls.append('open')
++        try:
++            yield 123
++        finally:
++            calls.append('close')
++    def inspect(handle, path, **options):
++        assert handle == 123 and path == 'synthetic-path'
++        assert options == {'leaf': leaf, 'directory': True}
++        calls.append('inspect')
++    def queried(handle):
++        assert handle == 123
++        calls.append('descriptor')
++        return descriptor(ace(), owner=owner)
++    native = SimpleNamespace(user=USER, opened=opened, inspect=inspect, descriptor=queried)
++    if expected is None:
++        with pytest.raises(w.PrivacyError):
++            probe.owner_evidence(native, 'synthetic-path', directory=True, leaf=leaf)
++    else:
++        assert probe.owner_evidence(native, 'synthetic-path', directory=True, leaf=leaf) == {
++            'owner_sid': probe.sid_text(owner), 'owner_class': expected}
++    assert calls == ['open', 'inspect', 'descriptor', 'close']
+diff --git a/tests/test_windows_privacy_native.py b/tests/test_windows_privacy_native.py
+new file mode 100644
+index 0000000..bb472c0
+--- /dev/null
++++ b/tests/test_windows_privacy_native.py
+@@ -0,0 +1,20 @@
++"""Expose the standalone controller tests to discovery; never fake native success."""
++import os
++import pytest
++from windows_privacy_native import NativeTests
++
++
++@pytest.fixture(scope='module', autouse=True)
++def owned_native_fixture(tmp_path_factory):
++    if os.name != 'nt':
++        yield
++        return
++    from windows_privacy_native import Fixture
++    # For complete per-host evidence use the standalone runner with a controller
++    # selected parent; the readable restricted-token control must really pass.
++    fixture = Fixture(tmp_path_factory.mktemp('native-controller'))
++    NativeTests.fixture = fixture
++    try:
++        yield
++    finally:
++        fixture.close()
+diff --git a/tests/test_windows_privacy_probe.py b/tests/test_windows_privacy_probe.py
+new file mode 100644
+index 0000000..5abfc02
+--- /dev/null
++++ b/tests/test_windows_privacy_probe.py
+@@ -0,0 +1,250 @@
++"""Test-only NT open marshalling/error paths. Doubles are not kernel evidence."""
++import ctypes as C
++
++import pytest
++import windows_privacy_native as probe
++from hermes_gadget_plugin import windows_privacy as w
++
++
++class NativeDouble:
++    def __init__(self):
++        self.closed = []
++        self.leaves = {}
++    def close(self, handle):
++        self.closed.append(handle.value if isinstance(handle, w.HANDLE) else handle)
++    def info(self, handle, result):
++        info = C.cast(result, C.POINTER(w._Info)).contents
++        info.attributes, info.links = 0, 1
++        return True
++    def type(self, handle): return 1
++    def read_bytes(self, handle, maximum):
++        assert maximum == 64
++        return b'public-control' if self.leaves[handle.value] == 'probe-control' else b'synthetic-private'
++
++
++def syscall(native, statuses):
++    calls = []
++    def create(output, access, attributes, io, allocation, flags, share, disposition, options, ea, ea_size):
++        obj = C.cast(attributes, C.POINTER(probe._ObjectAttributes)).contents
++        name_info = obj.name.contents
++        name = C.string_at(name_info.buffer, name_info.length).decode('utf-16-le')
++        assert obj.length == C.sizeof(probe._ObjectAttributes)
++        assert obj.root == 101 and obj.attributes == 0x40
++        assert not obj.security and not obj.qos
++        assert name_info.maximum == name_info.length + 2
++        assert C.string_at(name_info.buffer + name_info.length, 2) == b'\0\0'
++        assert access == w.FILE_GENERIC_READ
++        assert (allocation, flags, share, disposition, options, ea, ea_size) == (None, 0, 1, 1, 0x00200060, None, 0)
++        calls.append(name)
++        status = statuses.get(name, 0)
++        if status == 0:
++            handle = 200 + len(calls)
++            C.cast(output, C.POINTER(w.HANDLE)).contents.value = handle
++            native.leaves[handle] = name
++        return C.c_int32(status).value
++    return create, calls
++
++
++def test_relative_native_control_read_then_exact_private_denial():
++    native = NativeDouble()
++    create, calls = syscall(native, {'probe-private': 0xC0000022})
++    probe._probe_reads(native, create, 101)
++    assert calls == ['probe-control', 'probe-private']
++    assert native.closed == [201]
++
++
++@pytest.mark.parametrize('status', [0xC0000022, 0xC0000034, 0xC000000D, 0x103])
++def test_failed_control_never_counts_as_private_denial(status):
++    native = NativeDouble(); create, calls = syscall(native, {'probe-control': status})
++    with pytest.raises(probe._RelativeOpenError): probe._probe_reads(native, create, 101)
++    assert calls == ['probe-control']
++    assert not native.closed
++
++
++@pytest.mark.parametrize('status', [0xC0000034, 0xC000000D, 0x103])
++def test_private_path_io_and_pending_errors_are_not_access_denial(status):
++    native = NativeDouble(); create, calls = syscall(native, {'probe-private': status})
++    with pytest.raises(probe._RelativeOpenError): probe._probe_reads(native, create, 101)
++    assert native.closed == [201]
++
++
++def test_private_read_success_fails_probe_and_closes_both_files():
++    native = NativeDouble(); create, calls = syscall(native, {})
++    with pytest.raises(AssertionError, match='read private'): probe._probe_reads(native, create, 101)
++    assert native.closed == [201, 202]
++
++
++@pytest.mark.parametrize('damage', ['bytes', 'read-error', 'reparse', 'directory', 'hardlink'])
++def test_bad_control_metadata_content_or_read_cannot_certify_denial(damage):
++    native = NativeDouble(); create, calls = syscall(native, {})
++    if damage == 'bytes': native.read_bytes = lambda *a: b'wrong'
++    elif damage == 'read-error':
++        def fail(*args): raise OSError('synthetic read failure')
++        native.read_bytes = fail
++    else:
++        def info(handle, result):
++            data = C.cast(result, C.POINTER(w._Info)).contents
++            data.links = 2 if damage == 'hardlink' else 1
++            data.attributes = 0x400 if damage == 'reparse' else (0x10 if damage == 'directory' else 0)
++            return True
++        native.info = info
++    with pytest.raises((OSError, AssertionError)): probe._probe_reads(native, create, 101)
++    assert calls == ['probe-control'] and native.closed == [201]
++
++
++@pytest.mark.parametrize('name', ['../probe-private', 'probe-private:stream', 'C:\\data', '', 'other'])
++def test_probe_namespace_is_fixed_single_component(name):
++    native = NativeDouble(); create, calls = syscall(native, {})
++    with pytest.raises(ValueError): probe._relative_read(native, create, 101, name)
++    assert not calls
++
++
++@pytest.mark.parametrize('failure', [False, True])
++def test_anchor_is_directory_only_and_closed_on_inspection_failure(failure):
++    native = NativeDouble()
++    def opened(path, access, share, security, disposition, flags, template):
++        assert access == w.FILE_GENERIC_EXECUTE
++        assert (share, disposition, flags, template) == (3, 3, 0x02200000, None)
++        return 101
++    native.open = opened
++    def inspect(handle, path, **kw):
++        assert kw == {'leaf': False, 'directory': True}
++        if failure: raise w.PrivacyError()
++    native.inspect = inspect
++    if failure:
++        with pytest.raises(w.PrivacyError):
++            with probe._probe_anchor(native, 'fixture'): pass
++    else:
++        with probe._probe_anchor(native, 'fixture') as handle: assert handle == 101
++    assert native.closed == [101]
++
++
++def test_native_test_abi_sizes_and_offsets():
++    pointer = C.sizeof(w.PTR)
++    assert C.sizeof(probe._UnicodeString) == (16 if pointer == 8 else 8)
++    assert probe._UnicodeString.buffer.offset == (8 if pointer == 8 else 4)
++    assert C.sizeof(probe._ObjectAttributes) == (48 if pointer == 8 else 24)
++    assert probe._ObjectAttributes.root.offset == pointer
++    assert probe._ObjectAttributes.name.offset == pointer * 2
++    assert C.sizeof(probe._IoStatus) == pointer * 2
++    assert probe._IoStatus.information.offset == pointer
++
++
++@pytest.mark.parametrize('failure', [None, 'read', 'impersonate'])
++def test_probe_reverts_before_anchor_close_and_closes_tokens(monkeypatch, tmp_path, failure):
++    from contextlib import contextmanager
++    import struct
++    events = []
++    native = NativeDouble()
++    native.a = object()
++    native.process = lambda: 1
++    native.close = lambda h: events.append(('close', h.value))
++    def token(process, access, output):
++        assert access == 0x2E
++        C.cast(output, C.POINTER(w.HANDLE)).contents.value = 501
++        return True
++    def token_info(handle, kind, buf, size, output):
++        assert kind == 3 and handle.value == 502
++        C.cast(output, C.POINTER(w.DWORD)).contents.value = 16
++        if buf is None: return False
++        # One disabled privilege; enabling it would fail before impersonation.
++        C.memmove(buf, struct.pack('<IIII', 1, 0, 0, 0), 16)
++        return True
++    native.token, native.token_info = token, token_info
++    def restrict(handle, flags, count, disabled, deletes, privileges, restricted_count, restricting, output):
++        assert flags == 1 and count == restricted_count == 1
++        C.cast(output, C.POINTER(w.HANDLE)).contents.value = 502
++        events.append('restrict')
++        return True
++    def disable(handle, all_privileges, *args):
++        assert all_privileges is True
++        events.append('disable_all')
++        return True
++    def impersonate(handle):
++        events.append('impersonate')
++        return failure != 'impersonate'
++    def revert(): events.append('revert'); return True
++    funcs = {'CreateRestrictedToken': restrict, 'AdjustTokenPrivileges': disable,
++             'ImpersonateLoggedOnUser': impersonate, 'RevertToSelf': revert,
++             'NtCreateFile': object()}
++    monkeypatch.setattr(probe, 'bind', lambda lib, name, args, result: funcs[name])
++    monkeypatch.setattr(w, '_Native', lambda: native)
++    monkeypatch.setattr(C, 'WinDLL', lambda *a, **kw: object(), raising=False)
++    monkeypatch.setattr(C, 'get_last_error', lambda: 5, raising=False)
++    monkeypatch.setattr(C, 'WinError', lambda err: OSError('native impersonation failed'), raising=False)
++    @contextmanager
++    def anchor(n, directory):
++        events.append('anchor.open')
++        try: yield 101
++        finally: events.append('anchor.close')
++    def reads(n, create, handle):
++        assert events[-1] == 'impersonate'
++        events.append('reads')
++        if failure == 'read': raise ValueError('read failed')
++    monkeypatch.setattr(probe, '_probe_anchor', anchor)
++    monkeypatch.setattr(probe, '_probe_reads', reads)
++    private, control = tmp_path / 'probe-private', tmp_path / 'probe-control'
++    if failure:
++        with pytest.raises((OSError, ValueError)): probe.restricted_probe(private, control)
++    else: probe.restricted_probe(private, control)
++    middle = ['impersonate'] if failure == 'impersonate' else ['impersonate', 'reads', 'revert']
++    assert events == ['restrict', 'disable_all', 'anchor.open', *middle,
++                      'anchor.close', ('close', 502), ('close', 501)]
++
++
++def test_fixed_names_are_encoded_before_native_token_setup_in_fresh_process():
++    # A fresh isolated interpreter avoids pytest's already-warmed codec cache.
++    # Stop before any native API: this is runtime preparation evidence only.
++    import subprocess
++    import sys
++    script = '''
++import runpy, sys
++encoded = []
++def profile(frame, event, function):
++    if (event == 'c_call' and getattr(function, '__name__', None) == 'encode'
++            and getattr(function, '__self__', None) in ('probe-control', 'probe-private')):
++        encoded.append(function.__self__)
++sys.setprofile(profile)
++probe = runpy.run_path(sys.argv[1], run_name='probe_preparation_test')
++class BeforeNativeTokenSetup(Exception): pass
++def stop(): raise BeforeNativeTokenSetup()
++probe['w']._Native = stop
++try:
++    probe['restricted_probe']('fixture/probe-private', 'fixture/probe-control')
++except BeforeNativeTokenSetup:
++    pass
++else:
++    raise AssertionError('native boundary was not reached')
++sys.setprofile(None)
++assert sorted(encoded) == ['probe-control', 'probe-private'], encoded
++'''
++    result = subprocess.run([sys.executable, '-I', '-S', '-W', 'error', '-c',
++                             script, str(probe.Path(probe.__file__).resolve())],
++                            capture_output=True, text=True, timeout=10)
++    assert result.returncode == 0, result.stdout + result.stderr
++
++
++@pytest.mark.parametrize('private_status', [0xC0000022, 0xC0000034, 0])
++def test_prepared_names_still_require_fresh_control_and_exact_denial(monkeypatch, private_status):
++    # Model the actual cold-codec failure if an encode is attempted in the
++    # restricted interval, while running the real relative-read/status logic.
++    class NoLateEncode(str):
++        def encode(self, *args, **kwargs):
++            raise LookupError('unknown encoding: utf-16-le')
++    original = probe._relative_read
++    def restricted_read(native, create, anchor, name):
++        return original(native, create, anchor, NoLateEncode(name))
++    monkeypatch.setattr(probe, '_relative_read', restricted_read)
++    native = NativeDouble()
++    create, calls = syscall(native, {'probe-private': private_status})
++    if private_status == 0xC0000022:
++        probe._probe_reads(native, create, 101)
++    elif private_status:
++        with pytest.raises(probe._RelativeOpenError) as failure:
++            probe._probe_reads(native, create, 101)
++        assert failure.value.status == private_status
++    else:
++        with pytest.raises(AssertionError, match='restricted token read private data'):
++            probe._probe_reads(native, create, 101)
++    assert calls == ['probe-control', 'probe-private']
++    assert native.closed == ([201, 202] if private_status == 0 else [201])
+diff --git a/tests/test_windows_privacy_seams.py b/tests/test_windows_privacy_seams.py
+new file mode 100644
+index 0000000..43e15e7
+--- /dev/null
++++ b/tests/test_windows_privacy_seams.py
+@@ -0,0 +1,118 @@
++"""Platform-neutral routing regressions. Doubles are NOT Windows ACL evidence."""
++import json
++import os
++import sys
++from contextlib import contextmanager
++from types import SimpleNamespace
++
++import pytest
++
++from hermes_gadget_plugin import relay_grants, relay_outbox, store
++from test_relay_grants import fixture_grants
++
++
++def native_double(monkeypatch, **members):
++    module = SimpleNamespace(**members)
++    monkeypatch.setitem(sys.modules, 'hermes_gadget_plugin.windows_privacy', module)
++    return module
++
++
++def test_windows_grant_reads_inspected_bytes_not_reopened_path(tmp_path, monkeypatch):
++    path, _, _, _, data, _, grants = fixture_grants(tmp_path)
++    trusted = json.dumps(data).encode()
++    def read(p, maximum):
++        assert p == path and maximum == 65536
++        path.write_text('{"devices":{}}')  # substitution after inspection
++        return trusted
++    native_double(monkeypatch, read_private_file=read)
++    monkeypatch.setattr(relay_grants, 'os', SimpleNamespace(**{**vars(os), 'name': 'nt'}))
++    assert grants.snapshot()['phone']['generation'] == 1
++
++
++def test_windows_enrollment_privacy_failure_is_not_empty_authority(tmp_path, monkeypatch):
++    path = tmp_path / 'devices.json'
++    path.write_text('{"devices":{},"pairing":{}}')
++    devices = store.DeviceStore(tmp_path)
++    def deny(*a):
++        raise OSError('synthetic native failure')
++    native_double(monkeypatch, read_private_file=deny)
++    monkeypatch.setattr(store, 'os', SimpleNamespace(**{**vars(os), 'name': 'nt'}))
++    with pytest.raises(OSError):
++        devices.enrollment_snapshot()
++    assert devices._enrollment_complete
++    assert path.read_text() == '{"devices":{},"pairing":{}}'
++
++
++def test_windows_enrollment_reads_inspected_bytes(tmp_path, monkeypatch):
++    path = tmp_path / 'devices.json'
++    raw = b'{"devices":{},"pairing":{}}'
++    path.write_bytes(raw)
++    devices = store.DeviceStore(tmp_path)
++    inspected = []
++    def read(p, maximum):
++        inspected.append(p)
++        assert p == path and maximum == 1048576
++        path.write_text('{broken')
++        return raw
++    native_double(monkeypatch, read_private_file=read)
++    monkeypatch.setattr(store, 'os', SimpleNamespace(**{**vars(os), 'name': 'nt'}))
++    assert devices.enrollment_snapshot() == {}
++    assert inspected == [path]
++
++
++@pytest.mark.parametrize('failure_at', [1, 2])
++def test_windows_outbox_checks_new_journal_and_rolls_back_on_failure(tmp_path, monkeypatch, failure_at):
++    box = relay_outbox.Outbox(tmp_path / 'outbox.db', lambda: 1000)
++    box.put('owner', 'old', 'conversation', 'retained')
++    seen = []
++    @contextmanager
++    def guard(path):
++        def check():
++            journal = path.with_name(path.name + '-journal')
++            assert journal.is_file()  # actual SQLite journal, double ACL inspection
++            seen.append(journal)
++            if len(seen) == failure_at:
++                raise OSError('synthetic journal ACL failure')
++        yield check
++    native_double(monkeypatch, guarded_database=guard)
++    monkeypatch.setattr(relay_outbox, 'os', SimpleNamespace(**{**vars(os), 'name': 'nt'}))
++    with pytest.raises(relay_outbox.OutboxError, match='permission_denied'):
++        box.put('owner', 'new', 'conversation', 'not committed')
++    monkeypatch.undo()
++    assert seen
++    assert [x['event_id'] for x in box.read('owner', 50)['items']] == ['old']
++
++
++def test_windows_constructor_new_database_and_journal_are_checked(tmp_path, monkeypatch):
++    checks = []
++    @contextmanager
++    def guard(path):
++        path.touch(exist_ok=True)
++        def check():
++            assert path.is_file()
++            assert path.with_name(path.name + '-journal').is_file()
++            checks.append(True)
++        yield check
++    native_double(monkeypatch, guarded_database=guard)
++    monkeypatch.setattr(relay_outbox, 'os', SimpleNamespace(**{**vars(os), 'name': 'nt'}))
++    box = relay_outbox.Outbox(tmp_path / 'new.db', lambda: 1000)
++    assert len(checks) == 2
++    item = box.put('owner', 'event', 'conversation', 'text')
++    assert box.read('owner', 50)['items'] == [item]
++    assert len(checks) == 6
++
++
++def test_windows_unsafe_database_is_never_chmodded_or_opened_by_sqlite(tmp_path, monkeypatch):
++    path = tmp_path / 'unsafe.db'
++    path.write_bytes(b'retain unsafe bytes')
++    path.chmod(0o644)
++    @contextmanager
++    def guard(path):
++        raise OSError('native refusal')
++        yield
++    native_double(monkeypatch, guarded_database=guard)
++    monkeypatch.setattr(relay_outbox, 'os', SimpleNamespace(**{**vars(os), 'name': 'nt'}))
++    with pytest.raises(relay_outbox.OutboxError, match='permission_denied'):
++        relay_outbox.Outbox(path, lambda: 1000)
++    assert path.read_bytes() == b'retain unsafe bytes'
++    assert path.stat().st_mode & 0o777 == 0o644
+diff --git a/tests/windows_privacy_native.py b/tests/windows_privacy_native.py
+new file mode 100644
+index 0000000..7869b5d
+--- /dev/null
++++ b/tests/windows_privacy_native.py
+@@ -0,0 +1,529 @@
++"""Controller-only stdlib native fixture runner; all content is synthetic.
++
++Invoke on Windows with --parent EXISTING_DIRECTORY --receipt NEW_JSON_PATH.
++Creates a fresh owned child, mutates ACLs only there, cleans it in finally.
++Never imports an installed SDK. Restriction/impersonation runs only in a child
++process; no account creation or privilege enabling. Exit 0 requires all mandatory
++native assertions. Unsupported symlinks are reported separately from a pass.
++"""
++import argparse
++from contextlib import contextmanager
++import ctypes as C
++import hashlib
++import importlib.util
++import json
++import os
++from pathlib import Path
++import platform
++import shutil
++import struct
++import subprocess
++import sys
++import tempfile
++import traceback
++import unittest
++
++REPO = Path(__file__).resolve().parents[1]
++spec = importlib.util.spec_from_file_location('hermes_gadget_plugin', REPO / 'plugin/__init__.py',
++                                            submodule_search_locations=[str(REPO / 'plugin')])
++pkg = importlib.util.module_from_spec(spec)
++sys.modules[spec.name] = pkg
++spec.loader.exec_module(pkg)
++from hermes_gadget_plugin import windows_privacy as w
++from hermes_gadget_plugin.relay_outbox import Outbox, OutboxError
++from hermes_gadget_plugin.relay_grants import Grants, AuthorityUnavailable
++from hermes_gadget_plugin.store import DeviceStore
++
++
++def sid_text(sid):
++    return 'S-1-' + str(int.from_bytes(sid[2:8], 'big')) + ''.join(
++        '-' + str(n) for n in struct.unpack('<' + 'I' * sid[1], sid[8:]))
++
++
++def owner_evidence(native, path, *, directory, leaf=True):
++    """Record the queried object's owner; no assumed/default-token ownership."""
++    with native.opened(str(path), writable=True) as handle:
++        native.inspect(handle, str(path), leaf=leaf, directory=directory)
++        data = native.descriptor(handle)
++        w.validate_descriptor(data, native.user, leaf=leaf, directory=directory)
++        owner = w._sid(data, struct.unpack_from('<I', data, 4)[0], len(data))
++        owner_class = {native.user: 'TokenUser', w.SYSTEM: 'LocalSystem',
++                       w.ADMINISTRATORS: 'Administrators',
++                       w.TRUSTED_INSTALLER: 'TrustedInstaller'}.get(owner, 'Other')
++        return {'owner_sid': sid_text(owner), 'owner_class': owner_class}
++
++
++def bind(lib, name, args, result):
++    fn = getattr(lib, name); fn.argtypes, fn.restype = args, result
++    return fn
++
++
++class Fixture:
++    def __init__(self, parent):
++        self.native = w._Native()
++        self.user = sid_text(self.native.user)
++        self.root = Path(tempfile.mkdtemp(prefix='relay-native-', dir=parent)).resolve()
++        self.full = f'(A;OICI;FA;;;{self.user})(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)'
++        self.convert = bind(self.native.a, 'ConvertStringSecurityDescriptorToSecurityDescriptorW',
++                            [C.c_wchar_p, w.DWORD, C.POINTER(w.PTR), C.POINTER(w.DWORD)], w.BOOL)
++        self.set_security = bind(self.native.a, 'SetFileSecurityW', [C.c_wchar_p, w.DWORD, w.PTR], w.BOOL)
++        try:
++            self.acl(self.root, 'D:P' + self.full + '(A;;GRGX;;;WD)')
++        except BaseException:
++            shutil.rmtree(self.root)
++            raise
++
++    def acl(self, path, sddl):
++        # Test-only mutation; reject anything outside the newly created tree,
++        # including symlink/junction escape before SetFileSecurity follows it.
++        path = Path(path)
++        if path != self.root and self.root not in path.resolve().parents:
++            raise AssertionError('ACL mutation outside owned fixture')
++        if path.lstat().st_file_attributes & 0x400:
++            raise AssertionError('ACL mutation on reparse object')
++        descriptor = w.PTR()
++        try:
++            if not self.convert(sddl, 1, C.byref(descriptor), None):
++                raise C.WinError(C.get_last_error())
++            if not self.set_security(str(path), 0x80000004, descriptor):  # protected DACL only
++                raise C.WinError(C.get_last_error())
++        finally:
++            if descriptor: self.native.free(descriptor)
++
++    def private(self, path):
++        self.acl(path, 'D:P' + self.full)
++
++    def directory(self, name):
++        directory = self.root / name
++        directory.mkdir()
++        self.private(directory)
++        return directory
++
++    def close(self):
++        shutil.rmtree(self.root)
++
++
++class _UnicodeString(C.Structure):
++    _fields_ = [('length', C.c_uint16), ('maximum', C.c_uint16), ('buffer', w.PTR)]
++
++
++class _ObjectAttributes(C.Structure):
++    _fields_ = [('length', w.DWORD), ('root', w.HANDLE),
++                ('name', C.POINTER(_UnicodeString)), ('attributes', w.DWORD),
++                ('security', w.PTR), ('qos', w.PTR)]
++
++
++class _StatusUnion(C.Union):
++    _fields_ = [('status', C.c_int32), ('pointer', w.PTR)]
++
++
++class _IoStatus(C.Structure):
++    _fields_ = [('value', _StatusUnion), ('information', C.c_size_t)]
++
++
++# Prepare only fixed-name bytes while the ordinary process token is active.
++# A cold codec import can fail under impersonation before either kernel open.
++# No leaf is opened here; both NtCreateFile calls still use the reduced token.
++_PROBE_NAMES = {name: name.encode('utf-16-le')
++                for name in ('probe-control', 'probe-private')}
++
++
++class _RelativeOpenError(OSError):
++    def __init__(self, status):
++        self.status = status & 0xFFFFFFFF
++        super().__init__(f'NtCreateFile status 0x{self.status:08X}')
++
++
++@contextmanager
++def _probe_anchor(native, directory):
++    # Preopen ONLY an owned directory, never either leaf. Grant no mutation
++    # rights; deny DELETE sharing so the scoped namespace cannot be renamed.
++    handle = native.open(str(directory), w.FILE_GENERIC_EXECUTE, 3, None, 3, 0x02200000, None)
++    if handle in (None, C.c_void_p(-1).value):
++        raise C.WinError(C.get_last_error())
++    try:
++        native.inspect(handle, str(directory), leaf=False, directory=True)
++        yield handle
++    finally:
++        native.close(handle)
++
++
++def _relative_read(native, create_file, anchor, name):
++    """Fresh kernel open under the CURRENT token, rooted at one directory handle.
++
++    Single-component names cannot traverse existing private ancestors. This
++    isolates file DACL enforcement; it does not establish full-path reachability
++    for a second account. No backup intent, privileges or preopened leaf handles.
++    """
++    if name not in _PROBE_NAMES:
++        raise ValueError('probe leaf name outside fixed fixture namespace')
++    encoded = _PROBE_NAMES[name]
++    buffer = C.create_string_buffer(encoded + b'\0\0')
++    name_info = _UnicodeString(len(encoded), len(encoded) + 2, C.addressof(buffer))
++    attributes = _ObjectAttributes(C.sizeof(_ObjectAttributes), anchor, C.pointer(name_info),
++                                   0x40, None, None)  # OBJ_CASE_INSENSITIVE
++    handle, io = w.HANDLE(), _IoStatus()
++    try:
++        status = create_file(C.byref(handle), w.FILE_GENERIC_READ, C.byref(attributes),
++            C.byref(io), None, 0, 1, 1, 0x00200060, None, 0)
++        # FILE_OPEN, SHARE_READ, NON_DIRECTORY | SYNCHRONOUS_IO_NONALERT |
++        # OPEN_REPARSE_POINT. STATUS_PENDING is not a synchronous success.
++        if status != 0:
++            raise _RelativeOpenError(status)
++        if handle.value in (None, C.c_void_p(-1).value):
++            raise AssertionError('native success without a file handle')
++        info = w._Info()
++        if (not native.info(handle, C.byref(info)) or native.type(handle) != 1
++                or info.attributes & 0x410 or info.links != 1):
++            raise AssertionError('probe opened nonordinary file')
++        return native.read_bytes(handle, 64)
++    finally:
++        if handle.value not in (None, C.c_void_p(-1).value):
++            native.close(handle)
++
++
++def _probe_reads(native, create_file, anchor):
++    # The SAME anchor/token/access/options are used for both fresh opens.
++    if _relative_read(native, create_file, anchor, 'probe-control') != b'public-control':
++        raise AssertionError('readable control content mismatch')
++    try:
++        _relative_read(native, create_file, anchor, 'probe-private')
++    except _RelativeOpenError as exc:
++        if exc.status != 0xC0000022:  # STATUS_ACCESS_DENIED, not a path/I/O error
++            raise
++    else:
++        raise AssertionError('restricted token read private data')
++
++
++def restricted_probe(private, control):
++    """Disposable-process restricted token: Everyone-only restricting SID set.
++
++    Access must pass BOTH normal and restricting-SID ACL evaluation. Built-in
++    Administrators is deny-only; every token privilege is disabled explicitly.
++    This is a constrained token for the SAME user, not a second user account.
++    """
++    private, control = Path(private), Path(control)
++    if (private.parent != control.parent or private.name != 'probe-private'
++            or control.name != 'probe-control'):
++        raise ValueError('probe requires fixed sibling files')
++    n = w._Native()
++    # NtCreateFile is test-only; production uses the existing Win32 verifier.
++    nt = C.WinDLL('ntdll', use_last_error=True)
++    create_file = bind(nt, 'NtCreateFile', [C.POINTER(w.HANDLE), w.DWORD,
++        C.POINTER(_ObjectAttributes), C.POINTER(_IoStatus), C.POINTER(C.c_int64),
++        w.DWORD, w.DWORD, w.DWORD, w.DWORD, w.PTR, w.DWORD], C.c_int32)
++    ptr = C.POINTER(w.PTR)
++    create = bind(n.a, 'CreateRestrictedToken', [w.HANDLE, w.DWORD, w.DWORD, C.POINTER(w._SidAttributes),
++        w.DWORD, w.PTR, w.DWORD, C.POINTER(w._SidAttributes), ptr], w.BOOL)
++    adjust = bind(n.a, 'AdjustTokenPrivileges', [w.HANDLE, w.BOOL, w.PTR, w.DWORD, w.PTR, w.PTR], w.BOOL)
++    impersonate = bind(n.a, 'ImpersonateLoggedOnUser', [w.HANDLE], w.BOOL)
++    revert = bind(n.a, 'RevertToSelf', [], w.BOOL)
++    original, restricted = w.HANDLE(), w.HANDLE()
++    admin = C.create_string_buffer(w.ADMINISTRATORS)
++    everyone = C.create_string_buffer(bytes.fromhex('010100000000000100000000'))
++    disabled = w._SidAttributes(C.addressof(admin), 0)
++    restricting = w._SidAttributes(C.addressof(everyone), 0)
++    active = False
++    try:
++        if not n.token(n.process(), 0x2E, C.byref(original)): raise C.WinError(C.get_last_error())
++        if not create(original, 1, 1, C.byref(disabled), 0, None, 1, C.byref(restricting), C.byref(restricted)):
++            raise C.WinError(C.get_last_error())
++        if not adjust(restricted, True, None, 0, None, None): raise C.WinError(C.get_last_error())
++        # Assert no enabled privileges remain, including SeChangeNotifyPrivilege.
++        needed = w.DWORD()
++        n.token_info(restricted, 3, None, 0, C.byref(needed))
++        if not 4 <= needed.value <= 65536: raise AssertionError('token privilege bound')
++        buf = C.create_string_buffer(needed.value)
++        if not n.token_info(restricted, 3, buf, len(buf), C.byref(needed)): raise C.WinError(C.get_last_error())
++        count = struct.unpack_from('<I', buf.raw)[0]
++        if 4 + 12 * count > len(buf): raise AssertionError('token privilege shape')
++        for i in range(count):
++            assert not struct.unpack_from('<I', buf.raw, 4 + i * 12 + 8)[0] & 2
++        with _probe_anchor(n, private.parent) as anchor:
++            if not impersonate(restricted): raise C.WinError(C.get_last_error())
++            active = True
++            try:
++                _probe_reads(n, create_file, anchor)
++            finally:
++                if not revert():
++                    os._exit(91)  # never continue or close namespace impersonated
++                active = False
++    finally:
++        if active and not revert():
++            os._exit(91)  # disposable process; never continue impersonated
++        if restricted: n.close(restricted)
++        if original: n.close(original)
++    print(json.dumps({'control_read': True, 'private_access_denied': True,
++                      'enabled_privileges': 0, 'restricting_sid': 'Everyone',
++                      'administrators': 'deny-only', 'reverted': True,
++                      'open_boundary': 'fresh sibling NtCreateFile opens relative to pinned owned directory',
++                      'private_status': '0xC0000022', 'full_path_other_user_access': 'not tested'}))
++
++
++@unittest.skipUnless(os.name == 'nt', 'requires actual Windows kernel; not native evidence on POSIX')
++class NativeTests(unittest.TestCase):
++    fixture = None
++    evidence = []
++
++    def setUp(self):
++        self.directory = self.fixture.directory(self._testMethodName)
++        # A broken ancestor policy must ERROR here, not satisfy negative tests.
++        w.private_directory(self.directory)
++        self.evidence.append({'method': self._testMethodName,
++            'private_directory_owner': owner_evidence(
++                self.fixture.native, self.directory, directory=True)})
++
++    def data(self, name='data', content=b'synthetic-private'):
++        path = self.directory / name; path.write_bytes(content); return path
++
++    def test_private_read_and_stock_disabled_import(self):
++        w.private_directory(self.directory)
++        path = self.data()
++        self.assertEqual(w.read_private_file(path, 1024), b'synthetic-private')
++        with self.assertRaises(w.PrivacyError): w.read_private_file(path, 2)
++        # A fresh import of stock store and an ordinary load never imports Win32.
++        code = ('import sys; from pathlib import Path; '
++                'from hermes_gadget_plugin.store import DeviceStore; '
++                'DeviceStore(Path(sys.argv[1])); '
++                'assert "hermes_gadget_plugin.windows_privacy" not in sys.modules')
++        bootstrap = ('import importlib.util,sys; from pathlib import Path; '
++            f'p=Path({str(REPO / "plugin")!r}); '
++            's=importlib.util.spec_from_file_location("hermes_gadget_plugin",p/"__init__.py",submodule_search_locations=[str(p)]); '
++            'm=importlib.util.module_from_spec(s);sys.modules[s.name]=m;s.loader.exec_module(m);')
++        subprocess.run([sys.executable, '-I', '-W', 'error', '-c', bootstrap + code, str(self.directory)], check=True, timeout=30)
++
++    def test_broad_and_inherited_leaf_denial_preserves_bytes(self):
++        path = self.data()
++        self.assertEqual(w.read_private_file(path, 1024), b'synthetic-private')
++        for flags in ('', 'OI', 'CI', 'OICIIO'):
++            with self.subTest(flags=flags):
++                try:
++                    self.fixture.acl(self.directory, 'D:P' + self.fixture.full + f'(A;{flags};GR;;;WD)')
++                    with self.assertRaises(w.PrivacyError): w.read_private_file(path, 1024)
++                finally: self.fixture.private(self.directory)
++        # An actual inherited broad file ACE (not just an inheritable parent).
++        self.fixture.acl(self.directory, 'D:P' + self.fixture.full + '(A;OICI;GR;;;WD)')
++        inherited = self.data('inherited')
++        with self.fixture.native.opened(str(inherited), writable=True) as h:
++            sd = self.fixture.native.descriptor(h)
++        acl_offset = struct.unpack_from('<I', sd, 16)[0]
++        count = struct.unpack_from('<H', sd, acl_offset + 4)[0]
++        cursor, inherited_aces = acl_offset + 8, 0
++        for _ in range(count):
++            _, flags, length = struct.unpack_from('<BBH', sd, cursor)
++            inherited_aces += bool(flags & 0x10)
++            cursor += length
++        self.assertGreater(inherited_aces, 0)
++        with self.assertRaises(w.PrivacyError):
++            w.validate_descriptor(sd, self.fixture.native.user, leaf=True, directory=False)
++        self.fixture.private(self.directory)
++        self.assertEqual(path.read_bytes(), b'synthetic-private')
++        self.fixture.acl(path, 'D:NO_ACCESS_CONTROL')  # present null DACL
++        with self.assertRaises(w.PrivacyError): w.read_private_file(path, 1024)
++        self.fixture.private(path)
++
++    def test_ancestor_traversal_allowed_but_replacement_denied(self):
++        parent = self.directory
++        child = parent / 'private'; child.mkdir(); self.fixture.private(child)
++        path = child / 'data'; path.write_bytes(b'synthetic-private')
++        self.fixture.acl(parent, 'D:P' + self.fixture.full + '(A;;GRGX;;;WD)')
++        self.assertEqual(w.read_private_file(path, 1024), b'synthetic-private')
++        for mask in ('0x10000', '0x40000', '0x80000', '0x40', '0x100'):
++            try:
++                self.fixture.acl(parent, 'D:P' + self.fixture.full + f'(A;;{mask};;;WD)')
++                with self.assertRaises(w.PrivacyError): w.read_private_file(path, 1024)
++            finally: self.fixture.private(parent)
++
++    def test_hardlink_and_stream_refused(self):
++        path = self.data(); alias = self.directory / 'alias'
++        self.assertEqual(w.read_private_file(path, 1024), b'synthetic-private')
++        os.link(path, alias)
++        try:
++            with self.assertRaises(w.PrivacyError): w.read_private_file(path, 1024)
++        finally: alias.unlink()
++        with self.assertRaises(w.PrivacyError): w.read_private_file(str(path) + ':hidden', 1024)
++
++    def test_symlink_refused_when_supported(self):
++        path = self.data(); link = self.directory / 'link'
++        self.assertEqual(w.read_private_file(path, 1024), b'synthetic-private')
++        try: link.symlink_to(path)
++        except OSError as exc:
++            if exc.winerror == 1314: self.skipTest('symlink privilege unavailable; junction test remains mandatory')
++            raise
++        try:
++            with self.assertRaises(w.PrivacyError): w.read_private_file(link, 1024)
++        finally: link.unlink()
++
++    def test_junction_refused(self):
++        target = self.directory / 'target'; target.mkdir(); self.fixture.private(target)
++        path = target / 'data'; path.write_bytes(b'synthetic-private')
++        self.assertEqual(w.read_private_file(path, 1024), b'synthetic-private')
++        link = self.directory / 'junction'; link.mkdir()
++        sub = ('\\??\\' + str(target)).encode('utf-16-le'); display = str(target).encode('utf-16-le')
++        names = sub + b'\0\0' + display + b'\0\0'
++        payload = struct.pack('<IHHHHHH', 0xA0000003, 8 + len(names), 0, 0, len(sub), len(sub) + 2, len(display)) + names
++        n = self.fixture.native
++        ioctl = bind(n.k, 'DeviceIoControl', [w.HANDLE, w.DWORD, w.PTR, w.DWORD, w.PTR, w.DWORD, C.POINTER(w.DWORD), w.PTR], w.BOOL)
++        handle = n.open(str(link), 0x40000000, 3, None, 3, 0x02200000, None)
++        if handle in (None, C.c_void_p(-1).value): raise C.WinError(C.get_last_error())
++        try:
++            size = w.DWORD(); buf = C.create_string_buffer(payload)
++            if not ioctl(handle, 0x000900A4, buf, len(payload), None, 0, C.byref(size), None):
++                raise C.WinError(C.get_last_error())
++        finally: n.close(handle)
++        try:
++            with self.assertRaises(w.PrivacyError): w.read_private_file(link / 'data', 1024)
++        finally: link.rmdir()
++
++    def test_authority_same_object_and_replacement_rechecked(self):
++        path = self.data('grant', b'first')
++        replacement = self.data('replacement', b'second')
++        n = self.fixture.native
++        with w._directory(n, self.directory):
++            with n.opened(str(path), read=True) as handle:
++                n.inspect(handle, str(path), leaf=True, directory=False)
++                with self.assertRaises(PermissionError): os.replace(replacement, path)
++                self.assertEqual(n.read_bytes(handle, 1024), b'first')
++        os.replace(replacement, path)
++        self.assertEqual(w.read_private_file(path, 1024), b'second')
++        devices = self.directory / 'devices.json'
++        devices.write_text('{"devices":{},"pairing":{}}')
++        store = DeviceStore(self.directory)
++        store.enroll('phone', b'synthetic-phone-key')
++        store.enroll('watch', b'synthetic-watch-key')
++        grant_path = self.directory / 'relay-grants.json'
++        grant = {'schema': 1, 'profile_id': '9e8af651-47eb-411f-b28c-ed292bbfd305', 'generation': 1,
++                 'devices': {'phone': {'key_sha256': hashlib.sha256(b'synthetic-phone-key').hexdigest(),
++                                      'expires_at_ms': 5000, 'outbox': True}}}
++        grant_path.write_text(json.dumps(grant))
++        grants = Grants(grant_path, store, lambda _: True, lambda: 1000)
++        original = grants.get('phone')
++        store.enroll('phone', b'rotated-phone-key')
++        self.assertEqual(grants.snapshot(), {})
++        self.assertEqual(store.enrollment_snapshot()['watch'], b'synthetic-watch-key')
++        self.assertTrue(original['owner'])
++        self.fixture.acl(devices, 'D:P' + self.fixture.full + '(A;;GR;;;WD)')
++        with self.assertRaises(AuthorityUnavailable): grants.snapshot()
++        self.assertTrue(store._enrollment_complete)
++        self.fixture.private(devices)
++
++    def test_outbox_journal_restart_ack_and_unsafe_no_repair(self):
++        path = self.directory / 'outbox.db'
++        box = Outbox(path, lambda: 1000)
++        item = box.put('owner', 'event', 'conversation', 'synthetic final')
++        self.assertEqual(Outbox(path, lambda: 1000).put('owner', 'event', 'conversation', 'synthetic final'), item)
++        with box.tx() as db:
++            journal = Path(str(path) + '-journal')
++            self.assertTrue(journal.exists())
++            w.inspect_private_file(path); w.inspect_private_file(journal)
++            self.evidence.append({'db_and_active_journal': 'native owner/DACL checked',
++                'database_owner': owner_evidence(self.fixture.native, path, directory=False),
++                'active_journal_owner': owner_evidence(self.fixture.native, journal, directory=False)})
++        self.fixture.acl(path, 'D:P' + self.fixture.full + '(A;;GR;;;WD)')
++        before = path.read_bytes()
++        with self.assertRaises(OutboxError): Outbox(path, lambda: 1000)
++        self.assertEqual(path.read_bytes(), before)
++        self.fixture.private(path)
++        self.assertEqual(box.read('owner', 50)['items'], [item])
++        # A broad, preexisting journal is refused before SQLite consumes it.
++        journal = Path(str(path) + '-journal'); journal.write_bytes(b'synthetic unsafe journal')
++        self.fixture.acl(journal, 'D:P' + self.fixture.full + '(A;;GR;;;WD)')
++        with self.assertRaises(OutboxError): box.read('owner', 50)
++        self.assertEqual(journal.read_bytes(), b'synthetic unsafe journal')
++        journal.unlink()
++        # A newly created journal whose descriptor becomes unsafe causes rollback
++        # before business code or commit, retaining the existing final.
++        original = w._Native.inspect
++        armed = [True]
++        def inspect(native, handle, filename, **kw):
++            if filename.endswith('-journal') and armed[0]:
++                armed[0] = False
++                self.fixture.acl(Path(filename), 'D:P' + self.fixture.full + '(A;;GR;;;WD)')
++            return original(native, handle, filename, **kw)
++        w._Native.inspect = inspect
++        try:
++            with self.assertRaises(OutboxError): box.put('owner', 'other', 'conversation', 'uncommitted')
++        finally: w._Native.inspect = original
++        self.assertEqual(box.read('owner', 50)['items'], [item])
++        box.ack('owner', [item['delivery_id']])
++        self.assertEqual(Outbox(path, lambda: 1000).read('owner', 50)['items'], [])
++
++    def test_native_query_failure_retains_data_and_closes_handles(self):
++        path = self.data()
++        original = w._Native.descriptor
++        def unavailable(*args): raise w.PrivacyError()
++        w._Native.descriptor = unavailable
++        try:
++            with self.assertRaises(w.PrivacyError): w.read_private_file(path, 1024)
++        finally: w._Native.descriptor = original
++        # Rename succeeds after the error: no pinned handle escaped cleanup.
++        renamed = path.with_name('renamed')
++        path.rename(renamed)
++        self.assertEqual(w.read_private_file(renamed, 1024), b'synthetic-private')
++
++    def test_restricted_native_read_denial_with_readable_control(self):
++        # These siblings live in the already-traversable NEW fixture root.
++        # No existing parent or private directory/file ACL is relaxed. Its WD
++        # traversal ACE is non-inheriting; the private file inherits only U/SY/BA.
++        private = self.fixture.root / 'probe-private'; private.write_bytes(b'synthetic-private')
++        control = self.fixture.root / 'probe-control'; control.write_bytes(b'public-control')
++        w.inspect_private_file(self.data())  # production private-directory gate
++        n = self.fixture.native
++        with n.opened(str(private), read=True) as handle:
++            n.inspect(handle, str(private), leaf=True, directory=False)
++            self.assertEqual(n.read_bytes(handle, 64), b'synthetic-private')
++        self.fixture.acl(control, 'D:P' + self.fixture.full + '(A;;GR;;;WD)')
++        result = subprocess.run([sys.executable, '-I', '-W', 'error', str(Path(__file__).resolve()),
++            '--restricted-probe', str(private), str(control)], capture_output=True, text=True, timeout=30)
++        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
++        self.evidence.append(json.loads(result.stdout))
++
++
++def source_hashes():
++    paths = sorted((REPO / 'plugin').glob('*.py')) + [Path(__file__).resolve()]
++    return {str(p.relative_to(REPO)).replace('\\', '/'): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument('--parent', type=Path)
++    parser.add_argument('--receipt', type=Path)
++    parser.add_argument('--restricted-probe', nargs=2)
++    args = parser.parse_args()
++    if args.restricted_probe:
++        restricted_probe(*args.restricted_probe)
++        return 0
++    if not args.parent or not args.receipt: parser.error('--parent and --receipt are required')
++    if os.name != 'nt': parser.error('actual Windows required; POSIX is not native evidence')
++    if not args.parent.is_dir(): parser.error('parent must already exist; no existing ACLs will be changed')
++    if args.receipt.exists(): parser.error('receipt must be a new path')
++    receipt = {'os': platform.platform(), 'machine': platform.machine(), 'python': sys.version,
++               'pointer_bits': C.sizeof(C.c_void_p) * 8, 'sources': source_hashes(),
++               'native': True, 'evidence': NativeTests.evidence, 'cleanup': False}
++    fixture, result = None, None
++    try:
++        fixture = Fixture(args.parent)
++        NativeTests.fixture = fixture
++        receipt['process_user_sid'] = fixture.user
++        receipt['fixture'] = str(fixture.root)
++        receipt['fixture_parent_owner'] = owner_evidence(
++            fixture.native, fixture.root.parent, directory=True, leaf=False)
++        receipt['fixture_root_owner'] = owner_evidence(
++            fixture.native, fixture.root, directory=True, leaf=False)
++        result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(NativeTests))
++        receipt.update(tests=result.testsRun, failures=len(result.failures), errors=len(result.errors),
++                       skips=[(str(test), reason) for test, reason in result.skipped])
++    except BaseException:
++        receipt['fatal'] = traceback.format_exc()
++        traceback.print_exc()
++    finally:
++        try:
++            if fixture: fixture.close(); receipt['cleanup'] = True
++        except BaseException: receipt['cleanup_error'] = traceback.format_exc()
++        with args.receipt.open('x', encoding='utf-8') as stream:
++            json.dump(receipt, stream, indent=2)
++    return 0 if result is not None and result.wasSuccessful() and receipt['cleanup'] else 1
++
++
++if __name__ == '__main__':
++    raise SystemExit(main())

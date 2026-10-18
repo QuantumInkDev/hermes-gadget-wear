@@ -57,20 +57,20 @@ and platform-neutral tests, and extension setup documentation. Start from the ac
 Task 3 head in a fresh isolated checkout; do not edit its active review/fix checkout.
 The controller owns final patch-series export and live rollout.
 
-- [ ] Specify a small private-file/directory interface shared by grant and activation
+- [x] Specify a small private-file/directory interface shared by grant and activation
   checks. Keep existing POSIX semantics and public APIs unless the concrete consumer
   requires a reviewed change. No generic security framework or persistent bypass flag.
-- [ ] Implement native Windows inspection through standard-library ctypes with exact
+- [x] Implement native Windows inspection through standard-library ctypes with exact
   pointer-width-safe signatures and bounded allocations/counts. Determine the actual
   process user SID from its token; do not authorize by account name, locale or an
   environment variable. Allowed leaf identities are that SID, LocalSystem and built-in
   Administrators. Elevated/admin users remain within the existing local trust boundary.
-- [ ] Open existing objects without following reparse points; verify the handle's actual
+- [x] Open existing objects without following reparse points; verify the handle's actual
   file attributes/type, link count and security descriptor. Reject symlinks, junctions,
   other reparse forms, remote/unsupported filesystems, alternate streams, malformed or
   unsupported security descriptors, missing/null DACLs, unknown effective ACE types and
   unresolved authority. Close every handle/allocation on all error paths.
-- [ ] Require private leaf directory and authority/data owners to be the actual process
+- [x] Require private leaf directory and authority/data owners to be the actual process
   user, LocalSystem or built-in Administrators, with effective and inherited permissions
   limited to those same allowed identities. TrustedInstaller is an ancestor-owner exception
   only, never an allowed private-leaf owner or a blanket service-SID exemption.
@@ -79,35 +79,35 @@ The controller owns final patch-series export and live rollout.
   ancestor traversal is permitted; treat ancestor and private-leaf requirements separately.
   Derive concrete access-mask handling from native constants and test it. Do not simply
   reject every ancestor readable by Users or Everyone.
-- [ ] Prevent check/read path substitution at the actual grant/enrollment read boundary:
+- [x] Prevent check/read path substitution at the actual grant/enrollment read boundary:
   inspect and read the same opened object, with bounded bytes and preserved shape/load-
   health validation. A later file/path replacement cannot grant an old socket new authority.
   Unsafe/malformed reads deny access without deleting retained outbox bodies or secrets.
-- [ ] Validate database and journal privacy before accepting the extension, including a
+- [x] Validate database and journal privacy before accepting the extension, including a
   newly created SQLite journal during a real transaction. Existing unsafe files must not
   be repaired by chmod or ACL mutation. A transient validation failure must not turn an
   unreadable registry into an authoritative empty registry. Preserve transaction bounds,
   durability, deduplication and accepted current-grant semantics.
-- [ ] Keep Win32 imports lazy so stock-disabled and POSIX deployments do not require the
+- [x] Keep Win32 imports lazy so stock-disabled and POSIX deployments do not require the
   native module. Remove Windows deny branches only where the real validator replaces
   them. Any failed check keeps the optional service unavailable and stock speech usable.
-- [ ] Add genuine failing regressions for null/permissive/inheritable DACLs, wrong owner,
+- [x] Add genuine failing regressions for null/permissive/inheritable DACLs, wrong owner,
   unrecognized ACEs, unsafe ancestor replacement rights, reparse/hardlink/stream paths,
   grant replacement between check/read, newly created sidecars and native API failure.
   Unit API doubles exercise parser/error paths only, never establish native acceptance.
-- [ ] Add actual Windows-only tests using temporary synthetic directories/files and the
+- [x] Add actual Windows-only tests using temporary synthetic directories/files and the
   existing outbox: positive private ACL and normal read/write/restart/ACK; negative broad
   effective or inherited grants; reparse/junction and hardlink refusal where supported;
   database and active journal descriptor inspection; reduced-authority native read denial
   and a permissive control proving that the negative token can read ordinary test data.
   Impersonation must be confined to a disposable test process and reverted in finally;
   privileges stay disabled. No real identities/history/grants enter these fixtures.
-- [ ] Controller runs the native test artifact on GPU 5090 and Win 11 ARM using the actual
+- [x] Controller runs the native test artifact on GPU 5090 and Win 11 ARM using the actual
   supported gateway interpreter architecture and disposable per-task locations. Record
   OS, interpreter bitness, exact source hash, owner/SID class, assertions and skip reasons
   privately. Missing required native evidence blocks that box's activation; it does not
   complete Windows support as an unsupported-hardware exception.
-- [ ] Run affected platform-neutral storage/grant/adapter regressions warning-strict,
+- [x] Run affected platform-neutral storage/grant/adapter regressions warning-strict,
   retaining stock-disabled compatibility. Do not rerun unrelated core suites without a
   changed seam. Commit exact source paths, no push. Full report includes commands,
   genuine RED/GREEN counts, native-vs-mocked distinction and remaining gates. Independent
@@ -141,3 +141,14 @@ same-object checks, and unknown-owner refusal. TrustedInstaller remains ancestor
 Cost if wrong: the small ownership policy needs rework before activation; native runs and
 fresh independent security review still gate both boxes. This permits no new local identity
 beyond the plan's existing trust boundary and does not waive any mandatory native method.
+
+## Verified Task1 completion
+
+Source/fix reviews through2b64698 are clean. Public patch6 freshly reapplies after
+patches1–5; all274 combined SDK files match reviewed source.402 affected software
+checks pass, with10 explicit Windows-only skips on Mac. Actual supported AMD64 and
+ARM64 gateway interpreters each pass10 native methods, zero failures/errors/skips.
+Control bytes, exact private0xC0000022, disabled privileges, reversion and fixture/source
+cleanup are source-bound in private receipts. This completes this validator task, not
+O5 native clients or live rollout. Existing installed source/owners/ACLs/listeners and
+flags are unchanged; each installed profile still needs its own activation preflight.

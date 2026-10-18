@@ -2,7 +2,7 @@
 
 Base: SDK `v0.2.0`, commit `323e3303ab68981f810fc3208119cd8a22e64af0`.
 
-Apply the numbered [patches](patches/) in order to a clean checkout. Patch 1 adds optional Opus negotiation, bounded raw packets/OpusHead configuration, ffmpeg decode/encode pipes, paced downlink, protocol documentation, and compatibility tests. Patch 2 adds optional profile pet manifests and bounded PNG assets, safely confined metadata paths, and alpha/taxonomy tests. Patch 3 adds opt-in client speech acknowledgment, bounded final-text requests and profile voice hints, with voice-off and duplicate handling. Patch 4 adds an enrolled-key-scoped, durable final-text outbox with explicit read/ACK, bounded retention and silent recovery. It requires the matching [Hermes context hook version 2](core-patches/README.md), a valid private grant and the real runner allowlist; `enable_relay_outbox` defaults to false. Windows activation remains denied until its native storage-privacy implementation and host checks pass. This increment does not expose conversation/history/task methods. Default `enable_client_tts` is false. Default `enable_pets` is false. Default `enable_opus` is false; missing capabilities or ffmpeg support keeps stock PCM16. Local development branch: `wear/optional-extensions`. No upstream PR or maintainer agreement is claimed, and this series is not installed into live Hermes.
+Apply the numbered [patches](patches/) in order to a clean checkout. Patch 1 adds optional Opus negotiation, bounded raw packets/OpusHead configuration, ffmpeg decode/encode pipes, paced downlink, protocol documentation, and compatibility tests. Patch 2 adds optional profile pet manifests and bounded PNG assets, safely confined metadata paths, and alpha/taxonomy tests. Patch 3 adds opt-in client speech acknowledgment, bounded final-text requests and profile voice hints, with voice-off and duplicate handling. Patch 4 adds an enrolled-key-scoped, durable final-text outbox with explicit read/ACK, bounded retention and silent recovery. It requires the matching [Hermes context hook version 2](core-patches/README.md), a valid private grant and the real runner allowlist; `enable_relay_outbox` defaults to false. Patch 6 supplies the native Windows storage-privacy verifier and its accepted AMD64/ARM64 synthetic host checks. Installed-profile privacy/grants/core preflight and staged rollout still gate activation. This increment does not expose conversation/history/task methods. Default `enable_client_tts` is false. Default `enable_pets` is false. Default `enable_opus` is false; missing capabilities or ffmpeg support keeps stock PCM16. Local development branch: `wear/optional-extensions`. No upstream PR or maintainer agreement is claimed, and this series is not installed into live Hermes.
 
 Run `python3 tools/setup-extensions.py` from this repository for an isolated patched checkout/environment, then run its protocol, plugin-unit, Opus, pet, client-speech, grant, outbox and service tests, plus `tools/tests/test_extend_pet.py`. If a prior patched checkout exists, use `--sdk-dir` and `--environment` with fresh ignored `.local/` paths; modified checkouts are refused rather than reset. Keep the unmodified SDK environment for stock integration. See [upstream status](../docs/upstream.md) and [measurements](../docs/audio-measurements.md).
 
@@ -22,3 +22,15 @@ pets retain empty optional-row omission. Fresh pinned-source reapplication match
 checks, with no skips. Source/fix review and synthetic native composition are accepted;
 personal artwork, live transfer, physical playback and power remain separate gates.
 No profile assignment or optional live server flag is changed by exporting this patch.
+
+SDK patch 6 adds lazy, standard-library Win32 same-object inspection for private Relay
+authority/storage paths and SQLite sidecars. It preserves the POSIX and stock-disabled
+paths. Exact User/SYSTEM/Administrators leaf owners/grants are allowed; TrustedInstaller
+is an ancestor-owner exception only. Unsafe paths/descriptors deny access without repair.
+Fresh pinned-source reapplication matches all274 reviewed Windows/pet SDK files. The
+export passes402 affected software checks, with10 explicit Windows-only skips on Mac;
+actual AMD64 and ARM64 gateway interpreters each pass all10 native methods, zero skips.
+The reduced token reads its permissive control and receives exact0xC0000022 for the
+private leaf through fresh relative opens. This is the stated leaf-DACL test boundary,
+not another real account's full-path access. Existing installed source/ACLs/listeners and
+optional flags remain unchanged. Per-profile rollout preflight is still required.
