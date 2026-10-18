@@ -564,7 +564,7 @@ internal fun ConversationPage(
                 ) {
                     ProfileIdentity(
                         page,
-                        watch.artwork[page.key],
+                        page.presentationArtwork(watch),
                         watch,
                         true,
                         modifier = Modifier.recordingPortrait(
@@ -702,6 +702,9 @@ internal fun ConversationPage(
                     enabled = !watch.saving && conversation.prompt == null &&
                         conversation.mode != ConversationMode.LISTENING
                 )
+            }
+            presentationOptions(page, watch) { identity, mode ->
+                service.setPresentation(page.key, identity, mode)
             }
             item { jump() }
         }

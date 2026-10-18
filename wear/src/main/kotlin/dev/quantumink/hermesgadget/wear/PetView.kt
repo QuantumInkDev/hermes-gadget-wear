@@ -26,7 +26,12 @@ import dev.quantumink.hermesgadget.protocol.PetStates
 import kotlinx.coroutines.delay
 
 @Composable
-fun PetView(watch: WatchState, compact: Boolean = false, animated: Boolean = true) {
+fun PetView(
+    watch: WatchState,
+    compact: Boolean = false,
+    animated: Boolean = true,
+    portraitSurface: Boolean = false
+) {
     val running = animated && artworkMotionAllowed()
     val conversation = watch.connection.conversation
     val mode = when {
@@ -74,7 +79,22 @@ fun PetView(watch: WatchState, compact: Boolean = false, animated: Boolean = tru
     )
     val image = remember(bitmap) { bitmap?.asImageBitmap() }
     Canvas(
-        Modifier.size(if (compact) 48.dp else 96.dp, if (compact) 52.dp else 104.dp).semantics {
+        Modifier.size(
+            if (portraitSurface) {
+                160.dp
+            } else if (compact) {
+                48.dp
+            } else {
+                96.dp
+            },
+            if (portraitSurface) {
+                160.dp
+            } else if (compact) {
+                52.dp
+            } else {
+                104.dp
+            }
+        ).semantics {
             contentDescription =
                 "${atlas?.name ?: "Sample pet"}: $mode"
         }
@@ -87,10 +107,20 @@ fun PetView(watch: WatchState, compact: Boolean = false, animated: Boolean = tru
             0f
         }
         if (image != null) {
+            val margin = if (portraitSurface) 8.dp.toPx() else 0f
+            val scale = minOf(
+                (size.width - margin * 2) / image.width,
+                (size.height - margin * 2) / image.height
+            )
+            val width = (image.width * scale).toInt()
+            val height = (image.height * scale).toInt()
             drawImage(
                 image,
-                dstOffset = IntOffset(0, -bob.toInt()),
-                dstSize = IntSize(size.width.toInt(), size.height.toInt()),
+                dstOffset = IntOffset(
+                    ((size.width - width) / 2).toInt(),
+                    ((size.height - height) / 2 - bob).toInt()
+                ),
+                dstSize = IntSize(width, height),
                 filterQuality = FilterQuality.None
             )
         } else {

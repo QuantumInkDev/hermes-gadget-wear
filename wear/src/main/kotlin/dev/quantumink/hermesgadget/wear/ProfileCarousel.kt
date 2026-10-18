@@ -1,7 +1,5 @@
 package dev.quantumink.hermesgadget.wear
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -209,7 +207,7 @@ fun ProfileCarousel(
                         item {
                             ProfileIdentity(
                                 page,
-                                watch.artwork[page.key],
+                                page.presentationArtwork(watch),
                                 watch.copy(pet = null),
                                 selected
                             )
@@ -244,6 +242,9 @@ fun ProfileCarousel(
                                 Body(watch.catalogNotice, muted = true)
                             }
                         }
+                        presentationOptions(page, watch) { identity, mode ->
+                            service.setPresentation(page.key, identity, mode)
+                        }
                         item { controls() }
                     }
                 } else {
@@ -253,7 +254,7 @@ fun ProfileCarousel(
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        ProfileIdentity(page, watch.artwork[page.key], WatchState(), false)
+                        ProfileIdentity(page, page.presentationArtwork(watch), watch, false)
                     }
                 }
             }
@@ -298,29 +299,31 @@ fun ProfileIdentity(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        val pet = if (selected) watch.pet ?: artwork?.pet else artwork?.pet
-        Box(Modifier.requiredSize(160.dp, 168.dp).then(modifier)) {
-            Crossfade(
-                targetState = pet,
-                modifier = Modifier.requiredSize(160.dp, 168.dp),
-                animationSpec = tween(220),
-                label = "profile artwork"
-            ) { shown ->
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    if (shown == null && artwork?.portrait != null) {
-                        AnimatedPortrait(
-                            artwork.animation,
-                            artwork.portrait,
-                            "${page.label} profile picture",
-                            selected && page.status == CatalogStatus.AVAILABLE,
-                            Modifier.size(160.dp)
-                        )
-                    } else {
-                        PetView(
-                            watch.copy(pet = shown),
-                            animated = selected && page.status == CatalogStatus.AVAILABLE
-                        )
-                    }
+        val mode = watch.presentation[page.presentationKey()]
+        val pet = if (mode == PresentationMode.PET) page.presentationPet(watch) else null
+        val moving = selected && page.status == CatalogStatus.AVAILABLE
+        Box(
+            Modifier.requiredSize(160.dp, 168.dp).then(modifier),
+            contentAlignment = Alignment.Center
+        ) {
+            if (pet != null) {
+                PetView(watch.copy(pet = pet), animated = moving, portraitSurface = true)
+            } else if (artwork?.portrait != null) {
+                AnimatedPortrait(
+                    artwork.animation,
+                    artwork.portrait,
+                    "${page.label} profile picture",
+                    moving,
+                    Modifier.size(160.dp)
+                )
+            } else {
+                Box(
+                    Modifier.size(160.dp).semantics {
+                        contentDescription = "${page.label}: no portrait"
+                    },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No portrait", style = MaterialTheme.typography.bodyMedium)
                 }
             }
             RecordingRings(watch.captureActive, selected, watch.connection.conversation.level)

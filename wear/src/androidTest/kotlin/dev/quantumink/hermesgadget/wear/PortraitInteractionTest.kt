@@ -61,6 +61,22 @@ class PortraitInteractionTest {
         assertEquals(listOf("start", "cancel"), f.events)
     }
 
+    @Test fun petHoldReleaseAndCancelUseTheSameOuterRecordingSurface() = fixture { f ->
+        instrumentation.runOnMainSync { f.kind.value = 2 }
+        SystemClock.sleep(150)
+        f.down()
+        SystemClock.sleep(800)
+        assertEquals(listOf("start"), f.events)
+        f.up()
+        await { f.events == listOf("start", "finish") }
+        f.events.clear()
+        f.down()
+        SystemClock.sleep(800)
+        f.move(0f, 110f)
+        f.up()
+        await { f.events == listOf("start", "cancel") }
+    }
+
     @Test fun tapsPreholdHorizontalVerticalDragsAndDisabledPortraitNeverRecord() = fixture { f ->
         f.down()
         f.up()
@@ -324,6 +340,19 @@ class PortraitInteractionTest {
         val watch = WatchState(
             captureActive = f.recording.value,
             pet = pet,
+            presentationPets = pet?.let {
+                mapOf(PresentationKey.of("synthetic:p", null) to it)
+            }.orEmpty(),
+            artworkIdentities = mapOf("synthetic:p" to PresentationKey.of("synthetic:p", null)),
+            presentation = PresentationChoices(
+                if (f.kind.value == 2) {
+                    mapOf(
+                        PresentationKey.of("synthetic:p", null).digest to PresentationMode.PET
+                    )
+                } else {
+                    emptyMap()
+                }
+            ),
             connection = ConnectionState(conversation = ConversationState(mode = mode))
         )
         ProfileIdentity(

@@ -78,10 +78,27 @@ class WatchCarouselTest {
             "Three independent synthetic stock servers required",
             urls.all { it.startsWith("ws://localhost:") } && urls.distinct().size == 3
         )
+        val saved = IdentityVault(context).profiles()
+        val reuseFixture =
+            InstrumentationRegistry.getArguments().getString(
+                "syntheticReuseEnrollment"
+            ) == "true" &&
+                saved.map { it.endpoint.url }.toSet() == urls.toSet() &&
+                saved.all { it.label == "Agent" }
         assumeTrue(
-            "Never overwrite an existing enrollment",
-            File(context.filesDir, "gadget-vault").listFiles().isNullOrEmpty()
+            "Never overwrite an existing enrollment; opt-in may reuse only these exact synthetic URLs",
+            File(context.filesDir, "gadget-vault").listFiles().isNullOrEmpty() || reuseFixture
         )
+        val retainedIdentities = if (reuseFixture) {
+            urls.associateWith {
+                IdentityVault(context).identity(Endpoint.parse(it, true, true)).deviceId
+            }
+        } else {
+            emptyMap()
+        }
+        val initialPresentation = PresentationStore(
+            File(context.filesDir, "profile-presentation")
+        ).read()
         val pets = InstrumentationRegistry.getArguments().getString("syntheticCompanion") == "true"
         val vault = IdentityVault(context)
         val portraitCache = PortraitCache(File(context.filesDir, "portrait-cache"))
@@ -125,6 +142,9 @@ class WatchCarouselTest {
             CatalogStatus.OFFLINE,
             1
         )
+        retainedIdentities.forEach { (url, deviceId) ->
+            assertEquals(deviceId, vault.identity(Endpoint.parse(url, true, true)).deviceId)
+        }
         vault.select(urls.first())
         WatchCatalogVault(context).apply {
             val extra = (0 until if (oversizedRestore) 32 else 29).map { index ->
@@ -369,6 +389,43 @@ class WatchCarouselTest {
             capture("01-portrait-first")
             if (pets) {
                 waitUntil { service.state.value.pet?.rows?.containsKey("talking") == true }
+                val firstPage = ProfilePages.merge(
+                    service.state.value.profiles,
+                    service.state.value.catalog
+                )
+                    .single { it.key == pages.first().key }
+                assertEquals(
+                    if (reuseFixture) {
+                        initialPresentation[firstPage.presentationKey()]
+                    } else {
+                        PresentationMode.PORTRAIT
+                    },
+                    service.state.value.presentation[firstPage.presentationKey()]
+                )
+                if (reuseFixture &&
+                    initialPresentation[firstPage.presentationKey()] == PresentationMode.PET
+                ) {
+                    scrollTo { it.text?.toString() == "Portrait" }
+                    click { it.text?.toString() == "Portrait" }
+                    waitUntil {
+                        service.state.value.presentation[firstPage.presentationKey()] ==
+                            PresentationMode.PORTRAIT
+                    }
+                    scrollToTop()
+                }
+                waitUntil {
+                    find {
+                        it.contentDescription?.toString()?.endsWith("profile picture") == true
+                    } != null
+                }
+                recordArtwork(service, cancel = true, "o1-portrait-listening")
+                scrollTo { it.text?.toString() == "Pet" }
+                click { it.text?.toString() == "Pet" }
+                waitUntil {
+                    service.state.value.presentation[firstPage.presentationKey()] ==
+                        PresentationMode.PET
+                }
+                scrollToTop()
                 waitUntil {
                     find {
                         it.contentDescription?.toString()?.startsWith(
@@ -378,6 +435,9 @@ class WatchCarouselTest {
                 }
                 SystemClock.sleep(350)
                 capture("07-pet-first")
+                recordArtwork(service, cancel = false, "o1-pet-listening")
+                instrumentation.runOnMainSync { service.cancel() }
+                waitUntil { !service.state.value.connection.conversation.busy }
             }
             instrumentation.runOnMainSync { service.updateDraft("Unsent first") }
             swipe(true)
@@ -391,6 +451,15 @@ class WatchCarouselTest {
             capture("02-portrait-second")
             if (pets) {
                 waitUntil { service.state.value.pet?.name == "Carousel robot 2" }
+                val second = ProfilePages.merge(
+                    service.state.value.profiles,
+                    service.state.value.catalog
+                )
+                    .single { it.key == pages[1].key }
+                assertEquals(
+                    PresentationMode.PORTRAIT,
+                    service.state.value.presentation[second.presentationKey()]
+                )
                 SystemClock.sleep(350)
                 capture("08-pet-second")
             }
@@ -401,7 +470,18 @@ class WatchCarouselTest {
                     service.state.value.connection.status == ConnectionStatus.PAIRED
             }
             assertEquals("Unsent first", service.state.value.draft)
-            if (pets) assertEquals("Carousel robot 1", service.state.value.pet?.name)
+            if (pets) {
+                waitUntil { service.state.value.pet?.name == "Carousel robot 1" }
+                val first = ProfilePages.merge(
+                    service.state.value.profiles,
+                    service.state.value.catalog
+                )
+                    .single { it.key == pages.first().key }
+                assertEquals(
+                    PresentationMode.PET,
+                    service.state.value.presentation[first.presentationKey()]
+                )
+            }
             instrumentation.runOnMainSync { service.startRecording() }
             waitUntil {
                 service.state.value.connection.conversation.mode ==
@@ -579,30 +659,129 @@ class WatchCarouselTest {
         backward: Boolean = false,
         predicate: (AccessibilityNodeInfo) -> Boolean
     ): AccessibilityNodeInfo {
-        repeat(20) {
+        repeat(35) {
             find(predicate)?.let { return it }
             // The pager contains the focused rotary/vertical list. Compose exposes generic
             // forward/back actions for both, so target the focused inner list.
             val list = find { it.isScrollable && it.isFocused }
                 ?: error("Focused watch list missing")
-            list.performAction(
-                if (backward) {
-                    AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
-                } else {
-                    AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
-                }
-            )
+            check(list.isScrollable)
+            // Short settled touch steps overlap the round safe area; a full accessibility
+            // page can jump a short Settings action past the visible text band.
+            scrollStep(backward)
             instrumentation.waitForIdleSync()
             SystemClock.sleep(400)
         }
         error("Watch control missing")
     }
+    private fun scrollToTop() {
+        repeat(6) {
+            find {
+                it.isScrollable && it.isFocused
+            }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
+            SystemClock.sleep(150)
+        }
+        instrumentation.waitForIdleSync()
+    }
+
+    private fun scrollStep(backward: Boolean) {
+        val down = SystemClock.uptimeMillis()
+        fun event(action: Int, y: Float) {
+            val touch = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, 240f, y, 0)
+            touch.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+            automation.injectInputEvent(touch, true)
+            touch.recycle()
+        }
+        val start = if (backward) 180f else 320f
+        val direction = if (backward) 1 else -1
+        event(MotionEvent.ACTION_DOWN, start)
+        repeat(12) {
+            SystemClock.sleep(20)
+            event(MotionEvent.ACTION_MOVE, start + direction * (it + 1) * 10f)
+        }
+        repeat(8) {
+            SystemClock.sleep(30)
+            event(MotionEvent.ACTION_MOVE, start + direction * 120f)
+        }
+        event(MotionEvent.ACTION_UP, start + direction * 120f)
+    }
+
     private fun click(predicate: (AccessibilityNodeInfo) -> Boolean) {
         var node = find(predicate) ?: error("Watch control missing")
         while (!node.isClickable) node = node.parent ?: error("Clickable control missing")
         assertTrue(node.performAction(AccessibilityNodeInfo.ACTION_CLICK))
         SystemClock.sleep(250)
     }
+    private fun recordArtwork(service: GadgetService, cancel: Boolean, captureName: String) {
+        val node = requireNotNull(
+            find {
+                it.contentDescription?.toString()?.contains("Start recording") == true
+            }
+        )
+        val bounds = android.graphics.Rect().also(node::getBoundsInScreen)
+        val down = SystemClock.uptimeMillis()
+        fun event(action: Int, dy: Float = 0f) {
+            val touch = MotionEvent.obtain(
+                down,
+                SystemClock.uptimeMillis(),
+                action,
+                bounds.exactCenterX(),
+                bounds.exactCenterY() + dy,
+                0
+            )
+            touch.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+            automation.injectInputEvent(touch, true)
+            touch.recycle()
+        }
+        event(MotionEvent.ACTION_DOWN)
+        SystemClock.sleep(800)
+        waitUntil { service.state.value.captureActive }
+        val mounted = service.state.value
+        val page = ProfilePages.merge(mounted.profiles, mounted.catalog)
+            .single { it.key == mounted.selectedPage }
+        val mode = mounted.presentation[page.presentationKey()]
+        instrumentation.runOnMainSync {
+            service.setPresentation(
+                page.key,
+                PresentationKey.of("synthetic:wrong-profile", null),
+                PresentationMode.PET
+            )
+        }
+        assertEquals(mode, service.state.value.presentation[page.presentationKey()])
+        val otherMode = if (mode ==
+            PresentationMode.PORTRAIT
+        ) {
+            PresentationMode.PET
+        } else {
+            PresentationMode.PORTRAIT
+        }
+        instrumentation.runOnMainSync {
+            service.setPresentation(page.key, page.presentationKey(), otherMode)
+        }
+        waitUntil {
+            !service.state.value.presentationSaving &&
+                service.state.value.presentation[page.presentationKey()] == otherMode
+        }
+        assertTrue(
+            "Mode update must preserve the same locked recording",
+            service.state.value.captureActive
+        )
+        assertEquals(mounted.profile?.endpoint?.url, service.state.value.profile?.endpoint?.url)
+        assertEquals(mounted.selectedPage, service.state.value.selectedPage)
+        instrumentation.runOnMainSync {
+            service.setPresentation(page.key, page.presentationKey(), mode)
+        }
+        waitUntil {
+            !service.state.value.presentationSaving &&
+                service.state.value.presentation[page.presentationKey()] == mode
+        }
+        capture(captureName)
+        if (cancel) event(MotionEvent.ACTION_MOVE, 110f)
+        event(MotionEvent.ACTION_UP, if (cancel) 110f else 0f)
+        waitUntil { !service.state.value.captureActive }
+        if (cancel) waitUntil { !service.state.value.connection.conversation.busy }
+    }
+
     private fun swipe(next: Boolean, aborted: Boolean = false) {
         val start = if (aborted) {
             240f

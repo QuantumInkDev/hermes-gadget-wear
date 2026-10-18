@@ -89,6 +89,9 @@ class WatchPickerSurfaceTest {
                 loading = false,
                 selectedPage = pages.first().key,
                 connection = ConnectionState(status = ConnectionStatus.PAIRED),
+                artworkIdentities = mapOf(
+                    pages.first().key to PresentationKey.of(pages.first().key, endpoint.url)
+                ),
                 artwork = mapOf(pages.first().key to PageArtwork(portrait(), null))
             )
         )

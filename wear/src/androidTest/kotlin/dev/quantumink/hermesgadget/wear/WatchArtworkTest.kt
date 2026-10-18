@@ -142,6 +142,7 @@ class WatchArtworkTest {
         )
         val artwork = mutableStateOf(PageArtwork(portrait, null))
         val selected = mutableStateOf(true)
+        val choices = mutableStateOf(PresentationChoices())
         val page = ProfilePage("synthetic:p", "Fixture Agent", "Synthetic box", null, null)
         fun find(predicate: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo? {
             fun walk(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
@@ -175,7 +176,12 @@ class WatchArtworkTest {
                             artwork.value,
                             WatchState(
                                 connection = ConnectionState(status = ConnectionStatus.PAIRED),
-                                pet = artwork.value.pet
+                                pet = artwork.value.pet,
+                                presentationPets = artwork.value.pet?.let {
+                                    mapOf(page.presentationKey() to it)
+                                }.orEmpty(),
+                                artworkIdentities = mapOf(page.key to page.presentationKey()),
+                                presentation = choices.value
                             ),
                             selected.value
                         )
@@ -207,6 +213,14 @@ class WatchArtworkTest {
             instrumentation.runOnMainSync { artwork.value = PageArtwork(portrait, atlas) }
             SystemClock.sleep(350)
             assertEquals(before, label())
+            assertEquals("Incoming pet must preserve default Portrait", Color.BLUE, centerPixel())
+            instrumentation.runOnMainSync {
+                choices.value =
+                    PresentationChoices(
+                        mapOf(page.presentationKey().digest to PresentationMode.PET)
+                    )
+            }
+            SystemClock.sleep(150)
             val first = centerPixel()
             SystemClock.sleep(130)
             assertNotEquals(first, centerPixel())

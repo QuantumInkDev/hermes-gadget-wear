@@ -71,9 +71,15 @@ data class WatchState(
     val catalogNotice: String = "",
     val selectedPage: String = "",
     val artwork: Map<String, PageArtwork> = emptyMap(),
+    val artworkIdentities: Map<String, PresentationKey> = emptyMap(),
+    val presentationPets: Map<PresentationKey, PetAtlas> = emptyMap(),
     val path: TransportPath = TransportPath.DIRECT,
     val selecting: Boolean = false,
     val transportNotice: String = "",
+    val presentation: PresentationChoices = PresentationChoices(),
+    val presentationSaving: Boolean = false,
+    val presentationNotice: String = "",
+    val petEndpoint: String? = null,
     val pet: PetAtlas? = null,
     val petCue: String = "",
     val captureActive: Boolean = false,
@@ -120,6 +126,9 @@ class GadgetService : Service() {
         java.util.concurrent.ArrayBlockingQueue(3),
         { task -> Thread(task, "pet-storage").apply { isDaemon = true } }
     )
+    private val presentationArtEpoch = AtomicLong()
+    private var preparedArtworkIdentities = emptyMap<String, PresentationKey>()
+    private lateinit var presentationStore: PresentationStore
     private lateinit var petCache: PetCache
 
     @Volatile private var petManifest: PetManifest? = null
@@ -163,6 +172,7 @@ class GadgetService : Service() {
         CuePreferences.initialize(this)
         recordingCues = RecordingCues(this, watchLightHaptics = true)
         petCache = PetCache(this)
+        presentationStore = PresentationStore(java.io.File(filesDir, "profile-presentation"))
         catalog = WatchCatalogController(
             this,
             petCache,
@@ -178,7 +188,15 @@ class GadgetService : Service() {
                     )
                 }
             },
-            artwork = { artwork -> mutableState.update { it.copy(artwork = artwork) } }
+            artwork = { artwork ->
+                // Controller publishes only its latest prepare epoch on the main thread.
+                // Tag that projection before catalog keys or endpoints can be reused.
+                val identities = preparedArtworkIdentities.filterKeys { it in artwork }
+                val pictures = artwork.mapValues { (_, art) ->
+                    PageArtwork(art.portrait, null, art.animation)
+                }
+                mutableState.update { it.copy(artwork = pictures, artworkIdentities = identities) }
+            }
         )
         playback = PcmPlayback(
             this,
@@ -243,6 +261,24 @@ class GadgetService : Service() {
             }
         }
         storage.execute {
+            val modes = runCatching { presentationStore.read() }
+            main.post {
+                if (!destroyed) {
+                    modes.fold(
+                        { saved -> mutableState.update { it.copy(presentation = saved) } },
+                        {
+                            mutableState.update {
+                                it.copy(
+                                    presentationNotice =
+                                    "Saved presentation needs attention. " +
+                                        "Restore the private watch store or contact support; " +
+                                        "bytes were kept."
+                                )
+                            }
+                        }
+                    )
+                }
+            }
             opusReady = OpusSupport.probe()
             val restored = runCatching {
                 vault = IdentityVault(this)
@@ -358,10 +394,65 @@ class GadgetService : Service() {
         }
     }
 
+    fun setPresentation(pageKey: String, identity: PresentationKey, mode: PresentationMode) {
+        val watch = mutableState.value
+        if (watch.loading || watch.presentationSaving || watch.selectedPage != pageKey) return
+        val page =
+            ProfilePages.merge(watch.profiles, watch.catalog).singleOrNull { it.key == pageKey }
+                ?: return
+        if (page.presentationKey() != identity) return
+        mutableState.update { it.copy(presentationSaving = true) }
+        storage.execute {
+            val saved = runCatching { presentationStore.set(identity, mode) }
+            main.post {
+                if (destroyed) return@post
+                saved.fold(
+                    { choices ->
+                        mutableState.update {
+                            it.copy(
+                                presentation = choices,
+                                presentationSaving = false,
+                                presentationNotice = ""
+                            )
+                        }
+                    },
+                    { failure ->
+                        mutableState.update {
+                            it.copy(
+                                presentationSaving = false,
+                                presentationNotice = failure.message.orEmpty()
+                            )
+                        }
+                    }
+                )
+            }
+        }
+    }
+
     fun preparePages(keys: List<String>) {
         val watch = mutableState.value
         val pages = ProfilePages.merge(watch.profiles, watch.catalog)
-        catalog.prepare(keys.mapNotNull { key -> pages.singleOrNull { it.key == key } })
+        val prepared = keys.distinct().take(3).mapNotNull { key ->
+            pages.singleOrNull {
+                it.key ==
+                    key
+            }
+        }
+        preparedArtworkIdentities = prepared.associate { it.key to it.presentationKey() }
+        val request = presentationArtEpoch.incrementAndGet()
+        storage.execute {
+            if (request != presentationArtEpoch.get()) return@execute
+            val pets = prepared.mapNotNull { page ->
+                val endpoint = page.approved?.endpoint?.url ?: return@mapNotNull null
+                petCache.load(endpoint)?.let { page.presentationKey() to it }
+            }.toMap()
+            main.post {
+                if (!destroyed && request == presentationArtEpoch.get()) {
+                    mutableState.update { it.copy(presentationPets = pets) }
+                }
+            }
+        }
+        catalog.prepare(prepared)
     }
 
     fun rememberPage(key: String) {
@@ -479,6 +570,7 @@ class GadgetService : Service() {
                                 saving = false,
                                 draft = "",
                                 pet = null,
+                                petEndpoint = null,
                                 connection = ConnectionState()
                             )
                         }
@@ -850,12 +942,18 @@ class GadgetService : Service() {
         advertisedActions = actions
         val sameEndpoint = mutableState.value.profile?.endpoint?.url == profile.endpoint.url
         petManifest = null
-        if (!sameEndpoint) mutableState.update { it.copy(pet = null, petCue = "") }
+        if (!sameEndpoint) {
+            mutableState.update {
+                it.copy(pet = null, petEndpoint = null, petCue = "")
+            }
+        }
         storage.execute {
             val cached = petCache.load(profile.endpoint.url)
-            if (cached != null && version == epoch.get()) {
-                mutableState.update {
-                    if (version == epoch.get()) it.copy(pet = cached) else it
+            if (cached != null) {
+                main.post {
+                    if (!destroyed && version == epoch.get()) {
+                        mutableState.update { it.withPresentationPet(profile.endpoint.url, cached) }
+                    }
                 }
             }
         }
@@ -910,7 +1008,7 @@ class GadgetService : Service() {
                                     if (version == epoch.get() &&
                                         petManifest === manifest
                                     ) {
-                                        it.copy(pet = atlas)
+                                        it.withPresentationPet(profile.endpoint.url, atlas)
                                     } else {
                                         it
                                     }

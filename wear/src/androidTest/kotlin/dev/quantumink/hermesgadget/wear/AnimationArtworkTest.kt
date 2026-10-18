@@ -100,6 +100,7 @@ class AnimationArtworkTest {
         val watch = WatchState(
             catalog = listOf(page),
             selectedPage = page.key,
+            artworkIdentities = mapOf(page.key to PresentationKey.of(page.key, null)),
             artwork = mapOf(page.key to PageArtwork(portrait, null, cache.file(descriptor)))
         )
         try {
@@ -246,7 +247,7 @@ class AnimationArtworkTest {
                     PageArtwork(portrait, pet, cache.file(descriptor))
             }
             SystemClock.sleep(350)
-            assertEquals(Color.MAGENTA, pixel())
+            assertEquals("Pet arrival cannot override Portrait preference", Color.GREEN, pixel())
         } finally {
             if (changedMotion) restoreMotion()
             instrumentation.runOnMainSync {

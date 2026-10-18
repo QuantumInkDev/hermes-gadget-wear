@@ -38,6 +38,7 @@ class RecordingPortraitTest {
                 profile = profile,
                 profiles = listOf(profile),
                 connection = ConnectionState(status = ConnectionStatus.PAIRED),
+                artworkIdentities = mapOf(page.key to page.presentationKey()),
                 artwork = mapOf(page.key to PageArtwork(picture, null))
             )
         try {
