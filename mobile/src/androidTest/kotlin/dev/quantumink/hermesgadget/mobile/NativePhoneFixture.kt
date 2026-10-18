@@ -102,7 +102,7 @@ internal class NativePhoneFixture : AutoCloseable {
 
     fun find(text: String, description: Boolean = false): AccessibilityNodeInfo? {
         // Lazy-list scrolls can retain the old virtual children in UiAutomation's cache.
-        if (android.os.Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation.clearCache()
+        if (android.os.Build.VERSION.SDK_INT >= 34) instrumentation.uiAutomation.clearCache()
         fun walk(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
             node ?: return null
             val value = if (description) node.contentDescription else node.text

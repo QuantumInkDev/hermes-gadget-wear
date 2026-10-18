@@ -39,7 +39,7 @@ internal class WidgetHostFixture(context: Context) : AutoCloseable {
 internal object WidgetUi {
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     fun nodes(): List<AccessibilityNodeInfo> {
-        instrumentation.uiAutomation.clearCache()
+        if (android.os.Build.VERSION.SDK_INT >= 34) instrumentation.uiAutomation.clearCache()
         fun visit(node: AccessibilityNodeInfo): List<AccessibilityNodeInfo> = listOf(node) +
             (0 until node.childCount).flatMap { node.getChild(it)?.let(::visit).orEmpty() }
         return instrumentation.uiAutomation.rootInActiveWindow?.let(::visit).orEmpty()

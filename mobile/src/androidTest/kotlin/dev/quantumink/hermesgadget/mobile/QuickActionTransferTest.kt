@@ -66,7 +66,7 @@ class QuickActionTransferTest {
     }
 
     private fun delayedTransfer(route: String) {
-        assertTrue("Owned emulator only", android.os.Build.MODEL.startsWith("sdk_"))
+        assertTrue("Owned emulator only", isAndroidEmulator())
         val vault = CatalogVault(context)
         assertTrue(
             "Never overwrite existing setup",

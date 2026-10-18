@@ -21,7 +21,7 @@ class DirectoryNavigationTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
     private fun nodes(): List<AccessibilityNodeInfo> {
-        instrumentation.uiAutomation.clearCache()
+        if (android.os.Build.VERSION.SDK_INT >= 34) instrumentation.uiAutomation.clearCache()
         fun walk(node: AccessibilityNodeInfo): List<AccessibilityNodeInfo> = listOf(node) +
             (0 until node.childCount).flatMap { node.getChild(it)?.let(::walk).orEmpty() }
         return instrumentation.uiAutomation.rootInActiveWindow?.let(::walk).orEmpty()

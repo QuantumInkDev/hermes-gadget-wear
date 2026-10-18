@@ -48,7 +48,7 @@ class QuickActionLaunchTest {
     }
 
     @Test fun coldWarmLatestDeletedAndLockedLaunchesNeverEnrollOrSend() {
-        assertTrue("Owned emulator only", android.os.Build.MODEL.startsWith("sdk_"))
+        assertTrue("Owned emulator only", isAndroidEmulator())
         val vault = CatalogVault(context)
         assertTrue(
             "Never overwrite existing catalog",
