@@ -49,35 +49,39 @@ identity to bypass it. Explicit matching-signer `adb install -r`, recoverable ba
 post-install byte checks are required; stop on errors rather than using uninstall fallback.
 
 Private Akuma overlay v4 passes an actual production decoder/PCM playback fixture. All
-29,952 derived pixels are checked: zero outside-region changes; both open poses differ
-at 131 region pixels and differ from each other. Original inputs, identities/art/stores and
-settings are unchanged; original APKs are restored (98/99 baseline files identical, only
-the install marker changes). Art identity/continuous loops, authenticated art transfer and
-physical lip-sync/power remain open. No assignment changed. Kitana/Viper/Cthulhu remain
-queued behind accepted Akuma production art. N1/N2 Task1 private registry/grants/request
-journal implementation `0939b1e` has finished in its isolated frozen SDK. Its report
-records 536 distinct software/actual-core passes and ten explicit Windows-only skips.
-Fresh review finds one Important schema-constraint validation flaw and one deferred Minor
-result-depth inconsistency. Original-worker fix1 addresses schema validation; Windows
-Task1 execution and later real-core continuity remain separate gates. No methods enabled.
+29,952 derived mouth pixels are checked: zero outside-region changes, with both open
+poses differing at 131 region pixels. Controller inspection confirms the corrected
+listening necklace and permits continued private asset production; continuous motion,
+authenticated art delivery and physical lip-sync/power remain open. No assignment changed.
+Kitana has a selected compact base and native/watch previews; animation rows remain
+pending after two image-service connection failures. Viper and Cthulhu follow her.
+N1/N2 Task1 fix1 `c5ff24b` addresses the reviewed schema-constraint defect. It reports
+296 warning-strict SDK passes and 47 distinct actual-core passes; the latter had one
+initial subprocess timeout, followed by a separate 19-case pass with retries disabled.
+Fresh scoped review accepts the fix with no new Critical/Important findings. The Minor
+result-depth inconsistency remains deferred
+for the consumer contract. Task1 Windows execution and real two-device continuity are
+separate gates; no new method is enabled or candidate integrated.
 
 The accepted phone fixture has nine final native executions across API29/API37, zero
 skips, including large-font keyboard Save taps. The four-file fixture integration passes
-strict root checks (158 tasks, 25 executed). Native diagnostics Task2 is now implementing
-phone/watch health views and explicit safe report export in a fresh isolated worktree.
+strict root checks (158 tasks, 25 executed). Native diagnostics Task2 `4fc6ee8` is implemented and in fresh review: 67 JVM tests and
+16 native executions pass, including actual phone system-large text and Wear API33.
+Original APKs/settings are restored; ordinary runtime marker changes are disclosed.
 Only typed allowlisted data is exported; watch telemetry transfer is outside that increment.
 
-Read-only M5 rollout preflight found one shared gateway process owns all fifteen Gadget
-listeners, so a per-profile capability rollout still needs a reviewed grouped restart.
-Private source comparisons and stable backups/package manifests are prepared; no live
-source, configuration, enrollment or listener changed. The repository's historical
-Python3.11 environment passes 227 selected SDK checks, but the actual managed gateway
-uses Python3.14.7. The initial runtime label was corrected, and the separate actual-version
-selection now also passes all 227 checks without skips. All 36 preflight target hashes
-still match their before-state. A separate canonical real-core fixture run now passes
-47 tests with no failures/skips under that same managed runtime and read-only dependency
-set. Package review, drain/restart and live capability checks remain; these isolated
-results are not deployment evidence.
+Read-only M5 rollout preflight identifies twelve Gadget profiles and three auxiliary
+TCP listeners sharing one gateway, alongside other adapters. Any code restart is grouped.
+Stable private backups cover all 24 served-profile configuration/enrollment files and the
+existing service definition. Thirty transaction-consistent SQLite snapshots plus one
+empty placeholder total 93,798,400 bytes; these are per-database recovery artifacts,
+not one global transaction. No live source, configuration, enrollment or listener changed.
+The managed gateway uses Python3.14.7, distinct from the repository's Python3.11 venv.
+The actual-version isolated selection passes 227 SDK and 47 real-core tests without
+failure/skip. A prepared 22-runtime-file apply/rollback helper passes ten offline failure
+checks; read-only verification matches installed before hashes. Independent helper/package/
+procedure review and the bounded maintenance driver remain before any live execution.
+No install, drain, restart or capability activation follows from these checks.
 
 The owner asked for questions up front and will confirm wireless phone/watch connectivity
 before leaving. The initial eleven-question batch covers the proposed written design,

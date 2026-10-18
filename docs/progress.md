@@ -5,7 +5,8 @@ coverage by feature/source. Current physical inventory confirms phone Android 17
 and watch Android 16/API 36; modern owned emulators use API 37. API29 is the phone
 compatibility floor. Minimum Wear API33 motion-test failures were traced to fixture power,
 uiMode and navigation assumptions; the three-file correction has 26 passing affected
-native checks and awaits fresh review. No full minimum-Wear or physical pass is claimed.
+native checks, has a clean fresh review and is integrated as `e3afc20`. No full minimum-Wear
+or physical pass is claimed.
 
 ## Current expansion verification — 2026-10-18
 
@@ -44,34 +45,38 @@ identity to bypass it. Explicit matching-signer `adb install -r`, recoverable ba
 post-install byte checks are required; stop on errors rather than using uninstall fallback.
 
 Private Akuma overlay v4 passes an actual production decoder/PCM playback fixture. All
-29,952 derived pixels are checked: zero outside-region changes; both open poses differ
-at 131 region pixels and differ from each other. Original inputs, identities/art/stores and
-settings are unchanged; original APKs are restored (98/99 baseline files identical, only
-the install marker changes). Art identity/continuous loops, authenticated art transfer and
-physical lip-sync/power remain open. No assignment changed. Kitana/Viper/Cthulhu remain
-queued behind accepted Akuma production art. N1/N2 Task1 private registry/grants/request
-journal implementation `0939b1e` reports 536 distinct passing software/actual-core cases
-and ten explicit Windows-only skips. Fresh review finds one Important schema-constraint
-validation flaw; original-worker fix1 is active. A Minor result-depth inconsistency is
-retained for consumer-contract review. No new method is enabled or candidate integrated.
+29,952 derived mouth pixels are checked: zero outside-region changes, with both open
+poses differing at 131 region pixels. Controller inspection confirms the corrected
+listening necklace and permits continued private asset production; continuous motion,
+authenticated art delivery and physical lip-sync/power remain open. No assignment changed.
+Kitana has a selected compact base and native/watch previews; animation rows remain
+pending after two image-service connection failures. Viper and Cthulhu follow her.
+N1/N2 Task1 fix1 `c5ff24b` addresses the reviewed schema-constraint defect. It reports
+296 warning-strict SDK passes and 47 distinct actual-core passes; the latter had one
+initial subprocess timeout, followed by a separate 19-case pass with retries disabled.
+Fresh scoped review accepts the fix with no new Critical/Important findings. The Minor
+result-depth inconsistency remains deferred
+for the consumer contract. Task1 Windows execution and real two-device continuity are
+separate gates; no new method is enabled or candidate integrated.
 
 The approved phone follow-up has nine final native executions/five distinct methods
 on API29/API37, no skips, including settled-keyboard Save taps. The fixture integration
 passes strict root checks (158 tasks, 25 executed). N8 native health views and explicit
-safe export are now implementing in an isolated worktree; no watch telemetry transfer
+safe export are implemented at `4fc6ee8` and in fresh review; no watch telemetry transfer
 is claimed. New source checks cannot close the original N6 preservation incident.
 
-M5 live-rollout preparation compares installed source with the reviewed baseline and
-retains stable private file/configuration/enrollment backups plus an unapplied package.
-One gateway process owns fifteen listeners, requiring a reviewed grouped restart. No
-live file or listener changed. The repository Python3.11 environment passes 227 selected
-SDK checks; it is distinct from the running gateway's managed Python3.14.7 environment.
-That initial runtime labeling error is corrected. A separate private Python3.14.7 check
-with the actual selected gateway dependency versions also passes all 227 without skips;
-all 36 preflight target hashes still match. The canonical real-core recovery selection
-also passes 47 tests without failure/skip using that managed runtime and read-only
-dependencies. Package review and controlled rollout remain; no install/restart follows
-from isolated compatibility checks.
+Read-only M5 rollout preflight identifies twelve Gadget profiles and three auxiliary
+TCP listeners sharing one gateway, alongside other adapters. Any code restart is grouped.
+Stable private backups cover all 24 served-profile configuration/enrollment files and the
+existing service definition. Thirty transaction-consistent SQLite snapshots plus one
+empty placeholder total 93,798,400 bytes; these are per-database recovery artifacts,
+not one global transaction. No live source, configuration, enrollment or listener changed.
+The managed gateway uses Python3.14.7, distinct from the repository's Python3.11 venv.
+The actual-version isolated selection passes 227 SDK and 47 real-core tests without
+failure/skip. A prepared 22-runtime-file apply/rollback helper passes ten offline failure
+checks; read-only verification matches installed before hashes. Independent helper/package/
+procedure review and the bounded maintenance driver remain before any live execution.
+No install, drain, restart or capability activation follows from these checks.
 
 ## Expansion connectivity and first increments — 2026-10-18
 
