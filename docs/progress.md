@@ -41,7 +41,7 @@ post-install byte checks are required; stop on errors rather than using uninstal
 
 Private Akuma overlay v4 passes an actual production decoder/PCM playback fixture. All
 29,952 derived pixels are checked: zero outside-region changes; both open poses differ
-at131 region pixels and differ from each other. Original inputs, identities/art/stores and
+at 131 region pixels and differ from each other. Original inputs, identities/art/stores and
 settings are unchanged; original APKs are restored (98/99 baseline files identical, only
 the install marker changes). Art identity/continuous loops, authenticated art transfer and
 physical lip-sync/power remain open. No assignment changed. Kitana/Viper/Cthulhu remain

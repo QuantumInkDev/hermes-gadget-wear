@@ -144,9 +144,9 @@ beyond the plan's existing trust boundary and does not waive any mandatory nativ
 
 ## Verified Task1 completion
 
-Source/fix reviews through2b64698 are clean. Public patch6 freshly reapplies after
-patches1–5; all274 combined SDK files match reviewed source.402 affected software
-checks pass, with10 explicit Windows-only skips on Mac. Actual supported AMD64 and
+Source/fix reviews through `2b64698` are clean. Public patch 6 freshly reapplies after
+patches 1–5; all 274 combined SDK files match reviewed source. 402 affected software
+checks pass, with 10 explicit Windows-only skips on Mac. Actual supported AMD64 and
 ARM64 gateway interpreters each pass10 native methods, zero failures/errors/skips.
 Control bytes, exact private0xC0000022, disabled privileges, reversion and fixture/source
 cleanup are source-bound in private receipts. This completes this validator task, not

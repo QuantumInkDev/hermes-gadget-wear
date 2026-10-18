@@ -27,10 +27,10 @@ SDK patch 6 adds lazy, standard-library Win32 same-object inspection for private
 authority/storage paths and SQLite sidecars. It preserves the POSIX and stock-disabled
 paths. Exact User/SYSTEM/Administrators leaf owners/grants are allowed; TrustedInstaller
 is an ancestor-owner exception only. Unsafe paths/descriptors deny access without repair.
-Fresh pinned-source reapplication matches all274 reviewed Windows/pet SDK files. The
-export passes402 affected software checks, with10 explicit Windows-only skips on Mac;
-actual AMD64 and ARM64 gateway interpreters each pass all10 native methods, zero skips.
-The reduced token reads its permissive control and receives exact0xC0000022 for the
+Fresh pinned-source reapplication matches all 274 reviewed Windows/pet SDK files. The
+export passes 402 affected software checks, with 10 explicit Windows-only skips on Mac;
+actual AMD64 and ARM64 gateway interpreters each pass all 10 native methods, zero skips.
+The reduced token reads its permissive control and receives exact 0xC0000022 for the
 private leaf through fresh relative opens. This is the stated leaf-DACL test boundary,
 not another real account's full-path access. Existing installed source/ACLs/listeners and
 optional flags remain unchanged. Per-profile rollout preflight is still required.
