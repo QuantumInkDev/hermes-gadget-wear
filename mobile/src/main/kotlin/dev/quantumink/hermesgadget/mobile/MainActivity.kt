@@ -413,17 +413,20 @@ class MainActivity : ComponentActivity() {
 
     private fun requestQuickAction(
         reviewed: dev.quantumink.hermesgadget.protocol.QuickAction,
-        inputs: Map<String, String>
+        inputs: Map<String, String>,
+        previewIsCurrent: () -> Boolean
     ) {
+        if (!previewIsCurrent()) return
         val key = reviewed.profileKey ?: return
         if (phoneSelectionLocked(conversation.state.value)) {
             quickActionNotice = "Finish the current turn or approval before using an action."
             return
         }
         navigation.request(key, null, {
-            started && destination == "quick-actions" &&
+            previewIsCurrent() && started && destination == "quick-actions" &&
                 lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
         }) { resolved ->
+            if (!previewIsCurrent()) return@request
             val prompt = runCatching {
                 QuickActionNavigation.prompt(
                     reviewed,

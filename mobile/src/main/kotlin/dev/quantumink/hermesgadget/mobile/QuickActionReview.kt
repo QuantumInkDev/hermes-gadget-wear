@@ -9,6 +9,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,7 +27,7 @@ internal fun QuickActionReview(
     action: QuickAction,
     pages: List<CatalogPage>,
     locked: Boolean,
-    transfer: (QuickAction, Map<String, String>) -> Unit,
+    transfer: (QuickAction, Map<String, String>, () -> Boolean) -> Unit,
     edit: () -> Unit,
     back: () -> Unit,
     resetScroll: () -> Unit = {}
@@ -36,11 +37,25 @@ internal fun QuickActionReview(
     var values by remember(action) { mutableStateOf(emptyMap<String, String>()) }
     var preview by remember(action) { mutableStateOf<String?>(null) }
     val page = QuickActions.resolve(action, pages)
+    // Catalog reloads replace page objects; bind the lease to recipient configuration.
+    val generation = remember(action, page?.key, page?.profile?.gadgetUrl, page?.status) {
+        QuickActionReviewGeneration()
+    }
+    DisposableEffect(generation) {
+        onDispose { generation.close() }
+    }
+    fun invalidatePreview() {
+        generation.invalidate()
+        preview = null
+    }
     val expanded = runCatching { QuickActions.expand(action, values) }.getOrNull()
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Review action", style = MaterialTheme.typography.titleMedium)
         Text(action.title, style = MaterialTheme.typography.headlineSmall)
-        TextButton(back) { Text("Back to quick actions") }
+        TextButton({
+            invalidatePreview()
+            back()
+        }) { Text("Back to quick actions") }
         if (action.profileKey == null) {
             Text("Choose a profile in Edit action before reviewing.")
         } else if (page == null) {
@@ -53,14 +68,15 @@ internal fun QuickActionReview(
                     OutlinedTextField(
                         values[name].orEmpty(),
                         {
+                            invalidatePreview()
                             values = values + (name to it.take(8192))
-                            preview = null
                         },
                         label = { Text(name) },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
                 Button({
+                    invalidatePreview()
                     focus.clearFocus(force = true)
                     keyboard?.hide()
                     preview = expanded
@@ -78,19 +94,32 @@ internal fun QuickActionReview(
                 Text("Expanded prompt", style = MaterialTheme.typography.titleMedium)
                 Text(requireNotNull(preview))
                 TextButton({
-                    preview = null
+                    invalidatePreview()
                     resetScroll()
                 }) { Text("Change inputs") }
                 Text(
                     "Use this prompt replaces this profile’s saved draft. Connect and Send remain deliberate controls in Talk/Chat."
                 )
                 Button({
-                    transfer(action, values.toMap())
+                    val reviewedPrompt = preview
+                    val reviewedInputs = values.toMap()
+                    if (reviewedPrompt != null &&
+                        reviewedPrompt ==
+                        runCatching { QuickActions.expand(action, reviewedInputs) }.getOrNull()
+                    ) {
+                        val current = generation.capture()
+                        transfer(action, reviewedInputs) {
+                            current() && preview == reviewedPrompt && values == reviewedInputs
+                        }
+                    }
                 }, enabled = !locked) { Text("Use prompt in Talk/Chat") }
             }
         }
         if (locked) Text("Finish the current turn or approval before using an action.")
-        TextButton(edit) { Text("Edit action") }
+        TextButton({
+            invalidatePreview()
+            edit()
+        }) { Text("Edit action") }
     }
 }
 

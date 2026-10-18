@@ -12,6 +12,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class QuickActionUiTest {
@@ -30,7 +31,7 @@ class QuickActionUiTest {
         NativePhoneFixture().use { fixture ->
             var transferred = false
             fixture.show(scroll = true) {
-                QuickActionReview(action.copy(profileKey = null), listOf(page), false, { _, _ ->
+                QuickActionReview(action.copy(profileKey = null), listOf(page), false, { _, _, _ ->
                     transferred =
                         true
                 }, {}, {})
@@ -38,7 +39,7 @@ class QuickActionUiTest {
             assertNotNull(fixture.find("Choose a profile in Edit action before reviewing."))
             assertNull(fixture.find("Expanded prompt"))
             fixture.show(scroll = true) {
-                QuickActionReview(action, emptyList(), false, { _, _ ->
+                QuickActionReview(action, emptyList(), false, { _, _, _ ->
                     transferred =
                         true
                 }, {}, {})
@@ -58,7 +59,12 @@ class QuickActionUiTest {
                 var result = ""
                 fixture.show(mode, scroll = true) {
                     androidx.compose.runtime.key(mode) {
-                        QuickActionReview(action, listOf(page), false, { selected, inputs ->
+                        QuickActionReview(action, listOf(page), false, {
+                                selected,
+                                inputs,
+                                current
+                            ->
+                            assertTrue(current())
                             result =
                                 QuickActions.expand(selected, inputs)
                         }, {}, {})

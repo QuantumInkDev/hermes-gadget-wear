@@ -29,3 +29,21 @@ internal object QuickActionNavigation {
         return runCatching { QuickActions.expand(reviewed, inputs) }.getOrNull()
     }
 }
+
+/** UI-thread lease for one mounted action/profile review and its input revision. */
+internal class QuickActionReviewGeneration {
+    private var revision = 0L
+    private var mounted = true
+
+    fun invalidate() {
+        revision++
+    }
+    fun close() {
+        invalidate()
+        mounted = false
+    }
+    fun capture(): () -> Boolean {
+        val expected = revision
+        return { mounted && revision == expected }
+    }
+}

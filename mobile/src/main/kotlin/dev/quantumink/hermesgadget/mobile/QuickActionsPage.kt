@@ -35,7 +35,7 @@ import kotlinx.coroutines.withContext
 internal fun QuickActionsScreen(
     actionId: String?,
     locked: Boolean,
-    transfer: (QuickAction, Map<String, String>) -> Unit,
+    transfer: (QuickAction, Map<String, String>, () -> Boolean) -> Unit,
     back: () -> Unit,
     modifier: Modifier = Modifier
 ) {
