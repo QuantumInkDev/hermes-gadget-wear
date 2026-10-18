@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-18-relay-expansion-design.md`, scoped staged rollout and preservation requirements. The private accepted rollout procedure supplies concrete host bindings; personal paths, endpoints and receipts remain ignored.
 
+**Source-backed amendment:** partial implementation/review established that overall status timestamps cannot prove aggregate sample freshness. The separate [maintenance observation plan](2026-10-18-maintenance-observation.md) owns the producer prerequisite; the full driver must consume that reviewed contract and fail closed on old support. The original timestamp-only idle requirement below is insufficient and must not be implemented as authority. Live bootstrap remains separate.
+
 ## Global constraints
 
 - This plan authorizes isolated implementation/tests, followed by independent review. Its worker performs no live control, marker, source, service, device or provider operation.

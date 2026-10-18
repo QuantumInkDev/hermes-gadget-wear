@@ -1,5 +1,13 @@
 # Upstream work
 
+Planned, not implemented or installed: an optional `maintenance_observation` runtime-status
+object sampled only under an actually engaged external drain. The existing generic update
+timestamp can retain an old work count, so it cannot authorize the prepared rollout.
+The [isolated source plan](superpowers/plans/2026-10-18-maintenance-observation.md) requires
+strict source availability, per-instance sample identity, unchanged marker binding and
+real status/watcher tests. Export only its clean delta after review; preserve the separate
+bootstrap gate and current pinned Stage1 package. No new network/Gadget API is proposed.
+
 Baseline: Hermes Gadget SDK `v0.2.0`, commit `323e3303ab68981f810fc3208119cd8a22e64af0`; pet source snapshot `79af3f6cea8067284a7ea5725078578b3f790adb`. A local SDK patch series is prepared against the pinned base; no upstream pull request or maintainer agreement is claimed.
 
 | Proposal | Target | Status / gate |

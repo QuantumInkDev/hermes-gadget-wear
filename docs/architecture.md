@@ -1,5 +1,11 @@
 # Architecture
 
+Planned maintenance prerequisite: the [fresh observation plan](superpowers/plans/2026-10-18-maintenance-observation.md)
+adds an optional, explicitly sampled whole-gateway count to the existing local status path.
+Current generic status timestamps do not prove count freshness. This isolated producer is
+not installed; its consumer must reject missing/stale support, and installation requires
+a separately established pre-stop authority. It creates no Gadget method or service.
+
 ## Approved expansion architecture — 2026-10-18
 
 The approved [fifteen-feature design](superpowers/specs/2026-10-18-relay-expansion-design.md)
