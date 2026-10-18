@@ -5,7 +5,7 @@
 Both physical devices now have verified wireless ADB shell access on an isolated owned
 server. The owner's watch debugging pairing was renewed; Hermes enrollment, application
 data are preserved. The reviewed quick-action phone update is installed as recorded
-below; the watch retains its baseline build. Connection details are private under
+below; the reviewed Portrait/Pet watch update is also installed. Connection details are private under
 `.local/expansion/`.
 
 Reusable companion staging tooling at `c18b38e`, corrected by `4b7acd9`, passes 29
@@ -61,19 +61,35 @@ Integrated root source `c951b9e` passes 150 JVM tests /41 reports with zero fail
 errors or skips, strict checks, all four APKs and sequential formatting. These are source-
 bound software results, separate from worktree implementations and physical acceptance.
 
-Focused implementation handoffs: SDK/core finalizer integration through SDK `148e8d3`
-passes 71 warning-strict actual-core checks per clean/private-runtime fixture. Independent
-review found two Important registry/turn-context defects; original-worker fix round 1/5,
-public patch export/reapplication and Windows ACL activation support remain gates. A focused
+Focused implementation handoffs: SDK/core finalizer integration through SDK `e56d34d8`
+and clean hook `e956656d` passes fresh scoped review after the two Important registry/
+turn-context corrections. SDK patch 4 and the separately exported generic core hook v2
+reapply to fresh pinned sources: 265 SDK files and all 13 changed core files match the
+accepted source. Fresh warning-strict checks pass 187 SDK and 100 actual-core tests,
+without skips. Patches 1–3 and installed sources remain unchanged; private runtime
+modifications are excluded. Existing broader-core SQLite resource-warning debt is not
+claimed resolved. Native reconnect consumers, Windows verification and staged live
+activation remain gates. A focused
 [Windows storage plan](superpowers/plans/2026-10-18-windows-relay-storage.md) records the native
-validator and both-host gates; it is not implemented or activated.
-Watch Portrait/Pet `a29268d` has 157 JVM and 24 native passes/one explicit Battery Saver
-emulator skip plus synthetic carousel coverage; one Important portrait-provenance finding
-is in original-worker fix round 1/5. Phone audio `3f8d94e` has 162 JVM and 15 native
+validator and both-host gates; its isolated implementation is active, not activated.
+Watch Portrait/Pet `a29268d` plus provenance fix `1579d8c` has clean independent review,
+157 initial JVM/24 native passes, one explicit Battery Saver emulator skip and synthetic
+carousel coverage; the fix adds 11 focused JVM/21 native passes. Integrated as
+`dcc5ba4`/`b81564a`, it is installed on the watch with matching signer/hash and all 78
+baseline files, 19 identities, 29 artwork files, timeout and three tile/complication
+components preserved. No UI launch, pairing or live prompt occurred during installation;
+personal-art/live-pet/speech/Battery Saver observations remain open.
+Phone audio `3f8d94e` has 162 JVM and 15 native
 passes; `83f4ec2` adds tested Preparing voice/Stop UI with three focused native passes
 and affected strict build/format success. Full Task 1 review is clean with no findings;
 phone audio is integrated as `5cdc8d1`/`1fd00e9`. Settings/capacity and physical delivery
-remain separate phone gates. These handoffs are not accepted live features or physical app deliveries.
+remain separate phone gates. Source approval does not establish full live feature acceptance.
+
+Combined root `b81564a` passes 169 JVM tests/44 reports with zero failures/errors/skips,
+all four APK builds and sequential strict formatting. Structured-reply parser `be870de`
+has clean independent review and 23 new passing parser tests; its scoped protocol run
+has 132 passes/five explicit Python-fixture skips. Controller integration must run those
+fixtures; native card/action presentation remains a separate task.
 
 Reviewed phone audio root integration builds all four APKs with warning mode fail and
 passes sequential formatting. Profile-aware settings/64-entry vault Task 2 is active.

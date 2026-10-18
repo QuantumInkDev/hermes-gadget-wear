@@ -1,0 +1,657 @@
+diff --git a/gateway/delivery_ledger.py b/gateway/delivery_ledger.py
+index 7f65570484d9fe125ba73540a8670fa0ae824bda..ff182e52c475847fd8da59361f5ff45daf29fc26 100644
+--- a/gateway/delivery_ledger.py
++++ b/gateway/delivery_ledger.py
+@@ -25,6 +25,10 @@ from gateway.dead_targets import classify_dead_error
+ from hermes_cli.sqlite_util import add_column_if_missing
+ from hermes_constants import get_process_hermes_home
+ 
++class FinalDeliveryPending(RuntimeError):
++    """An adapter-owned recovery obligation still owns the canonical turn marker."""
++
++
+ logger = logging.getLogger(__name__)
+ _DB_LOCK = threading.Lock()
+ 
+@@ -206,6 +210,17 @@ def _initialize_schema(conn: sqlite3.Connection) -> None:
+     )
+     if "adapter_profile" not in {row[1] for row in conn.execute("PRAGMA table_info(delivery_obligations)")}:
+         add_column_if_missing(conn, "delivery_obligations", "adapter_profile", "adapter_profile TEXT")
++    if "delivery_context" not in {row[1] for row in conn.execute("PRAGMA table_info(delivery_obligations)")}:
++        add_column_if_missing(conn, "delivery_obligations", "delivery_context", "delivery_context TEXT")
++
++
++def get_delivery_context(obligation_id: str):
++    """Trusted adapter stamp stored atomically with the final; absent on old rows."""
++    import json
++    with _DB_LOCK, _transaction() as conn:
++        row = conn.execute("SELECT delivery_context FROM delivery_obligations WHERE obligation_id=?",
++                           (obligation_id,)).fetchone()
++        return json.loads(row[0]) if row and row[0] is not None else None
+ 
+ 
+ def _transaction():
+@@ -267,19 +282,39 @@ def compute_obligation_id(session_key: str, message_ref: str, content: str) -> s
+     return hashlib.sha256(f"{session_key}|{message_ref}|{content}".encode("utf-8", "replace")).hexdigest()[:24]
+ 
+ 
++def encode_delivery_context(context):
++    """Validate and detach a small trusted adapter identity (never final content)."""
++    import json
++    if context is None:
++        return None
++    if (not isinstance(context, dict) or not 1 <= len(context) <= 16
++            or not isinstance(context.get("kind"), str) or not context["kind"]
++            or any(not isinstance(key, str) or not 1 <= len(key) <= 64
++                   or type(value) not in (str, int, bool, type(None))
++                   or isinstance(value, str) and len(value) > 1024
++                   for key, value in context.items())):
++        raise ValueError("invalid delivery context")
++    encoded = json.dumps(context, allow_nan=False, sort_keys=True, separators=(",", ":"))
++    if len(encoded.encode("utf-8")) > 2048:
++        raise ValueError("delivery context too large")
++    return encoded
++
++
+ def record_obligation(*, obligation_id: str, session_key: str, platform: str, chat_id: str,
+-                      thread_id: Optional[str], content: str, adapter_profile: Optional[str] = None) -> None:
++                      thread_id: Optional[str], content: str, adapter_profile: Optional[str] = None,
++                      delivery_context: Optional[dict] = None) -> None:
+     """Record a final response as owed to the platform (state='pending')."""
++    encoded = encode_delivery_context(delivery_context)
+     now, (pid, started) = time.time(), _owner_stamp()
+     with _DB_LOCK, _transaction() as conn:
+         conn.execute(
+             """INSERT OR REPLACE INTO delivery_obligations
+                (obligation_id, session_key, platform, chat_id, thread_id,
+                 content, state, attempts, created_at, updated_at,
+-                owner_pid, owner_started_at, adapter_profile)
+-               VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?, ?)""",
++                owner_pid, owner_started_at, adapter_profile, delivery_context)
++               VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?, ?, ?)""",
+             (obligation_id, session_key, platform, str(chat_id), str(thread_id) if thread_id else None,
+-             content, now, now, pid, started, str(adapter_profile).strip() if adapter_profile else "default"))
++             content, now, now, pid, started, str(adapter_profile).strip() if adapter_profile else "default", encoded))
+         # Same transaction, same connection: the cron ledgers prune this way too
+         # (cron/delivery_queue._prune_terminal_unlocked, cron/executions._prune_unlocked).
+         _prune_unlocked(conn, now)
+@@ -287,24 +322,27 @@ def record_obligation(*, obligation_id: str, session_key: str, platform: str, ch
+ 
+ def record_crash_left_reply(*, obligation_id: str, session_key: str, platform: str, chat_id: str,
+                             thread_id: Optional[str], content: str, since: float,
+-                            adapter_profile: Optional[str] = None) -> None:
++                            adapter_profile: Optional[str] = None, delivery_context=None) -> None:
+     """Adopt a reply a killed process persisted but never ledgered. Unowned, so this boot's sweep
+     claims it, and 'attempting', because a streamed reply may already be on screen: it is
+     redelivered once, with the recovered marker. A no-op when the same reply was already ledgered
+     since *since* (the turn start), and idempotent across boots that die before their sweep."""
++    encoded = encode_delivery_context(delivery_context)
+     now = time.time()
+     with _DB_LOCK, _transaction() as conn:
+         conn.execute(
+             """INSERT OR IGNORE INTO delivery_obligations
+                (obligation_id, session_key, platform, chat_id, thread_id,
+                 content, state, attempts, created_at, updated_at,
+-                owner_pid, owner_started_at, adapter_profile)
+-               SELECT ?, ?, ?, ?, ?, ?, 'attempting', 0, ?, ?, NULL, NULL, ?
++                owner_pid, owner_started_at, adapter_profile, delivery_context)
++               SELECT ?, ?, ?, ?, ?, ?, 'attempting', 0, ?, ?, NULL, NULL, ?, ?
+                WHERE NOT EXISTS (SELECT 1 FROM delivery_obligations
+-                                 WHERE session_key = ? AND content = ? AND created_at >= ?)""",
++                                 WHERE session_key = ? AND
++                                 ((? IS NOT NULL AND delivery_context = ?) OR
++                                  (? IS NULL AND content = ? AND created_at >= ?)))""",
+             (obligation_id, session_key, platform, str(chat_id), str(thread_id) if thread_id else None,
+-             content, now, now, str(adapter_profile).strip() if adapter_profile else "default",
+-             session_key, content, since))
++             content, now, now, str(adapter_profile).strip() if adapter_profile else "default", encoded,
++             session_key, encoded, encoded, encoded, content, since))
+ 
+ 
+ def mark_attempting(obligation_id: str) -> None:
+diff --git a/gateway/platforms/base.py b/gateway/platforms/base.py
+index a8350f8da59bd6ef8adc05c54ddd2a1627205e1e..8f3c10da174cd55ef4f6176eb386302763fee6b9 100644
+--- a/gateway/platforms/base.py
++++ b/gateway/platforms/base.py
+@@ -4240,7 +4240,8 @@ class BasePlatformAdapter(ABC):
+                 platform=str(getattr(source.platform, "value", source.platform)),
+                 chat_id=source.chat_id, thread_id=getattr(source, "thread_id", None),
+                 content=text_content,
+-                adapter_profile=getattr(delivery_adapter, "_owner_profile", None))
++                adapter_profile=getattr(delivery_adapter, "_owner_profile", None),
++                delivery_context=delivery_adapter.final_delivery_context(event, session_key))
+             await asyncio.to_thread(mark_attempting, obligation_id)
+             return obligation_id
+         except Exception:
+@@ -4346,6 +4347,25 @@ class BasePlatformAdapter(ABC):
+             return
+         record_delivery(result)
+ 
++    # Optional edge adapters require the canonical final bracket even when a
++    # stream preview was already visible. Version gates concrete consumers.
++    FINAL_DELIVERY_CONTEXT_VERSION = 2
++
++    def requires_final_ledger(self, chat_id: str) -> bool:
++        return False
++
++    def final_delivery_context(self, event, session_key: str):
++        """Bounded adapter-owned recovery identity, never client routing metadata."""
++        return None
++
++    def bind_final_delivery_context(self, event, context, accepted_event=None):
++        """Bind an internal queued final to trusted held context; stock is unchanged."""
++        return event
++
++    async def send_recovered_final(self, row, content: str, metadata):
++        """Ledger replay only; adapters may recover text without replaying effects."""
++        return await self.send(chat_id=row["chat_id"], content=content, metadata=metadata)
++
+     async def send_final_ledgered(
+         self, event: MessageEvent, session_key: str, text_content: str, metadata: dict[str, Any], *,
+         reply_to: Optional[str], is_ephemeral_response: bool = False,
+@@ -4374,6 +4394,8 @@ class BasePlatformAdapter(ABC):
+     async def _release_turn_marker(self, event: MessageEvent) -> None:
+         """Clear the crash marker handed to this delivery lifecycle only once the final reply is ledgered or
+         nothing more is owed (no kill leaves a persisted reply with neither), then wake the drain. Idempotent."""
++        if getattr(event, "_final_delivery_pending", False):
++            return
+         if (getattr(event, "_turn_marker_handoff", False) and getattr(event, "_gateway_active_turn_token", None)
+                 and self.gateway_runner is not None):
+             await self.gateway_runner._clear_durable_active_turn(event)
+diff --git a/gateway/run_busy.py b/gateway/run_busy.py
+index 843d9cb9bb4ea636268f857734f523488f565b3f..757a8ff4316da92b12c9647095e74cba67fef53a 100644
+--- a/gateway/run_busy.py
++++ b/gateway/run_busy.py
+@@ -747,8 +747,8 @@ class GatewayBusySessionMixin:
+         anchor = self._reply_anchor_for_event(event)
+         inbound_id = str(event.message_id) if event.message_id else None
+         if turn.event is not None and turn.event is not event:
++            self._set_final_delivery_identity(turn.event, session_key, inbound_id)
+             turn.event.reply_anchor_override = anchor
+-            turn.event.ledger_message_id = inbound_id
+         if turn.ctx is not None:
+             turn.ctx.event_message_id = anchor
+             turn.ctx.inbound_message_id = inbound_id
+diff --git a/gateway/run_inbound.py b/gateway/run_inbound.py
+index f91f4305db60334b88bb713d8736cbf3c435bed1..0760e5b179a18c0733cb5730cfb7a6a1fa9e8a03 100644
+--- a/gateway/run_inbound.py
++++ b/gateway/run_inbound.py
+@@ -1685,10 +1685,25 @@ class GatewayInboundMixin(GatewayInboundHooksMixin, GatewayPluginInjectionMixin)
+ 
+     async def _mark_durable_active_turn(self, event: MessageEvent, session_key: str) -> bool:
+         """Persist the exact resolved routing key for this running turn."""
++        from gateway.platforms.base import BasePlatformAdapter
++        from gateway.delivery_ledger import FinalDeliveryPending
++        resolve = getattr(self, "_delivery_adapter_for", None)
++        source = getattr(event, "source", None)
++        adapter = resolve(source) if source is not None and callable(resolve) else None
++        context = (adapter.final_delivery_context(event, session_key)
++                   if isinstance(adapter, BasePlatformAdapter) else None)
+         try:
+-            token = await self.async_session_store.mark_turn_active(session_key)
++            if context is None:
++                token = await self.async_session_store.mark_turn_active(session_key)
++            else:
++                token = await self.async_session_store.mark_turn_active(
++                    session_key, delivery_context=context)
++                if not token:
++                    raise RuntimeError("final delivery identity could not be persisted")
+         except Exception as exc:
+             logger.warning("Could not persist active-turn marker for %s: %s", session_key, exc)
++            if context is not None or isinstance(exc, FinalDeliveryPending):
++                raise RuntimeError("final delivery identity unavailable; turn not started") from exc
+             return False
+         if not token:
+             return False
+@@ -1698,6 +1713,29 @@ class GatewayInboundMixin(GatewayInboundHooksMixin, GatewayPluginInjectionMixin)
+         event._gateway_active_turn_token = token
+         return True
+ 
++    def _set_final_delivery_identity(self, event: MessageEvent, session_key: str, message_ref) -> None:
++        """Publish a queued/redirect terminal id only with its durable recovery context.
++
++        The opening event/message_id is unchanged: an adapter's accepted enrollment
++        authority must not be replaced by the terminal input's enrollment.
++        """
++        from copy import copy
++        from gateway.platforms.base import BasePlatformAdapter
++        resolve = getattr(self, "_delivery_adapter_for", None)
++        source = getattr(event, "source", None)
++        adapter = resolve(source) if source is not None and callable(resolve) else None
++        previous = (adapter.final_delivery_context(event, session_key)
++                    if isinstance(adapter, BasePlatformAdapter) else None)
++        if previous is not None:
++            candidate = copy(event)
++            candidate.ledger_message_id = message_ref
++            replacement = adapter.final_delivery_context(candidate, session_key)
++            if getattr(event, "_gateway_active_turn_session_key", None) != session_key:
++                raise RuntimeError("final delivery handoff has no canonical turn owner")
++            self.session_store.replace_turn_delivery_context(
++                session_key, getattr(event, "_gateway_active_turn_token", None), previous, replacement)
++        event.ledger_message_id = message_ref
++
+     async def _clear_durable_active_turn(self, event: MessageEvent) -> bool:
+         """Best-effort CAS clear of the marker owned by *event* (3 attempts; never blocks agent/lease
+         release — a stale marker is bounded by the agent timeout and clean-start discard)."""
+diff --git a/gateway/run_notifications.py b/gateway/run_notifications.py
+index 312f0d270983cb9977d947fd800d4ac9d425a34f..daa287653ee78195553b1bfd101a18e444769d1c 100644
+--- a/gateway/run_notifications.py
++++ b/gateway/run_notifications.py
+@@ -363,9 +363,28 @@ class GatewayNotificationsMixin(GatewayUpdateNotificationsMixin, GatewayNotifica
+         inbound id the ledger falls back to the event's own (empty) message id. Adapters without
+         the base contract and sends without a session key keep the plain send."""
+         if session_key and isinstance(adapter, BasePlatformAdapter):
++            queued = MessageEvent(text="", source=source, ledger_message_id=inbound_message_id)
++            if type(adapter).bind_final_delivery_context is not BasePlatformAdapter.bind_final_delivery_context:
++                try:
++                    lookup = getattr(getattr(self, "session_store", None), "lookup_by_session_key", None)
++                    entry = lookup(session_key) if callable(lookup) else None
++                    context = getattr(entry, "active_turn_delivery_context", None)
++                    peek = getattr(self, "_peek_session_state", None)
++                    state = peek(session_key) if callable(peek) else None
++                    opening = getattr(getattr(state, "turn", None), "event", None)
++                    if context is not None and opening is not None:
++                        self._set_final_delivery_identity(opening, session_key, inbound_message_id)
++                        context = entry.active_turn_delivery_context
++                    queued = adapter.bind_final_delivery_context(queued, context, opening)
++                    if context is not None and opening is None:
++                        self.session_store.replace_turn_delivery_context(
++                            session_key, entry.active_turn_token, context,
++                            adapter.final_delivery_context(queued, session_key))
++                except Exception:
++                    from gateway.platforms.base import SendResult
++                    return SendResult(success=False, error="queued final identity unavailable")
+             result, _ = await adapter.send_final_ledgered(
+-                MessageEvent(text="", source=source, ledger_message_id=inbound_message_id),
+-                session_key, text_content, _mark_notify_metadata(metadata), reply_to=event_message_id)
++                queued, session_key, text_content, _mark_notify_metadata(metadata), reply_to=event_message_id)
+         else:
+             result = await adapter.send(source.chat_id, text_content, metadata=metadata)
+         if not getattr(result, "success", False):
+diff --git a/gateway/run_startup.py b/gateway/run_startup.py
+index 068da958488ff36082e2d97790b6644b42e84abd..28eb7466cc06a172a599e8d583b956142aa00c1e 100644
+--- a/gateway/run_startup.py
++++ b/gateway/run_startup.py
+@@ -469,13 +469,27 @@ class GatewayStartupMixin:
+                 content = row.get("marker", RECOVERED_MARKER) + content
+             metadata = {"thread_id": row["thread_id"]} if row.get("thread_id") else None
+             try:
+-                result = await adapter.send(chat_id=row["chat_id"], content=content, metadata=metadata)
++                from gateway.platforms.base import BasePlatformAdapter
++                if isinstance(adapter, BasePlatformAdapter):
++                    from gateway.delivery_ledger import get_delivery_context
++                    row = dict(row, delivery_context=await asyncio.to_thread(
++                        get_delivery_context, row["obligation_id"]))
++                    result = await adapter.send_recovered_final(row, content, metadata)
++                else:
++                    result = await adapter.send(chat_id=row["chat_id"], content=content, metadata=metadata)
+             except Exception as send_err:
+                 logger.warning("obligation %s: redelivery send raised: %s", row["obligation_id"], send_err)
+                 result = None
+             with _log_suppressed(logging.DEBUG, "delivery ledger update failed", exc_info=True):
+                 if result is not None and getattr(result, "success", False):
+                     await asyncio.to_thread(mark_delivered, row["obligation_id"])
++                    running = getattr(self, "_is_session_running", None)
++                    if (row.get("delivery_context") is not None
++                            and not (callable(running) and running(row["session_key"]))):
++                        # A queued intermediate final may recover while the same
++                        # chain still runs. Only terminal settlement releases it.
++                        await self.async_session_store.clear_turn_active_for_delivery(
++                            row["session_key"], row["delivery_context"])
+                     redelivered += 1
+                     logger.info(
+                         "Redelivered recovered final response to %s:%s (obligation %s, attempt %d)",
+@@ -767,12 +781,12 @@ class GatewayStartupMixin:
+             self.session_store._ensure_loaded_locked()
+             marked = [
+                 (e.session_key, e.session_id, e.active_turn_token, e.active_turn_started_at, e.origin,
+-                 e.transport_profile)
++                 e.transport_profile, e.active_turn_delivery_context)
+                 for e in self.session_store._entries.values()
+                 if e.active_turn_token and e.active_turn_started_at and e.origin and not e.suspended
+             ]
+         ledgered = 0
+-        for key, session_id, token, started_at, origin, profile in marked:
++        for key, session_id, token, started_at, origin, profile, context in marked:
+             started = started_at.timestamp()  # aware UTC marker; a pre-upgrade naive one reads as local
+             if started < cutoff:
+                 continue
+@@ -785,7 +799,8 @@ class GatewayStartupMixin:
+                     record_crash_left_reply,
+                     obligation_id=compute_obligation_id(key, f"crash:{token}", text), session_key=key,
+                     platform=str(getattr(origin.platform, "value", origin.platform)), chat_id=origin.chat_id,
+-                    thread_id=origin.thread_id, content=text, since=started, adapter_profile=profile)
++                    thread_id=origin.thread_id, content=text, since=started, adapter_profile=profile,
++                    delivery_context=context)
+             if await self.async_session_store.clear_turn_active(key, token) and text:
+                 ledgered += 1
+         return ledgered
+diff --git a/gateway/run_turn.py b/gateway/run_turn.py
+index 2cd5315513d8ad484c32dd8a68acdac7d14f2625..e0c05c0d658a6a963a41695b6728bee60f8fee95 100644
+--- a/gateway/run_turn.py
++++ b/gateway/run_turn.py
+@@ -290,7 +290,7 @@ class GatewayTurnMixin(GatewayTurnPrepareMixin, GatewayTurnHygieneMixin, Gateway
+             if isinstance(agent_result, dict):
+                 _terminal_inbound = agent_result.get("queued_terminal_inbound_id")
+                 if _terminal_inbound:
+-                    event.ledger_message_id = str(_terminal_inbound)
++                    self._set_final_delivery_identity(event, session_key, str(_terminal_inbound))
+                 if "queued_terminal_notification_category" in agent_result:
+                     event.metadata["notification_category"] = agent_result["queued_terminal_notification_category"]
+                 if isinstance(agent_result.get("_notification_reply_muted"), bool):
+diff --git a/gateway/run_turn_prepare.py b/gateway/run_turn_prepare.py
+index a2e2052c8de96230510e4f500c8162f8bf538af8..39308e3ade99938a5786c4be9e00ed2ee133eb45 100644
+--- a/gateway/run_turn_prepare.py
++++ b/gateway/run_turn_prepare.py
+@@ -663,7 +663,11 @@ class GatewayTurnPrepareMixin:
+ 
+         # A turn becomes durable recovery work only after it owns the per-session lease; marking
+         # earlier would falsely recover a message that never began processing.
+-        await self._mark_durable_active_turn(event, session_entry.session_key)
++        try:
++            await self._mark_durable_active_turn(event, session_entry.session_key)
++        except Exception:
++            self._clear_session_env(_session_env_tokens)
++            raise
+ 
+         # An unreadable store is not an empty conversation: stop before the agent invents continuity
+         # from []. Restore task-local context here (before the broad cleanup finally).
+diff --git a/gateway/session.py b/gateway/session.py
+index 4f4f895c923aa1e440b535ff4cf720e87b1fc4cd..8bacbd3d1c3f2e99a09ee3079ff88e8ca4d607c6 100644
+--- a/gateway/session.py
++++ b/gateway/session.py
+@@ -529,6 +529,7 @@ class SessionEntry:
+     # SIGKILL/OOM so unclean startup recovers the exact session instead of guessing.
+     active_turn_token: Optional[str] = None
+     active_turn_started_at: Optional[datetime] = None
++    active_turn_delivery_context: Optional[dict] = None
+     # Session-scoped /model override (model/provider/base_url ONLY — never credentials, see
+     # sanitize_model_override). Persisted so a restart keeps the chosen model.
+     model_override: Optional[dict[str, str]] = None
+@@ -571,6 +572,7 @@ class SessionEntry:
+         result["last_resume_marked_at"] = _iso(self.last_resume_marked_at)
+         result["active_turn_token"] = self.active_turn_token
+         result["active_turn_started_at"] = _iso(self.active_turn_started_at)
++        result["active_turn_delivery_context"] = self.active_turn_delivery_context
+         result.update((name, getattr(self, name)) for name in self._RESET_FIELDS)
+         if self.model_override:
+             # Defence-in-depth against an unsanitized dict stored directly.
+@@ -623,6 +625,7 @@ class SessionEntry:
+             chat_type=data.get("chat_type", "dm"), metadata=dict(data.get("metadata") or {}),
+             last_resume_marked_at=_parse_iso(data.get("last_resume_marked_at")),
+             active_turn_token=token, active_turn_started_at=started_at,
++            active_turn_delivery_context=data.get("active_turn_delivery_context"),
+             model_override=sanitize_model_override(data.get("model_override")),
+             prompt_pin=sanitize_prompt_pin(data.get("prompt_pin")),
+             transport_profile=transport_profile if isinstance(transport_profile, str) and transport_profile else None,
+diff --git a/gateway/session_ingress.py b/gateway/session_ingress.py
+index 2a0e12cd142af4067192c70cfc1a964f199c7cc4..4c55368764740b6917f237e659aa5aee7ed9d59c 100644
+--- a/gateway/session_ingress.py
++++ b/gateway/session_ingress.py
+@@ -166,6 +166,8 @@ async def deliver_resolved(authority, admission_id, *, owed):
+ 
+ 
+ async def _release_turn_marker(authority, event):
++    if getattr(event, '_final_delivery_pending', False):
++        return
+     if getattr(event, '_gateway_active_turn_token', None):
+         await authority.runner._clear_durable_active_turn(event)
+ 
+diff --git a/gateway/session_lifecycle.py b/gateway/session_lifecycle.py
+index 3f13ced631994414a2dbd7ddc2b29a5c2326cda2..76d1a37f8c2ee21625a7aa34e2b030493ff6ea13 100644
+--- a/gateway/session_lifecycle.py
++++ b/gateway/session_lifecycle.py
+@@ -120,10 +120,16 @@ class SessionLifecycleMixin:
+         """
+         return self._update_entry(session_key, lambda e: setattr(e, "suspended", True))
+ 
+-    def _set_turn_marker_locked(self, session_key: str, entry: SessionEntry, token, started_at) -> None:
++    def _set_turn_marker_locked(self, session_key: str, entry: SessionEntry, token, started_at,
++                                delivery_context=None) -> None:
+         """Persist the active-turn pair BEFORE publishing it in memory, so a failed write can
+         neither leak an unowned token nor drop a live one. Lock held."""
++        from gateway.delivery_ledger import encode_delivery_context
++        import json
++        encoded = encode_delivery_context(delivery_context)
++        delivery_context = json.loads(encoded) if encoded is not None else None
+         candidate = entry.to_dict()
++        candidate["active_turn_delivery_context"] = delivery_context
+         candidate["active_turn_token"] = token
+         candidate["active_turn_started_at"] = _iso(started_at)
+         touched = _now() if started_at is not None else None
+@@ -132,12 +138,13 @@ class SessionLifecycleMixin:
+             # downgrade/upgrade window.
+             candidate["updated_at"] = touched.isoformat()
+         self._save_entry(session_key, entry_data=candidate, lock_held=True)
++        entry.active_turn_delivery_context = delivery_context
+         entry.active_turn_token = token
+         entry.active_turn_started_at = started_at
+         if touched is not None:
+             entry.updated_at = touched
+ 
+-    def mark_turn_active(self, session_key: str) -> Optional[str]:
++    def mark_turn_active(self, session_key: str, *, delivery_context=None) -> Optional[str]:
+         """Persist exact ownership of the running agent turn; returns the opaque token for
+         :meth:`clear_turn_active`. Re-marking replaces the previous token so a stale asynchronous
+         unwind cannot clear a newer turn."""
+@@ -146,9 +153,12 @@ class SessionLifecycleMixin:
+             entry = self._entry_locked(session_key)
+             if entry is None:
+                 return None
++            if entry.active_turn_token and entry.active_turn_delivery_context is not None:
++                from gateway.delivery_ledger import FinalDeliveryPending
++                raise FinalDeliveryPending("unresolved final delivery still owns this turn marker")
+             # Aware UTC, unlike the local wall clock elsewhere: the next process compares it with
+             # epoch transcript timestamps and may run in another zone (DST, container vs unit TZ).
+-            self._set_turn_marker_locked(session_key, entry, token, datetime.now(UTC))
++            self._set_turn_marker_locked(session_key, entry, token, datetime.now(UTC), delivery_context)
+         return token
+ 
+     def clear_turn_active(self, session_key: str, token: str) -> bool:
+@@ -161,6 +171,33 @@ class SessionLifecycleMixin:
+             self._set_turn_marker_locked(session_key, entry, None, None)
+         return True
+ 
++    def replace_turn_delivery_context(self, session_key: str, token: str, previous, replacement) -> None:
++        """CAS the recovery identity before publishing a terminal-input handoff."""
++        from gateway.delivery_ledger import encode_delivery_context, FinalDeliveryPending
++        before, after = encode_delivery_context(previous), encode_delivery_context(replacement)
++        if before is None or after is None:
++            raise ValueError("delivery identity cannot be removed during handoff")
++        with self._lock:
++            entry = self._entry_locked(session_key)
++            if (entry is None or not token or entry.active_turn_token != token
++                    or encode_delivery_context(entry.active_turn_delivery_context) != before):
++                raise FinalDeliveryPending("final delivery handoff lost marker ownership")
++            self._set_turn_marker_locked(session_key, entry, token, entry.active_turn_started_at, replacement)
++
++    def clear_turn_active_for_delivery(self, session_key: str, delivery_context) -> bool:
++        """A recovered final may release only its own still-held context."""
++        from gateway.delivery_ledger import encode_delivery_context
++        wanted = encode_delivery_context(delivery_context)
++        if wanted is None:
++            return False
++        with self._lock:
++            entry = self._entry_locked(session_key)
++            if (entry is None or not entry.active_turn_token
++                    or encode_delivery_context(entry.active_turn_delivery_context) != wanted):
++                return False
++            self._set_turn_marker_locked(session_key, entry, None, None)
++        return True
++
+     def recover_interrupted_turns(self, max_age_seconds: int = 60 * 60) -> int:
+         """Promote crash-left turn markers into ``resume_pending`` (unclean startup only).
+         Old/invalid markers are cleared without resuming; suspended sessions are never re-armed.
+@@ -172,6 +209,10 @@ class SessionLifecycleMixin:
+             nonlocal promoted
+             if not entry.active_turn_token:
+                 return False
++            if entry.active_turn_delivery_context is not None:
++                # An adapter-owned final identity is not permission to rerun a
++                # model/tool turn. Recovery must settle its final or leave it held.
++                return False
+             started_at = entry.active_turn_started_at
+             # Epoch arithmetic: a pre-upgrade naive marker reads as local time, an aware one exactly.
+             marker_is_stale = started_at is None or (
+@@ -187,6 +228,7 @@ class SessionLifecycleMixin:
+                     entry.resume_reason = "restart_interrupted"
+                     entry.last_resume_marked_at = now  # freshness starts at discovery
+                     promoted += 1
++            entry.active_turn_delivery_context = None
+             entry.active_turn_token = None
+             entry.active_turn_started_at = None
+             return True
+@@ -199,6 +241,9 @@ class SessionLifecycleMixin:
+         def _discard(entry: SessionEntry) -> bool:
+             if not entry.active_turn_token and entry.active_turn_started_at is None:
+                 return False
++            if entry.active_turn_delivery_context is not None:
++                return False
++            entry.active_turn_delivery_context = None
+             entry.active_turn_token = None
+             entry.active_turn_started_at = None
+             return True
+diff --git a/gateway/stream_consumer_transport.py b/gateway/stream_consumer_transport.py
+index 3be6b06a52432cac2846c4e9b4e458f2e5779d28..994ab0f10c7c16f840f1e3d1e8c90d169be8081e 100644
+--- a/gateway/stream_consumer_transport.py
++++ b/gateway/stream_consumer_transport.py
+@@ -315,6 +315,11 @@ class StreamTransportMixin:
+         """Send or edit the streaming message; True if delivered.  ``finalize`` marks the
+         last edit.  Transport order: native frame → draft frame → edit existing → first
+         send; a transport returns None to fall through to the next."""
++        # A preview has no canonical input identity. Leave its final to the
++        # event-bearing bracket, including after a disconnected draft transport.
++        if (finalize and is_turn_final and isinstance(self.adapter, _BasePlatformAdapter)
++                and self.adapter.requires_final_ledger(self.chat_id) is True):
++            return False
+         text = self._clean_for_display(text)
+         # Stream-is-the-message draft frames must stay prefix-stable: a closing ```
+         # on a mid-code-block frame makes frame N not a prefix of N+1 and the
+diff --git a/tests/gateway/test_adapter_final_delivery_context.py b/tests/gateway/test_adapter_final_delivery_context.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..4998d5f4dd5d73ed57eae3874dd0a8eb6c1d6740
+--- /dev/null
++++ b/tests/gateway/test_adapter_final_delivery_context.py
+@@ -0,0 +1,122 @@
++"""Optional adapter recovery identity; stock context-free marker semantics stay intact."""
++from contextlib import closing
++import json
++from types import SimpleNamespace
++
++import pytest
++
++from gateway import delivery_ledger as ledger
++from gateway.config import GatewayConfig, Platform
++from gateway.session import SessionSource, SessionStore
++
++
++@pytest.fixture
++def store(tmp_path, monkeypatch):
++    monkeypatch.setattr(ledger, '_db_path', lambda: tmp_path / 'ledger.db')
++    result = SessionStore(sessions_dir=tmp_path / 'sessions', config=GatewayConfig())
++    result._db = None  # exact legacy JSON persistence boundary, independent of test home's DB
++    yield result
++    result.close_all_db_handles()
++
++
++def entry(store):
++    return store.get_or_create_session(SessionSource(platform=Platform.TELEGRAM,
++        chat_id='synthetic-chat', chat_type='dm', user_id='synthetic-user'))
++
++
++@pytest.mark.parametrize('context', [[], {}, {'kind': ''}, {'kind': 'x', 'payload': []},
++    {'kind': 'x', 'payload': {'nested': True}}, {'kind': 'x', 'payload': float('nan')},
++    {'kind': 'x', 'payload': 'x' * 1025}, {'kind': 'x', **{str(i): i for i in range(20)}}])
++def test_invalid_context_never_publishes_marker(store, context):
++    e = entry(store)
++    before = e.to_dict()
++    with pytest.raises(ValueError):
++        store.mark_turn_active(e.session_key, delivery_context=context)
++    assert e.to_dict() == before
++
++
++def test_atomic_identity_restart_and_compare_clear(store):
++    e = entry(store)
++    first = {'kind': 'synthetic-v1', 'identity': 'first', 'owner': 'one'}
++    token = store.mark_turn_active(e.session_key, delivery_context=first)
++    first['owner'] = 'mutated caller'
++    assert e.active_turn_delivery_context['owner'] == 'one'
++    loaded = SessionStore(sessions_dir=store.sessions_dir, config=GatewayConfig())
++    loaded._db = None
++    try:
++        loaded._ensure_loaded()
++        recovered = loaded._entries[e.session_key]
++        assert recovered.active_turn_token == token
++        assert loaded.recover_interrupted_turns() == 0
++        assert loaded.discard_active_turn_markers() == 0
++        with pytest.raises(RuntimeError, match='unresolved final'):
++            loaded.mark_turn_active(e.session_key, delivery_context={'kind': 'synthetic-v1', 'identity': 'next'})
++        assert not loaded.clear_turn_active_for_delivery(e.session_key, first)
++        assert loaded.clear_turn_active_for_delivery(e.session_key, recovered.active_turn_delivery_context)
++        assert recovered.active_turn_token is None
++        assert recovered.active_turn_delivery_context is None
++        # Stock re-mark/cas and interrupted replay semantics remain available.
++        previous = loaded.mark_turn_active(e.session_key)
++        current = loaded.mark_turn_active(e.session_key)
++        assert current != previous and not loaded.clear_turn_active(e.session_key, previous)
++        assert loaded.recover_interrupted_turns() == 1
++    finally:
++        loaded.close_all_db_handles()
++
++
++def test_distinct_same_text_crash_rows_use_context_identity(store):
++    args = dict(session_key='synthetic-session', platform='telegram', chat_id='chat',
++                thread_id=None, content='same answer', since=0)
++    first = {'kind': 'synthetic-v1', 'identity': 'one'}
++    second = {'kind': 'synthetic-v1', 'identity': 'two'}
++    ledger.record_crash_left_reply(obligation_id='one', delivery_context=first, **args)
++    ledger.record_crash_left_reply(obligation_id='two', delivery_context=second, **args)
++    ledger.record_crash_left_reply(obligation_id='retry', delivery_context=first, **args)
++    with closing(ledger._connect()) as db:
++        assert db.execute('SELECT count(*) FROM delivery_obligations').fetchone()[0] == 2
++    assert ledger.get_delivery_context('one') == first
++    assert ledger.get_delivery_context('two') == second
++
++
++def test_legacy_row_context_is_absent_and_context_is_bounded(store):
++    ledger.record_obligation(obligation_id='old', session_key='session', platform='telegram',
++                             chat_id='chat', thread_id=None, content='answer')
++    assert ledger.get_delivery_context('old') is None
++    with pytest.raises(ValueError):
++        ledger.encode_delivery_context({'kind': 'x', 'a': 'x' * 1024, 'b': 'x' * 1024})
++
++
++def test_terminal_context_handoff_requires_exact_owner_and_detaches(store):
++    e = entry(store)
++    original = {'kind': 'synthetic-v2', 'accepted_identity': 'A', 'identity': 'A'}
++    terminal = {'kind': 'synthetic-v2', 'accepted_identity': 'A', 'identity': 'B'}
++    token = store.mark_turn_active(e.session_key, delivery_context=original)
++    with pytest.raises(RuntimeError, match='lost marker ownership'):
++        store.replace_turn_delivery_context(e.session_key, 'stale-token', original, terminal)
++    with pytest.raises(RuntimeError, match='lost marker ownership'):
++        store.replace_turn_delivery_context(e.session_key, token, terminal, original)
++    assert e.active_turn_delivery_context == original
++    store.replace_turn_delivery_context(e.session_key, token, original, terminal)
++    terminal['accepted_identity'] = 'caller mutation'
++    assert e.active_turn_delivery_context == {'kind': 'synthetic-v2', 'accepted_identity': 'A', 'identity': 'B'}
++    assert not store.clear_turn_active_for_delivery(e.session_key, original)
++    assert store.clear_turn_active_for_delivery(e.session_key, e.active_turn_delivery_context)
++
++
++@pytest.mark.asyncio
++async def test_default_queued_hook_does_not_read_context_store():
++    from unittest.mock import AsyncMock
++    from gateway.config import PlatformConfig
++    from gateway.platforms.base import SendResult
++    from plugins.platforms.telegram.adapter import TelegramAdapter
++    from gateway.run import GatewayRunner
++    adapter = TelegramAdapter(PlatformConfig(enabled=True))
++    adapter.send_final_ledgered = AsyncMock(return_value=(SendResult(success=True), adapter))
++    runner = GatewayRunner.__new__(GatewayRunner)
++    def forbidden(*args):
++        raise AssertionError('stock queued delivery must not read adapter context')
++    runner.session_store = SimpleNamespace(lookup_by_session_key=forbidden)
++    source = SessionSource(platform=Platform.TELEGRAM, chat_id='synthetic', user_id='stock', chat_type='dm')
++    assert (await runner._send_queued_final_text(adapter, source, 'answer', None, None, 'session', 'B')).success
++    event = adapter.send_final_ledgered.await_args.args[0]
++    assert event.message_id is None and event.ledger_message_id == 'B'

@@ -8,7 +8,8 @@ Baseline: Hermes Gadget SDK `v0.2.0`, commit `323e3303ab68981f810fc3208119cd8a22
 | Optional client TTS and profile voice hint | Gadget SDK | Patch 3 implemented/tested; opt-in negotiation and final text; physical/provider gate open |
 | Pet manifest and bounded PNG asset transfer on channel 4 | Gadget SDK | Patch 2 implemented/tested; Android delivery/cache checks pass; real-profile/Ultra gate open |
 | Optional companion metadata and extra rows in one hatch normalization pass | Hermes Agent | Later-row registration tool implemented/tested; same-hatch generator change remains proposed |
-| Pending outbox on reconnect | Gadget SDK | [Bounded retention/deduplication proposal](pending-outbox.md); not implemented |
+| Pending outbox on reconnect | Gadget SDK | Patch 4 implemented and independently reviewed; enrolled-key grants, bounded silent read/ACK and durable final capture; fresh export/host/live gates tracked in progress |
+| Generic adapter final-delivery context and coherent queue/recovery handoff | Hermes Agent | [Clean core patch](../server/core-patches/README.md), hook version 2; 100 focused actual-core checks per clean/private-runtime fixture; no upstream agreement or live activation |
 | Profile discovery/select with multiplexed gateway | Gadget SDK / Hermes Agent | [V2 design proposal](profiles-v2.md) only; **DECISION** and upstream maintainer feedback before implementation |
 | Read-only watch catalog projection from host profile/avatar inventory | Hermes Agent / self-host catalog tooling | [Multi-box carousel design](superpowers/specs/2026-10-11-multi-box-profile-carousel-design.md) approved for isolated development; independent Gadget endpoints; live rollout requires review |
 
@@ -26,3 +27,13 @@ modifying stock SDK v0.2.0. The app's real three-stock-server and three-TLS-cata
 independent URLs and pairing keys remain the routing boundary. Proposed private per-box
 mappings, installation and rollback notes are prepared for owner review. No live deployment,
 new pairing, upstream PR or agreement is claimed. Existing SDK patch exports remain unchanged.
+
+The 2026-10-18 outbox increment exports SDK patch 4 and a separate clean-core hook patch.
+Independent review accepts the registry-completeness and queued/redirected provenance
+corrections. Recovered text never triggers automatic speech, tool work or approvals.
+Fresh pinned-source reapplication passes 187 SDK and 100 actual-core warning-strict
+checks without skips; 265 SDK files and all 13 changed core files match reviewed source.
+Native Windows storage validation is a required follow-up; the current Windows gate
+remains closed. Private existing core modifications are excluded from the public delta.
+Earlier software/stock compatibility evidence is not a claim of full-core warning
+cleanliness, physical speech, continuity/task implementation or live deployment.

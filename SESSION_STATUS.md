@@ -45,19 +45,22 @@ and implementation activity do not establish live integration.
 Latest: outbox storage `d097717` is independently approved in the isolated SDK, with
 39 storage +30 stock/extension warning-strict passes. Grant/wire task 2 through `dbead4db`
 has clean spec/quality review after its cancellation correction; 119 affected grants/service
-and 30 compatibility checks pass warning-strict. Actual-core Task 3 initial handoff through SDK `148e8d3` has 71 warning-strict checks
-per clean/private-runtime fixture. Independent review found two Important defects:
-registry load-completeness provenance after stock re-enrollment and queued/redirected
-marker/final-context coherence. The original implementer is in fix round 1/5 with actual
-socket/core regressions required. Trusted context/durable recovery remain unaccepted
-until fresh scoped review and public patch reapplication. Windows activation is still denied pending a real ACL
-verifier and host evidence. A focused
+and 30 compatibility checks pass warning-strict. Actual-core Task 3 is accepted after
+fix round 1: SDK `e56d34d8` and clean-core hook `e956656d` preserve registry-load
+completeness and accepted/terminal turn provenance, including real queued/redirected
+and crash-recovery paths. Fresh scoped review accepts both Important corrections.
+The public SDK patch 4 and separate generic core hook v2 patch reapply to fresh pinned
+checkouts. All 265 SDK source files and 13 changed core files match the accepted source;
+187 SDK and 100 actual-core checks pass warning-strict, without skips. Patches 1–3
+are unchanged; no private runtime changes are exported. Existing broader-core SQLite
+resource-warning debt remains explicitly outside this passing selection. Windows
+activation is still denied pending a real ACL verifier and host evidence. A focused
 [Windows storage plan](docs/superpowers/plans/2026-10-18-windows-relay-storage.md) records the native
-validator and both-host gates; it is not implemented or activated.
+validator and both-host gates; its isolated implementation is active, not activated.
 No server capability is enabled.
-Actual-core finalizer recovery is a known Task 3 gate: a failed SendResult alone does
-not prevent the pinned core from releasing its marker. Do not enable the flag until
-durable canonical recovery is proven. Quick actions are integrated as `ed64905`,
+The reviewed core hook retains durable final-delivery obligations instead of relying
+on a failed SendResult. Native reconnect drain/ACK consumers, Windows verification and
+staged live rollout remain required before O5 is complete. Quick actions are integrated as `ed64905`,
 `5363cb0` and `c0568fe`; the stale preview-navigation fix has a clean scoped review.
 Source `27ad4e8` is installed on the phone with matching signer/hash: all 104 baseline
 files, 18 identities, 55 artwork files, seven widget providers and the five-minute
@@ -91,12 +94,15 @@ implementation `3f8d94e` with 162 JVM and 15 native passes; `83f4ec2` completes 
 required Preparing voice/Stop UI seam with three focused native passes and a clean strict
 affected build. Independent full Task 1 review is clean (zero findings), and both
 commits are integrated as `5cdc8d1`/`1fd00e9`. Profile-aware settings/capacity is the
-next phone task; no new physical app update has been installed. Watch
-Portrait/Pet selection `a29268d` has 157 JVM passes, 24 native passes/one explicit Battery
-Saver emulator skip and a passing synthetic carousel scenario. Review found one Important
-portrait-cache provenance defect; its original implementer is in fix round 1/5, preserving
-old art and adding real admission/cache coverage. The watch increment remains unintegrated; neither new audio nor pet-selector build is
-installed on physical devices yet. SDK/core,
+next phone task; no new physical phone update has been installed. Watch
+Portrait/Pet selection `a29268d`, corrected by `1579d8c`, is independently approved
+and integrated as `dcc5ba4`/`b81564a`. The provenance correction has 11 focused JVM and
+21 native passes; earlier coverage includes 157 JVM and 24 native passes, one explicit
+Battery Saver emulator skip and a passing synthetic carousel scenario. The preserving
+physical watch update is installed with matching signer/hash: all 78 baseline files,
+19 identities, 29 artwork files, timeout and three tile/complication components remain
+unchanged. Installation used no UI launch, pairing or live prompt; actual personal-art,
+live pet, speech and Battery Saver observations remain open. SDK/core,
 watch and phone source ownership are disjoint. The canonical-history/task plan is written;
 implementation follows the reviewed core/outbox bridge.
 
@@ -135,7 +141,13 @@ actual authenticated session binding, not copied transcript text; task state mus
 real run/session events. The installed Hermes source is newer than the original snapshot;
 concrete adapter compatibility must be checked without exposing administrative APIs.
 
-Existing enrollments/artwork are preserved; the watch retains its prior build. PR #1 is linked and remains
+Combined root source `b81564a` passes 169 JVM tests/44 reports with zero failures,
+errors or skips, all four APK builds and sequential strict formatting. The reviewed
+structured-reply parser `be870de` is ready for integration; its five Python-fixture
+skips must be rerun with the controller's configured fixture environments. Native cards
+and deliberate platform actions are a separate task.
+
+Existing enrollments/artwork are preserved; the watch has the reviewed selector update. PR #1 is linked and remains
 draft. No merge, signing rotation or public release is part of the new goal. Older build
 and acceptance receipts below remain the baseline rather than evidence for new features.
 
