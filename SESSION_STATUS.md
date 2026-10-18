@@ -52,7 +52,25 @@ settings are unchanged; original APKs are restored (98/99 baseline files identic
 the install marker changes). Art identity/continuous loops, authenticated art transfer and
 physical lip-sync/power remain open. No assignment changed. Kitana/Viper/Cthulhu remain
 queued behind accepted Akuma production art. N1/N2 Task1 private registry/grants/request
-journal implementation is now running in an isolated frozen SDK; no methods are enabled.
+journal implementation `0939b1e` has finished in its isolated frozen SDK. Its report
+records 536 distinct software/actual-core passes and ten explicit Windows-only skips;
+fresh independent spec/security/quality review is active. No new methods are enabled.
+
+Phone minimum-runtime test support `3ff89f6` reports nine final native executions across
+API29/API37, zero skips, including large-font keyboard Save taps. Wear fixture `4166885`
+and this one-file phone correction are under a fresh scoped review. N6 fix1 `80909ea`
+has a separate fresh review for checklist lifetime, maximum-tail geometry and the valid
+idle probe; the original synthetic-emulator preservation failure remains open.
+
+Read-only M5 rollout preflight found one shared gateway process owns all fifteen Gadget
+listeners, so a per-profile capability rollout still needs a reviewed grouped restart.
+Private source comparisons and stable backups/package manifests are prepared; no live
+source, configuration, enrollment or listener changed. The repository's historical
+Python3.11 environment passes 227 selected SDK checks, but the actual managed gateway
+uses Python3.14.7. The initial runtime label was corrected, and the separate actual-version
+selection now also passes all 227 checks without skips. All 36 preflight target hashes
+still match their before-state. Actual-core/package review, drain/restart and live
+capability checks remain; these SDK results are not deployment evidence.
 
 The owner asked for questions up front and will confirm wireless phone/watch connectivity
 before leaving. The initial eleven-question batch covers the proposed written design,

@@ -3,8 +3,9 @@
 The [Android runtime matrix](android-test-matrix.md) records modern and minimum-version
 coverage by feature/source. Current physical inventory confirms phone Android 17/API 37
 and watch Android 16/API 36; modern owned emulators use API 37. API29 is the phone
-compatibility floor. Minimum Wear API33 execution has exposed motion-test failures under investigation;
-no full minimum-Wear pass is claimed.
+compatibility floor. Minimum Wear API33 motion-test failures were traced to fixture power,
+uiMode and navigation assumptions; the three-file correction has 26 passing affected
+native checks and awaits fresh review. No full minimum-Wear or physical pass is claimed.
 
 ## Current expansion verification — 2026-10-18
 
@@ -46,7 +47,24 @@ settings are unchanged; original APKs are restored (98/99 baseline files identic
 the install marker changes). Art identity/continuous loops, authenticated art transfer and
 physical lip-sync/power remain open. No assignment changed. Kitana/Viper/Cthulhu remain
 queued behind accepted Akuma production art. N1/N2 Task1 private registry/grants/request
-journal implementation is now running in an isolated frozen SDK; no methods are enabled.
+journal implementation `0939b1e` reports 536 distinct passing software/actual-core cases
+and ten explicit Windows-only skips. Fresh independent review is active; the candidate
+is not integrated and no new method is enabled.
+
+Phone test-support `3ff89f6` reports nine final native executions, five distinct methods,
+on API29/API37 with no skips, including large-font settled-keyboard Save taps. It and
+Wear fixture `4166885` are under fresh scoped review. N6 fix1 `80909ea` separately awaits
+review; new source/evidence checks cannot close the original preservation incident.
+
+M5 live-rollout preparation compares installed source with the reviewed baseline and
+retains stable private file/configuration/enrollment backups plus an unapplied package.
+One gateway process owns fifteen listeners, requiring a reviewed grouped restart. No
+live file or listener changed. The repository Python3.11 environment passes 227 selected
+SDK checks; it is distinct from the running gateway's managed Python3.14.7 environment.
+That initial runtime labeling error is corrected. A separate private Python3.14.7 check
+with the actual selected gateway dependency versions also passes all 227 without skips;
+all 36 preflight target hashes still match. Actual-core/package review and controlled
+live rollout remain, with no installation or restart inferred from these checks.
 
 ## Expansion connectivity and first increments — 2026-10-18
 
