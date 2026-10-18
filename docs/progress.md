@@ -10,7 +10,23 @@ or physical pass is claimed.
 
 ## Current expansion verification — 2026-10-18
 
-Current checkpoint: app source `14ea9f4` passes the combined strict root check: **206
+Latest integrated app source `2284399` includes the independently approved native
+connection-health screens and explicit safe report export. Combined strict builds pass
+and all four debug/test APKs compile. Across the preserved initial/unit and enabled SDK
+runs, **211 distinct JVM cases /48 suites** pass, zero final failures/errors/skips. The
+initial missing-environment skips and stale local speech-fixture startup failure remain
+recorded; the speech case passes against the accepted extension SDK. No source change
+was used to hide either setup issue.
+
+The physical phone now has this exact reviewed APK. Full before/after archives preserve
+all 18 enrolled phone identities and 55 artwork files: no original file is missing,
+105/106 originals are byte-identical, and only the ordinary install marker differs.
+Its five-minute timeout is unchanged; no UI, pairing or live prompt was launched. The
+install command returned nonzero without a captured platform explanation; independent
+installed-hash/data reconciliation establishes the resulting update. No retry/reset was
+used. The watch's saved connection port is closed; its prior installed build remains.
+
+Prior production baseline: app source `14ea9f4` passes the combined strict root check: **206
 JVM tests /46 reports**, zero failures/errors/skips, and all four APKs. Public SDK patches
 1–6 freshly reapply to stock v0.2.0; all 274 combined Windows/pet source files match
 reviewed code. The Windows export passes 402 affected software checks, with ten explicit
@@ -49,20 +65,21 @@ Private Akuma overlay v4 passes an actual production decoder/PCM playback fixtur
 poses differing at 131 region pixels. Controller inspection confirms the corrected
 listening necklace and permits continued private asset production; continuous motion,
 authenticated art delivery and physical lip-sync/power remain open. No assignment changed.
-Kitana has a selected compact base and native/watch previews; animation rows remain
-pending after two image-service connection failures. Viper and Cthulhu follow her.
+Kitana has a selected compact base and native/watch previews. Her first idle strip
+was rejected for a clipped fan; its targeted framing correction hit another image-service
+connection failure. No unfinished atlas or profile assignment is accepted. Viper and
+Cthulhu follow her.
 N1/N2 Task1 fix1 `c5ff24b` addresses the reviewed schema-constraint defect. It reports
 296 warning-strict SDK passes and 47 distinct actual-core passes; the latter had one
 initial subprocess timeout, followed by a separate 19-case pass with retries disabled.
 Fresh scoped review accepts the fix with no new Critical/Important findings. The Minor
-result-depth inconsistency remains deferred
-for the consumer contract. Task1 Windows execution and real two-device continuity are
-separate gates; no new method is enabled or candidate integrated.
+result-depth inconsistency remains deferred for the consumer contract. Task1 Windows execution and real two-device continuity are
+separate gates; isolated Task2 core admission/history implementation is active; no new method is enabled or candidate integrated.
 
 The approved phone follow-up has nine final native executions/five distinct methods
 on API29/API37, no skips, including settled-keyboard Save taps. The fixture integration
 passes strict root checks (158 tasks, 25 executed). N8 native health views and explicit
-safe export are implemented at `4fc6ee8` and in fresh review; no watch telemetry transfer
+safe export are reviewed at `4fc6ee8` and integrated as `2284399`; no watch telemetry transfer
 is claimed. New source checks cannot close the original N6 preservation incident.
 
 Read-only M5 rollout preflight identifies twelve Gadget profiles and three auxiliary
@@ -73,10 +90,16 @@ empty placeholder total 93,798,400 bytes; these are per-database recovery artifa
 not one global transaction. No live source, configuration, enrollment or listener changed.
 The managed gateway uses Python3.14.7, distinct from the repository's Python3.11 venv.
 The actual-version isolated selection passes 227 SDK and 47 real-core tests without
-failure/skip. A prepared 22-runtime-file apply/rollback helper passes ten offline failure
-checks; read-only verification matches installed before hashes. Independent helper/package/
-procedure review and the bounded maintenance driver remain before any live execution.
+failure/skip. The 22-runtime-file helper has accepted fixes for operation ownership,
+durable journal setup and protected-manifest binding. All 53 offline cases pass; fresh re-review closes
+all five findings and read-only verification still matches installed before hashes. The
+bounded maintenance driver remains unimplemented and review-required before live execution.
 No install, drain, restart or capability activation follows from these checks.
+
+The [walking-audio foundation](superpowers/plans/2026-10-18-walking-audio-foundation.md)
+now has a fresh isolated implementation owner for actual output observation, interruption
+and old-playback callback fencing. This does not complete larger walking controls,
+concise speech, Replay/More or physical earbud acceptance.
 
 ## Expansion connectivity and first increments — 2026-10-18
 

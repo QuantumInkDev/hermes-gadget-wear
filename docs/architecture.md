@@ -409,3 +409,14 @@ stationary baseline. In short keyboard windows, the conversation toolbar yields 
 the minimum composer and returns when the IME closes. Both profile-picture entry points use
 one window-bounded sheet with a scrolling body and independent Cancel footer. Courier layers
 retain the shared resource names; supported API 29+ builds package adaptive icons.
+
+
+## Native connection health — 2026-10-18
+
+The reviewed native health surface consumes only typed diagnostics. Phone previews freeze
+one snapshot; Copy/Share re-encode that same snapshot through the canonical bounded
+encoder. Refresh is explicit and owner/session changes discard the preview. Sharing is
+idle-only because the existing foreground conversation closes on activity departure;
+Preview/Copy remain available while busy. Watch health stays inline below controls with
+Jump last and no implied telemetry transfer. Received protocol audio and actual native
+playback remain separately labeled. No report persists text, endpoints or raw errors.
