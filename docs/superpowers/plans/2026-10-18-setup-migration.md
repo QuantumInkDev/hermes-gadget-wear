@@ -101,9 +101,10 @@ in the task report for Task2 before that consumer begins.
   No filesystem extraction API. JSON duplicate-key handling must be explicit and reject
   ambiguous inputs rather than accept last-key-wins at security boundaries.
 - [ ] Encrypt the complete archive in an explicit bounded binary envelope using
-  PBKDF2-HMAC-SHA256 (>=210,000 iterations, fixed bounded decoder policy), random16-byte
+  PBKDF2-HMAC-SHA256 (v1 fixed600,000 iterations, fixed bounded decoder policy), random16-byte
   salt, AES256-GCM random12-byte nonce/128-bit tag and version/header AAD. Passphrase
-  >=12 characters; no persisted key/passphrase. Validate header lengths/algorithm/KDF
+  >=12 NFC-normalized Unicode code points; no trimming/case folding and no persisted key/passphrase. Reject malformed
+  Unicode before normalization and keep the bounded input length. Validate header lengths/algorithm/KDF
   bounds before expensive allocation or work. Wrong password and tamper yield one safe
   typed failure and no partially returned snapshot. State honestly that password entropy
   controls offline attack resistance. Clear owned mutable plaintext/key buffers when done;
@@ -150,6 +151,11 @@ encrypted export and reviewed non-destructive import, with durable replay/import
   collision/cancel/tamper/quota/failure/restart behavior, QR raster decode and all three
   themes at normal/large font. Use independent API29/API37 synthetic fixtures, preserving
   APK/data/settings. No launcher reinstall/uninstall/reset or quarantined-device access.
+- [ ] Exercise the largest supported realistic artwork archive on a constrained-memory
+  API29 fixture; measure actual heap/time and native crypto/ZIP interoperability. Keep all
+  KDF/archive/decode work off the main thread. A source allocation estimate is not proof
+  of low-memory usability. Read failures must use safe generic wording, not assert that
+  every failure is a wrong password; never log raw URL-bearing construction exceptions.
 - [ ] Run affected strict tests/lint/formatting/all four APK compilation, commit focused
   source/test/evidence and report. Controller obtains fresh combined review before integration.
 
@@ -184,3 +190,18 @@ encrypted export and reviewed non-destructive import, with durable replay/import
 Source mapping is provisional only where explicitly assigned to Task2 preflight. Task1
 is independently usable/testable pure code; Task2 may require a recorded schema amendment
 after actual store inventory, before consumer implementation. No live authority is added.
+
+## Controller resolution before the first real archive — Task1 review
+
+The first review found mutable collection aliases could invalidate a previously checked
+snapshot and still produce an unreadable export. Fix1 must own immutable defensive
+copies, revalidate the exact stable manifest before sealing, and own artwork bytes through
+validation/serialization. Tests must mutate original/nested collections and artwork inputs.
+
+Settle the draft v1 passphrase policy now: NFC-normalized strict UTF-8 and exactly600,000
+PBKDF2-HMAC-SHA256 rounds. [OWASP's password-storage guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#pbkdf2)
+lists600,000 for this PBKDF2 variant. Applying that work factor to this passphrase-derived
+archive key is our implementation choice; it makes no FIPS claim. The earlier210,000
+candidate and its evidence remain historical, and no real archive or client has shipped.
+The increased work and Unicode policy require new independent vectors and later Android
+timing/interop tests. Future policy changes need an explicit format-version decision.
