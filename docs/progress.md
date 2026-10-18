@@ -46,9 +46,11 @@ Demo path: Settings → Quick actions, choose a profile and inputs, preview, the
 draft. A later authorized unlocked-phone check opens Settings → Quick actions, verifies
 unbound review cannot transfer, and observes editor fields. No save, profile binding,
 pairing or live message occurred; 73 identity/art files and timeout are preserved, and
-the phone returns to the launcher. Profile-bound preview/shortcut/live-send, scroll-to-
-Cancel and API29 acceptance remain open. The initial verifier wrongly assumed Cancel
-was in the current viewport; its failed assertion is retained privately, not an app defect.
+the phone returns to the launcher. A later normal scroll reveals Cancel and its tap
+returns without saving; Profiles is restored and all 73 protected files/timeout still
+match. Profile-bound preview/shortcut/live-send and API29 acceptance remain open.
+The initial verifier wrongly assumed Cancel was in the first viewport; normal scrolling
+resolves that failed assertion, retained privately rather than labeled an app defect.
 
 Grant/wire through `dbead4db` has clean independent spec/quality review after one P2
 cancellation correction. Eight focused, 119 affected and 30 compatibility checks pass

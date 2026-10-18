@@ -59,7 +59,9 @@ authorized unlocked-phone check opened Settings → Quick actions, verified that
 review blocks transfer, and observed the editor fields. No action was saved/profile bound
 or message sent. All 73 identity/art files and the five-minute timeout remain unchanged;
 the phone returned to the launcher. Profile-bound preview/shortcuts/live and API29 gates
-remain open. Cancel was below the observed viewport and was not exercised.
+remain open. A subsequent normal scroll reveals Cancel; its tap returns to quick actions
+without saving. Profiles is restored before returning to the launcher. All 73 protected
+identity/art files and the five-minute timeout remain unchanged after that check.
 Typed diagnostics through `d9313c8` has clean spec/quality review after two fix rounds;
 114 protocol tests/27 reports pass with no failures/errors/skips. Integrated root checks
 at `c951b9e` pass 150 JVM tests/41 reports, all four APKs and sequential strict formatting.
