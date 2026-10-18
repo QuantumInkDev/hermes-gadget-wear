@@ -14,6 +14,74 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PhoneAudioTest {
+    @Test fun pendingVoiceStopKeepsTextAndDraftWithoutLatePlayback() = fixture { f ->
+        val voice = "pendingUiVoice"
+        val message = "Synthetic pending UI speech"
+        val reply = "You said: " + message
+        val draft = "Unsent synthetic draft"
+        try {
+            NativePhoneFixture().use { ui ->
+                f.settings.set(SpeechSettings(SpeechMode.PROFILE, "synthetic-key", voice))
+                f.model.open(f.profiles[1])
+                f.model.connect()
+                await {
+                    f.model.state.value.connection.status ==
+                        dev.quantumink.hermesgadget.protocol.ConnectionStatus.PAIRED
+                }
+                ui.show(back = f.model::hide) { modifier ->
+                    ConversationPage(
+                        f.model,
+                        null,
+                        f.model::connect,
+                        f.model::startRecording,
+                        f.model::hide,
+                        modifier
+                    )
+                }
+                assertEquals(0, f.count(voice))
+                f.model.draft(message)
+                f.model.send()
+                await {
+                    f.count(voice) == 1 && f.model.state.value.preparingSpeech &&
+                        !f.model.state.value.connection.conversation.busy &&
+                        !f.model.state.value.sending
+                }
+                f.model.draft(draft)
+                ui.await { ui.find(reply) != null && ui.find(draft) != null }
+                assertTrue(
+                    "Stop voice must remain available after the server turn ends",
+                    ui.find("Stop voice") != null
+                )
+                assertTrue(
+                    "Pending synthesis must be labelled honestly",
+                    ui.find("Preparing voice") != null
+                )
+                assertEquals(null, ui.find("Speaking"))
+                assertFalse(f.model.state.value.speaking)
+                assertTrue(f.peaks.isEmpty())
+                assertEquals(0, f.playbackStarts.get())
+                ui.click("Stop voice")
+                assertFalse(f.model.state.value.preparingSpeech)
+                assertFalse(f.model.state.value.speaking)
+                f.provider("release", voice)
+                await { f.provider("completed", voice) == 1 }
+                Thread.sleep(350)
+                ui.await { ui.find("Preparing voice") == null && ui.find("Stop voice") == null }
+                assertTrue(f.peaks.isEmpty())
+                assertEquals(0, f.playbackStarts.get())
+                assertEquals(0f, f.model.state.value.playbackLevel)
+                assertFalse(f.model.state.value.speaking)
+                assertFalse(f.model.state.value.preparingSpeech)
+                assertEquals(draft, f.model.state.value.draft)
+                assertEquals(reply, f.model.state.value.connection.conversation.reply)
+                assertTrue(ui.find(draft) != null && ui.find(reply) != null)
+                assertEquals(1, f.count(voice))
+            }
+        } finally {
+            f.provider("release", voice)
+        }
+    }
+
     @Test fun stockServerIgnoresClientOfferAndStillPlaysNativePcm() = fixture { f ->
         f.settings.set(SpeechSettings(SpeechMode.SHARED, "synthetic-key", "stockVoice"))
         f.model.open(f.profiles[0])
@@ -276,7 +344,9 @@ class PhoneAudioTest {
         val peaks: java.util.concurrent.CopyOnWriteArrayList<Float>,
         val count: (String) -> Int,
         val reader: java.util.concurrent.atomic.AtomicReference<((String) -> SpeechSettings)?>,
-        val prober: java.util.concurrent.atomic.AtomicReference<(() -> Boolean)?>
+        val prober: java.util.concurrent.atomic.AtomicReference<(() -> Boolean)?>,
+        val provider: (String, String) -> Int,
+        val playbackStarts: java.util.concurrent.atomic.AtomicInteger
     )
     private fun fixture(body: (Fixture) -> Unit) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -325,6 +395,7 @@ class PhoneAudioTest {
         )
         val probe = java.util.concurrent.atomic.AtomicBoolean(false)
         val peaks = java.util.concurrent.CopyOnWriteArrayList<Float>()
+        val playbackStarts = java.util.concurrent.atomic.AtomicInteger()
         val provider = okhttp3.HttpUrl.Builder().scheme(
             "https"
         ).host("localhost").port(requireNotNull(args.getString("providerPort")).toInt()).build()
@@ -341,6 +412,7 @@ class PhoneAudioTest {
             vault,
             client,
             { ctx, interrupted, level, finished ->
+                playbackStarts.incrementAndGet()
                 dev.quantumink.hermesgadget.client.PcmPlayback(
                     ctx,
                     interrupted,
@@ -380,7 +452,16 @@ class PhoneAudioTest {
                     ).execute().use {
                         requireNotNull(it.body).string().toInt()
                     }
-                }, reader, prober)
+                }, reader, prober, { route, voice ->
+                    client.newCall(
+                        okhttp3.Request.Builder().url(
+                            provider.newBuilder()
+                                .addPathSegment(route).addPathSegment(voice).build()
+                        ).build()
+                    ).execute().use {
+                        requireNotNull(it.body).string().toInt()
+                    }
+                }, playbackStarts)
             )
         } finally {
             model.hide()

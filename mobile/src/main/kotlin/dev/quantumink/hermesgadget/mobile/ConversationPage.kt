@@ -132,6 +132,7 @@ internal fun ConversationContent(
                                 Text(
                                     when {
                                         listening -> "Listening"
+                                        state.preparingSpeech -> "Preparing voice"
                                         state.speaking -> "Speaking"
                                         conversation.busy -> "Working"
                                         paired -> "Ready to talk"

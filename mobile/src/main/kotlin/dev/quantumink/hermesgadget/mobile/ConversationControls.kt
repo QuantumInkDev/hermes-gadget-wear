@@ -92,8 +92,8 @@ internal fun ConversationControls(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        if (!recording && (state.speaking || conversation.busy)) {
-            if (state.speaking) {
+        if (!recording && (state.speaking || state.preparingSpeech || conversation.busy)) {
+            if (state.speaking || state.preparingSpeech) {
                 TextButton(stopVoice) { Text("Stop voice") }
             } else {
                 TextButton(cancelTurn, enabled = paired) { Text("Cancel turn") }
