@@ -45,8 +45,11 @@ and implementation activity do not establish live integration.
 Latest: outbox storage `d097717` is independently approved in the isolated SDK, with
 39 storage +30 stock/extension warning-strict passes. Grant/wire task 2 through `dbead4db`
 has clean spec/quality review after its cancellation correction; 119 affected grants/service
-and 30 compatibility checks pass warning-strict. Actual-core Task 3 is now implementing
-trusted enrollment context and durable final-delivery recovery in isolated fixtures.
+and 30 compatibility checks pass warning-strict. Actual-core Task 3 is implemented through SDK `148e8d3` and now has independent
+spec/quality review in progress. Its actual clean-core and private-runtime runs each pass
+71 warning-strict checks; trusted context/durable recovery remain unaccepted until review
+and fresh public patch reapplication. Windows activation is still denied pending a real ACL
+verifier and host evidence.
 No server capability is enabled.
 Actual-core finalizer recovery is a known Task 3 gate: a failed SendResult alone does
 not prevent the pinned core from releasing its marker. Do not enable the flag until
@@ -79,10 +82,24 @@ unchanged. A [focused renderer plan](docs/superpowers/plans/2026-10-18-pet-expre
 holds the body anchor fixed and renders only the generated mouth region, keeping exact
 body stability without rewriting source art. This is planned, not implemented. Kitana,
 Viper and Cthulhu remain queued after Akuma's production stage.
-The [phone audio plan](docs/superpowers/plans/2026-10-18-phone-optional-audio.md) is active
-in an isolated worktree; Portrait/Pet selection is active in another. SDK/core, watch
-and phone source ownership are disjoint. The canonical-history/task plan is written;
+The [phone audio plan](docs/superpowers/plans/2026-10-18-phone-optional-audio.md) has
+implementation `3f8d94e` with 162 JVM and 15 native passes; its original implementer is
+finishing the required Preparing voice/Stop UI seam before independent review. Watch
+Portrait/Pet selection `a29268d` has 157 JVM passes, 24 native passes/one explicit Battery
+Saver emulator skip and a passing synthetic carousel scenario; independent review is
+active. Neither increment is integrated or installed on physical devices yet. SDK/core,
+watch and phone source ownership are disjoint. The canonical-history/task plan is written;
 implementation follows the reviewed core/outbox bridge.
+
+Physical codec checkpoint: the actual phone and watch each pass both existing Opus
+encode/decode tests using synthetic in-memory audio in an isolated temporary app built
+from exact production codec sources. Both original APK hashes, every baseline app-data
+file, 73 phone/48 watch enrollment/art files and original timeouts are unchanged; the
+temporary apps are removed. The watch's cached original process exited during the check;
+Android ApplicationExitInfo explicitly records LOW_MEMORY, not an app crash. No microphone,
+audible playback, network or provider request occurred. This establishes hardware codec
+support only, not a live negotiated turn, speech quality or battery result. Receipts and
+source/artifact hashes are ignored under `.local/expansion/codec-probe/physical-r2/`.
 
 Two real ElevenLabs format probes pass (2 calls /102 characters; real Opus accepted by
 the app parser). Remaining allowance: 8 calls /2,398 characters. Credentials were read

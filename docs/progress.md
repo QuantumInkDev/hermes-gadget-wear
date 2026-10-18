@@ -61,6 +61,23 @@ Integrated root source `c951b9e` passes 150 JVM tests /41 reports with zero fail
 errors or skips, strict checks, all four APKs and sequential formatting. These are source-
 bound software results, separate from worktree implementations and physical acceptance.
 
+Focused implementation handoffs: SDK/core finalizer integration through SDK `148e8d3`
+passes 71 warning-strict actual-core checks per clean/private-runtime fixture; independent
+review, public patch export/reapplication and Windows ACL activation support remain gates.
+Watch Portrait/Pet `a29268d` has 157 JVM and 24 native passes/one explicit Battery Saver
+emulator skip plus synthetic carousel coverage; independent review is active. Phone audio
+`3f8d94e` has 162 JVM and 15 native passes; Preparing voice/Stop UI is being completed
+before review. These handoffs are not accepted live features or physical app deliveries.
+
+Physical synthetic codec demo: each actual device passes the two existing production-code
+Opus encode/decode methods in a separate temporary app. The three-second fixture encodes
+96,000 PCM payload bytes into 8,844 phone/8,905 watch Opus payload bytes. This is a single
+synthetic sample, not a battery, network or speech-quality benchmark. Both main APKs,
+all baseline app-data files and original timeouts are unchanged; 73 phone/48 watch protected
+files match and test apps are removed. Android records a cached-watch-process LOW_MEMORY
+exit during the check. No microphone, audible speaker, network or synthesis was used.
+Source/APK receipts and the initial preflight-only helper failure remain private.
+
 Later owner instruction expands personal artwork after Akuma to Kitana, SF6 C. Viper
 and Cthulhu. All receive standard states plus listening/talking/sleeping companions;
 Kitana uses a regal walk and fan-cooling waiting loop. References and art stay private.
