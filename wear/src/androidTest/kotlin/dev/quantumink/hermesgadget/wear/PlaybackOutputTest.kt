@@ -443,18 +443,15 @@ class PlaybackOutputTest {
     }
 
     @Test fun platformOpusSilenceDrainsAndInterruptsThroughSameOwner() = foreground {
-        val format = android.media.MediaFormat.createAudioFormat(
-            android.media.MediaFormat.MIMETYPE_AUDIO_OPUS,
-            16000,
-            1
+        // API29 advertises Opus at 48 kHz; the wire header still carries its 16 kHz source rate.
+        val decoderAvailable = android.media.MediaCodecList(
+            android.media.MediaCodecList.REGULAR_CODECS
         )
-        org.junit.Assume.assumeTrue(
-            "Platform Opus decoder unavailable",
-            android.media.MediaCodecList(
-                android.media.MediaCodecList.REGULAR_CODECS
-            ).findDecoderForFormat(format) !=
-                null
-        )
+            .codecInfos.any { info ->
+                !info.isEncoder &&
+                    info.supportedTypes.any { it.equals("audio/opus", ignoreCase = true) }
+            }
+        org.junit.Assume.assumeTrue("Platform Opus decoder unavailable", decoderAvailable)
         val header =
             byteArrayOf(79, 112, 117, 115, 72, 101, 97, 100, 1, 1, 0, 0, -128, 62, 0, 0, 0, 0, 0)
         val packet = byteArrayOf(0xf8.toByte(), 0xff.toByte(), 0xfe.toByte()) // RFC 6716 silence.
