@@ -83,6 +83,9 @@ internal fun ConversationContent(
     val listening = conversation.mode == ConversationMode.LISTENING
     val paired = state.connection.status == ConnectionStatus.PAIRED
     var details by remember(state.profile?.endpoint?.url) { mutableStateOf(false) }
+    var health by remember(state.sessionVersion, state.profile?.endpoint?.url) {
+        mutableStateOf(false)
+    }
     val keyboard = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     BoxWithConstraints(modifier.fillMaxSize()) {
         val compactKeyboard = keyboard && maxHeight < 160.dp
@@ -262,6 +265,15 @@ internal fun ConversationContent(
                     Modifier.verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    TextButton({
+                        details = false
+                        health = true
+                    }) { Text("Connection health") }
+                    Text(
+                        dev.quantumink.hermesgadget.client.ConnectionHealth.summary(
+                            state.connection.diagnostics
+                        )
+                    )
                     Text(state.profile?.endpoint?.url.orEmpty())
                     Text(
                         "Phone pairing is separate from the watch. " +
@@ -296,5 +308,16 @@ internal fun ConversationContent(
             },
             dismissButton = { TextButton({ details = false }) { Text("Close") } }
         )
+    }
+    if (health) {
+        androidx.compose.runtime.key(state.sessionVersion, state.profile?.endpoint?.url) {
+            ConnectionHealthDialog(
+                state.connection.diagnostics,
+                state.speaking,
+                state.preparingSpeech,
+                shareAllowed = connectionReportShareAllowed(state),
+                close = { health = false }
+            )
+        }
     }
 }

@@ -512,6 +512,14 @@ internal fun ConversationPage(
     jump: @Composable () -> Unit = {}
 ) {
     val connection = watch.connection
+    var healthOpen by remember(watch.profile?.endpoint?.url) { mutableStateOf(false) }
+    var healthPreview by remember(watch.profile?.endpoint?.url) {
+        mutableStateOf<dev.quantumink.hermesgadget.protocol.ConnectionDiagnosticsSnapshot?>(null)
+    }
+    androidx.activity.compose.BackHandler(healthOpen) {
+        healthOpen = false
+        healthPreview = null
+    }
     val conversation = connection.conversation
     val prompt = conversation.prompt
     val paired = connection.status == ConnectionStatus.PAIRED
@@ -706,6 +714,18 @@ internal fun ConversationPage(
             presentationOptions(page, watch) { identity, mode ->
                 service.setPresentation(page.key, identity, mode)
             }
+            connectionHealthItems(
+                connection.diagnostics,
+                watch.speaking,
+                watch.speechPending,
+                healthOpen,
+                {
+                    healthOpen = !healthOpen
+                    healthPreview = null
+                },
+                healthPreview,
+                { healthPreview = connection.diagnostics }
+            )
             item { jump() }
         }
     }
