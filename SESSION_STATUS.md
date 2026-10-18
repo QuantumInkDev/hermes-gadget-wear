@@ -14,6 +14,32 @@ The [runtime coverage matrix](docs/android-test-matrix.md) separates compatibili
 checks from modern emulators and physical devices. Direct inventory confirms Android 17/
 API 37 on the phone and Android 16/API 36 on the watch; both apps target API 37.
 
+Current checkpoint: reviewed profile-aware phone settings and its artifact-preservation/
+large-font fix are integrated at `380d64c`. The combined strict root check passes **199
+JVM tests /46 XML reports**, zero failures/errors/skips, and all four APKs. Phone Task 2
+fix1 review has no findings. Root API29 checks have 30 initial passes, a corrected
+profile-navigation pass and the 12-state large-font geometry method passes. The broad
+large-font settings navigation method fails to find the key field; the original worker
+is investigating it and a settled Dark/keyboard visual gate. Nine older navigation
+methods still skip on a legacy emulator-name guard; N6 owns the narrow support correction.
+Do not label the entire API29 increment accepted yet.
+
+A fresh owned minimum-Wear API33 run executes 27 methods: 22 pass and five fail. A
+focused retry passes the previously failed footer method, but rings and sprite motion
+remain static. The original worker is investigating actual system power/lifecycle state;
+no minimum-version animation pass is claimed. Existing API37 and physical receipts remain
+source-bound evidence, not substitutes for this gate.
+
+Expression overlay fixes `50c3c0a` (app) / `46d61f0` (isolated SDK) pass fresh scoped
+re-review: all three findings addressed, no new findings. Public integration/export and
+fresh reapplication are next; private Akuma art remains unaccepted. Windows fix2
+`0f4b0ad` passes scoped source review and 177 affected software checks with ten explicit
+Windows skips on Mac. Fresh reliable SFTP runs on both actual gateway architectures each
+execute ten methods: **nine pass, one fails, zero errors/skips**, fixture/source cleanup
+succeeds. The restricted probe fails during lazy UTF-16 codec lookup under impersonation,
+before the readable-control/private-denial assertion. This is not native acceptance or
+activation. Native structured cards are in isolated implementation from `380d64c`.
+
 The owner asked for questions up front and will confirm wireless phone/watch connectivity
 before leaving. The initial eleven-question batch covers the proposed written design,
 staged live rollout/delegation, history/task grants, retention, pet presentation/artwork,
@@ -95,7 +121,7 @@ A separate five-call Akuma row attempt retains geometry-valid private partials, 
 art is accepted. The raw full-frame talking check still fails; source originals remain
 unchanged. A [focused renderer plan](docs/superpowers/plans/2026-10-18-pet-expression-overlays.md)
 holds the body anchor fixed and renders only the generated mouth region, keeping exact
-body stability without rewriting source art. This is planned, not implemented. Kitana,
+body stability without rewriting source art. Its implementation/fix passed review as recorded above. Kitana,
 Viper and Cthulhu remain queued after Akuma's production stage.
 The [phone audio plan](docs/superpowers/plans/2026-10-18-phone-optional-audio.md) has
 implementation `3f8d94e` with 162 JVM and 15 native passes; `83f4ec2` completes the
@@ -105,7 +131,7 @@ commits are integrated as `5cdc8d1`/`1fd00e9`. Profile-aware settings/capacity i
 next phone task; no new physical phone update has been installed. Task 2 `5b73a3e`
 has 47 JVM passes, 31 native executions and 36 source-bound captures on API37. Review
 requires corrupt AtomicFile sidecar preservation and a large-font label correction;
-original-worker fix round 1 is active. The separate test-support batch `0bcb6d4` has
+fix `28505ce` passes fresh review and is integrated at `380d64c`. The separate test-support batch `0bcb6d4` has
 no review findings and is integrated as `37aa867`. Watch
 Portrait/Pet selection `a29268d`, corrected by `1579d8c`, is independently approved
 and integrated as `dcc5ba4`/`b81564a`. The provenance correction has 11 focused JVM and
@@ -123,7 +149,8 @@ implementation follows the reviewed core/outbox bridge.
 
 Phone audio integration `5cdc8d1`/`1fd00e9` builds all four APKs warning-strict and
 passes sequential formatting; source/APK-bound receipts are private. Task 2 profile-aware
-speech settings and the 64-endpoint vault boundary are in original-worker fix round 1.
+speech settings and the 64-endpoint vault boundary have passed corrected-source review;
+the minimum-runtime and settled-keyboard checks above remain.
 Root created a separate owned Android 10/API29 emulator for the minimum-SDK gate: 13
 quick-action native methods ran, seven passed and six failed at test-support boundaries
 (four legacy emulator-model guards, two unavailable accessibility-cache calls). These are
@@ -132,7 +159,7 @@ has a narrowly scoped test-helper correction, preserving all behavior/fresh-data
 the independently reviewed helper batch fixes those prerequisites. Root `37aa867`
 builds affected phone APKs/lint/format warning-strict; all 13 N4 methods now pass on
 the owned API29 emulator with no failures/skips. Task 2 settings still needs its
-corrected-source review/API29 run. The physical phone is
+remaining API29 native checks. The physical phone is
 reachable but locked, so no profile-bound physical UI action was attempted this turn.
 
 Physical codec checkpoint: the actual phone and watch each pass both existing Opus

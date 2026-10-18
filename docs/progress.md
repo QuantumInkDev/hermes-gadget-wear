@@ -3,7 +3,36 @@
 The [Android runtime matrix](android-test-matrix.md) records modern and minimum-version
 coverage by feature/source. Current physical inventory confirms phone Android 17/API 37
 and watch Android 16/API 36; modern owned emulators use API 37. API29 is the phone
-compatibility floor. Minimum Wear API33 expansion execution remains open.
+compatibility floor. Minimum Wear API33 execution has exposed motion-test failures under investigation;
+no full minimum-Wear pass is claimed.
+
+## Current expansion verification — 2026-10-18
+
+Current checkpoint: reviewed profile-aware phone settings and its artifact-preservation/
+large-font fix are integrated at `380d64c`. The combined strict root check passes **199
+JVM tests /46 XML reports**, zero failures/errors/skips, and all four APKs. Phone Task 2
+fix1 review has no findings. Root API29 checks have 30 initial passes, a corrected
+profile-navigation pass and the 12-state large-font geometry method passes. The broad
+large-font settings navigation method fails to find the key field; the original worker
+is investigating it and a settled Dark/keyboard visual gate. Nine older navigation
+methods still skip on a legacy emulator-name guard; N6 owns the narrow support correction.
+Do not label the entire API29 increment accepted yet.
+
+A fresh owned minimum-Wear API33 run executes 27 methods: 22 pass and five fail. A
+focused retry passes the previously failed footer method, but rings and sprite motion
+remain static. The original worker is investigating actual system power/lifecycle state;
+no minimum-version animation pass is claimed. Existing API37 and physical receipts remain
+source-bound evidence, not substitutes for this gate.
+
+Expression overlay fixes `50c3c0a` (app) / `46d61f0` (isolated SDK) pass fresh scoped
+re-review: all three findings addressed, no new findings. Public integration/export and
+fresh reapplication are next; private Akuma art remains unaccepted. Windows fix2
+`0f4b0ad` passes scoped source review and 177 affected software checks with ten explicit
+Windows skips on Mac. Fresh reliable SFTP runs on both actual gateway architectures each
+execute ten methods: **nine pass, one fails, zero errors/skips**, fixture/source cleanup
+succeeds. The restricted probe fails during lazy UTF-16 codec lookup under impersonation,
+before the readable-control/private-denial assertion. This is not native acceptance or
+activation. Native structured cards are in isolated implementation from `380d64c`.
 
 ## Expansion connectivity and first increments — 2026-10-18
 

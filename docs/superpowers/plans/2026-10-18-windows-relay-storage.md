@@ -70,8 +70,10 @@ The controller owns final patch-series export and live rollout.
   other reparse forms, remote/unsupported filesystems, alternate streams, malformed or
   unsupported security descriptors, missing/null DACLs, unknown effective ACE types and
   unresolved authority. Close every handle/allocation on all error paths.
-- [ ] Require the private leaf directory and authority/data files to belong to the current
-  process user, with effective and inherited permissions limited to the allowed identities.
+- [ ] Require private leaf directory and authority/data owners to be the actual process
+  user, LocalSystem or built-in Administrators, with effective and inherited permissions
+  limited to those same allowed identities. TrustedInstaller is an ancestor-owner exception
+  only, never an allowed private-leaf owner or a blanket service-SID exemption.
   Check existing components through the filesystem root for reparse substitution and
   outsider permissions that can replace/delete/change the protected path. Ordinary
   ancestor traversal is permitted; treat ancestor and private-leaf requirements separately.
@@ -124,3 +126,18 @@ The controller owns final patch-series export and live rollout.
 Ruling: retain Windows as a required software/host-validation task. The cost is native
 ACL and race-boundary work plus two actual-host runs; removing the guard based on existing
 Get-Acl output would fail the approved per-box privacy/rollout contract.
+
+## Native evidence clarification after fix round 1
+
+The actual SSH test contexts use a built-in Administrators default token owner; newly
+created synthetic files therefore have Administrators ownership. One inspected existing
+private parent is also Administrators-owned. Requiring TokenUser-only ownership conflicts
+with the explicitly allowed local SYSTEM/Administrators trust boundary and fails all
+positive methods before their intended checks. No installed ownership or ACL is changed.
+
+Ruling: allow only TokenUser, LocalSystem or built-in Administrators as private-leaf
+owners, while retaining the existing effective/future DACL allowlist, all native path and
+same-object checks, and unknown-owner refusal. TrustedInstaller remains ancestor-owner-only.
+Cost if wrong: the small ownership policy needs rework before activation; native runs and
+fresh independent security review still gate both boxes. This permits no new local identity
+beyond the plan's existing trust boundary and does not waive any mandatory native method.
