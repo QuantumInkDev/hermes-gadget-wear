@@ -44,46 +44,46 @@ ElevenLabsApi callback sink/wrapper if required; affected native/unit audio test
 existing protocol/client codecs. Avoid wear/GadgetService, MainActivity/navigation and
 unrelated presentation changes. No live key/settings changes.
 
-- [ ] Add failing tests for phone capabilities and negotiated capture. Off-main preparation
+- [x] Add failing tests for phone capabilities and negotiated capture. Off-main preparation
   probes the existing codec implementation and reads the endpoint's selected speech settings.
   Publish only for the still-current visible connection request. A late result after hide,
   profile replacement or another connect cannot open a socket or change its capabilities.
   Preserve the existing explicit Connect/enrollment boundary; no UI entry auto-connects.
-- [ ] Advertise Opus only after a successful runtime probe; retain pcm16 in both lists.
+- [x] Advertise Opus only after a successful runtime probe; retain pcm16 in both lists.
   Each direction still follows the server-selected format independently. Wire CaptureStart
   format, codecHeader, capturedOpus and raw captureLevel to the existing validated token.
   Keep the real waveform and recording-start/finish semantics. Probe failure uses PCM
   without losing a recording or retrying an already submitted turn.
-- [ ] Offer client TTS only for an explicit non-SERVER endpoint setting with a nonempty
+- [x] Offer client TTS only for an explicit non-SERVER endpoint setting with a nonempty
   readable key. Vault failure preserves bytes and uses normal server speech with a concise
   notice; never silently change the stored mode. No provider call occurs during connect.
   If the stock server does not acknowledge client TTS, normal server audio remains usable.
-- [ ] Implement one bounded, cancellable foreground PhoneClientSpeech owner around the
+- [x] Implement one bounded, cancellable foreground PhoneClientSpeech owner around the
   existing ElevenLabsApi. Prefer a typed header/packet/end sink with the current framed
   OutputStream wrapper preserved for watch channels. No unbounded pipe, second synthesis
   implementation, raw response logging or automatic format/provider retry. Keep current
   parsing, byte/frame/time limits and fixed-origin checks on both consumers.
-- [ ] Handle only validated ClientSpeak effects for the current socket/profile/turn.
+- [x] Handle only validated ClientSpeak effects for the current socket/profile/turn.
   Resolve current selected settings immediately before a deliberate live synthesis;
   SERVER/deleted key now denies that call with readable failure rather than using a stale
   key. Use override voice or the validated server-provided voice as existing API specifies.
   Dedup effects before API invocation. A stale callback cannot start audio for another
   session; Stop, capture start, new reply, hide and teardown cancel in-flight HTTP/work.
-- [ ] Route synthesized audio through the same PcmPlayback owner and real waveform as
+- [x] Route synthesized audio through the same PcmPlayback owner and real waveform as
   server speech. Track preparing versus speaking honestly; completion waits for native
   playback drain. Stop during pending synthesis must work. Preserve audio focus/muted hint,
   user draft and complete textual answer on provider error/quota/cancellation. Never fall
   back to a second paid call or automatically ask Hermes to synthesize again.
-- [ ] Use synthetic local TLS fixtures for SERVER/no-ack, shared/profile voice precedence,
+- [x] Use synthetic local TLS fixtures for SERVER/no-ack, shared/profile voice precedence,
   missing/corrupt key, 401/403/429, redirects, oversized/empty/malformed PCM/Ogg, cancellation
   before/during response and delayed old-profile callbacks. Prove one request per accepted
   ClientSpeak and no call from reconnect/previousReply. Existing watch framed API tests
   remain green; do not claim a stubbed native sink proves actual sound.
-- [ ] Run actual owned-emulator MediaCodec encode/decode with synthetic PCM and the real
+- [x] Run actual owned-emulator MediaCodec encode/decode with synthetic PCM and the real
   PhoneConversation capture/playback adapters where supported. Capability absence is
   reported and PCM fallback tested; it is not an Opus pass. Use device_list/device_open,
   no other worker's AVD or physical microphone. Preserve source/APK-bound receipts.
-- [ ] Run affected native tests and strict mobile APK/instrumentation builds; serialize
+- [x] Run affected native tests and strict mobile APK/instrumentation builds; serialize
   ktlint after compilation. Commit exact owned paths, no push. Full report with genuine
   RED/GREEN, commands/counts/skips and limits to the task report. Independent review gates
   integration; physical speech/STT, provider playback and battery comparison remain open.

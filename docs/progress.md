@@ -71,7 +71,9 @@ Watch Portrait/Pet `a29268d` has 157 JVM and 24 native passes/one explicit Batte
 emulator skip plus synthetic carousel coverage; one Important portrait-provenance finding
 is in original-worker fix round 1/5. Phone audio `3f8d94e` has 162 JVM and 15 native
 passes; `83f4ec2` adds tested Preparing voice/Stop UI with three focused native passes
-and affected strict build/format success. Full Task 1 review is active. These handoffs are not accepted live features or physical app deliveries.
+and affected strict build/format success. Full Task 1 review is clean with no findings;
+phone audio is integrated as `5cdc8d1`/`1fd00e9`. Settings/capacity and physical delivery
+remain separate phone gates. These handoffs are not accepted live features or physical app deliveries.
 
 Physical synthetic codec demo: each actual device passes the two existing production-code
 Opus encode/decode methods in a separate temporary app. The three-second fixture encodes

@@ -89,11 +89,13 @@ Viper and Cthulhu remain queued after Akuma's production stage.
 The [phone audio plan](docs/superpowers/plans/2026-10-18-phone-optional-audio.md) has
 implementation `3f8d94e` with 162 JVM and 15 native passes; `83f4ec2` completes the
 required Preparing voice/Stop UI seam with three focused native passes and a clean strict
-affected build. Independent full Task 1 review is active. Watch
+affected build. Independent full Task 1 review is clean (zero findings), and both
+commits are integrated as `5cdc8d1`/`1fd00e9`. Profile-aware settings/capacity is the
+next phone task; no new physical app update has been installed. Watch
 Portrait/Pet selection `a29268d` has 157 JVM passes, 24 native passes/one explicit Battery
 Saver emulator skip and a passing synthetic carousel scenario. Review found one Important
 portrait-cache provenance defect; its original implementer is in fix round 1/5, preserving
-old art and adding real admission/cache coverage. Neither increment is integrated or
+old art and adding real admission/cache coverage. The watch increment remains unintegrated; neither new audio nor pet-selector build is
 installed on physical devices yet. SDK/core,
 watch and phone source ownership are disjoint. The canonical-history/task plan is written;
 implementation follows the reviewed core/outbox bridge.
