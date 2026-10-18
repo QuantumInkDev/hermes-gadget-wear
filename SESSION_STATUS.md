@@ -33,7 +33,8 @@ tests. Seven regressions reproduced the two original Important findings before f
 fresh scoped review accepts both fixes without new findings. Both generated Akuma
 candidates are rejected, so no companion art is accepted. Private APK/data backups
 are verified for both devices (104 phone files, including 18 identity and 55 art files;
-78 watch files, including 19 identity and 29 art files). No app UI or setting was changed.
+78 watch files, including 19 identity and 29 art files). These initial backups changed
+no UI or setting; the later phone UI check is recorded below.
 The [server contract](docs/relay-server-contract.md) and
 [focused outbox plan](docs/superpowers/plans/2026-10-18-relay-server-foundations.md)
 define the next server increment. Its storage task is accepted in an isolated SDK.
@@ -42,26 +43,44 @@ Typed protocol diagnostics is accepted from its
 and implementation activity do not establish live integration.
 
 Latest: outbox storage `d097717` is independently approved in the isolated SDK, with
-39 storage +30 stock/extension warning-strict passes. Grant/wire task 2 at `aa081cd8`
-passes 151 targeted +30 compatibility checks; independent review requests one P2
-cancellation correction. Fix round 1 is dispatched; no server capability is enabled.
+39 storage +30 stock/extension warning-strict passes. Grant/wire task 2 through `dbead4db`
+has clean spec/quality review after its cancellation correction; 119 affected grants/service
+and 30 compatibility checks pass warning-strict. Actual-core Task 3 is now implementing
+trusted enrollment context and durable final-delivery recovery in isolated fixtures.
+No server capability is enabled.
 Actual-core finalizer recovery is a known Task 3 gate: a failed SendResult alone does
 not prevent the pinned core from releasing its marker. Do not enable the flag until
 durable canonical recovery is proven. Quick actions are integrated as `ed64905`,
 `5363cb0` and `c0568fe`; the stale preview-navigation fix has a clean scoped review.
 Source `27ad4e8` is installed on the phone with matching signer/hash: all 104 baseline
 files, 18 identities, 55 artwork files, seven widget providers and the five-minute
-timeout are preserved. No UI launch, pairing or live send occurred; the locked phone's
-physical UI/live acceptance remains open. Controls are under Settings → Quick actions.
+timeout are preserved. Installation itself launched no UI, pairing or live send. A later
+authorized unlocked-phone check opened Settings → Quick actions, verified that unbound
+review blocks transfer, and observed the editor fields. No action was saved/profile bound
+or message sent. All 73 identity/art files and the five-minute timeout remain unchanged;
+the phone returned to the launcher. Profile-bound preview/shortcuts/live and API29 gates
+remain open. Cancel was below the observed viewport and was not exercised.
 Typed diagnostics through `d9313c8` has clean spec/quality review after two fix rounds;
-114 protocol tests/27 reports pass with no failures/errors/skips. Native diagnostics
-presentation/export and physical validation remain pending.
+114 protocol tests/27 reports pass with no failures/errors/skips. Integrated root checks
+at `c951b9e` pass 150 JVM tests/41 reports, all four APKs and sequential strict formatting.
+Native diagnostics presentation/export and physical validation remain pending.
 
 The owner has expanded the artwork scope after Akuma: create Kitana and SF6 C. Viper
 from scratch with full standard/watch states, followed by a Cthulhu pet matching the
 current profile portrait. Kitana's walk must be regal and her waiting loop should cool
 her with fans. References and generated personal assets remain private. The initial
 Akuma-only restriction below is historical; this explicit later authorization supersedes it.
+
+A separate five-call Akuma row attempt retains geometry-valid private partials, but no
+art is accepted. The raw full-frame talking check still fails; source originals remain
+unchanged. A [focused renderer plan](docs/superpowers/plans/2026-10-18-pet-expression-overlays.md)
+holds the body anchor fixed and renders only the generated mouth region, keeping exact
+body stability without rewriting source art. This is planned, not implemented. Kitana,
+Viper and Cthulhu remain queued after Akuma's production stage.
+The [phone audio plan](docs/superpowers/plans/2026-10-18-phone-optional-audio.md) is active
+in an isolated worktree; Portrait/Pet selection is active in another. SDK/core, watch
+and phone source ownership are disjoint. The canonical-history/task plan is written;
+implementation follows the reviewed core/outbox bridge.
 
 Two real ElevenLabs format probes pass (2 calls /102 characters; real Opus accepted by
 the app parser). Remaining allowance: 8 calls /2,398 characters. Credentials were read

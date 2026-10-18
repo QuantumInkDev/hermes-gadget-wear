@@ -43,16 +43,31 @@ has clean spec/quality review and recorded RED-to-GREEN native coverage. Source 
 is installed on the phone with matching signer and APK hash; all 104 baseline files,
 18 identities, 55 artwork files, seven providers and five-minute timeout are unchanged.
 Demo path: Settings → Quick actions, choose a profile and inputs, preview, then open a
-draft. Physical UI/live-send and API29 acceptance remain open; no UI launch occurred
-while the phone was locked.
+draft. A later authorized unlocked-phone check opens Settings → Quick actions, verifies
+unbound review cannot transfer, and observes editor fields. No save, profile binding,
+pairing or live message occurred; 73 identity/art files and timeout are preserved, and
+the phone returns to the launcher. Profile-bound preview/shortcut/live-send, scroll-to-
+Cancel and API29 acceptance remain open. The initial verifier wrongly assumed Cancel
+was in the current viewport; its failed assertion is retained privately, not an app defect.
 
-Grant/wire task `aa081cd8` passes 151 targeted and 30 compatibility checks warning-strict;
-fresh review requires one P2 cancellation correction. Fix round 1 is dispatched.
-Actual-core recovery, transport provenance and live activation remain gated.
+Grant/wire through `dbead4db` has clean independent spec/quality review after one P2
+cancellation correction. Eight focused, 119 affected and 30 compatibility checks pass
+warning-strict. Actual-core recovery/provenance integration is underway in isolated clean
+and actual-runtime fixtures; live activation remains gated.
+
+Integrated root source `c951b9e` passes 150 JVM tests /41 reports with zero failures,
+errors or skips, strict checks, all four APKs and sequential formatting. These are source-
+bound software results, separate from worktree implementations and physical acceptance.
 
 Later owner instruction expands personal artwork after Akuma to Kitana, SF6 C. Viper
 and Cthulhu. All receive standard states plus listening/talking/sleeping companions;
 Kitana uses a regal walk and fan-cooling waiting loop. References and art stay private.
+
+Five separate-row Akuma generation calls preserve every original and retain private
+listening/sleeping candidates; full-frame talking remains rejected. The
+[talking overlay plan](superpowers/plans/2026-10-18-pet-expression-overlays.md) moves exact
+body stability to deterministic native rendering while keeping raw source checks honest.
+It is not yet implemented. New pets follow Akuma's accepted production stage.
 
 ## Fifteen-feature expansion intake — 2026-10-18 (historical)
 

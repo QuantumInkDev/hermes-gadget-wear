@@ -21,7 +21,7 @@ an existing full-frame gate. Listening/sleeping remain independently reviewed fu
 
 - Preserve originals, hashes, endpoint isolation, bounded asset decoding and stock behavior.
 - Personal art, selected mouth coordinates and receipts stay private; public fixtures synthetic.
-- No overlay/icon/control covers the watch artwork. Keep current recording target, rings,
+- No floating UI, icon or control covers the watch artwork. Keep current recording target, rings,
   haptics, swipes, scroll, Portrait default and final Jump footer.
 - Mouth selection follows actual native playback amplitude with existing hysteresis; no
   timer-driven speech, provider call, automatic replay or animation while offscreen/ambient.
