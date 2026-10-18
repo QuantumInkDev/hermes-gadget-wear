@@ -37,8 +37,10 @@ or quarantined emulator was touched.
 The interrupted implementations are checkpointed without accepting unfinished code.
 Continuity Task3's fresh fix1 review closes the four original Important findings and the
 public UUID/report corrections. One new Important finding remains: disabling conversations
-can falsely acknowledge unread shared outbox copies. Focused fix2 is in progress; broad
-checks and the separate queued-marker integration concern remain unresolved.
+could falsely acknowledge unread shared outbox copies. Focused fix2 `a4a0c37` now has a
+clean fresh scoped review:13 new cases within114 distinct affected coverage. The Task3
+source-review gate is accepted; broad checks, queued-marker integration, later server
+work and native/live acceptance remain unresolved.
 Maintenance-observation fix2
 (`7ecfa8a3` / `9fe6dccd`) has a clean fresh source review. All original findings and
 the first-engagement process-birth I/O gap are closed. Four affected files pass208

@@ -60,7 +60,9 @@ retains the desktop source and is directly consumable by `active_package`.
   the regular source at its normal filename and emit a distinct `gadget-base` file
   plus `gadgetBasePath`; register/validate companion delivery against that alternate.
   Include every source/output hash in the receipt. Preserve default call behavior and
-  prepare-grid argument rules. Reject output-name collisions before copying/writing.
+  prepare-grid argument rules. Input metadata already declaring `gadgetBasePath` requires
+  the explicit stager argument; otherwise refuse with a clear error before output, rather
+  than preserving a dangling reference. Reject output-name collisions before copying/writing.
 - [ ] RED/GREEN tests exercise a synthetic regular source whose encoded delivery
   exceeds2MiB with a valid alternate below the ceiling; actual SDK packaging/sender
   succeeds only with valid metadata and retains original bytes. Cover absent-field
