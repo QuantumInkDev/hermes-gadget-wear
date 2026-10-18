@@ -25,8 +25,11 @@ no minimum-version animation pass is claimed. Existing API37 and physical receip
 source-bound evidence, not substitutes for this gate.
 
 Expression overlay fixes `50c3c0a` (app) / `46d61f0` (isolated SDK) pass fresh scoped
-re-review: all three findings addressed, no new findings. Public integration/export and
-fresh reapplication are next; private Akuma art remains unaccepted. Windows fix2
+re-review: all three findings addressed, no new findings. App integration `3862227`/`14ea9f4` and public SDK patch 5 freshly reapply: all265 SDK
+files match accepted source, patches1–4 unchanged,89 affected compatibility checks pass
+without skips. Combined root strict check206JVM/46reports/all4APKs passes. Private Akuma
+overlay candidate v4 is staged; raw full-frame differences remain failed, human/live/physical
+gates remain open. Windows fix2
 `0f4b0ad` passes scoped source review and 177 affected software checks with ten explicit
 Windows skips on Mac. Fresh reliable SFTP runs on both actual gateway architectures each
 execute ten methods: **nine pass, one fails, zero errors/skips**, fixture/source cleanup

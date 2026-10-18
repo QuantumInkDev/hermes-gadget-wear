@@ -1,0 +1,227 @@
+diff --git a/plugin/pets.py b/plugin/pets.py
+index 940a139..46854e0 100644
+--- a/plugin/pets.py
++++ b/plugin/pets.py
+@@ -21,6 +21,20 @@ def confined(directory: Path, path: str) -> Path:
+     return result
+ 
+ 
++def _overlay(value, kind, name, count):
++    if kind != 'companion' or name != 'talking' or count != 3:
++        raise ValueError('Overlay requires companion talking with three poses')
++    if not isinstance(value, dict) or set(value) != {'anchor_frame', 'rect'}:
++        raise ValueError('Invalid overlay descriptor')
++    anchor, rect = value['anchor_frame'], value['rect']
++    if type(anchor) is not int or anchor != 0 or not isinstance(rect, list) or len(rect) != 4 or any(type(n) is not int for n in rect):
++        raise ValueError('Invalid overlay anchor or rectangle')
++    left, top, right, bottom = rect
++    if not (0 <= left < right <= 192 and 0 <= top < bottom <= 208 and right - left <= 96 and bottom - top <= 104):
++        raise ValueError('Overlay rectangle exceeds cell or region limits')
++    return {'anchor_frame': 0, 'rect': list(rect)}
++
++
+ def _sheet(path: Path, kind: str, rows=None):
+     from PIL import Image
+     with Image.open(path) as source:
+@@ -42,6 +56,7 @@ def _sheet(path: Path, kind: str, rows=None):
+             raise ValueError('Invalid pet row')
+         if kind == 'companion' and (name not in ('listening', 'talking', 'sleeping') or (name == 'talking' and count != 3)):
+             raise ValueError('Invalid companion row')
++        overlay = _overlay(row['overlay'], kind, name, count) if 'overlay' in row else None
+         labels.add(name); indices.add(index)
+         frames = 0
+         for column in range(count):
+@@ -51,10 +66,13 @@ def _sheet(path: Path, kind: str, rows=None):
+             if alpha.getextrema()[0] == 255:
+                 raise ValueError("Opaque pet frame")
+             frames += 1
++        if name == 'talking' and (overlay is not None or frames > 0) and frames != 3:
++            raise ValueError('Talking needs three occupied poses')
+         if frames:
+-            if name == 'talking' and frames != 3:
+-                raise ValueError('Talking needs three occupied poses')
+-            occupied.append({'name': name, 'index': index, 'frames': frames})
++            descriptor = {'name': name, 'index': index, 'frames': frames}
++            if overlay is not None:
++                descriptor['overlay'] = overlay
++            occupied.append(descriptor)
+     if not occupied or (kind == 'base' and 'idle' not in [row['name'] for row in occupied]):
+         raise ValueError('Empty pet')
+     output = io.BytesIO()
+@@ -100,6 +118,17 @@ def active_package():
+ async def send_package(session, value):
+     from .protocol import binary
+     manifest, assets = value
++    cap = session.caps.get('pet')
++    version = cap.get('expression_overlays') if isinstance(cap, dict) else None
++    if type(version) is not int or version != 1:
++        # Do not reinterpret a generated overlay pose as approved full-frame art.
++        filtered = []
++        for sheet, data in assets:
++            rows = [row for row in sheet['rows'] if 'overlay' not in row]
++            if rows:
++                filtered.append(({**sheet, 'rows': rows}, data))
++        assets = filtered
++        manifest = {**manifest, 'sheets': [sheet for sheet, _ in assets]}
+     await session.send_json(manifest)
+     for stream, (sheet, data) in enumerate(assets, 1):
+         if not session.paired or session.closed:
+diff --git a/tests/test_pets.py b/tests/test_pets.py
+index f622aac..e7d233d 100644
+--- a/tests/test_pets.py
++++ b/tests/test_pets.py
+@@ -108,3 +108,154 @@ def test_profile_selection_and_disabled_setting_are_respected(tmp_path, monkeypa
+     config['display']['pet']['enabled'] = False
+     assert pets.active_package() is None
+     assert len(selected) == 1
++
++
++def overlay_package(tmp_path):
++    path = tmp_path / 'base.webp'; sheet(path)
++    image = Image.new('RGBA', (1152, 624)); draw = ImageDraw.Draw(image)
++    for row, count in enumerate((6, 3, 6)):
++        for col in range(count):
++            x, y = col * 192, row * 208
++            draw.rectangle((x + 60, y + 60, x + 132, y + 180), fill=(100 + col * 20, 90, 40, 255))
++            draw.rectangle((x + 88, y + 100, x + 104, y + 102 + col * 3), fill='black')
++    image.save(tmp_path / 'companion.png')
++    rows = [{'name': n, 'index': i, 'frames': c} for i, (n, c) in enumerate((('listening', 6), ('talking', 3), ('sleeping', 6)))]
++    rows[1]['overlay'] = {'anchor_frame': 0, 'rect': [80, 96, 112, 128]}
++    (tmp_path / 'pet.json').write_text(json.dumps({'gadgetSheet': {'spritesheetPath': 'companion.png', 'rows': rows}}))
++    return path, rows
++
++
++def test_overlay_descriptor_preserved_and_source_unchanged(tmp_path):
++    path, rows = overlay_package(tmp_path)
++    before = [(tmp_path / name).read_bytes() for name in ('base.webp', 'companion.png', 'pet.json')]
++    manifest, assets = pets.package(tmp_path, path, 'Synthetic', 'synthetic')
++    assert manifest['sheets'][1]['rows'][1]['overlay'] == rows[1]['overlay']
++    assert assets[1][0] == manifest['sheets'][1]
++    assert before == [(tmp_path / name).read_bytes() for name in ('base.webp', 'companion.png', 'pet.json')]
++
++
++@pytest.mark.parametrize('descriptor', [None, True, [], {},
++    {'anchor_frame': True, 'rect': [80, 96, 112, 128]},
++    {'anchor_frame': 1, 'rect': [80, 96, 112, 128]},
++    {'anchor_frame': 0, 'rect': [True, 96, 112, 128]},
++    {'anchor_frame': 0, 'rect': [80.0, 96, 112, 128]},
++    {'anchor_frame': 0, 'rect': [80, 96, 112]},
++    {'anchor_frame': 0, 'rect': [80, 96, 112, 128, 140]},
++    {'anchor_frame': 0, 'rect': [-1, 96, 112, 128]},
++    {'anchor_frame': 0, 'rect': [80, 96, 193, 128]},
++    {'anchor_frame': 0, 'rect': [80, 96, 112, 209]},
++    {'anchor_frame': 0, 'rect': [80, 96, 80, 128]},
++    {'anchor_frame': 0, 'rect': [0, 0, 97, 104]},
++    {'anchor_frame': 0, 'rect': [0, 0, 96, 105]},
++    {'anchor_frame': 0, 'rect': [80, 96, 112, 128], 'mask': 'no'}])
++def test_malformed_overlays_fail_closed(tmp_path, descriptor):
++    path, rows = overlay_package(tmp_path)
++    rows[1]['overlay'] = descriptor
++    with pytest.raises(ValueError): pets._sheet(tmp_path / 'companion.png', 'companion', rows)
++
++
++@pytest.mark.parametrize('capability', [None, False, True, 0, 2, '1', 1.0, 1])
++def test_delivery_negotiates_exact_overlay_version_without_mutating_package(tmp_path, capability):
++    path, rows = overlay_package(tmp_path)
++    value = pets.package(tmp_path, path, 'Synthetic', 'synthetic')
++    original = json.dumps(value[0], sort_keys=True)
++    class Session:
++        paired, closed = True, False
++        caps = {'pet': {'asset_channel': 4, 'expression_overlays': capability}}
++        def __init__(self): self.sent = []
++        async def send_json(self, data): self.sent.append(data)
++        async def send_binary(self, data): pass
++    session = Session()
++    asyncio.run(pets.send_package(session, value))
++    sent = session.sent[0]['sheets']
++    received = {r['name']: r for r in sent[1]['rows']}
++    assert ('talking' in received) == (type(capability) is int and capability == 1)
++    assert 'listening' in received and 'sleeping' in received
++    assert sent[0] == value[0]['sheets'][0]
++    assert json.dumps(value[0], sort_keys=True) == original
++
++
++@pytest.mark.parametrize('change', ['listening', 'sleeping', 'frames', 'empty', 'partial'])
++def test_overlay_requires_talking_and_three_occupied_poses(tmp_path, change):
++    path, rows = overlay_package(tmp_path)
++    if change in ('listening', 'sleeping'):
++        rows = [dict(rows[1], name=change)]
++    elif change == 'frames': rows[1]['frames'] = 2
++    else:
++        image = Image.open(tmp_path / 'companion.png')
++        draw = ImageDraw.Draw(image)
++        draw.rectangle((0 if change == 'empty' else 384, 208, 1151, 415), fill=(0, 0, 0, 0))
++        image.save(tmp_path / 'companion.png')
++    with pytest.raises(ValueError): pets._sheet(tmp_path / 'companion.png', 'companion', rows)
++
++
++def test_old_client_omits_an_overlay_only_companion_asset(tmp_path):
++    path, rows = overlay_package(tmp_path)
++    companion = pets._sheet(tmp_path / 'companion.png', 'companion', [rows[1]])
++    manifest, assets = pets.package(tmp_path, path, 'Synthetic', 'synthetic')
++    value = ({**manifest, 'sheets': [assets[0][0], companion[0]]}, [assets[0], companion])
++    class Session:
++        paired, closed, caps = True, False, {'pet': {'asset_channel': 4}}
++        def __init__(self): self.sent = []
++        async def send_json(self, data): self.sent.append(data)
++        async def send_binary(self, data): pass
++    session = Session()
++    asyncio.run(pets.send_package(session, value))
++    assert session.sent[0]['sheets'] == [assets[0][0]]
++    assert sum(m['type'] == 'asset.start' for m in session.sent) == 1
++
++
++@pytest.mark.parametrize('capability', [None, 1])
++def test_packaging_omits_unmasked_empty_talking_but_delivers_supported_rows(tmp_path, capability):
++    path, rows = overlay_package(tmp_path)
++    del rows[1]['overlay']
++    with Image.open(tmp_path / 'companion.png') as source:
++        image = source.copy()
++    ImageDraw.Draw(image).rectangle((0, 208, 1151, 415), fill=(0, 0, 0, 0))
++    image.save(tmp_path / 'companion.png')
++    (tmp_path / 'pet.json').write_text(json.dumps({'gadgetSheet': {'spritesheetPath': 'companion.png', 'rows': rows}}))
++    originals = [(tmp_path / name).read_bytes() for name in ('base.webp', 'companion.png', 'pet.json')]
++    value = pets.package(tmp_path, path, 'Ordinary synthetic', 'ordinary')
++    assert [r['name'] for r in value[0]['sheets'][1]['rows']] == ['listening', 'sleeping']
++    class Session:
++        paired, closed = True, False
++        caps = {'pet': {'asset_channel': 4, 'expression_overlays': capability}}
++        def __init__(self): self.sent = []
++        async def send_json(self, data): self.sent.append(data)
++        async def send_binary(self, data): pass
++    session = Session()
++    asyncio.run(pets.send_package(session, value))
++    assert [s['kind'] for s in session.sent[0]['sheets']] == ['base', 'companion']
++    assert [r['name'] for r in session.sent[0]['sheets'][1]['rows']] == ['listening', 'sleeping']
++    assert sum(m['type'] == 'asset.end' for m in session.sent) == 2
++    assert originals == [(tmp_path / name).read_bytes() for name in ('base.webp', 'companion.png', 'pet.json')]
++
++
++@pytest.mark.parametrize('occupied', [1, 2])
++def test_unmasked_partial_talking_still_rejected(tmp_path, occupied):
++    path, rows = overlay_package(tmp_path)
++    del rows[1]['overlay']
++    with Image.open(tmp_path / 'companion.png') as source:
++        image = source.copy()
++    ImageDraw.Draw(image).rectangle((occupied * 192, 208, 1151, 415), fill=(0, 0, 0, 0))
++    image.save(tmp_path / 'companion.png')
++    with pytest.raises(ValueError, match='three occupied'):
++        pets._sheet(tmp_path / 'companion.png', 'companion', rows)
++
++
++@pytest.mark.parametrize('descriptor', [
++    '{"anchor_frame":0e0,"rect":[80,100,112,124]}',
++    '{"anchor_frame":0,"rect":[8e1,100,112,124]}',
++    '{"anchor_frame":0,"rect":[2147483647,100,-2147483648,124]}',
++    '{"anchor_frame":0,"rect":[80,2147483647,112,-2147483648]}'
++])
++def test_json_numeric_tokens_and_extrema_are_rejected(tmp_path, descriptor):
++    path, rows = overlay_package(tmp_path)
++    rows[1]['overlay'] = json.loads(descriptor)
++    metadata = json.dumps({'gadgetSheet': {'spritesheetPath': 'companion.png', 'rows': rows}})
++    # Preserve exponent tokens through the actual package metadata reader, rather
++    # than normalizing them to decimal floats in this fixture's JSON round trip.
++    metadata = metadata.replace(json.dumps(rows[1]['overlay']), descriptor)
++    assert descriptor in metadata
++    (tmp_path / 'pet.json').write_text(metadata)
++    with pytest.raises(ValueError): pets.package(tmp_path, path, 'Synthetic', 'synthetic')

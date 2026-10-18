@@ -7,6 +7,7 @@ Baseline: Hermes Gadget SDK `v0.2.0`, commit `323e3303ab68981f810fc3208119cd8a22
 | Optional mic/speaker Opus negotiation, packet framing and paced codec pipeline | Gadget SDK | Patch 1 implemented/tested with real ffmpeg and SDK; Android cross-codec tests pass; Ultra measurements open |
 | Optional client TTS and profile voice hint | Gadget SDK | Patch 3 implemented/tested; opt-in negotiation and final text; physical/provider gate open |
 | Pet manifest and bounded PNG asset transfer on channel 4 | Gadget SDK | Patch 2 implemented/tested; Android delivery/cache checks pass; real-profile/Ultra gate open |
+| Optional talking-region replacement and exact capability negotiation | Gadget SDK | Patch 5 reviewed/freshly reapplied; 89 affected compatibility checks pass; personal art/live/physical gates open |
 | Optional companion metadata and extra rows in one hatch normalization pass | Hermes Agent | Later-row registration tool implemented/tested; same-hatch generator change remains proposed |
 | Pending outbox on reconnect | Gadget SDK | Patch 4 implemented and independently reviewed; enrolled-key grants, bounded silent read/ACK and durable final capture; fresh export/host/live gates tracked in progress |
 | Generic adapter final-delivery context and coherent queue/recovery handoff | Hermes Agent | [Clean core patch](../server/core-patches/README.md), hook version 2; 100 focused actual-core checks per clean/private-runtime fixture; no upstream agreement or live activation |

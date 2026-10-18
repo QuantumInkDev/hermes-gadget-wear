@@ -12,3 +12,13 @@ Actual-core adapter and recovery tests run through the pinned Hermes canonical t
 runner with temporary homes; SDK-only tests do not establish that hook integration.
 Source checks, fresh reapplication and live acceptance are recorded separately in
 [progress](../docs/progress.md). No optional server flag has been enabled on a live box.
+
+SDK patch 5 adds optional talking-region metadata and exact client capability negotiation.
+Updated clients compose three mouth poses from an immutable body anchor; old clients
+receive ordinary base/listening/sleeping rows and omit overlay-dependent talking. The
+validated descriptor is limited to the declared cell and bounded region. Existing unmasked
+pets retain empty optional-row omission. Fresh pinned-source reapplication matches all
+265 reviewed SDK files and passes 89 affected pet/protocol/plugin/tooling compatibility
+checks, with no skips. Source/fix review and synthetic native composition are accepted;
+personal artwork, live transfer, physical playback and power remain separate gates.
+No profile assignment or optional live server flag is changed by exporting this patch.
