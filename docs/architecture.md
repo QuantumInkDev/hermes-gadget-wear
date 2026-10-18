@@ -1,5 +1,11 @@
 # Architecture
 
+Planned pet delivery refinement: optional local `gadgetBasePath` selects a validated
+Gadget sheet while regular Hermes keeps its original `spritesheetPath`. The
+[producer/stager plan](superpowers/plans/2026-10-18-pet-gadget-base.md) preserves existing
+PNG, geometry, capability and confinement limits without changing the wire contract.
+This refinement is not yet implemented, reviewed or installed.
+
 Planned maintenance prerequisite: the [fresh observation plan](superpowers/plans/2026-10-18-maintenance-observation.md)
 adds an optional, explicitly sampled whole-gateway count to the existing local status path.
 Current generic status timestamps do not prove count freshness. This isolated producer is

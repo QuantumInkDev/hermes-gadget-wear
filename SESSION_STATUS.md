@@ -21,17 +21,24 @@ only inside their declared native regions (Kitana24/23, Viper16/16, Cthulhu374/3
 pixels). An initial failed pixel check used Pillow's different nearest-neighbour phase;
 independent alpha checks across67 non-overlay frames per pet establish this Android
 runtime's even-coordinate sampling. That discrepancy is retained as evidence. Cthulhu's
-current watch optimization preserves Pillow samples; preserving the original under
-Android's calibrated phase remains a follow-up. Full motion/semantic review, authenticated
-live delivery and physical power/voice acceptance remain open. Preserving installs and
-restoration verify both original APKs/signers, all settings and504 original app files:
-zero missing, only the ordinary install marker changed, plus309 new fixture captures.
+revised watch base now preserves all54 active base frames' original RGBA samples at that
+phase. A further actual Android case passes with69 decoded frames and65 playback samples;
+the companion's row registration and mouth-only changes also pass. Its full-detail desktop
+atlas is retained. Full motion/semantic review, authenticated live delivery and physical
+power/voice acceptance remain open. The latest preserving install/restoration verifies
+both original APKs/signers, all settings and813 original app files: zero missing, only the
+ordinary install marker changed, plus103 new fixture captures. This includes the earlier
+309 captures. An optional alternate-base producer/stager is now planned so one regular
+pet directory can retain desktop detail and deliver the watch sheet. It is not implemented
+or installed; see the pet Gadget base plan linked in the architecture document.
 The standard test APK was rebuilt without private assets/classes. No physical device
 or quarantined emulator was touched.
 
 The interrupted implementations are checkpointed without accepting unfinished code.
-Continuity Task3 has finished in its isolated successor. Fresh combined review
-requires four Important delivery/lifecycle/compatibility fixes before acceptance.
+Continuity Task3's fresh fix1 review closes the four original Important findings and the
+public UUID/report corrections. One new Important finding remains: disabling conversations
+can falsely acknowledge unread shared outbox copies. Focused fix2 is in progress; broad
+checks and the separate queued-marker integration concern remain unresolved.
 Maintenance-observation fix2
 (`7ecfa8a3` / `9fe6dccd`) has a clean fresh source review. All original findings and
 the first-engagement process-birth I/O gap are closed. Four affected files pass208
@@ -39,7 +46,9 @@ cases with8 platform skips on each foundation. The earlier feature-only239 passe
 6 inherited warning failures and hygiene-enabled245 passes describe separate older
 trees and remain recorded. Minor test-coverage observations are deferred explicitly;
 the shared status publisher's pre-existing process-birth I/O is outside the observer
-probe correction. The offline full driver can now consume the reviewed contract.
+probe correction. The full offline driver has275 distinct passes, but fresh review finds
+four Important listener-diagnostic, source-ownership, marker-freshness and recovery-cleanup
+defects. Focused fix1 is in progress. Actual pre-stop authority/bootstrap stays unsupported.
 No maintenance prerequisite, continuation method or migration feature is live.
 
 Latest integrated app source `dc1fb14` adds the independently reviewed playback-output

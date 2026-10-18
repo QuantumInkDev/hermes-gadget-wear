@@ -12,7 +12,8 @@ reply cards and explicit handoff; diagnostics, supported remote wake and QR/migr
 History/task access defaults to Relay work and requires per-profile opt-in for other
 Hermes surfaces. Pet presentation is now explicitly selectable and initially preserves
 current portraits/GIFs, superseding automatic-pet-priority descriptions below.
-Personal companion artwork is limited to **Akuma**, with reusable tooling for future pets.
+Personal artwork starts with **Akuma**; the owner's later instruction also authorizes
+Kitana, SF6 C. Viper and Cthulhu with all standard and watch companion states.
 Approval does not establish implementation, integration, physical or release acceptance.
 
 ## Native client behavior — 2026-10-12

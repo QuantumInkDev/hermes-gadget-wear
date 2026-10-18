@@ -1,5 +1,11 @@
 # Pets: verified atlas contract and missing states
 
+Planned optional metadata: `gadgetBasePath` will allow a separately validated Gadget
+base while retaining the original regular `spritesheetPath` and desktop atlas bytes.
+The [implementation plan](superpowers/plans/2026-10-18-pet-gadget-base.md) covers bounded
+relative paths, unchanged delivery limits, preserving staging and actual Hermes loading.
+No producer, stager or live support for this new field is claimed yet.
+
 ## Approved live-pet proof of concept — 2026-10-18
 
 The owner initially limited personal artwork to Akuma. A later explicit instruction
