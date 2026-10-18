@@ -14,6 +14,12 @@ The [runtime coverage matrix](docs/android-test-matrix.md) separates compatibili
 checks from modern emulators and physical devices. Direct inventory confirms Android 17/
 API 37 on the phone and Android 16/API 36 on the watch; both apps target API 37.
 
+The interrupted implementations are checkpointed without accepting unfinished code.
+Fresh isolated successors are resuming continuity Task3 and the QR/migration format;
+the committed maintenance-observation candidate (`1762a725` / `de9848db`) is under
+independent source/evidence review. Its original worker stopped before a completion
+report. No maintenance prerequisite, continuation method or migration feature is live.
+
 Latest integrated app source `dc1fb14` adds the independently reviewed playback-output
 and interruption foundation. Strict root checks pass: 11 client JVM cases, zero failures,
 errors or skips; affected lint/formatting and all four APK builds pass (200 tasks,
@@ -88,9 +94,11 @@ Kitana has a selected compact base and a corrected six-pose idle strip. Direct e
 first rejected its tight, unequal generated spacing; lossless column repacking retains
 all source pixels and lets the real Hermes extractor/normalizer produce native/watch
 technical previews. Complete fans and six distinct poses are verified; final all-state
-registration, continuous motion and remaining animations are not accepted yet. A side-view
-walk now has six complete wide/passing gait phases and technical native/watch previews;
-weaker earlier drafts remain rejected. No profile assignment changed. Viper and Cthulhu
+registration, continuous motion and remaining animations are not accepted yet. Both side-view walks now have six complete wide/passing gait phases and technical
+native/watch previews. A fan-cooling waiting loop also has six distinct extracted phases.
+The four-loop playable preview validates 48 frame files/dimensions; final all-state
+registration and motion acceptance remain open. Greeting drafts remain rejected for
+handedness/glow or clipped fan edges; no damaged pose is included. No profile assignment changed. Viper and Cthulhu
 follow her.
 N1/N2 Task1 fix1 `c5ff24b` addresses the reviewed schema-constraint defect. It reports
 296 warning-strict SDK passes and 47 distinct actual-core passes; the latter had one

@@ -16,6 +16,12 @@ has two reproduced final-delivery prerequisites scoped into its implementation. 
 M5 partial maintenance lease has clean review; its full driver awaits a genuine
 sample-observation producer and independent live bootstrap authority. No server changes.
 
+The interrupted implementations are checkpointed without accepting unfinished code.
+Fresh isolated successors are resuming continuity Task3 and the QR/migration format;
+the committed maintenance-observation candidate (`1762a725` / `de9848db`) is under
+independent source/evidence review. Its original worker stopped before a completion
+report. No maintenance prerequisite, continuation method or migration feature is live.
+
 Latest integrated app source `dc1fb14` adds the independently reviewed playback-output
 and interruption foundation. Strict root checks pass: 11 client JVM cases, zero failures,
 errors or skips; affected lint/formatting and all four APK builds pass (200 tasks,
