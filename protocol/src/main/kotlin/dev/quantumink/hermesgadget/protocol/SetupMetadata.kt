@@ -22,26 +22,32 @@ data class SetupEndpoint(
     val transport: TransportPreference = TransportPreference.AUTO
 ) {
     init {
-        transferName(label)
-        transferUrl(url, catalog = false)
-        require(transport != TransportPreference.RELAY || url.startsWith("wss:"))
+        transferChecked("Invalid setup endpoint.") {
+            transferName(label)
+            transferUrl(url, catalog = false)
+            require(transport != TransportPreference.RELAY || url.startsWith("wss:"))
+        }
     }
     override fun toString(): String = "SetupEndpoint(content=redacted)"
 
     companion object {
         /** Deliberate allowlist projection; never serialize EndpointProfile.message(). */
         fun from(profile: EndpointProfile): SetupEndpoint =
-            SetupEndpoint(profile.label, profile.endpoint.url, profile.transport)
+            transferChecked("Invalid setup endpoint.") {
+                SetupEndpoint(profile.label, profile.endpoint.url, profile.transport)
+            }
     }
 }
 
 /** A source still requires an independently entered credential before native catalog discovery. */
 data class SetupCatalog(val id: String, val label: String, val url: String) {
     init {
-        transferId(id)
-        require(id != "manual")
-        transferName(label)
-        transferUrl(url, catalog = true)
+        transferChecked("Invalid setup catalog.") {
+            transferId(id)
+            require(id != "manual")
+            transferName(label)
+            transferUrl(url, catalog = true)
+        }
     }
     override fun toString(): String = "SetupCatalog(content=redacted)"
 
@@ -50,12 +56,12 @@ data class SetupCatalog(val id: String, val label: String, val url: String) {
          * Applies only HTTP-equivalent canonicalization of a user-typed native URL (lowercase host,
          * default 443 omitted, empty path as "/"); anything else must already be canonical.
          */
-        fun from(source: CatalogSource): SetupCatalog {
+        fun from(source: CatalogSource): SetupCatalog = transferChecked("Invalid setup catalog.") {
             val uri = URI(source.url)
             val port = uri.port.takeUnless { it == -1 || it == 443 }?.let { ":" + it }.orEmpty()
             val path = uri.rawPath.orEmpty().ifEmpty { "/" }
             val url = "https://" + requireNotNull(uri.host).lowercase(Locale.ROOT) + port + path
-            return SetupCatalog(source.id, source.label, url)
+            SetupCatalog(source.id, source.label, url)
         }
     }
 }
@@ -69,12 +75,14 @@ data class SetupMetadata(
     val catalog: SetupCatalog?
 ) {
     init {
-        require(setupId.matches(Regex("[a-f0-9]{32}")))
-        transferTime(issuedAtEpochSeconds)
-        transferTime(expiresAtEpochSeconds)
-        require(expiresAtEpochSeconds - issuedAtEpochSeconds in 1..600)
-        transferName(label)
-        require(endpoint != null || catalog != null)
+        transferChecked("Invalid setup metadata.") {
+            require(setupId.matches(Regex("[a-f0-9]{32}")))
+            transferTime(issuedAtEpochSeconds)
+            transferTime(expiresAtEpochSeconds)
+            require(expiresAtEpochSeconds - issuedAtEpochSeconds in 1..600)
+            transferName(label)
+            require(endpoint != null || catalog != null)
+        }
     }
     override fun toString(): String = "SetupMetadata(content=redacted)"
 }
@@ -194,6 +202,16 @@ internal fun decodeCatalog(value: JsonElement): SetupCatalog {
         item.transferString("label"),
         item.transferString("url")
     )
+}
+
+/**
+ * N10 constructors/projections never surface input-bearing messages or causes (for example a
+ * URISyntaxException quotes the private URL). Global Endpoint/stock behavior is unchanged.
+ */
+internal inline fun <T> transferChecked(message: String, block: () -> T): T = try {
+    block()
+} catch (_: Exception) {
+    throw IllegalArgumentException(message)
 }
 
 internal fun transferId(value: String) {

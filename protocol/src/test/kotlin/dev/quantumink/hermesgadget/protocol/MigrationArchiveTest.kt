@@ -7,6 +7,7 @@ import java.io.File
 import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -16,6 +17,7 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 import javax.imageio.ImageIO
+import kotlin.concurrent.thread
 import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -158,7 +160,10 @@ class MigrationArchiveTest {
         for ((offset, number) in listOf(
             12 to 0,
             12 to 209999,
+            12 to 210000,
             12 to 210001,
+            12 to 599999,
+            12 to 600001,
             12 to Int.MAX_VALUE,
             16 to Int.MAX_VALUE,
             20 to Int.MAX_VALUE
@@ -436,15 +441,7 @@ class MigrationArchiveTest {
             MigrationArchive.deriveKey("Password".toCharArray(), "NaCl".toByteArray(), 80000)
                 .transferHex()
         )
-        // Independent Python hashlib vector at the fixed production work factor.
-        assertEquals(
-            "92b02f4b9d5cb8aacac3fbbe41ce7962651bbf19d39577ec7185da1afbc941f5",
-            MigrationArchive.deriveKey(
-                "pässwörd 月光 moon".toCharArray(),
-                ByteArray(16) { it.toByte() },
-                MigrationArchive.KDF_ITERATIONS
-            ).transferHex()
-        )
+        assertEquals(600000, MigrationArchive.KDF_ITERATIONS)
     }
 
     @Test fun nonAsciiPassphrasesRoundtripAndUnpairedSurrogatesAreRejected() {
@@ -788,8 +785,307 @@ class MigrationArchiveTest {
         }
     }
 
+    @Test fun callerMutationOfSourceAndNestedListsCannotChangeOrBreakASnapshot() {
+        val base = snapshot()
+        val endpoints = ArrayList(base.endpoints)
+        val profiles = ArrayList(base.profiles)
+        val order = ArrayList(base.profileOrder)
+        val slots = arrayListOf<String?>(key, null, null, null)
+        val widget = MigrationWidget(id, MigrationWidgetPreset.FOUR, slots)
+        val widgets = arrayListOf(widget)
+        val value = base.copy(
+            endpoints = endpoints,
+            profiles = profiles,
+            profileOrder = order,
+            widgets = widgets
+        )
+        val expected = base.copy(
+            widgets = listOf(
+                MigrationWidget(id, MigrationWidgetPreset.FOUR, listOf(key, null, null, null))
+            )
+        )
+        endpoints.clear()
+        profiles += profiles.first()
+        order.reverse()
+        slots[1] = "box:gone"
+        slots += manual
+        widgets += widget
+        assertEquals(expected, value)
+        assertEquals(listOf(key, null, null, null), value.widgets.single().slots)
+        MigrationArchive.decodeZip(MigrationArchive.encodeZip(value, art())).use {
+            assertEquals(expected, it.snapshot)
+        }
+    }
+
+    @Test fun exposedCollectionsAreUnmodifiableEvenWhenCastToMutable() {
+        val base = snapshot()
+        val value = base.copy(
+            endpoints = ArrayList(base.endpoints),
+            catalogs = ArrayList(base.catalogs),
+            profiles = ArrayList(base.profiles),
+            sourceOrder = ArrayList(base.sourceOrder),
+            profileOrder = ArrayList(base.profileOrder),
+            actions = ArrayList(base.actions),
+            widgets = ArrayList(
+                base.widgets.map {
+                    MigrationWidget(it.id, it.preset, ArrayList(it.slots), it.theme)
+                }
+            ),
+            artwork = ArrayList(base.artwork)
+        )
+        val views = listOf<List<Any?>>(
+            value.endpoints, value.catalogs, value.profiles, value.sourceOrder,
+            value.profileOrder, value.actions, value.widgets, value.artwork,
+            value.widgets.first().slots
+        )
+        for ((index, view) in views.withIndex()) {
+            assertThrows("view=$index", UnsupportedOperationException::class.java) {
+                (view as MutableList<Any?>).add(null)
+            }
+            assertThrows("view=$index", UnsupportedOperationException::class.java) {
+                (view as MutableList<Any?>).removeAt(0)
+            }
+        }
+        assertEquals(base, value)
+    }
+
+    @Test fun artworkBytesAreOwnedFromValidationThroughSerialization() {
+        val source = png.copyOf()
+        var reads = 0
+        val hostile = object : HashMap<String, ByteArray>(
+            mapOf(pngHash to source, gifHash to gif)
+        ) {
+            override fun get(key: String): ByteArray? = super.get(key).also {
+                // Every lookup after the first silently corrupts the caller-owned array.
+                if (key == pngHash &&
+                    reads++ > 0
+                ) {
+                    source[source.size / 2] = (source[source.size / 2] + 1).toByte()
+                }
+            }
+        }
+        val zip = MigrationArchive.encodeZip(snapshot(), hostile)
+        source.fill(0)
+        MigrationArchive.decodeZip(zip).use { assertArrayEquals(png, it.artwork.getValue(pngHash)) }
+    }
+
+    @Test fun concurrentCallerMutationYieldsAValidArchiveOrACleanRejection() {
+        val base = snapshot()
+        val profiles = ArrayList(base.profiles)
+        val slots = arrayListOf<String?>(key, null, null, null)
+        val source = png.copyOf()
+        val stop = AtomicBoolean(false)
+        val mutator = thread {
+            var index = 0
+            while (!stop.get()) {
+                profiles += profiles[0]
+                profiles.removeAt(profiles.lastIndex)
+                slots[1] = key
+                slots[1] = null
+                val at = index++ % source.size
+                source[at] = (source[at] + 1).toByte()
+                source[at] = (source[at] - 1).toByte()
+            }
+        }
+        var accepted = 0
+        var rejected = 0
+        try {
+            repeat(400) {
+                val value = try {
+                    base.copy(
+                        profiles = profiles,
+                        widgets = listOf(MigrationWidget(id, MigrationWidgetPreset.FOUR, slots))
+                    )
+                } catch (_: IllegalArgumentException) {
+                    rejected++
+                    return@repeat
+                }
+                val zip = try {
+                    MigrationArchive.encodeZip(value, mapOf(pngHash to source, gifHash to gif))
+                } catch (_: IllegalArgumentException) {
+                    rejected++
+                    return@repeat
+                }
+                // Anything that was emitted must be readable and equal to the checked snapshot.
+                MigrationArchive.decodeZip(zip).use { assertEquals(value, it.snapshot) }
+                accepted++
+            }
+        } finally {
+            stop.set(true)
+            mutator.join()
+        }
+        assertEquals(400, accepted + rejected)
+        println("concurrent mutation: accepted=$accepted rejected=$rejected")
+    }
+
+    @Test fun fixedV1WorkFactorMatchesIndependentNfcVectors() {
+        val salt = ByteArray(16) { it.toByte() }
+        fun key(text: String) =
+            MigrationArchive.deriveKey(text.toCharArray(), salt, MigrationArchive.KDF_ITERATIONS)
+                .transferHex()
+        // Python hashlib.pbkdf2_hmac("sha256", NFC(text).encode(), bytes(range(16)), 600000, 32).
+        val ascii = "b6ef34f61bbe5d5d0014644fad33374e5fad47880bc948417dda225bc3216938"
+        assertEquals(ascii, key("synthetic passphrase!"))
+        val spec = PBEKeySpec("synthetic passphrase!".toCharArray(), salt, 600000, 256)
+        val jdk = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+        spec.clearPassword()
+        assertEquals(ascii, jdk.transferHex()) // Independent JDK baseline: ASCII is unchanged.
+        val latin = "9418a9e8c2142370658d047c2056fc96900cefadce5e10f62608dd645da131a4"
+        assertEquals(latin, key("p\u00E4ssw\u00F6rd \u6708\u5149 moon"))
+        assertEquals(latin, key("pa\u0308sswo\u0308rd \u6708\u5149 moon"))
+        assertEquals(
+            "27bbc41af055a7bc45943b90fea6b69c4b969c4bdbb63fbd07e8c6c736294ce4",
+            key(
+                "\u1112\u1161\u11AB\u1100\u116E\u11A8\u110B\u1165 " +
+                    "\u1107\u1175\u1106\u1175\u11AF\u1107\u1165\u11AB\u1112\u1169 " +
+                    "\u1106\u116E\u11AB\u1100\u116E"
+            )
+        )
+    }
+
+    @Test fun normalizationIsCanonicalOnlyWithoutCompatibilityTrimOrCaseFolding() {
+        val salt = ByteArray(16)
+        fun key(text: String) =
+            MigrationArchive.deriveKey(text.toCharArray(), salt, 1).transferHex()
+        // Python: NFC leaves U+FB01 intact; NFKC would have produced "fi".
+        assertEquals(
+            "8c45fad93d9f4a6d842ffe75292a693b1ba1d8eaef35e62908192541084b455f",
+            MigrationArchive.deriveKey(
+                "\uFB01xed passphrase".toCharArray(),
+                ByteArray(16) {
+                    it.toByte()
+                },
+                1
+            )
+                .transferHex()
+        )
+        assertNotEquals(key("\uFB01xed passphrase"), key("fixed passphrase"))
+        assertNotEquals(key(" fixed passphrase"), key("fixed passphrase"))
+        assertNotEquals(key("Fixed passphrase"), key("fixed passphrase"))
+        // U+212B ANGSTROM SIGN canonically maps to U+00C5, never to a plain A.
+        assertNotEquals(key("\u212Bngstr\u00F6m units"), key("\u0041ngstr\u00F6m units"))
+        assertEquals(key("\u212Bngstr\u00F6m units"), key("\u00C5ngstr\u00F6m units"))
+    }
+
+    @Test fun canonicallyEquivalentPassphrasesOpenTheSameArchiveAndLengthCountsNfc() {
+        val composed = "p\u00E4ssw\u00F6rd \u6708\u5149 moon".toCharArray()
+        val decomposed = "pa\u0308sswo\u0308rd \u6708\u5149 moon".toCharArray()
+        val encrypted = MigrationArchive.encrypt(MigrationSnapshot(), composed)
+        (MigrationArchive.decrypt(encrypted, decomposed) as MigrationReadResult.Success).use {
+            assertEquals(MigrationSnapshot(), it.snapshot)
+        }
+        // 22 UTF-16 units but only 11 code points after NFC; 12 decomposed letters are enough.
+        assertThrows(IllegalArgumentException::class.java) {
+            MigrationArchive.encrypt(MigrationSnapshot(), "e\u0301".repeat(11).toCharArray())
+        }
+        assertSame(
+            MigrationReadResult.Invalid,
+            MigrationArchive.decrypt(encrypted, "e\u0301".repeat(11).toCharArray())
+        )
+        val twelve = "e\u0301".repeat(12).toCharArray()
+        val sealed = MigrationArchive.encrypt(MigrationSnapshot(), twelve)
+        (
+            MigrationArchive.decrypt(
+                sealed,
+                "\u00E9".repeat(12).toCharArray()
+            ) as MigrationReadResult.Success
+            )
+            .close()
+    }
+
+    @Test fun anArchiveSealedWithTheUnshipped210000DraftIsRejected() {
+        val zip = MigrationArchive.encodeZip(MigrationSnapshot(), emptyMap())
+        val header = MigrationArchive.encrypt(MigrationSnapshot(), password).copyOfRange(0, 52)
+        big(header).putInt(12, 210000).putInt(16, zip.size).putInt(20, zip.size + 16)
+        val draft = header + cipher(Cipher.ENCRYPT_MODE, header).doFinal(zip)
+        assertSame(MigrationReadResult.Invalid, MigrationArchive.decrypt(draft, password))
+        assertSame(
+            MigrationReadResult.Invalid,
+            MigrationArchive.read(ByteArrayInputStream(draft), password)
+        )
+    }
+
+    @Test fun constructionAndProjectionFailuresNeverQuoteAddressesOrCauses() {
+        val secret = "secret-sentinel"
+        val cases = listOf<() -> Any>(
+            { SetupEndpoint("Bot", "wss://$secret.example.test/a b") },
+            { SetupEndpoint("Bot", "wss://$secret.example.test/%zz") },
+            { SetupCatalog("box", "Box", "https://$secret.example.test/a b") },
+            {
+                SetupCatalog.from(
+                    CatalogSource("box", "Box", "https://$secret.example.test/a/../b", "S")
+                )
+            },
+            { MigrationProfile("box:p", "P", "wss://$secret.example.test/^") },
+            { MigrationProfile("box:p", "P", "ws://$secret.example.test/") },
+            {
+                MigrationSnapshot(
+                    endpoints = List(2) { SetupEndpoint("Bot", "wss://$secret.example.test/") }
+                )
+            },
+            { SetupMetadataCodec.create("Bot", "wss://$secret.example.test/?token=x", 1792281600L) }
+        )
+        for ((index, case) in cases.withIndex()) {
+            val error = assertThrows("case=$index", IllegalArgumentException::class.java) { case() }
+            assertFalse("case=$index", error.toString().contains(secret))
+            assertEquals("case=$index", null, error.cause)
+        }
+        // Global stock Endpoint behavior and messages are deliberately unchanged.
+        val stock = assertThrows(IllegalArgumentException::class.java) {
+            Endpoint.parse("wss://user@$secret.example.test/")
+        }
+        assertEquals(
+            "Keep credentials outside the URL; query strings and fragments are unsupported.",
+            stock.message
+        )
+    }
+
+    @Test fun trailingCompressedBytesAfterTheDeflateEndAreRejected() {
+        val manifest = plain()
+        val deflater = java.util.zip.Deflater(java.util.zip.Deflater.DEFAULT_COMPRESSION, true)
+        val compressed = try {
+            deflater.setInput(manifest)
+            deflater.finish()
+            val output = ByteArray(manifest.size + 64)
+            output.copyOf(deflater.deflate(output))
+        } finally {
+            deflater.end()
+        }
+        val crc = CRC32().also { it.update(manifest) }.value.toInt()
+        val honest = rawZip("manifest.json", compressed, manifest.size, crc)
+        assertEquals(MigrationSnapshot(), MigrationArchive.decodeZip(honest).snapshot)
+        rejectZip(rawZip("manifest.json", compressed + byteArrayOf(0, 1, 2), manifest.size, crc))
+    }
+
+    @Test fun storedJvmZipExactlyFillsThePreflightWithoutExtras() {
+        val value = snapshot()
+        val zip = MigrationArchive.encodeZip(value, art())
+        val manifest = MigrationArchive.manifest(value).size
+        val members = listOf("manifest.json" to manifest) +
+            value.artwork.map { it.path to it.bytes }
+        // 30-byte local + 46-byte central header per member, names twice, 22-byte EOCD.
+        assertEquals(22 + members.sumOf { (name, size) -> 76 + 2 * name.length + size }, zip.size)
+    }
+
+    /** Hand-built single raw-DEFLATE member: exact local/central sizes, no descriptor or extras. */
+    private fun rawZip(name: String, data: ByteArray, size: Int, crc: Int): ByteArray {
+        val title = name.toByteArray(Charsets.US_ASCII)
+        val local = little(ByteArray(30 + title.size)).putInt(0x04034b50).putShort(20)
+            .putShort(0).putShort(8).putInt(0).putInt(crc).putInt(data.size).putInt(size)
+            .putShort(title.size.toShort()).putShort(0).put(title).array()
+        val central = little(ByteArray(46 + title.size)).putInt(0x02014b50).putShort(20)
+            .putShort(20).putShort(0).putShort(8).putInt(0).putInt(crc).putInt(data.size)
+            .putInt(size).putShort(title.size.toShort()).putShort(0).putShort(0).putShort(0)
+            .putShort(0).putInt(0).putInt(0).put(title).array()
+        val offset = local.size + data.size
+        val end = little(ByteArray(22)).putInt(0x06054b50).putShort(0).putShort(0).putShort(1)
+            .putShort(1).putInt(central.size).putInt(offset).putShort(0).array()
+        return local + data + central + end
+    }
+
     private fun cipher(mode: Int, header: ByteArray): Cipher {
-        val spec = PBEKeySpec(password, header.copyOfRange(24, 40), 210000, 256)
+        val iterations = ByteBuffer.wrap(header).getInt(12)
+        val spec = PBEKeySpec(password, header.copyOfRange(24, 40), iterations, 256)
         val key = try {
             SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
         } finally {

@@ -1,6 +1,5 @@
 package dev.quantumink.hermesgadget.protocol
 
-import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.nio.ByteBuffer
@@ -9,6 +8,9 @@ import java.nio.CharBuffer
 import java.nio.charset.CodingErrorAction
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.text.Normalizer
+import java.util.Collections
+import java.util.Objects
 import java.util.zip.CRC32
 import java.util.zip.Inflater
 import java.util.zip.ZipEntry
@@ -67,59 +69,145 @@ data class MigrationProfile(
     val animationFallback: String? = null
 ) {
     init {
-        transferKey(key)
-        transferName(name)
-        val manual = key.startsWith("manual:")
-        require(!manual || key.substringAfter(':').matches(Regex("[a-f0-9]{64}")))
-        gadgetUrl?.let { transferUrl(it, catalog = false) }
-        require(gadgetUrl == null || gadgetUrl.startsWith("wss:")) // Native pages expose TLS only.
-        require((animation == null) == (animationFallback == null))
-        require(fallbackPortrait == null || manual || gadgetUrl != null)
+        transferChecked("Invalid migration profile.") {
+            transferKey(key)
+            transferName(name)
+            val manual = key.startsWith("manual:")
+            require(!manual || key.substringAfter(':').matches(Regex("[a-f0-9]{64}")))
+            gadgetUrl?.let { transferUrl(it, catalog = false) }
+            require(gadgetUrl == null || gadgetUrl.startsWith("wss:")) // Native pages are TLS only.
+            require((animation == null) == (animationFallback == null))
+            require(fallbackPortrait == null || manual || gadgetUrl != null)
+        }
     }
     override fun toString(): String = "MigrationProfile(content=redacted)"
 }
 
-/** Portable template ID, never an Android launcher ID/provider class/PendingIntent/revision. */
-data class MigrationWidget(
+/**
+ * Portable template ID, never an Android launcher ID/provider class/PendingIntent/revision.
+ * [slots] is an owned unmodifiable copy; later changes to the caller's list have no effect.
+ */
+class MigrationWidget(
     val id: String,
     val preset: MigrationWidgetPreset,
-    val slots: List<String?>,
+    slots: List<String?>,
     val theme: MigrationWidgetTheme = MigrationWidgetTheme.SYSTEM
 ) {
+    val slots: List<String?> = ownedList(slots)
+
     init {
-        require(QuickActions.validId(id) && slots.size == preset.capacity)
-        val bound = slots.filterNotNull()
-        bound.forEach(::transferKey)
-        require(bound.distinct().size == bound.size)
+        transferChecked("Invalid widget template.") {
+            require(QuickActions.validId(id) && this.slots.size == preset.capacity)
+            val bound = this.slots.filterNotNull()
+            bound.forEach(::transferKey)
+            require(bound.distinct().size == bound.size)
+        }
     }
+
+    fun copy(
+        id: String = this.id,
+        preset: MigrationWidgetPreset = this.preset,
+        slots: List<String?> = this.slots,
+        theme: MigrationWidgetTheme = this.theme
+    ): MigrationWidget = MigrationWidget(id, preset, slots, theme)
+
+    override fun equals(other: Any?): Boolean = other is MigrationWidget && id == other.id &&
+        preset == other.preset && slots == other.slots && theme == other.theme
+    override fun hashCode(): Int = listOf(id, preset, slots, theme).hashCode()
     override fun toString(): String = "MigrationWidget(content=redacted)"
 }
 
 /**
- * Explicit allowlist, validated on construction. Runtime status, consent, identity, auth,
- * providers, history and watch-local appearance have no fields. Every reference resolves.
+ * Explicit allowlist, deeply immutable and validated on construction. Every collection is an
+ * owned unmodifiable copy (read once from the caller, never retained), so a checked snapshot
+ * cannot change afterwards. Runtime status, consent, identity, auth, providers, history and
+ * watch-local appearance have no fields. Every reference resolves.
  */
-data class MigrationSnapshot(
-    val endpoints: List<SetupEndpoint> = emptyList(),
-    val catalogs: List<SetupCatalog> = emptyList(),
-    val profiles: List<MigrationProfile> = emptyList(),
-    val sourceOrder: List<String> = listOf("manual"),
-    val profileOrder: List<String> = emptyList(),
+class MigrationSnapshot(
+    endpoints: List<SetupEndpoint> = emptyList(),
+    catalogs: List<SetupCatalog> = emptyList(),
+    profiles: List<MigrationProfile> = emptyList(),
+    sourceOrder: List<String> = listOf("manual"),
+    profileOrder: List<String> = emptyList(),
     val appearance: MigrationTheme = MigrationTheme.DARK,
-    val actions: List<QuickAction> = emptyList(),
-    val widgets: List<MigrationWidget> = emptyList(),
-    val artwork: List<MigrationArtwork> = emptyList()
+    actions: List<QuickAction> = emptyList(),
+    widgets: List<MigrationWidget> = emptyList(),
+    artwork: List<MigrationArtwork> = emptyList()
 ) {
+    val endpoints: List<SetupEndpoint> = ownedItems(endpoints)
+    val catalogs: List<SetupCatalog> = ownedItems(catalogs)
+    val profiles: List<MigrationProfile> = ownedItems(profiles)
+    val sourceOrder: List<String> = ownedItems(sourceOrder)
+    val profileOrder: List<String> = ownedItems(profileOrder)
+    val actions: List<QuickAction> = ownedItems(actions)
+    val widgets: List<MigrationWidget> = ownedItems(widgets)
+    val artwork: List<MigrationArtwork> = ownedItems(artwork)
+
     init {
-        MigrationArchive.validate(this)
+        transferChecked("Invalid migration snapshot.") { MigrationArchive.validate(this) }
     }
+
+    fun copy(
+        endpoints: List<SetupEndpoint> = this.endpoints,
+        catalogs: List<SetupCatalog> = this.catalogs,
+        profiles: List<MigrationProfile> = this.profiles,
+        sourceOrder: List<String> = this.sourceOrder,
+        profileOrder: List<String> = this.profileOrder,
+        appearance: MigrationTheme = this.appearance,
+        actions: List<QuickAction> = this.actions,
+        widgets: List<MigrationWidget> = this.widgets,
+        artwork: List<MigrationArtwork> = this.artwork
+    ): MigrationSnapshot = MigrationSnapshot(
+        endpoints,
+        catalogs,
+        profiles,
+        sourceOrder,
+        profileOrder,
+        appearance,
+        actions,
+        widgets,
+        artwork
+    )
+
+    private fun fields(): List<Any> = listOf(
+        endpoints,
+        catalogs,
+        profiles,
+        sourceOrder,
+        profileOrder,
+        appearance,
+        actions,
+        widgets,
+        artwork
+    )
+    override fun equals(other: Any?): Boolean =
+        other is MigrationSnapshot && fields() == other.fields()
+    override fun hashCode(): Int = fields().hashCode()
     override fun toString(): String = "MigrationSnapshot(content=redacted)"
 }
 
+/**
+ * One read of the caller's list (`toArray`), then a JDK 1.2 unmodifiable wrapper available on every
+ * Android API level; a cast to MutableList cannot mutate it. Avoids Java 9+ `List.copyOf`.
+ */
+internal fun <T> ownedList(values: List<T>): List<T> = transferChecked("Invalid collection.") {
+    Collections.unmodifiableList(ArrayList(values))
+}
+
+/** As [ownedList], also rejecting nulls that a racing Java caller could otherwise smuggle in. */
+internal fun <T : Any> ownedItems(values: List<T>): List<T> = ownedList(values).also {
+    require(it.none(Objects::isNull)) { "Invalid collection." }
+}
+
 sealed interface MigrationReadResult {
-    /** Owned artwork bytes; close after the native staging copy to clear these buffers. */
-    class Success(val snapshot: MigrationSnapshot, val artwork: Map<String, ByteArray>) :
-        MigrationReadResult,
+    /**
+     * Produced only by this decoder (an API affordance, not a cryptographic seal). Owned artwork
+     * bytes; close after the native staging copy to clear these buffers.
+     */
+    class Success internal constructor(
+        val snapshot: MigrationSnapshot,
+        val artwork: Map<String, ByteArray>
+    ) : MigrationReadResult,
         AutoCloseable {
         override fun close() {
             artwork.values.forEach { it.fill(0) }
@@ -127,7 +215,11 @@ sealed interface MigrationReadResult {
         override fun toString(): String = "MigrationReadResult.Success(content=redacted)"
     }
 
-    /** Same result for malformed input, wrong password, tamper and unsupported/quota violations. */
+    /**
+     * One result for malformed input, wrong passphrase, tamper, unsupported/quota violations and
+     * also caller stream I/O or JCA provider failures. UI must use generic wording ("could not
+     * open this archive"), never assert a wrong passphrase, and never log the input.
+     */
     data object Invalid : MigrationReadResult
 }
 
@@ -146,7 +238,11 @@ object MigrationArchive {
     const val MAX_ZIP_ENTRIES = 256
     const val MAX_ARTWORK = 128
     const val MAX_WIDGETS = 128
-    const val KDF_ITERATIONS = 210000
+
+    /** Fixed v1 work factor (OWASP's PBKDF2-HMAC-SHA256 figure; our choice, no FIPS claim). */
+    const val KDF_ITERATIONS = 600000
+    const val MIN_PASSPHRASE_CODE_POINTS = 12
+    const val MAX_PASSPHRASE_CHARS = 1024
     const val MAX_PNG_DIMENSION = 4096
     const val MAX_PNG_PIXELS = 16_000_000L
     internal const val HEADER_BYTES = 52
@@ -160,7 +256,9 @@ object MigrationArchive {
         artwork: Map<String, ByteArray> = emptyMap()
     ): ByteArray {
         requirePassphrase(passphrase)
-        val archive = encodeZip(snapshot, artwork)
+        val archive = transferChecked("Could not create the migration archive.") {
+            encodeZip(snapshot, artwork)
+        }
         try {
             val salt = ByteArray(16).also(random::nextBytes)
             val nonce = ByteArray(12).also(random::nextBytes)
@@ -190,19 +288,29 @@ object MigrationArchive {
         }
     }
 
-    fun decrypt(envelope: ByteArray, passphrase: CharArray): MigrationReadResult {
-        if (envelope.size > MAX_ENVELOPE_BYTES) return MigrationReadResult.Invalid
-        return read(ByteArrayInputStream(envelope), passphrase)
+    /**
+     * Opens a caller-held envelope in place: no stream or chunk copy of the ciphertext is made and
+     * the caller's array is never modified. See [MigrationReadResult.Invalid] for failure wording.
+     */
+    fun decrypt(envelope: ByteArray, passphrase: CharArray): MigrationReadResult = try {
+        requirePassphrase(passphrase)
+        require(envelope.size in HEADER_BYTES..MAX_ENVELOPE_BYTES)
+        val header = envelope.copyOfRange(0, HEADER_BYTES)
+        val bodyLength = validateHeader(header)
+        require(envelope.size == HEADER_BYTES + bodyLength) // No truncation or trailing bytes.
+        open(header, envelope, HEADER_BYTES, bodyLength, passphrase)
+    } catch (_: Exception) {
+        MigrationReadResult.Invalid
     }
 
     /**
-     * Validates the fixed header before reading the body or doing KDF work; body memory grows only
-     * with bytes actually received. Requires exact EOF; the caller closes [input].
+     * Validates the fixed header before reading the body or doing KDF work. Body chunks are
+     * allocated only as bytes arrive (at most one 1-MiB chunk beyond what was received), then
+     * assembled once, so this path transiently holds about twice the ciphertext. Requires exact
+     * EOF; the caller closes [input]. See [MigrationReadResult.Invalid] for failure wording.
      */
     fun read(input: InputStream, passphrase: CharArray): MigrationReadResult {
         var ciphertext: ByteArray? = null
-        var plaintext: ByteArray? = null
-        var key: ByteArray? = null
         return try {
             requirePassphrase(passphrase)
             val header = ByteArray(HEADER_BYTES)
@@ -210,7 +318,25 @@ object MigrationArchive {
             val bodyLength = validateHeader(header)
             ciphertext = readBody(input, bodyLength)
             require(input.read() == -1) // No concatenated envelopes or trailing bytes.
-            key = deriveKey(passphrase, header.copyOfRange(24, 40), KDF_ITERATIONS)
+            open(header, ciphertext, 0, bodyLength, passphrase)
+        } catch (_: Exception) {
+            MigrationReadResult.Invalid
+        } finally {
+            ciphertext?.fill(0)
+        }
+    }
+
+    /** KDF only after the complete bounded body is present; one doFinal verifies the tag first. */
+    private fun open(
+        header: ByteArray,
+        body: ByteArray,
+        offset: Int,
+        length: Int,
+        passphrase: CharArray
+    ): MigrationReadResult.Success {
+        var plaintext: ByteArray? = null
+        val key = deriveKey(passphrase, header.copyOfRange(24, 40), KDF_ITERATIONS)
+        try {
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(
                 Cipher.DECRYPT_MODE,
@@ -218,16 +344,13 @@ object MigrationArchive {
                 GCMParameterSpec(128, header.copyOfRange(40, 52))
             )
             cipher.updateAAD(header)
-            // JCA returns no plaintext until the tag is verified.
-            plaintext = cipher.doFinal(ciphertext)
-            require(plaintext.size == bodyLength - TAG_BYTES)
-            decodeZip(plaintext)
-        } catch (_: Exception) {
-            MigrationReadResult.Invalid
+            // A single doFinal: JCA returns no plaintext unless the tag verifies. Never update().
+            plaintext = cipher.doFinal(body, offset, length)
+            require(plaintext.size == length - TAG_BYTES)
+            return decodeZip(plaintext)
         } finally {
-            ciphertext?.fill(0)
             plaintext?.fill(0)
-            key?.fill(0)
+            key.fill(0)
         }
     }
 
@@ -247,21 +370,42 @@ object MigrationArchive {
         return bodyLength
     }
 
-    /** At least 12 code points, at most 1024 UTF-16 units, and well-formed (strict UTF-8). */
+    /** v1 policy: at least 12 code points after NFC; see [kdfInput]. */
     private fun requirePassphrase(passphrase: CharArray) {
-        require(
-            passphrase.size <= 1024 &&
-                Character.codePointCount(passphrase, 0, passphrase.size) >= 12
-        ) { "Use a passphrase of 12–1024 characters." }
-        utf8(passphrase).fill(0)
+        val bytes = kdfInput(passphrase)
+        try {
+            // Strict UTF-8: every code point has exactly one non-continuation (lead) byte.
+            val codePoints = bytes.count { (it.toInt() and 0xc0) != 0x80 }
+            require(codePoints >= MIN_PASSPHRASE_CODE_POINTS) {
+                "Use a passphrase of at least 12 characters."
+            }
+        } finally {
+            bytes.fill(0)
+        }
     }
 
-    private fun utf8(passphrase: CharArray): ByteArray {
-        val buffer = ByteBuffer.allocate(passphrase.size * 3)
+    /**
+     * Fixed v1 passphrase-to-bytes policy: at most 1024 UTF-16 input units; malformed Unicode
+     * (unpaired surrogates) rejected BEFORE normalization; then Unicode NFC (canonical equivalence
+     * only: no NFKC, trimming or case folding) and strict UTF-8. ASCII input is unchanged. The
+     * normalized form is an immutable JVM String that cannot be erased.
+     */
+    private fun kdfInput(passphrase: CharArray): ByteArray {
+        require(passphrase.size in 1..MAX_PASSPHRASE_CHARS) {
+            "Use a passphrase of 12–1024 characters."
+        }
+        utf8(CharBuffer.wrap(passphrase)).fill(0)
+        return utf8(
+            CharBuffer.wrap(Normalizer.normalize(CharBuffer.wrap(passphrase), Normalizer.Form.NFC))
+        )
+    }
+
+    private fun utf8(text: CharBuffer): ByteArray {
+        val buffer = ByteBuffer.allocate(text.remaining() * 3)
         return try {
             val encoder = Charsets.UTF_8.newEncoder().onMalformedInput(CodingErrorAction.REPORT)
                 .onUnmappableCharacter(CodingErrorAction.REPORT)
-            val result = encoder.encode(CharBuffer.wrap(passphrase), buffer, true)
+            val result = encoder.encode(text, buffer, true)
             if (result.isError) result.throwException()
             val flushed = encoder.flush(buffer)
             if (flushed.isError) flushed.throwException()
@@ -275,13 +419,12 @@ object MigrationArchive {
     }
 
     /**
-     * RFC 8018 PBKDF2-HMAC-SHA256, one 32-byte block, over explicit strict UTF-8 so every JCA
-     * provider (JDK, Android) derives the same key. Mac/SecretKeySpec internal copies are not
-     * erasable.
+     * RFC 8018 PBKDF2-HMAC-SHA256, one 32-byte block, over [kdfInput] bytes so every JCA provider
+     * (JDK, Android) derives the same key. Mac/SecretKeySpec internal copies are not erasable.
      */
     internal fun deriveKey(passphrase: CharArray, salt: ByteArray, iterations: Int): ByteArray {
-        require(iterations > 0 && passphrase.isNotEmpty())
-        val password = utf8(passphrase)
+        require(iterations > 0)
+        val password = kdfInput(passphrase)
         val block = ByteArray(32)
         val result = ByteArray(32)
         try {
@@ -308,7 +451,7 @@ object MigrationArchive {
         }
     }
 
-    /** Allocates at most one 1-MiB chunk beyond the bytes actually received, whatever is declared. */
+    /** Allocates at most one 1-MiB chunk beyond the bytes actually received. */
     private fun readBody(input: InputStream, length: Int): ByteArray {
         val chunks = mutableListOf<ByteArray>()
         var received = 0
@@ -546,52 +689,76 @@ object MigrationArchive {
         require(order.size == values.size && order.toSet() == values.toSet())
     }
 
+    /**
+     * Reads each caller artwork array exactly once into an owned copy; validation, CRC and ZIP
+     * writing all use those copies, which are zeroed afterwards. The exact manifest bytes are
+     * parsed back and must equal [snapshot] before anything is written (pre-seal self-check).
+     */
     internal fun encodeZip(
         snapshot: MigrationSnapshot,
         artwork: Map<String, ByteArray>
     ): ByteArray {
-        val metadata = manifest(snapshot)
+        val owned = linkedMapOf<String, ByteArray>()
         try {
-            require(artwork.keys == snapshot.artwork.map { it.sha256 }.toSet())
-            require(
-                metadata.size.toLong() + snapshot.artwork.sumOf { it.bytes.toLong() } <=
-                    MAX_UNCOMPRESSED_BYTES
-            )
-            snapshot.artwork.forEach { asset ->
-                validateAsset(asset, artwork.getValue(asset.sha256))
+            var total = 0L
+            for ((hash, bytes) in artwork.entries.toList()) {
+                require(owned.size < MAX_ARTWORK && bytes.size in 1..MAX_ARTWORK_BYTES)
+                total += bytes.size
+                require(total <= MAX_UNCOMPRESSED_BYTES && hash !in owned)
+                owned[hash] = bytes.copyOf()
             }
-            val capacity = 22L + metadata.size + 76 + 2 * "manifest.json".length +
-                snapshot.artwork.sumOf { it.bytes.toLong() + 76 + 2 * it.path.length }
-            require(capacity <= MAX_ENVELOPE_BYTES - HEADER_BYTES - TAG_BYTES)
-            return WipingOutput(capacity.toInt()).use { output ->
-                val zip = ZipOutputStream(output)
-                try {
-                    fun member(name: String, bytes: ByteArray) {
-                        val entry = ZipEntry(name).apply {
-                            method = ZipEntry.STORED
-                            size = bytes.size.toLong()
-                            compressedSize = size
-                            crc = CRC32().also { it.update(bytes) }.value
-                            // 2000: inside the DOS range in every timezone; no timestamp extra.
-                            time = 946684800000L
-                        }
-                        zip.putNextEntry(entry)
-                        zip.write(bytes)
-                        zip.closeEntry()
-                    }
-                    member("manifest.json", metadata)
-                    snapshot.artwork.sortedBy { it.path }.forEach {
-                        member(it.path, artwork.getValue(it.sha256))
-                    }
-                    zip.finish()
-                    output.toByteArray()
-                } finally {
-                    zip.close()
-                }
-            }.also { require(it.size <= MAX_ENVELOPE_BYTES - HEADER_BYTES - TAG_BYTES) }
+            require(owned.keys == snapshot.artwork.map { it.sha256 }.toSet())
+            snapshot.artwork.forEach { asset -> validateAsset(asset, owned.getValue(asset.sha256)) }
+            val metadata = manifest(snapshot)
+            try {
+                require(parseManifest(metadata) == snapshot)
+                return zip(snapshot, metadata, owned)
+            } finally {
+                metadata.fill(0)
+            }
         } finally {
-            metadata.fill(0)
+            owned.values.forEach { it.fill(0) }
         }
+    }
+
+    private fun zip(
+        snapshot: MigrationSnapshot,
+        metadata: ByteArray,
+        artwork: Map<String, ByteArray>
+    ): ByteArray {
+        require(
+            metadata.size.toLong() + snapshot.artwork.sumOf { it.bytes.toLong() } <=
+                MAX_UNCOMPRESSED_BYTES
+        )
+        val capacity = 22L + metadata.size + 76 + 2 * "manifest.json".length +
+            snapshot.artwork.sumOf { it.bytes.toLong() + 76 + 2 * it.path.length }
+        require(capacity <= MAX_ENVELOPE_BYTES - HEADER_BYTES - TAG_BYTES)
+        return WipingOutput(capacity.toInt()).use { output ->
+            val zip = ZipOutputStream(output)
+            try {
+                fun member(name: String, bytes: ByteArray) {
+                    val entry = ZipEntry(name).apply {
+                        method = ZipEntry.STORED
+                        size = bytes.size.toLong()
+                        compressedSize = size
+                        crc = CRC32().also { it.update(bytes) }.value
+                        // 2000: inside the DOS range in every timezone; no timestamp extra.
+                        time = 946684800000L
+                    }
+                    zip.putNextEntry(entry)
+                    zip.write(bytes)
+                    zip.closeEntry()
+                }
+                member("manifest.json", metadata)
+                snapshot.artwork.sortedBy { it.path }.forEach {
+                    member(it.path, artwork.getValue(it.sha256))
+                }
+                zip.finish()
+                output.detach() // The stored-only layout normally fills the preflight exactly.
+            } finally {
+                zip.close()
+            }
+        }.also { require(it.size <= MAX_ENVELOPE_BYTES - HEADER_BYTES - TAG_BYTES) }
     }
 
     internal fun decodeZip(bytes: ByteArray): MigrationReadResult.Success {
@@ -611,7 +778,7 @@ object MigrationArchive {
                 assets[asset.sha256] = data
                 validateAsset(asset, data)
             }
-            return MigrationReadResult.Success(snapshot, assets)
+            return MigrationReadResult.Success(snapshot, Collections.unmodifiableMap(assets))
         } catch (failure: Exception) {
             assets.values.forEach { it.fill(0) }
             throw failure
@@ -704,8 +871,18 @@ object MigrationArchive {
             require(count.toLong() + length <= buf.size)
             super.write(bytes, offset, length)
         }
+        private var detached = false
+
+        /** Hands over an exactly filled buffer without another copy; otherwise an exact copy. */
+        fun detach(): ByteArray = if (count == buf.size) {
+            detached = true
+            buf
+        } else {
+            toByteArray()
+        }
+
         override fun close() {
-            buf.fill(0)
+            if (!detached) buf.fill(0)
             reset()
         }
     }
