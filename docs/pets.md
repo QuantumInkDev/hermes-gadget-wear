@@ -162,3 +162,40 @@ the PNG. Ambient receives that static portrait and displays a dim grayscale circ
 64×64 sparse black/white rendition for low-bit displays, under the existing minute shift.
 A pet idle outline retains priority. No GIF decoding or animation occurs in ambient mode.
 These rendering rules do not establish physical watch battery cost or lip-sync quality.
+
+## Optional talking expression overlays (v1)
+
+A companion `talking` row with exactly three occupied poses may explicitly declare:
+
+```json
+{"name":"talking","index":1,"frames":3,"overlay":{"anchor_frame":0,"rect":[80,100,112,124]}}
+```
+
+This synthetic example uses half-open integer cell coordinates in 192×208. The rectangle
+must be nonempty, inside the cell, at most 96 pixels wide and 104 high. Anchor is exactly
+integer zero. Booleans, extra descriptor fields, other states/kinds/counts and malformed
+rectangles are rejected. No path, mask or shader is supported. Listening and sleeping
+retain full-frame semantics; ordinary pets remain unchanged.
+
+Updated Wear clients advertise `caps.pet.expression_overlays: 1`. The optional SDK extension
+preserves the validated descriptor with the original PNG hash and omits dependent rows
+for every other capability value (including boolean true). Ordinary base and full-frame
+companion rows remain available. A companion with no remaining rows is omitted entirely.
+The private SDK change awaits independent review and controller-owned patch export.
+
+During cache decode, each talking pose replaces the rectangle of pose zero with its own
+source pixels, including transparent pixels. Composition precedes nearest-neighbour scaling
+to 96×104, so contain scaling retains the same geometry and sampling as ordinary sprites.
+The original decoded atlas and PNG bytes are never edited; only three prepared in-memory
+frames are retained. Existing endpoint/hash validation, playback amplitude hysteresis,
+drain/stop callbacks, static/reduced-motion/power-saving and ambient policies apply.
+
+Staging explicitly opts in with `tools/pet-companion.py --expression-overlay LEFT TOP RIGHT
+BOTTOM` in **registered output cell coordinates**. This is mutually exclusive with the
+unchanged strict full-frame `--mouth-box` gate. The private receipt records raw registered
+full-frame and outside-region differences, three distinct nonempty region samples,
+`requires_expression_overlays=1`, and unproven SDK negotiation. This is staging evidence;
+human mouth/identity/props/seam/reduced-size review and actual negotiated delivery/playback
+must pass separately before a bundle is deliverable. Raw generated inputs and original
+base files remain unchanged. This extension does not establish artwork or physical O2
+acceptance.

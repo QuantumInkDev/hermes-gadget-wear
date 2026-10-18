@@ -88,10 +88,14 @@ def prepare_grid(source_path: Path, output: Path):
             'grid': [6, 3], 'operation': 'equal-grid extraction, shared nearest-neighbour scale, blank unused talking cells'}
 
 
-def talking_metrics(sheet, mouth_box):
+def talking_metrics(sheet, mouth_box, overlay=False):
     if mouth_box is None:
         return {'status': 'unchecked', 'reason': 'No reviewed mouth rectangle supplied'}
+    if len(mouth_box) != 4 or any(type(n) is not int for n in mouth_box):
+        raise ValueError('Mouth rectangle requires four integers')
     left, top, right, bottom = mouth_box
+    if overlay and (right - left > 96 or bottom - top > 104):
+        raise ValueError('Overlay rectangle exceeds region limits')
     if not (0 <= left < right <= 192 and 0 <= top < bottom <= 208):
         raise ValueError('Mouth rectangle must be inside one 192x208 cell')
     frames = [sheet.crop((column * 192, 208, (column + 1) * 192, 416)) for column in range(3)]
@@ -102,10 +106,20 @@ def talking_metrics(sheet, mouth_box):
         a, b = anchor.copy(), frame.copy()
         a.paste((0, 0, 0, 0), mouth_box); b.paste((0, 0, 0, 0), mouth_box)
         outside.append(_changed(a, b))
-    if any(outside):
+    if any(outside) and not overlay:
         raise ValueError('Talking body changes outside the reviewed mouth rectangle')
     if not all(inside) or _changed(frames[1].crop(mouth_box), frames[2].crop(mouth_box)) == 0:
         raise ValueError('Talking requires three distinct mouth shapes')
+    if overlay:
+        for frame in frames:
+            region = frame.crop(mouth_box)
+            if not _register.bbox(region):
+                raise ValueError('Empty overlay region sample')
+        return {'status': 'overlay_region_validated', 'reviewed_region': list(mouth_box),
+                'source_whole_body_match': 'failed' if any(outside) else 'matched',
+                'outside_mouth_changed_pixels': outside, 'mouth_changed_pixels': inside,
+                'raw_full_frame_changed_pixels': [_changed(anchor, frame) for frame in frames[1:]],
+                'requires_expression_overlays': 1}
     return {'status': 'passed', 'mouth_box': list(mouth_box),
             'outside_mouth_changed_pixels': outside, 'mouth_changed_pixels': inside}
 
@@ -150,7 +164,9 @@ def contact_sheet(base, sheet, output):
     preview.save(output)
 
 
-def build(metadata_path: Path, companion_path: Path, output_dir: Path, mouth_box=None):
+def build(metadata_path: Path, companion_path: Path, output_dir: Path, mouth_box=None, overlay_rect=None):
+    if overlay_rect is not None and mouth_box is not None:
+        raise ValueError('Full-frame mouth gate and expression overlay are mutually exclusive')
     metadata_path, companion_path, output_dir = map(Path, (metadata_path, companion_path, output_dir))
     directory = metadata_path.resolve().parent
     bounded_size(metadata_path, MAX_METADATA_BYTES)
@@ -177,8 +193,13 @@ def build(metadata_path: Path, companion_path: Path, output_dir: Path, mouth_box
     try:
         fragment = _register.extend(base, companion_path, output_dir / 'gadget-sheet.png')
         sheet = _register.opened(output_dir / 'gadget-sheet.png')
-        talking = talking_metrics(sheet, mouth_box)
+        talking = talking_metrics(sheet, overlay_rect if overlay_rect is not None else mouth_box,
+                                  overlay=overlay_rect is not None)
+        if overlay_rect is not None:
+            fragment['gadgetSheet']['rows'][1]['overlay'] = {'anchor_frame': 0, 'rect': list(overlay_rect)}
         companion_delivery = delivery_sheet(sheet, 'companion')
+        if overlay_rect is not None:
+            companion_delivery['rows'][1]['overlay'] = fragment['gadgetSheet']['rows'][1]['overlay']
         shutil.copyfile(base, output_dir / base.name)
         metadata['spritesheetPath'] = base.name
         metadata.update(fragment)
@@ -200,6 +221,8 @@ def build(metadata_path: Path, companion_path: Path, output_dir: Path, mouth_box
                    'frames': frames, 'talking': talking, 'delivery': [base_delivery, companion_delivery],
                    'acceptance': {'human_art_review': 'pending', 'live_delivery': 'untested',
                                   'playback_response': 'untested', 'physical_legibility': 'untested'}}
+        if overlay_rect is not None:
+            receipt['acceptance']['sdk_overlay_negotiation'] = 'unproven'
         (output_dir / 'manifest.json').write_text(json.dumps(receipt, indent=2) + '\n')
         return receipt
     except BaseException:
@@ -215,15 +238,20 @@ if __name__ == '__main__':
     parser.add_argument('--output-dir', type=Path)
     parser.add_argument('--prepared-output', type=Path)
     parser.add_argument('--mouth-box', nargs=4, type=int, metavar=('LEFT', 'TOP', 'RIGHT', 'BOTTOM'))
+    parser.add_argument('--expression-overlay', nargs=4, type=int, metavar=('LEFT', 'TOP', 'RIGHT', 'BOTTOM'),
+                        help='Explicit reviewed cell-space replacement region; requires negotiated overlays v1')
     args = parser.parse_args()
+    if args.expression_overlay and args.mouth_box:
+        parser.error('--expression-overlay and --mouth-box are mutually exclusive')
     if args.prepare_grid:
-        if not args.prepared_output or args.metadata or args.companion or args.output_dir or args.mouth_box:
+        if not args.prepared_output or args.metadata or args.companion or args.output_dir or args.mouth_box or args.expression_overlay:
             parser.error('--prepare-grid requires only --prepared-output')
         receipt = prepare_grid(args.prepare_grid, args.prepared_output)
         print(json.dumps(receipt, indent=2))
         raise SystemExit(0)
     if not args.metadata or not args.companion or not args.output_dir or args.prepared_output:
         parser.error('Staging requires --metadata, --companion and --output-dir')
-    build(args.metadata, args.companion, args.output_dir, tuple(args.mouth_box) if args.mouth_box else None)
+    build(args.metadata, args.companion, args.output_dir, tuple(args.mouth_box) if args.mouth_box else None,
+          tuple(args.expression_overlay) if args.expression_overlay else None)
     # Paths and metadata stay in the private receipt; avoid leaking them in normal logs.
     print('Staged bundle and review receipt; human, live and physical acceptance remain pending.')

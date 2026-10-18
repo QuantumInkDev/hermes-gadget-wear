@@ -75,9 +75,12 @@ class PetCache(context: Context) {
             if (!file.isFile || file.length() != sheet.bytes.toLong()) continue
             val decoded = runCatching { decode(sheet, file.readBytes()) }.getOrNull() ?: continue
             file.setLastModified(System.currentTimeMillis())
-            result.putAll(decoded)
+            decoded.forEach { (name, frames) ->
+                result.put(name, frames)?.forEach(Bitmap::recycle)
+            }
         }
         return if (result["idle"].isNullOrEmpty()) {
+            result.values.flatten().forEach(Bitmap::recycle)
             null
         } else {
             PetAtlas(
@@ -111,6 +114,7 @@ class PetCache(context: Context) {
             require(bitmap.hasAlpha())
             val rows = sheet.rows.associate { row ->
                 val frames = mutableListOf<Bitmap>()
+                var anchor: IntArray? = null
                 for (column in 0 until row.frames) {
                     val frame = Bitmap.createBitmap(bitmap, column * 192, row.index * 208, 192, 208)
                     val pixels = IntArray(192 * 208)
@@ -123,8 +127,34 @@ class PetCache(context: Context) {
                         frame.recycle()
                         error("Opaque frame")
                     }
-                    val scaled = frame.scale(96, 104, false)
-                    frame.recycle()
+                    // Replace source pixels before nearest-neighbour sampling. Drawing over the
+                    // anchor would retain its closed mouth through transparent source pixels.
+                    row.overlay?.let { overlay ->
+                        require(
+                            sheet.kind == "companion" && row.name == "talking" && row.frames == 3
+                        )
+                        if (column == 0) {
+                            anchor = pixels.copyOf()
+                        } else {
+                            val fixed = requireNotNull(anchor).copyOf()
+                            for (y in overlay.top until overlay.bottom) {
+                                val offset = y * 192 + overlay.left
+                                pixels.copyInto(fixed, offset, offset, y * 192 + overlay.right)
+                            }
+                            fixed.copyInto(pixels)
+                        }
+                    }
+                    val composed = if (row.overlay != null && column != 0) {
+                        Bitmap.createBitmap(pixels, 192, 208, Bitmap.Config.ARGB_8888)
+                    } else {
+                        frame
+                    }
+                    val scaled = try {
+                        composed.scale(96, 104, false)
+                    } finally {
+                        if (composed !== frame) composed.recycle()
+                        frame.recycle()
+                    }
                     frames.add(scaled)
                     prepared.add(scaled)
                 }

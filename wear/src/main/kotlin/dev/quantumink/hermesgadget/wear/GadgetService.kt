@@ -951,7 +951,10 @@ class GadgetService : Service() {
         }
         val caps = WatchActions.capabilities().toMutableMap()
         if (speech != null) caps["tts"] = JsonPrimitive("client")
-        caps["pet"] = buildJsonObject { put("asset_channel", 4) }
+        caps["pet"] = buildJsonObject {
+            put("asset_channel", 4)
+            put("expression_overlays", 1)
+        }
         if (opusReady) {
             val formats = JsonArray(listOf(JsonPrimitive("opus"), JsonPrimitive("pcm16")))
             listOf("mic", "speaker").forEach { name ->

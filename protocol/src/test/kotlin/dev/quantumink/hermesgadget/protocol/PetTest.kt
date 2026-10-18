@@ -28,6 +28,67 @@ class PetTest {
         )
     )
 
+    private fun overlayManifest(
+        descriptor: String,
+        kind: String = "companion",
+        label: String = "talking",
+        frames: Int = 3
+    ): Message = requireNotNull(
+        Message.parse(
+            """{"type":"pet.manifest","name":"Synthetic","cell_width":192,"cell_height":208,"loop_ms":1100,
+            "sheets":[{"kind":"base","sha256":"${"a".repeat(
+                64
+            )}","bytes":64,"width":1152,"height":208,
+            "rows":[{"name":"idle","index":0,"frames":6}]},
+            {"kind":"$kind","sha256":"${"b".repeat(64)}","bytes":64,"width":1152,"height":624,
+            "rows":[{"name":"$label","index":1,"frames":$frames,"overlay":$descriptor}]}]}"""
+        )
+    )
+
+    @Test fun rejectsMalformedOrMisplacedExpressionDescriptors() {
+        val invalid = listOf(
+            "null", "true", "[]", "{}",
+            """{"anchor_frame":true,"rect":[80,100,112,124]}""",
+            """{"anchor_frame":1,"rect":[80,100,112,124]}""",
+            """{"anchor_frame":0,"rect":[true,100,112,124]}""",
+            """{"anchor_frame":0,"rect":[80.0,100,112,124]}""",
+            """{"anchor_frame":0,"rect":[80,100,112]}""",
+            """{"anchor_frame":0,"rect":[80,100,112,124,125]}""",
+            """{"anchor_frame":0,"rect":[-1,100,112,124]}""",
+            """{"anchor_frame":0,"rect":[80,100,193,124]}""",
+            """{"anchor_frame":0,"rect":[80,100,112,209]}""",
+            """{"anchor_frame":0,"rect":[80,100,80,124]}""",
+            """{"anchor_frame":0,"rect":[0,0,97,104]}""",
+            """{"anchor_frame":0,"rect":[0,0,96,105]}""",
+            """{"anchor_frame":0,"rect":[80,100,112,124],"mask":"no"}"""
+        )
+        invalid.forEach { descriptor ->
+            org.junit.Assert.assertThrows(descriptor, IllegalArgumentException::class.java) {
+                PetManifest.parse(overlayManifest(descriptor))
+            }
+        }
+        val valid = """{"anchor_frame":0,"rect":[80,100,112,124]}"""
+        val parsed = PetManifest.parse(overlayManifest(valid))
+        val overlay = requireNotNull(parsed.sheets[1].rows[0].overlay)
+        assertEquals(80, overlay.left)
+        assertEquals(124, overlay.bottom)
+        assertEquals(
+            80,
+            PetManifest.parse(
+                requireNotNull(Message.parse(parsed.encoded))
+            ).sheets[1].rows[0].overlay?.left
+        )
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            PetSheet("base", hash, 64, 1152, 208, listOf(PetRow("talking", 0, 3, overlay)))
+        }
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            PetManifest.parse(overlayManifest(valid, label = "listening"))
+        }
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            PetManifest.parse(overlayManifest(valid, frames = 2))
+        }
+    }
+
     @Test fun verifiesHashSequenceLengthAndExpiryBeforePromotion() {
         val receiver = PetTransfers()
         assertTrue(receiver.message(manifest(), 0).single() is PetEffect.Manifest)

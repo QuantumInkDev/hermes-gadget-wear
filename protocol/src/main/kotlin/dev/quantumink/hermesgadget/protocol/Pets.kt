@@ -4,8 +4,39 @@ import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
 
-class PetRow(val name: String, val index: Int, val frames: Int)
+/** Cell-space replacement region; source poses and anchor remain immutable. */
+class PetOverlay(val left: Int, val top: Int, val right: Int, val bottom: Int) {
+    init {
+        require(left >= 0 && top >= 0 && right <= 192 && bottom <= 208)
+        require(right - left in 1..96 && bottom - top in 1..104)
+    }
+
+    companion object {
+        fun parse(raw: kotlinx.serialization.json.JsonElement): PetOverlay {
+            val value = raw as? JsonObject ?: throw IllegalArgumentException("Invalid overlay")
+            require(value.keys == setOf("anchor_frame", "rect"))
+            fun integer(raw: kotlinx.serialization.json.JsonElement?): Int {
+                val number = raw as? JsonPrimitive
+                require(number != null && !number.isString)
+                return requireNotNull(number.intOrNull)
+            }
+            require(integer(value["anchor_frame"]) == 0)
+            val rect = value["rect"] as? JsonArray
+            require(rect != null && rect.size == 4)
+            val coordinates = rect.map(::integer)
+            return PetOverlay(coordinates[0], coordinates[1], coordinates[2], coordinates[3])
+        }
+    }
+}
+
+class PetRow(val name: String, val index: Int, val frames: Int, val overlay: PetOverlay? = null) {
+    init {
+        require(overlay == null || (name == "talking" && frames == 3))
+    }
+}
 class PetSheet(
     val kind: String,
     val sha256: String,
@@ -14,6 +45,9 @@ class PetSheet(
     val height: Int,
     val rows: List<PetRow>
 ) {
+    init {
+        require(kind == "companion" || rows.none { it.overlay != null })
+    }
     override fun toString(): String = "PetSheet(redacted)"
 }
 class PetManifest(
@@ -73,7 +107,7 @@ class PetManifest(
                         require(label in setOf("listening", "talking", "sleeping"))
                     }
                     if (label == "talking") require(frames == 3)
-                    PetRow(label, index, frames)
+                    PetRow(label, index, frames, row.field("overlay")?.let(PetOverlay::parse))
                 }
                 require(
                     rows.map { it.name }.distinct().size == rows.size &&

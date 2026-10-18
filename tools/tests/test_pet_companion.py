@@ -227,3 +227,33 @@ def test_raw_cell_boundary_clipping_rejected_before_padding(tmp_path, edge):
         tool.prepare_grid(source, output)
     assert source.read_bytes() == original
     assert not output.exists()
+
+
+def test_overlay_staging_keeps_raw_body_difference_honest_and_sources_unchanged(tmp_path):
+    tool = load()
+    metadata, base, source = inputs(tmp_path)
+    image = Image.open(source)
+    ImageDraw.Draw(image).point((192 + 95, 208 + 170), fill='white')
+    image.save(source)
+    before = [p.read_bytes() for p in (metadata, base, source)]
+    receipt = tool.build(metadata, source, tmp_path / 'overlay', overlay_rect=(88, 104, 104, 124))
+    talking = receipt['talking']
+    assert talking['status'] == 'overlay_region_validated'
+    assert talking['source_whole_body_match'] == 'failed'
+    assert talking['outside_mouth_changed_pixels'][0] > 0
+    assert talking['requires_expression_overlays'] == 1
+    assert talking['reviewed_region'] == [88, 104, 104, 124]
+    assert receipt['acceptance']['sdk_overlay_negotiation'] == 'unproven'
+    proposed = json.loads((tmp_path / 'overlay' / 'pet.json').read_text())
+    assert proposed['gadgetSheet']['rows'][1]['overlay'] == {'anchor_frame': 0, 'rect': [88, 104, 104, 124]}
+    assert receipt['delivery'][1]['rows'][1]['overlay'] == proposed['gadgetSheet']['rows'][1]['overlay']
+    assert before == [p.read_bytes() for p in (metadata, base, source)]
+
+
+@pytest.mark.parametrize('rect', [(True, 0, 30, 30), (0, 0, 97, 104), (0, 0, 96, 105), (0, 0, 0, 30), (0, 0, 192, 208), (80, 100, 193, 124)])
+def test_overlay_staging_rejects_invalid_regions_and_conflicting_modes(tmp_path, rect):
+    tool = load()
+    metadata, base, source = inputs(tmp_path)
+    with pytest.raises(ValueError): tool.build(metadata, source, tmp_path / 'invalid', overlay_rect=rect)
+    assert not (tmp_path / 'invalid').exists()
+    with pytest.raises(ValueError): tool.build(metadata, source, tmp_path / 'conflicting', mouth_box=(88, 104, 104, 124), overlay_rect=(88, 104, 104, 124))
