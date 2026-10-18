@@ -36,6 +36,7 @@ class ConnectionDiagnosticsTest {
         assertEquals(RequestStage.IDLE, diagnostics.snapshot(1).requestStage)
         conversation.sendText("new synthetic secret", 10)
         conversation.receive(message("turn.start", "current"), 20)
+        assertEquals(TurnCorrelation.OBSERVED, diagnostics.snapshot(20).turnCorrelation)
         assertFalse(diagnostics.snapshot(30019).stalled)
         assertTrue(conversation.tick(30020).isEmpty())
         assertTrue(diagnostics.snapshot(30020).stalled)
@@ -281,6 +282,160 @@ class ConnectionDiagnosticsTest {
         )
         assertEquals(RequestStage.CANCELLED, diagnostics.snapshot(5).requestStage)
         assertFalse(ConnectionDiagnosticsReport.encode(diagnostics.snapshot(6)).contains("secret"))
+    }
+
+    @Test
+    fun promptStopsLocalCaptureTelemetryBeforeAndAfterPacketsWithoutResurrection() {
+        for (hasPacket in listOf(false, true)) {
+            for (answer in listOf(false, true)) {
+                val diagnostics = ConnectionDiagnostics()
+                diagnostics.reset(DiagnosticTransport.DIRECT, 0)
+                val conversation = Conversation(diagnostics = diagnostics)
+                conversation.setPaired(true)
+                val capture = conversation.startRecording(1)
+                    .filterIsInstance<ConversationEffect.CaptureStart>().single()
+                if (hasPacket) conversation.capture(capture.token, ByteArray(640), 2)
+                val stopped = conversation.receive(
+                    Message.create(
+                        "prompt",
+                        buildJsonObject {
+                            put("id", "capture-prompt")
+                            put("title", "synthetic secret")
+                            put("text", "synthetic secret")
+                        }
+                    ),
+                    3
+                )
+                assertTrue(stopped.contains(ConversationEffect.CaptureStop))
+                assertEquals(
+                    listOf("audio.cancel"),
+                    stopped.filterIsInstance<ConversationEffect.Send>()
+                        .map { it.message.type }
+                )
+                assertEquals(
+                    listOf(ConversationEffect.RecordingOutcome(capture.token, false)),
+                    stopped.filterIsInstance<ConversationEffect.RecordingOutcome>()
+                )
+                assertEquals(RequestStage.CANCELLED, diagnostics.snapshot(3).requestStage)
+                assertFalse(diagnostics.requestActive)
+                assertEquals(2L, diagnostics.snapshot(60000).elapsedMillis)
+                assertTrue(conversation.finishRecording(60001, capture.token).isEmpty())
+                assertTrue(conversation.cancelRecording(60002).isEmpty())
+                val promptEffects = if (answer) {
+                    conversation.answer("capture-prompt", true, 60003)
+                } else {
+                    conversation.receive(
+                        Message.create(
+                            "prompt.close",
+                            buildJsonObject {
+                                put("id", "capture-prompt")
+                            }
+                        ),
+                        60003
+                    )
+                }
+                assertEquals(
+                    if (answer) listOf("prompt.reply") else emptyList<String>(),
+                    promptEffects.filterIsInstance<ConversationEffect.Send>().map {
+                        it.message.type
+                    }
+                )
+                assertTrue(
+                    promptEffects.filterIsInstance<ConversationEffect.RecordingOutcome>().isEmpty()
+                )
+                assertFalse(promptEffects.any { it is ConversationEffect.CaptureStart })
+                assertEquals(null, conversation.state.prompt)
+                assertEquals(RequestStage.CANCELLED, diagnostics.snapshot(90000).requestStage)
+                assertEquals(2L, diagnostics.snapshot(90000).elapsedMillis)
+                assertFalse(diagnostics.snapshot(90000).stalled)
+                assertFalse(
+                    ConnectionDiagnosticsReport.encode(
+                        diagnostics.snapshot(90000)
+                    ).contains("secret")
+                )
+            }
+        }
+    }
+
+    @Test
+    fun evictedTurnReplayCannotProgressOrCompleteANewRequest() {
+        val diagnostics = ConnectionDiagnostics()
+        diagnostics.reset(DiagnosticTransport.DIRECT, 0)
+        val conversation = Conversation(diagnostics = diagnostics)
+        conversation.setPaired(true)
+        repeat(129) {
+            conversation.receive(message("turn.start", "retired-$it"), it * 2L)
+            conversation.receive(message("turn.end", "retired-$it"), it * 2L + 1)
+        }
+        val history = Conversation::class.java.getDeclaredField("retiredTurns")
+            .apply { isAccessible = true }.get(conversation) as Set<*>
+        assertEquals(128, history.size)
+        conversation.sendText("current synthetic request", 1000)
+        assertEquals(TurnCorrelation.HISTORY_LIMIT, diagnostics.snapshot(1000).turnCorrelation)
+        assertTrue(diagnostics.snapshot(31000).stalled)
+        conversation.receive(message("turn.start", "retired-0"), 31001)
+        conversation.receive(message("status", "retired-0", "synthetic replay secret"), 31002)
+        conversation.receive(message("transcript", "retired-0", "synthetic replay secret"), 31003)
+        conversation.receive(message("reply", "retired-0", "synthetic replay secret"), 31004)
+        conversation.receive(message("turn.end", "retired-0"), 31005)
+        assertEquals(RequestStage.WAITING, diagnostics.snapshot(31005).requestStage)
+        assertTrue(diagnostics.snapshot(31005).stalled)
+        assertTrue(diagnostics.requestActive)
+        assertEquals("synthetic replay secret", conversation.state.reply)
+        val report = ConnectionDiagnosticsReport.encode(diagnostics.snapshot(31005))
+        assertEquals(
+            "HISTORY_LIMIT",
+            Json.parseToJsonElement(report).jsonObject
+                .getValue("turnCorrelation").jsonPrimitive.content
+        )
+        assertFalse(report.contains("secret"))
+        assertFalse(report.contains("retired-"))
+        assertEquals(128, history.size)
+        // Fresh and unsolicited server output remains functional, but cannot prove which
+        // pending local request it belongs to after exact-history loss.
+        conversation.cancel(32000)
+        assertEquals(RequestStage.CANCELLED, diagnostics.snapshot(32000).requestStage)
+        conversation.receive(message("turn.start", "fresh-unsolicited"), 32001)
+        conversation.receive(message("reply", "fresh-unsolicited", "fresh readable reply"), 32002)
+        conversation.receive(message("turn.end", "fresh-unsolicited"), 32003)
+        assertEquals("fresh readable reply", conversation.state.reply)
+        assertEquals(RequestStage.CANCELLED, diagnostics.snapshot(32003).requestStage)
+        assertEquals(TurnCorrelation.HISTORY_LIMIT, diagnostics.snapshot(32003).turnCorrelation)
+        assertFalse(diagnostics.requestActive)
+        assertEquals(128, history.size)
+        conversation.disconnected(33000)
+        conversation.setPaired(true)
+        conversation.sendText("after reconnect", 34000)
+        assertEquals(TurnCorrelation.HISTORY_LIMIT, diagnostics.snapshot(34000).turnCorrelation)
+        conversation.receive(message("turn.start", "fresh-after-reconnect"), 34001)
+        conversation.receive(
+            message("reply", "fresh-after-reconnect", "readable after reconnect"),
+            34002
+        )
+        conversation.receive(message("turn.end", "fresh-after-reconnect"), 34003)
+        assertEquals(RequestStage.WAITING, diagnostics.snapshot(34003).requestStage)
+        assertEquals("readable after reconnect", conversation.state.reply)
+        assertTrue(conversation.tick(64000).isEmpty())
+        assertTrue(diagnostics.snapshot(64000).stalled)
+        assertTrue(diagnostics.requestActive)
+    }
+
+    @Test
+    fun replacingALiveTurnAtTheHistoryBoundaryExposesUncertaintyImmediately() {
+        val diagnostics = ConnectionDiagnostics()
+        diagnostics.reset(DiagnosticTransport.DIRECT, 0)
+        val conversation = Conversation(diagnostics = diagnostics)
+        conversation.setPaired(true)
+        repeat(128) {
+            conversation.receive(message("turn.start", "boundary-$it"), it * 2L)
+            conversation.receive(message("turn.end", "boundary-$it"), it * 2L + 1)
+        }
+        conversation.receive(message("turn.start", "live-boundary"), 300)
+        assertEquals(TurnCorrelation.OBSERVED, diagnostics.snapshot(300).turnCorrelation)
+        conversation.sendText("replacement synthetic request", 1000)
+        assertEquals(TurnCorrelation.HISTORY_LIMIT, diagnostics.snapshot(1000).turnCorrelation)
+        assertEquals(RequestStage.WAITING, diagnostics.snapshot(1000).requestStage)
+        assertTrue(diagnostics.snapshot(31000).stalled)
     }
 
     private fun message(type: String, turn: String, text: String? = null) = Message.create(

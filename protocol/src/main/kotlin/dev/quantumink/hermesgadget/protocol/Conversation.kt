@@ -115,6 +115,7 @@ class Conversation(
     private var speakerFormat = "pcm16"
     private var turn: String? = null
     private val retiredTurns = linkedSetOf<String>()
+    private var retiredHistoryTruncated = false
     private var inputCounter = 0L
     private var upload: Upload? = null
     private var playback: Stream? = null
@@ -183,7 +184,9 @@ class Conversation(
                     if (id == turn || id in retiredTurns) return emptyList()
                     if (turn != id) retireTurn()
                     turn = id
-                    if (upload == null) {
+                    if (upload == null && retiredHistoryTruncated) {
+                        diagnostics.uncertainTurn(now)
+                    } else if (upload == null) {
                         if (diagnostics.requestActive) {
                             diagnostics.request(RequestStage.WAITING, now)
                         } else {
@@ -193,6 +196,7 @@ class Conversation(
                                 DiagnosticObservation.TRANSITION
                             )
                         }
+                        diagnostics.observedTurn(now)
                     }
                     if (upload == null) {
                         state =
@@ -228,14 +232,16 @@ class Conversation(
                 "turn.end" -> {
                     if (message.string("turn") == null || !matchesTurn(message)) return emptyList()
                     val failed = message.string("outcome") == "failure"
-                    diagnostics.request(
-                        when (message.string("outcome")) {
-                            "failure" -> RequestStage.FAILED
-                            "cancelled" -> RequestStage.CANCELLED
-                            else -> RequestStage.COMPLETE
-                        },
-                        now
-                    )
+                    if (!retiredHistoryTruncated) {
+                        diagnostics.request(
+                            when (message.string("outcome")) {
+                                "failure" -> RequestStage.FAILED
+                                "cancelled" -> RequestStage.CANCELLED
+                                else -> RequestStage.COMPLETE
+                            },
+                            now
+                        )
+                    }
                     retireTurn()
                     if (upload == null) {
                         state = state.copy(
@@ -254,7 +260,7 @@ class Conversation(
                     if (!matchesTurn(message)) return emptyList()
                     if (upload == null) {
                         val value = text(message, "text", 8192)
-                        if (diagnostics.requestActive) {
+                        if (diagnostics.requestActive && !retiredHistoryTruncated) {
                             if (message.type ==
                                 "transcript"
                             ) {
@@ -429,9 +435,9 @@ class Conversation(
             notice("Enter a shorter message.", now)
             return emptyList()
         }
-        diagnostics.startRequest(RequestStage.WAITING, now)
         val effects = cancelUpload("replaced") + listOf(ConversationEffect.PlaybackStop)
         retireTurn()
+        startDiagnosticRequest(RequestStage.WAITING, now)
         playback = null
         state = state.copy(mode = ConversationMode.THINKING, status = "", transcript = "")
         return effects +
@@ -446,12 +452,12 @@ class Conversation(
 
     fun startRecording(now: Long): List<ConversationEffect> {
         if (!canInput() || upload != null) return emptyList()
-        diagnostics.startRequest(RequestStage.RECORDING, now)
         val token = "a" + ++inputCounter
         val stream = (inputCounter % 250 + 1).toInt()
         upload = Upload(token, stream, now, microphoneFormat)
         playback = null
         retireTurn()
+        startDiagnosticRequest(RequestStage.RECORDING, now)
         state =
             state.copy(mode = ConversationMode.LISTENING, level = 0f, status = "", transcript = "")
         return listOf(
@@ -660,8 +666,9 @@ class Conversation(
         val title = text(message, "title", 256)
         val body = text(message, "text", 8192)
         val expiry = deadline(message, now, null, false)
-        diagnostics.progress(now, DiagnosticObservation.PROMPT)
+        if (!retiredHistoryTruncated) diagnostics.progress(now, DiagnosticObservation.PROMPT)
         diagnostics.audio(false, now, interrupted = true)
+        if (upload != null) diagnostics.request(RequestStage.CANCELLED, now)
         val effects =
             cancelUpload("prompt") +
                 listOf(ConversationEffect.PlaybackStop, ConversationEffect.Haptic.PROMPT)
@@ -731,11 +738,23 @@ class Conversation(
         paired && upload == null && state.prompt == null && matchesTurn(message)
 
     private fun retireTurn() {
-        turn?.let { remember(retiredTurns, it) }
+        turn?.let {
+            if (it !in retiredTurns && retiredTurns.size == 128) {
+                retiredHistoryTruncated = true
+                retiredTurns.remove(retiredTurns.first())
+            }
+            retiredTurns.add(it)
+        }
         turn = null
     }
 
-    private fun diagnosticTurn(message: Message): Boolean = turn != null && matchesTurn(message)
+    private fun startDiagnosticRequest(stage: RequestStage, now: Long) {
+        diagnostics.startRequest(stage, now)
+        if (retiredHistoryTruncated) diagnostics.uncertainTurn(now)
+    }
+
+    private fun diagnosticTurn(message: Message): Boolean =
+        !retiredHistoryTruncated && turn != null && matchesTurn(message)
 
     private fun canInput(): Boolean = paired && state.prompt == null
     private fun matchesTurn(message: Message): Boolean =

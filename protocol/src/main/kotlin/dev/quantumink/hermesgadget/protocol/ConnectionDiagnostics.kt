@@ -44,8 +44,13 @@ enum class DiagnosticObservation {
     PROGRESS,
     PROMPT,
     AUDIO_START,
-    AUDIO_END
+    AUDIO_END,
+    CORRELATION_OBSERVED,
+    CORRELATION_UNCERTAIN
 }
+
+/** Identity correlation within this bounded Conversation scope; never durable admission. */
+enum class TurnCorrelation { UNOBSERVED, OBSERVED, HISTORY_LIMIT }
 enum class DiagnosticAudioStage { IDLE, RECEIVING, COMPLETE, INTERRUPTED }
 
 data class DiagnosticEvent(
@@ -68,7 +73,8 @@ class ConnectionDiagnosticsSnapshot internal constructor(
     val stalled: Boolean = false,
     val audioStage: DiagnosticAudioStage = DiagnosticAudioStage.IDLE,
     events: List<DiagnosticEvent> = emptyList(),
-    omittedEvents: Int = 0
+    omittedEvents: Int = 0,
+    val turnCorrelation: TurnCorrelation = TurnCorrelation.UNOBSERVED
 ) {
     val elapsedMillis: Long = elapsedMillis.coerceIn(0, ConnectionDiagnostics.MAX_MILLIS)
     val connectionElapsedMillis: Long = connectionElapsedMillis.coerceIn(
@@ -94,11 +100,12 @@ class ConnectionDiagnosticsSnapshot internal constructor(
         connectionElapsedMillis == other.connectionElapsedMillis &&
         lastProgressAgeMillis == other.lastProgressAgeMillis && stalled == other.stalled &&
         audioStage == other.audioStage && events == other.events &&
-        omittedEvents == other.omittedEvents
+        omittedEvents == other.omittedEvents && turnCorrelation == other.turnCorrelation
 
     override fun hashCode(): Int = listOf(
         transport, connectionStage, requestStage, failureCategory, elapsedMillis,
-        connectionElapsedMillis, lastProgressAgeMillis, stalled, audioStage, events, omittedEvents
+        connectionElapsedMillis, lastProgressAgeMillis, stalled, audioStage, events, omittedEvents,
+        turnCorrelation
     ).hashCode()
 
     override fun toString(): String =
@@ -120,6 +127,7 @@ class ConnectionDiagnostics(
     private var request = RequestStage.IDLE
     private var failure = FailureCategory.NONE
     private var audio = DiagnosticAudioStage.IDLE
+    private var correlation = TurnCorrelation.UNOBSERVED
     private var origin: Long? = null
     private var current = Long.MIN_VALUE
     private var requestAt: Long? = null
@@ -136,6 +144,7 @@ class ConnectionDiagnostics(
         request = RequestStage.IDLE
         failure = FailureCategory.NONE
         audio = DiagnosticAudioStage.IDLE
+        correlation = TurnCorrelation.UNOBSERVED
         origin = now
         current = now
         requestAt = null
@@ -188,8 +197,24 @@ class ConnectionDiagnostics(
         failure = FailureCategory.NONE
         audio = DiagnosticAudioStage.IDLE
         request = stage
+        correlation = TurnCorrelation.UNOBSERVED
         // This observes local submission only; stock frames do not prove durable core admission.
         event(observation, forward)
+    }
+
+    fun observedTurn(now: Long) {
+        val forward = advance(now)
+        if (!active || correlation != TurnCorrelation.UNOBSERVED) return
+        correlation = TurnCorrelation.OBSERVED
+        event(DiagnosticObservation.CORRELATION_OBSERVED, forward)
+    }
+
+    /** Loss of bounded identity history is uncertainty, never evidence of progress. */
+    fun uncertainTurn(now: Long) {
+        val forward = advance(now)
+        if (correlation == TurnCorrelation.HISTORY_LIMIT) return
+        correlation = TurnCorrelation.HISTORY_LIMIT
+        event(DiagnosticObservation.CORRELATION_UNCERTAIN, forward)
     }
 
     fun request(stage: RequestStage, now: Long) {
@@ -207,7 +232,7 @@ class ConnectionDiagnostics(
 
     fun progress(now: Long, observation: DiagnosticObservation = DiagnosticObservation.PROGRESS) {
         val forward = advance(now)
-        if (!active) return
+        if (!active || correlation == TurnCorrelation.HISTORY_LIMIT) return
         progressAt = current
         event(observation, forward)
     }
@@ -222,9 +247,13 @@ class ConnectionDiagnostics(
         } else {
             DiagnosticAudioStage.COMPLETE
         }
-        if (audio == stage || (receiving && !active)) return
+        if (audio == stage ||
+            (receiving && (!active || correlation == TurnCorrelation.HISTORY_LIMIT))
+        ) {
+            return
+        }
         audio = stage
-        if (active) progressAt = current
+        if (active && correlation != TurnCorrelation.HISTORY_LIMIT) progressAt = current
         event(
             if (receiving) DiagnosticObservation.AUDIO_START else DiagnosticObservation.AUDIO_END,
             forward
@@ -240,7 +269,7 @@ class ConnectionDiagnostics(
             origin?.let { duration(current, it) } ?: 0, age,
             active && request in setOf(RequestStage.WAITING, RequestStage.TRANSCRIBED) &&
                 age >= STALL_MILLIS,
-            audio, events.toList(), omitted
+            audio, events.toList(), omitted, correlation
         )
     }
 
@@ -303,6 +332,7 @@ object ConnectionDiagnosticsReport {
                 put("lastProgressAgeMillis", bounded(snapshot.lastProgressAgeMillis))
                 put("stalled", snapshot.stalled)
                 put("audioStage", snapshot.audioStage.name)
+                put("turnCorrelation", snapshot.turnCorrelation.name)
                 put(
                     "omittedEvents",
                     (
