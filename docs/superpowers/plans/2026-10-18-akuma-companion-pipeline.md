@@ -78,3 +78,20 @@ bundle exactly matches the existing SDK package function's PNG sheet metadata. P
 source hashes, raw generations, preparation chain, failed checks, contact sheet and detailed
 report remain under ignored `.local/expansion/akuma/`. Original metadata/base/config hashes
 are unchanged. Final fresh review belongs to the controller.
+
+
+## Review fix round 1 — 2026-10-18
+
+- [x] Reproduce oversized base/companion reaching hashing before their byte gate, and
+  bulk hashing of valid input. Regressions fail on c18b38e; preflight every source
+  before any hashing, then stream SHA-256 in at most 64 KiB chunks with a total cap.
+- [x] Reproduce boundary-touching raw poses becoming interior after aspect-ratio padding.
+  Four edge regressions use 1152×312 synthetic grids. Reject raw occupied-cell bounds
+  touching any edge before scaling/padding, while retaining prepared-pose checks.
+- [x] Run the seven focused regressions RED→GREEN and the full pet suite: 29 passed
+  with warnings treated as errors. Existing 8 MiB / 3,200,000-pixel / 2 MiB PNG limits,
+  source separation and pending Akuma artwork/live/physical acceptance remain intact.
+
+Detailed fixes, commands and private test receipts are recorded in
+`.local/expansion/akuma/fix-round-1-report.md`; no new artwork generation or device/server
+operation was performed in this fix round.

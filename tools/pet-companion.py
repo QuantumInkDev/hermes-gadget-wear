@@ -14,14 +14,34 @@ _register = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_register)
 COUNTS = (('listening', 6), ('talking', 3), ('sleeping', 6))
 RESERVED = {'pet.json', 'gadget-sheet.png', 'manifest.json', 'contact-sheet.png'}
+MAX_ART_BYTES = 8 * 1024 * 1024
+MAX_METADATA_BYTES = 65536
+HASH_CHUNK_BYTES = 64 * 1024
 
 
-def sha256(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def bounded_size(path, limit=MAX_ART_BYTES):
+    size = path.stat().st_size
+    if size > limit:
+        raise ValueError('Input exceeds byte limit')
+    return size
 
 
-def record(path):
-    return {'path': str(path.resolve()), 'sha256': sha256(path), 'bytes': path.stat().st_size}
+def sha256(path, limit=MAX_ART_BYTES):
+    bounded_size(path, limit)
+    digest = hashlib.sha256()
+    total = 0
+    with path.open('rb') as stream:
+        while chunk := stream.read(min(HASH_CHUNK_BYTES, limit - total + 1)):
+            total += len(chunk)
+            if total > limit:
+                raise ValueError('Input exceeds byte limit while hashing')
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def record(path, limit=MAX_ART_BYTES):
+    size = bounded_size(path, limit)
+    return {'path': str(path.resolve()), 'sha256': sha256(path, limit), 'bytes': size}
 
 
 def _within(child, parent):
@@ -53,6 +73,11 @@ def prepare_grid(source_path: Path, output: Path):
             box = (round(column * source.width / 6), round(row * source.height / 3),
                    round((column + 1) * source.width / 6), round((row + 1) * source.height / 3))
             cell = source.crop(box)
+            bounds = _register.bbox(cell)
+            if not bounds:
+                raise ValueError('Empty raw companion pose')
+            if bounds[0] == 0 or bounds[1] == 0 or bounds[2] == cell.width or bounds[3] == cell.height:
+                raise ValueError('Clipped raw companion pose')
             scaled = cell.resize((max(1, round(cell.width * scale)), max(1, round(cell.height * scale))), Image.Resampling.NEAREST)
             x, y = (192 - scaled.width) // 2, (208 - scaled.height) // 2
             result.paste(scaled, (column * 192 + x, row * 208 + y))
@@ -128,8 +153,7 @@ def contact_sheet(base, sheet, output):
 def build(metadata_path: Path, companion_path: Path, output_dir: Path, mouth_box=None):
     metadata_path, companion_path, output_dir = map(Path, (metadata_path, companion_path, output_dir))
     directory = metadata_path.resolve().parent
-    if metadata_path.stat().st_size > 65536:
-        raise ValueError('Metadata exceeds 65536-byte limit')
+    bounded_size(metadata_path, MAX_METADATA_BYTES)
     metadata = json.loads(metadata_path.read_text())
     relative = Path(metadata['spritesheetPath'])
     if relative.is_absolute() or '..' in relative.parts:
@@ -142,7 +166,10 @@ def build(metadata_path: Path, companion_path: Path, output_dir: Path, mouth_box
     destination = output_dir.resolve()
     if output_dir.exists() or output_dir.is_symlink() or _within(destination, directory):
         raise ValueError('Output must be a fresh directory outside the source pet')
-    sources = {'metadata': record(metadata_path), 'base': record(base), 'companion': record(companion_path)}
+    # Check every source before hashing any of them; invalid art never reaches a read.
+    for path, limit in ((metadata_path, MAX_METADATA_BYTES), (base, MAX_ART_BYTES), (companion_path, MAX_ART_BYTES)):
+        bounded_size(path, limit)
+    sources = {'metadata': record(metadata_path, MAX_METADATA_BYTES), 'base': record(base), 'companion': record(companion_path)}
     # Decode/validate before creating staging files. extend repeats the bounded checks.
     base_image = _register.opened(base)
     base_delivery = delivery_sheet(base_image, 'base')
@@ -162,8 +189,9 @@ def build(metadata_path: Path, companion_path: Path, output_dir: Path, mouth_box
                 cell = sheet.crop((column * 192, row * 208, (column + 1) * 192, (row + 1) * 208))
                 frames.append({'state': name, 'frame': column, 'bbox': list(_register.bbox(cell))})
         contact_sheet(base_image, sheet, output_dir / 'contact-sheet.png')
-        for source in sources.values():
-            if sha256(Path(source['path'])) != source['sha256']:
+        for name, source in sources.items():
+            limit = MAX_METADATA_BYTES if name == 'metadata' else MAX_ART_BYTES
+            if sha256(Path(source['path']), limit) != source['sha256']:
                 raise ValueError('Input changed during staging')
         outputs = {path.name: {'sha256': sha256(path), 'bytes': path.stat().st_size}
                    for path in sorted(output_dir.iterdir())}

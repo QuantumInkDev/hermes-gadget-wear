@@ -153,3 +153,77 @@ def test_grid_preparation_preserves_alpha_aspect_and_raw_input(tmp_path):
     assert source.read_bytes() == before
     with pytest.raises(ValueError, match='exists'):
         tool.prepare_grid(source, output)
+
+
+@pytest.mark.parametrize('oversized', ['base', 'companion'])
+def test_build_checks_all_art_sizes_before_hashing_or_bulk_reads(tmp_path, monkeypatch, oversized):
+    tool = load()
+    metadata, base, companion = inputs(tmp_path)
+    target = base if oversized == 'base' else companion
+    # Sparse invalid input exercises the boundary without allocating its contents.
+    with target.open('wb') as stream:
+        stream.truncate(8 * 1024 * 1024 + 1)
+    original_hash = tool.sha256
+    hashed = []
+    def observed_hash(path, *args, **kwargs):
+        hashed.append(Path(path))
+        return original_hash(path, *args, **kwargs)
+    original_read = Path.read_bytes
+    def reject_bulk_read(path):
+        if path == target:
+            pytest.fail('Oversized source reached bulk read before the size gate')
+        return original_read(path)
+    monkeypatch.setattr(tool, 'sha256', observed_hash)
+    monkeypatch.setattr(Path, 'read_bytes', reject_bulk_read)
+    output = tmp_path / 'bundle'
+    with pytest.raises(ValueError, match='limit'):
+        tool.build(metadata, companion, output)
+    assert not hashed
+    assert not output.exists()
+
+
+def test_hash_streams_valid_input_and_rejects_oversize_before_open(tmp_path, monkeypatch):
+    import hashlib
+    tool = load()
+    source = tmp_path / 'source.bin'
+    source.write_bytes(b'synthetic' * 20000)
+    expected = hashlib.sha256(source.read_bytes()).hexdigest()
+    def no_bulk_read(path):
+        pytest.fail('Hashing must stream bounded chunks, not call read_bytes')
+    monkeypatch.setattr(Path, 'read_bytes', no_bulk_read)
+    assert tool.sha256(source) == expected
+    with source.open('wb') as stream:
+        stream.truncate(8 * 1024 * 1024 + 1)
+    original_open = Path.open
+    def reject_source_open(path, *args, **kwargs):
+        if path == source:
+            pytest.fail('Oversized source was opened before the size gate')
+        return original_open(path, *args, **kwargs)
+    monkeypatch.setattr(Path, 'open', reject_source_open)
+    with pytest.raises(ValueError, match='limit'):
+        tool.sha256(source)
+
+
+@pytest.mark.parametrize('edge', ['left', 'top', 'right', 'bottom'])
+def test_raw_cell_boundary_clipping_rejected_before_padding(tmp_path, edge):
+    tool = load()
+    source, output = tmp_path / 'clipped-raw.png', tmp_path / 'prepared.png'
+    # Half-height source cells would be vertically padded into the 208px target,
+    # hiding top/bottom cuts from extend() if preparation did not inspect raw alpha.
+    image = Image.new('RGBA', (1152, 312))
+    draw = ImageDraw.Draw(image)
+    for row, (_, count) in enumerate(tool.COUNTS):
+        for column in range(count):
+            left, top, right, bottom = 71, 20, 120, 69
+            if edge == 'left': left, right = 0, 49
+            elif edge == 'top': top, bottom = 0, 49
+            elif edge == 'right': left, right = 142, 191
+            elif edge == 'bottom': top, bottom = 54, 103
+            draw.rectangle((column * 192 + left, row * 104 + top,
+                            column * 192 + right, row * 104 + bottom), fill=(190, 80, 20, 230))
+    image.save(source)
+    original = source.read_bytes()
+    with pytest.raises(ValueError, match='Clipped raw'):
+        tool.prepare_grid(source, output)
+    assert source.read_bytes() == original
+    assert not output.exists()

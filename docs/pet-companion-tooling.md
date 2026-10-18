@@ -26,7 +26,9 @@ mouth shape. Do not substitute existing running rows for these expressions.
 If a generator returns a reviewed equal six-column/three-row grid at a different
 resolution, prepare it with shared nearest-neighbour scaling and transparent cell
 packing. This operation does not clean, repaint or repair the art. It assumes the
-reviewer has checked the declared grid boundaries; cut poses fail later registration.
+reviewer has checked the declared grid boundaries. Preparation rejects any occupied
+raw cell whose alpha bounds touch a cell edge before adding scale/padding; later
+registration also rejects clipped prepared poses. Human review is still required.
 The preparation JSON contains exact input/output paths and hashes, so save it privately.
 
 ```sh
@@ -57,8 +59,10 @@ No source metadata changes. Outputs are staging artifacts, not approval to deplo
 Registration uses one transform per row: median idle height, center and baseline,
 with nearest-neighbour scaling. Empty, clipped, drifting or extreme-scale poses fail.
 The existing SDK delivery limits still apply: input art at most 8 MiB and 3,200,000
-pixels; each delivery PNG at most 2 MiB. Standard 1536×1872 and legacy 1728×1664 bases
-are supported. A 1536×2288 eleven-row base exceeds the pixel limit and is rejected
+pixels; each delivery PNG at most 2 MiB. All source byte sizes are checked before
+source hashing; SHA-256 reads at most 64 KiB per chunk and aborts if the file grows
+beyond its limit while hashing. Metadata retains its 65,536-byte limit. Standard
+1536×1872 and legacy 1728×1664 bases are supported. A 1536×2288 eleven-row base exceeds the pixel limit and is rejected
 unchanged. Do not crop rows or increase limits to force acceptance.
 
 For a reviewed mouth rectangle in **registered 192×208 cell coordinates**, add
