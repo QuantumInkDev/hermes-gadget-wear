@@ -19,13 +19,15 @@ M5 partial maintenance lease has clean review; its full driver awaits a genuine
 sample-observation producer and independent live bootstrap authority. No server changes.
 
 The interrupted implementations are checkpointed without accepting unfinished code.
-Continuity Task3 continues in an isolated successor. Maintenance-observation fix1
-(`79a1e7ce` / `da2f963a`) is under fresh scoped review for idle-write and loop-I/O
-corrections. Its separate SQLite test-hygiene heads pass245 cases with8 platform
-skips on each foundation; feature-only runs retain239 passes,6 inherited warning
-failures and8 skips. These are different trees, not one green source-only result.
-The original worker's missing report is explicitly distinguished from the successor's
-verified report. No maintenance prerequisite or continuation method is live.
+Continuity Task3 continues in an isolated successor. Maintenance-observation fix2
+(`7ecfa8a3` / `9fe6dccd`) has a clean fresh source review. All original findings and
+the first-engagement process-birth I/O gap are closed. Four affected files pass208
+cases with8 platform skips on each foundation. The earlier feature-only239 passes/
+6 inherited warning failures and hygiene-enabled245 passes describe separate older
+trees and remain recorded. Minor test-coverage observations are deferred explicitly;
+the shared status publisher's pre-existing process-birth I/O is outside the observer
+probe correction. The offline full driver can now consume the reviewed contract.
+No maintenance prerequisite, continuation method or migration feature is live.
 
 Latest integrated app source `dc1fb14` adds the independently reviewed playback-output
 and interruption foundation. Strict root checks pass: 11 client JVM cases, zero failures,

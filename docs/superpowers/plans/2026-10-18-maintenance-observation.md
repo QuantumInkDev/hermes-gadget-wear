@@ -69,3 +69,12 @@ blocked filesystem operation. Independent review must assess the pending-read bo
 The unrelated SQLite cleanup fixture is a separate test-hygiene commit. Report the
 feature-only warning failures and the hygiene-enabled results separately; do not export
 the fixture as part of the observer or claim its passing run describes a different tree.
+
+Controller ruling after fix1 review: its N1 residual constructor process-birth probe
+is a remaining spec gap in I2, even though the reviewer grades its expected frequency
+Minor. Do not accept a synchronous first-engagement filesystem probe as an exception
+to the explicit off-loop requirement. Correct the producer and cover the first real
+watcher engagement, including `io.open`/process-birth access, before export or Task2.
+This enters fix round2 as an Important spec gap; it does not reopen unrelated code.
+Append the auxiliary-clone and pre-commit test-byte evidence qualifications (review N3)
+and the worst-case engaged-tick delay (N2) without rewriting historical records.

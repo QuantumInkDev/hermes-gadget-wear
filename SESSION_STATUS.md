@@ -15,13 +15,15 @@ checks from modern emulators and physical devices. Direct inventory confirms And
 API 37 on the phone and Android 16/API 36 on the watch; both apps target API 37.
 
 The interrupted implementations are checkpointed without accepting unfinished code.
-Continuity Task3 continues in an isolated successor. Maintenance-observation fix1
-(`79a1e7ce` / `da2f963a`) is under fresh scoped review for idle-write and loop-I/O
-corrections. Its separate SQLite test-hygiene heads pass245 cases with8 platform
-skips on each foundation; feature-only runs retain239 passes,6 inherited warning
-failures and8 skips. These are different trees, not one green source-only result.
-The original worker's missing report is explicitly distinguished from the successor's
-verified report. No maintenance prerequisite or continuation method is live.
+Continuity Task3 continues in an isolated successor. Maintenance-observation fix2
+(`7ecfa8a3` / `9fe6dccd`) has a clean fresh source review. All original findings and
+the first-engagement process-birth I/O gap are closed. Four affected files pass208
+cases with8 platform skips on each foundation. The earlier feature-only239 passes/
+6 inherited warning failures and hygiene-enabled245 passes describe separate older
+trees and remain recorded. Minor test-coverage observations are deferred explicitly;
+the shared status publisher's pre-existing process-birth I/O is outside the observer
+probe correction. The offline full driver can now consume the reviewed contract.
+No maintenance prerequisite, continuation method or migration feature is live.
 
 Latest integrated app source `dc1fb14` adds the independently reviewed playback-output
 and interruption foundation. Strict root checks pass: 11 client JVM cases, zero failures,
@@ -150,10 +152,9 @@ Read-only identity/topology and all twelve capability-OFF config checks are reco
 these do not prove idle state. Driver work returned a source-backed limitation: the
 status protocol cannot distinguish a fresh aggregate sample from a stale zero retained
 by unrelated status updates. Only the outer lease is implemented (68 partial-checkpoint
-cases); fresh review accepts that partial source only. A separate existing-status
-maintenance-observation producer is now being implemented in isolated runtime/clean
-clones. Its true sampling identity and strict source counts must be reviewed before the
-driver consumes them. Installing that prerequisite still needs independent pre-stop
+cases); fresh review accepts that partial source only. The separate existing-status maintenance-observation producer now has a reviewed
+fix2 source contract in isolated runtime/clean clones. The offline driver can consume
+its true sampling identity and strict source counts. Installing that prerequisite still needs independent pre-stop
 authority; the hook cannot bootstrap its own safety proof. The full phase driver
 and actual stock acceptance remain required. No install, drain, restart or capability activation follows from these checks.
 
