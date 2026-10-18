@@ -40,6 +40,19 @@ Typed protocol diagnostics is also underway from its
 [focused plan](docs/superpowers/plans/2026-10-18-connection-diagnostics.md). These designs
 and implementation activity do not establish live integration.
 
+Latest: outbox storage `d097717` is independently approved in the isolated SDK, with
+39 storage +30 stock/extension warning-strict passes; grant/wire task 2 is active.
+Actual-core finalizer recovery is a known Task 3 gate: a failed SendResult alone does
+not prevent the pinned core from releasing its marker. Do not enable the flag until
+durable canonical recovery is proven. Quick actions (isolated `88f2cd8`, `7f1076d`) and
+typed diagnostics (`00def510`) have fresh reviews and active first fix rounds (one and
+two P2 findings respectively). They are not yet accepted/delivered.
+
+Two real ElevenLabs format probes pass (2 calls /102 characters; real Opus accepted by
+the app parser). Remaining allowance: 8 calls /2,398 characters. Credentials were read
+only from existing private configuration/cache and not copied to reports. Receipts and
+budget are under `.local/expansion/`. Native playback and live BYOK remain open.
+
 The [umbrella design](docs/superpowers/specs/2026-10-18-relay-expansion-design.md)
 defines all fifteen acceptance contracts, recorded decisions and the workstream split.
 Next: focused implementation plans and reviewed implementation increments.

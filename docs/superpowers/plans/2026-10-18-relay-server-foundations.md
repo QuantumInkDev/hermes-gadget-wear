@@ -551,8 +551,13 @@ hub JSON parser so deeply nested input cannot disconnect unrelated clients. Resp
 return fewer than limit when needed and leave the rest unacknowledged. An item of
 16 KiB text plus escaping must fit; JSON `ensure_ascii=False` avoids worst-case Unicode
 expansion, but quotes/backslashes still require the actual serialized byte check. Add
-exact boundary tests (50×16-KiB finals must never form one frame). These are acceptance
-requirements, not optional hardening.
+exact boundary tests (50×16-KiB finals must never form one frame). Test the actual
+DeviceSession sender, which currently defaults to ASCII escaping, as well as compact
+UTF-8. An individual delivery must meet both the 16-KiB UTF-8 text limit and the
+64-KiB serialized envelope limit. C0 controls can expand sixfold even with UTF-8 JSON;
+reject an unframeable delivery before commit with a stable error, preserving the
+canonical delivery obligation through Task 3. Never truncate text or commit an item
+that can never be read. These are acceptance requirements, not optional hardening.
 - [ ] Fix ACK tombstone quota, 128-owner cleanup and seven-day identity-expiry behavior from
 Task 1 with concrete tests. Ensure an unknown key owner cannot consume another owner's
 retained data. Do not erase live owners merely because their device is disconnected.

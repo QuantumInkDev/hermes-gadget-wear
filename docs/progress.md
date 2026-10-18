@@ -19,6 +19,25 @@ has a [focused plan](superpowers/plans/2026-10-18-relay-server-foundations.md) a
 Read-only APK/data backups preserve 18 phone and 19 watch identity files plus current
 artwork/settings. No live expansion rollout is claimed.
 
+The isolated outbox storage checkpoint `d097717` is independently approved: 39 storage
+and 30 stock/extension tests pass warning-strict with no skips. Restart/ACK/dedup,
+concurrent writers and killed-writer boundaries are covered; measured DB/journal peak
+is below the documented 36-MiB bound. The broader upstream SDK run has existing resource
+leaks and capability skips, recorded privately; it is not claimed green. Grant/wire and
+actual-core recovery integration remain separate pending tasks; no capability is enabled.
+
+Actual pinned-core pet resolution and packaging passed in an isolated temporary home
+using a read-only copy of the selected base art. The original remains unchanged; this
+is not live delivery. Two approved ElevenLabs synthesis tests returned valid PCM and
+Opus using 102 total input characters; the app's Ogg parser accepts the real Opus stream
+(233 packets). No key was saved, default voice changed, or native playback claimed.
+Eight calls and 2,398 characters remain in the authorized synthesis test allowance.
+
+Protocol diagnostics at `00def510` passes 106 warning-strict JVM tests/26 reports with
+no skips. Independent review found two P2 stage/replay edge cases; fix round 1 is active.
+The quick-action increment is also in fix round 1 for one stale preview-navigation P2.
+Neither pending-review increment is claimed ready for physical delivery.
+
 ## Fifteen-feature expansion intake — 2026-10-18 (historical)
 
 The owner reports several days of successful use and requests the five unfinished

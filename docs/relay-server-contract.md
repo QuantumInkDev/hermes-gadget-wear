@@ -181,7 +181,9 @@ request, never treat it as new.
 ## Optional outbox and attachments
 
 The first increment advertises `limits.outbox_cursor=false`, `page_items=50`,
-`text_bytes=16384`: `read` supports only `limit`, returns oldest unacknowledged items
+`text_bytes=16384`: each delivery must also fit the 64-KiB serialized response envelope;
+an unframeable escaped body is refused before capture without truncation. Actual-core
+integration must retain its canonical delivery obligation. `read` supports only `limit`, returns oldest unacknowledged items
 within a 64-KiB response and includes persistent `gap_generation`. Its pull-only finals
 come from `send_final_ledgered`, not guessed transcript timestamps. No live server TTS
 replay occurs on a read. The informational conversation ID for existing stock lanes is
