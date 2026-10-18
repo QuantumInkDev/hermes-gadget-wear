@@ -14,6 +14,21 @@ The [runtime coverage matrix](docs/android-test-matrix.md) separates compatibili
 checks from modern emulators and physical devices. Direct inventory confirms Android 17/
 API 37 on the phone and Android 16/API 36 on the watch; both apps target API 37.
 
+Private pet native validation now passes three asset-specific API37 cases using
+production decoding, rendering and real AudioTrack callbacks:69 distinct decoded frames
+per pet,207 total,65 playback-level samples each. Android-derived mouth poses change
+only inside their declared native regions (Kitana24/23, Viper16/16, Cthulhu374/372 watch
+pixels). An initial failed pixel check used Pillow's different nearest-neighbour phase;
+independent alpha checks across67 non-overlay frames per pet establish this Android
+runtime's even-coordinate sampling. That discrepancy is retained as evidence. Cthulhu's
+current watch optimization preserves Pillow samples; preserving the original under
+Android's calibrated phase remains a follow-up. Full motion/semantic review, authenticated
+live delivery and physical power/voice acceptance remain open. Preserving installs and
+restoration verify both original APKs/signers, all settings and504 original app files:
+zero missing, only the ordinary install marker changed, plus309 new fixture captures.
+The standard test APK was rebuilt without private assets/classes. No physical device
+or quarantined emulator was touched.
+
 The interrupted implementations are checkpointed without accepting unfinished code.
 Continuity Task3 has finished in its isolated successor. Fresh combined review
 requires four Important delivery/lifecycle/compatibility fixes before acceptance.
