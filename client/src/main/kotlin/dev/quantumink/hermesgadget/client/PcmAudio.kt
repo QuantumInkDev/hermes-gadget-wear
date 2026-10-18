@@ -209,7 +209,7 @@ class PcmPlayback(
         val header = opusHeader?.copyOf()
         callbacks.post {
             if (requested.get() !== playback || playback.stopped.get()) return@post
-            active?.let { complete(it, false) }
+            active?.let { complete(it) }
             if (requested.get() === playback && !playback.stopped.get()) {
                 active = playback
                 Thread({ play(playback, rate, header) }, "gadget-speaker")
@@ -366,7 +366,7 @@ class PcmPlayback(
             playback.focus = null
             playback.focusListener = null
             playback.queue.clear()
-            callbacks.post { complete(playback, false) }
+            callbacks.post { complete(playback) }
         }
     }
 
@@ -420,7 +420,7 @@ class PcmPlayback(
     fun stop() {
         val playback = requested.getAndSet(null) ?: return
         cancel(playback)
-        callbacks.post { complete(playback, false) }
+        callbacks.post { complete(playback) }
     }
 
     private fun interrupt(playback: Playback) {
@@ -436,7 +436,7 @@ class PcmPlayback(
                 return@post
             }
             cancel(playback)
-            complete(playback, true)
+            complete(playback)
         }
     }
 
@@ -458,11 +458,15 @@ class PcmPlayback(
         active === playback && requested.get() === playback &&
             !playback.stopped.get() && !playback.interruptionQueued.get()
 
-    private fun complete(playback: Playback, interrupted: Boolean) {
+    private fun complete(playback: Playback) {
         if (playback.completed) return
         playback.completed = true
         if (active === playback) active = null
-        requested.compareAndSet(playback, null)
+        // All completion callers resolve the accepted reason here: worker cleanup may enqueue
+        // first. Stop/replacement wins if it has already removed this requested owner.
+        val interrupted = requested.compareAndSet(playback, null) &&
+            playback.interruptionQueued.get()
+
         // A client callback may itself start another stream. Fence each subsequent notification.
         fun latest(): Boolean = generations.get() == playback.generation
         if (interrupted && latest()) onInterrupted()

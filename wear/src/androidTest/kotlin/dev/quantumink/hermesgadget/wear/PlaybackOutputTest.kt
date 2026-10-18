@@ -102,6 +102,81 @@ class PlaybackOutputTest {
         }
     }
 
+    @Test fun workerCompletionPreservesAcceptedInterruptionBeforeItsPendingPost() = foreground {
+        val interruptions = AtomicInteger()
+        val completions = AtomicInteger()
+        val levels = CopyOnWriteArrayList<Float>()
+        val pendingPost = java.util.concurrent.CountDownLatch(1)
+        val allowPost = java.util.concurrent.CountDownLatch(1)
+        val caller = java.util.concurrent.atomic.AtomicReference<Thread>()
+        val player = PcmPlayback(
+            context,
+            { interruptions.incrementAndGet() },
+            { levels.add(it) },
+            { completions.incrementAndGet() }
+        )
+        // Delay only the actual interrupt caller's Handler enqueue, after its production CAS.
+        // The real worker and main looper remain free to release and complete first.
+        val callbacks = object : android.os.Handler(android.os.Looper.getMainLooper()) {
+            override fun sendMessageAtTime(
+                message: android.os.Message,
+                uptimeMillis: Long
+            ): Boolean {
+                if (Thread.currentThread() === caller.get()) {
+                    pendingPost.countDown()
+                    check(allowPost.await(20, java.util.concurrent.TimeUnit.SECONDS))
+                }
+                return super.sendMessageAtTime(message, uptimeMillis)
+            }
+        }
+        player.javaClass.getDeclaredField("callbacks").apply { isAccessible = true }
+            .set(player, callbacks)
+        try {
+            player.start(16000)
+            await { track(player)?.playState == AudioTrack.PLAYSTATE_PLAYING }
+            val owner = requireNotNull(field(player, "active"))
+            val original = requireNotNull(track(player))
+            val focus = field(owner, "focusListener") as AudioManager.OnAudioFocusChangeListener
+            val thread = Thread {
+                focus.onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+            }
+            caller.set(thread)
+            thread.start()
+            assertTrue(pendingPost.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            assertTrue(
+                (
+                    field(
+                        owner,
+                        "interruptionQueued"
+                    ) as java.util.concurrent.atomic.AtomicBoolean
+                    ).get()
+            )
+            // No Stop or replacement: worker cleanup/completion must beat the pending post.
+            await { original.state == AudioTrack.STATE_UNINITIALIZED }
+            await { completions.get() == 1 }
+            assertEquals(1L, allowPost.count)
+            Log.i("N5Playback", "controlled worker completion before interruption enqueue")
+            assertEquals(1, interruptions.get())
+            assertEquals(1, completions.get())
+            assertEquals(0f, levels.last())
+            assertTrue(context.receivers.isEmpty())
+            for (name in listOf("track", "receiver", "routing", "focus", "focusListener")) {
+                assertEquals("released owner resource: $name", null, field(owner, name))
+            }
+            allowPost.countDown()
+            thread.join(2000)
+            assertTrue(!thread.isAlive)
+            instrumentation.waitForIdleSync()
+            assertEquals(1, interruptions.get())
+            assertEquals(1, completions.get())
+            assertEquals(0f, levels.last())
+        } finally {
+            allowPost.countDown()
+            caller.get()?.join(2000)
+            player.stop()
+        }
+    }
+
     @Test fun competingNativeFocusInterruptsAndDoesNotAutomaticallyResume() = foreground {
         val done = AtomicInteger()
         val lost = AtomicInteger()
