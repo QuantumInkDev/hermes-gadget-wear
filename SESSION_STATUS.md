@@ -42,12 +42,17 @@ power/voice acceptance remain open. The latest preserving install/restoration ve
 both original APKs/signers, all settings and813 original app files: zero missing, only the
 ordinary install marker changed, plus103 new fixture captures. This includes the earlier
 309 captures. An optional alternate-base producer/stager is implemented in isolated
-SDK/tool candidates (`2381700` / `9c6c03d`), with198 reported distinct affected passes.
-Fresh combined review found one Important filesystem case-alias escape in the stager's
-source-directory fence. Fix round1 `98af954` reports117 affected tool/integration passes;
-the unchanged SDK's98 cases remain retained evidence. Fresh scoped independent review is
-active; integration, final private restaging and live delivery remain open. The proposed
-bundle retains desktop detail alongside the watch sheet in one regular pet directory.
+SDK/tool candidates (`2381700` / `98af954`) now have clean independent source reviews.
+The filesystem case-alias correction is accepted and integrated through `c30c6b8`.
+The combined private SDK reapplication is `c34133f`; all four changed files match reviewed
+source exactly, and every other tracked file matches its accepted continuity foundation.
+Root verification passes215 distinct affected cases (98 SDK plus117 tools/integration),
+zero failures/errors/skips. Final private Cthulhu staging preserves its2,868,932-byte
+regular atlas; actual isolated Hermes selects that original while actual SDK packaging
+selects the alternate. Both delivered assets, manifest, rows and overlay match the native-
+tested inputs exactly. In-memory sender reassembly passes all three overlay capability
+controls. No further native run was needed for identical inputs. Authenticated live
+delivery and physical acceptance remain open; no live assignment changed.
 The standard test APK was rebuilt without private assets/classes. No physical device
 or quarantined emulator was touched.
 
@@ -63,8 +68,9 @@ message/segment identity, authenticated cursors and restart reconciliation.
 The [Android sharing plan](docs/superpowers/plans/2026-10-18-android-sharing.md) now
 covers encrypted share drafts, scoped uploads and actual image/PDF/text ingestion.
 Its preflight identifies the existing native text-only guard and document-reader dependency;
-no sharing implementation or support advertisement is claimed. Remote wake's sender plan
-is likewise ready for the next implementation slot.
+no sharing implementation or support advertisement is claimed. Remote wake's authenticated
+sender/receipt/backend Task1 is now in fresh isolated implementation on the accepted SDK;
+its worker performs no actual host wake or power operation.
 Maintenance-observation fix2
 (`7ecfa8a3` / `9fe6dccd`) has a clean fresh source review. All original findings and
 the first-engagement process-birth I/O gap are closed. Four affected files pass208
