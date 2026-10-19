@@ -64,6 +64,10 @@ must cover every state, including error and companion rows; restoring an origina
 can reintroduce a previously removed lighting defect. Palette membership and unchanged
 pixels are measurable gates, but do not replace visual review of joints and movement.
 Fixed appearance details must not be recalculated into a new shape for every frame.
+Attach small details at their anatomical root rather than the changing hair outline.
+For repeated directional heads, retain one source pixel rig and translate it as a unit;
+its edit footprint must exclude shoulders and clothing. Inspect enlarged joins as well
+as native playback. A fixed streak hash alone cannot prove correct anatomical placement.
 Shared palette membership also does not establish matched exposure; compare the actual
 base and companion lighting, and avoid darkening an already corrected source again.
 

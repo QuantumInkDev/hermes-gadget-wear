@@ -1,6 +1,25 @@
 <!-- Current focus: owner pet feedback after orchestration/capacity failure. Broad goal is blocked/incomplete; no automatic agent/provider fallback restart. Preserve existing work, enrollments and artwork. -->
 # Session status
 
+## Focused head and gesture correction — 2026-10-19
+
+The latest private candidate supersedes the prior turning-signature revision for the
+one requested figure. Walks now reuse one original native head per direction; its short
+hairline details translate with those same pixels. The enlarged preview exposed a
+shoulder cut in the initial rectangular mask, corrected with a head-only footprint.
+Listening inserts a hand-to-ear arm while retaining original body pixels elsewhere.
+The signature uses startup, dash, impact and a held back-facing finish with a red glyph;
+its new back pose is the disclosed original-body exception. Approved purple working
+effects remain unchanged. Other pet candidates and original files are preserved.
+
+Actual SDK/PNG/hash checks pass for 62 poses, including fixed walk-head pixels,
+19,209 unchanged purple effect pixels and three mouth-only talking poses. Final
+desktop/dark and mobile/light inline previews decode all 62 poses with no reported
+overflow or console errors. One built-in pose-edit call, zero agents/fallbacks. The
+private comparison and prompt are saved. Visual approval and new Android/live/physical
+acceptance remain open; no installed art, app, device or live assignment changed.
+The broad expansion remains blocked/incomplete.
+
 ## Focused appearance correction — 2026-10-19
 
 The latest private revision replaces changing head-detail masks with fixed subtle

@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-10-19 — focused head attachment and listening correction
+
+One private candidate now uses original native head pixels as a fixed rig per walking
+direction, with short details starting at the hairline. A shoulder-mask defect found in
+the enlarged preview was corrected before delivery. Listening uses a hand-to-ear edit;
+the signature replaces the turn-in-place sequence with startup/dash/impact/held finish.
+Only the newly drawn back pose is a whole-body replacement. Existing purple working
+effects remain unchanged. SDK/hash/PNG and source-pixel checks pass for 62 poses;
+inline desktop/dark and mobile/light previews decode all 62 without reported console
+errors or overflow. One built-in image call, zero agents/provider fallbacks or live/device
+changes. Owner visual approval and new native/physical acceptance remain open.
+
 ## 2026-10-19 — fixed appearance templates and restored signature
 
 Focused private edits keep head details fixed through stationary loops, restore the
