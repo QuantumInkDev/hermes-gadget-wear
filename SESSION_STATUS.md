@@ -1,15 +1,39 @@
-<!-- Current continuation: active 2026-10-18 fifteen-feature expansion goal; full rollout approved; Akuma first, then authorized Kitana/Viper/Cthulhu; wireless phone/watch confirmed, focused increments underway. Preserve enrollments/artwork. -->
+<!-- Current focus: owner pet feedback after orchestration/capacity failure. Broad goal is blocked/incomplete; no automatic agent/provider fallback restart. Preserve existing work, enrollments and artwork. -->
 # Session status
 
-## Active expansion goal — 2026-10-18
+## Current owner feedback — 2026-10-18
+
+The owner reported excessive delegated model/fallback consumption and requested specific
+pet corrections. This pass starts no agents or provider fallbacks. A fresh project
+inventory finds no active delegated threads. The existing broad tool-managed goal is
+blocked, not complete; unrelated implementation/review queues were not restarted.
+
+Four private artwork revisions are staged with before/after playback previews. Listening
+uses hand-to-ear poses throughout; revised states include both walking directions,
+character-specific signature/working/review actions, speaking tentacles, rope hand ties
+and hair details. Eight built-in image-generation calls were used. One artistic item
+remains explicitly open: the fan twirl still reverses and does not complete a continuous
+spin. Do not treat that candidate as accepted. No personal artwork is committed.
+
+The actual stager and accepted private SDK validate four packages, each with 12 states
+and 69 occupied poses; every delivered PNG fits the existing 2 MiB limit and matches its
+hash. All 21 recorded original files are unchanged. New native Android decoding,
+authenticated delivery, physical legibility/power and owner art acceptance remain open.
+No live assignment, installed app, device setting or service was changed.
+
+Continuity history Task4 and the migration fix successor have returned results awaiting
+review; neither is active or accepted. Migration I7 remains open. Remote-wake Task1
+failed after creating private WIP, which must be preserved before any future successor.
+
+## Approved expansion scope — 2026-10-18
 
 The owner reports several stable days with the existing apps and requests all fifteen
 features in the [feature roadmap](docs/roadmap.md): original backlog O1–O5 (pets,
 companion expressions, Opus, phone BYOK, reconnect outbox) plus N1–N10 (history and
 device continuation, task inbox, Android sharing, custom prompt actions, walking mode,
 rich replies, explicit handoff, diagnostics, supported remote wake, QR/migration).
-The one-port Gadget gateway proposal is excluded. A tool-managed goal is active for the
-full scope; do not reduce completion to a client-only subset or software-only evidence.
+The one-port Gadget gateway proposal is excluded. The full tool-managed goal is currently
+blocked; do not reduce completion to a client-only subset or software-only evidence.
 The [runtime coverage matrix](docs/android-test-matrix.md) separates compatibility-floor
 checks from modern emulators and physical devices. Direct inventory confirms Android 17/
 API 37 on the phone and Android 16/API 36 on the watch; both apps target API 37.
@@ -18,10 +42,11 @@ Native QR/migration Task2 `f155a72` failed its first combined source/crypto revi
 six Important source findings cover recovery deadlock, post-commit QR capacity checks,
 rollback artwork loss, full-format memory capacity, remapped action collisions and hidden
 publication failures. The original implementer's resumed model was at capacity before
-work began; a fresh isolated successor is working on fix round1. No integration is
-accepted. Two picker/export UX corrections are included in that focused round.
-It reports93 distinct native case/parameter combinations on each API29/API37 fixture,
-including real file/photo pickers and13 process-death recoveries. API29's exact APK/data/
+work began; a fresh isolated successor returned fix round1 at `66f18fb` (`b38602d`
+source). It awaits independent review; no integration is accepted. Two picker/export
+UX corrections are included in that focused round, and I7 remains open.
+The original Task2 report covers 93 distinct native case/parameter combinations on each
+API29/API37 fixture, including real file/photo pickers and13 process-death recoveries. API29's exact APK/data/
 settings return passes. API37's original empty snapshot restores app/test/data absence,
 but53 global,10 secure and6 system setting differences remain. That restoration gate is
 open; an OS-initialization hypothesis is not attribution proof or a waiver. The fixture
@@ -63,14 +88,17 @@ could falsely acknowledge unread shared outbox copies. Focused fix2 `a4a0c37` no
 clean fresh scoped review:13 new cases within114 distinct affected coverage. The Task3
 source-review gate is accepted; broad checks, queued-marker integration, later server
 work and native/live acceptance remain unresolved.
-Task4 durable history projection is now in isolated implementation, including stable
-message/segment identity, authenticated cursors and restart reconciliation.
+Task4 durable history projection returned isolated candidates (`e0f556e` SDK,
+`4c47c2c` runtime core, `1fedbee` clean core), including stable message/segment identity,
+authenticated cursors and restart reconciliation. Its report states 448 affected cases
+per core; independent review and integration remain pending. No worker is active.
 The [Android sharing plan](docs/superpowers/plans/2026-10-18-android-sharing.md) now
 covers encrypted share drafts, scoped uploads and actual image/PDF/text ingestion.
 Its preflight identifies the existing native text-only guard and document-reader dependency;
 no sharing implementation or support advertisement is claimed. Remote wake's authenticated
-sender/receipt/backend Task1 is now in fresh isolated implementation on the accepted SDK;
-its worker performs no actual host wake or power operation.
+sender/receipt/backend Task1 failed at model capacity after producing private WIP on
+the accepted SDK. Preserve its edits/evidence before any future successor. No worker
+is active, and no actual host wake or power operation was performed.
 Maintenance-observation fix2
 (`7ecfa8a3` / `9fe6dccd`) has a clean fresh source review. All original findings and
 the first-engagement process-birth I/O gap are closed. Four affected files pass208

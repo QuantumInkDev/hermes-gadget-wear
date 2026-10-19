@@ -1,5 +1,21 @@
 # Progress
 
+## 2026-10-18 — private pet feedback revision; broad goal still incomplete
+
+Following owner feedback about delegation/provider consumption, this pass launches zero
+agents or automatic provider fallbacks. The prior broad goal is blocked; completed
+history/migration candidates await review, and remote-wake WIP remains preserved.
+
+Four private revised pet packages pass the actual stager and accepted SDK's geometry,
+row, size and hash checks:12 states/69 poses each,276 total. All21 recorded original
+files remain unchanged. Listening gestures, walking candidates, character-specific
+actions and speaking expressions are revised. Eight built-in image-generation calls
+were used. The fan's full continuous spin remains explicitly open; it is still a partial
+twirl. Before/after browser previews draw all276 revised poses; responsive728/360px
+checks load all assets without horizontal overflow. These are asset/packaging/browser
+checks, not new Android decoding, authenticated delivery or physical acceptance. No live
+assignment, installed app or device setting changed. No milestone is marked complete.
+
 The [Android runtime matrix](android-test-matrix.md) records modern and minimum-version
 coverage by feature/source. Current physical inventory confirms phone Android 17/API 37
 and watch Android 16/API 36; modern owned emulators use API 37. API29 is the phone
@@ -8,7 +24,7 @@ uiMode and navigation assumptions; the three-file correction has 26 passing affe
 native checks, has a clean fresh review and is integrated as `e3afc20`. No full minimum-Wear
 or physical pass is claimed.
 
-## Current expansion verification — 2026-10-18
+## Earlier expansion verification — 2026-10-18, before the feedback checkpoint above
 
 Native QR/migration Task2 `f155a72` failed its first combined source/crypto review:
 six Important source findings cover recovery deadlock, post-commit QR capacity checks,
