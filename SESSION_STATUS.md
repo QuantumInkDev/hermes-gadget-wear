@@ -36,9 +36,10 @@ atlas is retained. Full motion/semantic review, authenticated live delivery and 
 power/voice acceptance remain open. The latest preserving install/restoration verifies
 both original APKs/signers, all settings and813 original app files: zero missing, only the
 ordinary install marker changed, plus103 new fixture captures. This includes the earlier
-309 captures. An optional alternate-base producer/stager is now planned so one regular
-pet directory can retain desktop detail and deliver the watch sheet. It is not implemented
-or installed; see the pet Gadget base plan linked in the architecture document.
+309 captures. An optional alternate-base producer/stager is implemented in isolated
+SDK/tool candidates (`2381700` / `9c6c03d`), with198 reported distinct affected passes.
+Fresh combined review is active; integration, final private restaging and live delivery
+remain open. It retains desktop detail alongside the watch sheet in one regular pet directory.
 The standard test APK was rebuilt without private assets/classes. No physical device
 or quarantined emulator was touched.
 
@@ -49,6 +50,8 @@ could falsely acknowledge unread shared outbox copies. Focused fix2 `a4a0c37` no
 clean fresh scoped review:13 new cases within114 distinct affected coverage. The Task3
 source-review gate is accepted; broad checks, queued-marker integration, later server
 work and native/live acceptance remain unresolved.
+Task4 durable history projection is now in isolated implementation, including stable
+message/segment identity, authenticated cursors and restart reconciliation.
 Maintenance-observation fix2
 (`7ecfa8a3` / `9fe6dccd`) has a clean fresh source review. All original findings and
 the first-engagement process-birth I/O gap are closed. Four affected files pass208
@@ -56,10 +59,11 @@ cases with8 platform skips on each foundation. The earlier feature-only239 passe
 6 inherited warning failures and hygiene-enabled245 passes describe separate older
 trees and remain recorded. Minor test-coverage observations are deferred explicitly;
 the shared status publisher's pre-existing process-birth I/O is outside the observer
-probe correction. The full offline driver has275 distinct passes, but fresh review finds
-four Important listener-diagnostic, source-ownership, marker-freshness and recovery-cleanup
-defects. Fix1 `3cf8c054` awaits fresh scoped review, reporting121 affected passes including
-24 new regression cases. Actual pre-stop authority/bootstrap stays unsupported.
+probe correction. The full offline driver now has a clean fresh fix1 source review at`3cf8c054`:
+all four listener-diagnostic, source-ownership, marker-freshness and recovery-cleanup
+findings are closed. Its final affected selection has121 passes including24 new cases;
+the earlier275 base passes remain historical. Actual pre-stop authority/bootstrap stays
+unsupported; no installation or live stop/start authority follows from source acceptance.
 No maintenance prerequisite, continuation method or migration feature is live.
 
 Latest integrated app source `dc1fb14` adds the independently reviewed playback-output
