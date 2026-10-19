@@ -23,8 +23,7 @@ def inputs(tmp_path):
     fixture(base, 1536, 1872, 100, [6] * 9)
     metadata = pet / 'pet.json'
     metadata.write_text(json.dumps({'id': 'synthetic', 'displayName': 'Synthetic', 'spritesheetPath': base.name}))
-    source = tmp_path / 'raw' / 'expressions.png'
-    source.parent.mkdir()
+    source = tmp_path / 'expressions.png'
     fixture(source, 1152, 624, 100, [6, 3, 6])
     image = Image.open(source)
     draw = ImageDraw.Draw(image)

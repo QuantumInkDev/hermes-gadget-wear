@@ -255,8 +255,9 @@ are rechecked; a failure removes the new staging directory and preserves the inp
 The receipt's `outputs` indexes the bundle files other than `manifest.json` itself.
 
 Output filename collisions, including case aliases and file/directory conflicts, refuse
-before copying or writing. Existing outputs and output directories inside source directories
-are refused. Metadata already declaring `gadgetBasePath` requires the explicit argument,
+before copying or writing. Existing outputs are refused. Alternate staging requires output
+outside every source directory; legacy no-field calls retain their outside-source-pet
+placement rule. Metadata already declaring `gadgetBasePath` requires the explicit argument,
 even when it names the regular file; without it staging refuses before creating output.
 With it, a syntactically valid old reference may be replaced (it need not still exist), and
 the fresh metadata names the alternate actually copied. Malformed metadata is rejected.

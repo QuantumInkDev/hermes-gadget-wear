@@ -252,7 +252,9 @@ def build(metadata_path: Path, companion_path: Path, output_dir: Path, mouth_box
         names.append(alternate_output)
     _output_collisions(names)
     destination = output_dir.resolve()
-    source_dirs = {directory, companion_path.resolve().parent, selected.parent}
+    source_dirs = {directory}
+    if gadget_base is not None:
+        source_dirs.update((companion_path.resolve().parent, selected.parent))
     if output_dir.exists() or output_dir.is_symlink() or any(_within(destination, parent) for parent in source_dirs):
         raise ValueError('Output must be a fresh directory outside all source directories')
     # Check every source before hashing any of them; invalid art never reaches a read.

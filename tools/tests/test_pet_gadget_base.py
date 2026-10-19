@@ -222,3 +222,15 @@ def test_no_field_api_retains_legacy_flat_layout_and_receipt(tmp_path):
     assert set(receipt['outputs']) == {'pet.json', 'base.webp', 'gadget-sheet.png', 'contact-sheet.png'}
     assert (output / base.name).read_bytes() == base.read_bytes()
     assert snapshots(original) == original
+
+
+def test_legacy_sibling_companion_output_remains_allowed(tmp_path):
+    tool = load(); metadata, base, companion = inputs(tmp_path)
+    # Original callable layout: standalone companion and fresh output share a parent,
+    # while the regular pet has its own source directory.
+    companion = companion.rename(tmp_path / 'standalone-companion.png')
+    original = snapshots((metadata, base, companion))
+    output = tmp_path / 'legacy-output'
+    tool.build(metadata, companion, output)
+    assert (output / base.name).read_bytes() == base.read_bytes()
+    assert snapshots(original) == original
