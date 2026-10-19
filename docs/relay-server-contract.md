@@ -107,8 +107,14 @@ methods return `unsupported`; expired/revoked grants return `permission_denied`.
 
 Conversation-capable discovery may add `server_time_ms` (UTC milliseconds) and
 `limits.dto_bytes=8192`, `limits.dto_depth=6`. These limits cover each complete
-serialized conversation response/event, using the actual JSON sender encoding.
-Legacy O5 keeps its separate 64-KiB response limit and existing text/page limits.
+serialized conversation response/event, using the actual JSON sender encoding, except
+the bounded history-page method below. Task4 advertises optional
+`limits.history_page_bytes=65536` and `limits.history_text_bytes=32768` when its tested
+history implementation is enabled: that method's complete response is at most64 KiB,
+and each text segment at most32 KiB UTF-8. Other conversation responses/events keep
+the8-KiB limit. History segmentation also accounts for JSON escaping and the complete
+response envelope; a32-KiB text allowance is not permission to exceed the wire bound.
+Legacy O5 keeps its separate64-KiB response limit and existing text/page limits.
 Optional discovery fields confer no permission and old clients may ignore them.
 
 Common errors: `invalid_request`, `unsupported`, `permission_denied`, `not_found`,

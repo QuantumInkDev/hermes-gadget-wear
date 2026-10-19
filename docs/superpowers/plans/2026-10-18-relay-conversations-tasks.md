@@ -312,6 +312,12 @@ Depends on Tasks 1–3.
   Serve up to 50 items, ≤32 KiB text segments, final envelope ≤64 KiB after JSON escaping.
   Segment cursor resumes inside a message without dropping tail text. An oversize single
   DTO is a named failure; never silent truncation. Authorization precedes any read/limit.
+  History is the explicit method-specific exception to the Task3 general8-KiB DTO limit.
+  Advertise `history_page_bytes=65536`/`history_text_bytes=32768` only with the tested
+  implementation; retain8 KiB for every other conversation response/event. Segments use
+  the same canonical `message_id` plus `segment_index`/`segment_count`; compute a stable
+  partition against the actual escaped envelope before paging, rather than silently
+  resizing a prior segment when the remaining page space changes.
 - [ ] Cursors bind profile, server, subject/key generation, grant generation, conversation,
   query, lineage watermark, position and 15-minute expiry; MAC them with a private server
   secret. Cap encoded cursor at 512 bytes. Compression or deletion invalidates stale
