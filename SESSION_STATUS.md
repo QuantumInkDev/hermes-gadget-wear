@@ -1,6 +1,20 @@
 <!-- Current focus: owner pet feedback after orchestration/capacity failure. Broad goal is blocked/incomplete; no automatic agent/provider fallback restart. Preserve existing work, enrollments and artwork. -->
 # Session status
 
+## Focused appearance correction — 2026-10-19
+
+The latest private revision replaces changing head-detail masks with fixed subtle
+patches, retaining identical patch coordinates through stationary-state loops. The
+signature row explicitly restores the earlier six-pose turning sequence; that row is
+the stated exception to original-body preservation. The review effect's violet material
+is restored within a recorded mask. Companion lighting is calibrated to the unchanged
+base reference without applying another shadow pass; other base rows and alpha remain
+unchanged. The two updated packages pass SDK/hash/overlay checks for 131 poses.
+The browser's 131-pose render marker and state waits pass, while its snapshot command
+times out twice. Inline previews provide the visual evidence; no clean browser-console
+or physical acceptance claim follows. Zero generation calls, agents or provider fallbacks
+were used. No live or device changes; owner visual review remains open.
+
 ## Source-pixel pet correction — 2026-10-19
 
 Further owner feedback rejects the walk quality, inconsistent state palettes and loss

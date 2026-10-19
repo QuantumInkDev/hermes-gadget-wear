@@ -1,5 +1,14 @@
 # Progress
 
+## 2026-10-19 — fixed appearance templates and restored signature
+
+Focused private edits keep head details fixed through stationary loops, restore the
+turning signature sequence in its own row, recover violet effect material and match
+companion exposure to the base reference. The two updated packages pass SDK/hash/overlay
+checks for 131 poses. The browser render marker and state waits pass; snapshot capture
+times out twice, so inline previews are the visual record. Artistic/native/physical
+acceptance remains open. Zero generation calls, agents, fallbacks or live/device changes.
+
 ## 2026-10-19 — source-pixel correction after further owner rejection
 
 Private candidates now retain original visible figure pixels outside local edit masks,

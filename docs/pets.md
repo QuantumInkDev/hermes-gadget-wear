@@ -63,6 +63,9 @@ alongside the original before evaluating watch-size samples. A shared character 
 must cover every state, including error and companion rows; restoring an original row
 can reintroduce a previously removed lighting defect. Palette membership and unchanged
 pixels are measurable gates, but do not replace visual review of joints and movement.
+Fixed appearance details must not be recalculated into a new shape for every frame.
+Shared palette membership also does not establish matched exposure; compare the actual
+base and companion lighting, and avoid darkening an already corrected source again.
 
 `state_rows_for_grid` selects Codex rows for **any row count >= 9**, otherwise legacy rows. Thus adding 11 or 12 rows does not itself switch to a wrong taxonomy in this function; extra rows are unnamed and unavailable through normal state lookup. Existing consumers do not share a contract for them. Preserve the base sheet and use a companion rather than extending row count.
 
