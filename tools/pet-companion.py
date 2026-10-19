@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import shutil
+import stat
 import unicodedata
 from pathlib import Path, PureWindowsPath
 
@@ -47,6 +48,32 @@ def record(path, limit=MAX_ART_BYTES):
 
 def _within(child, parent):
     return child == parent or parent in child.parents
+
+
+def _within_source_directory(destination, source_dirs):
+    """Compare actual ancestors: resolve() alone does not canonicalize case aliases."""
+    try:
+        identities = set()
+        for source in source_dirs:
+            info = source.stat()
+            if not stat.S_ISDIR(info.st_mode):
+                raise ValueError('Cannot inspect source directory')
+            identities.add((info.st_dev, info.st_ino))
+        for ancestor in destination.parents:
+            try:
+                ancestor.lstat()
+            except FileNotFoundError:
+                # A fresh destination may have several not-yet-created parents.
+                continue
+            # Only absent entries are ignored; broken links and inspection errors refuse.
+            info = ancestor.stat()
+            if not stat.S_ISDIR(info.st_mode):
+                raise ValueError('Cannot inspect output ancestor directory')
+            if (info.st_dev, info.st_ino) in identities:
+                return True
+    except (OSError, RuntimeError) as exc:
+        raise ValueError('Cannot inspect output/source directories') from exc
+    return False
 
 
 def _relative_path(value, field, limit=None):
@@ -255,7 +282,7 @@ def build(metadata_path: Path, companion_path: Path, output_dir: Path, mouth_box
     source_dirs = {directory}
     if gadget_base is not None:
         source_dirs.update((companion_path.resolve().parent, selected.parent))
-    if output_dir.exists() or output_dir.is_symlink() or any(_within(destination, parent) for parent in source_dirs):
+    if output_dir.exists() or output_dir.is_symlink() or _within_source_directory(destination, source_dirs):
         raise ValueError('Output must be a fresh directory outside all source directories')
     # Check every source before hashing any of them; invalid art never reaches a read.
     inputs = [(metadata_path, MAX_METADATA_BYTES), (base, MAX_ART_BYTES), (companion_path, MAX_ART_BYTES)]

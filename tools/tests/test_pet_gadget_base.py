@@ -1,5 +1,6 @@
 """Preserving staging for a separate Gadget base; original synthetic fixtures only."""
 import hashlib
+import errno
 import io
 import json
 from pathlib import Path
@@ -233,4 +234,98 @@ def test_legacy_sibling_companion_output_remains_allowed(tmp_path):
     output = tmp_path / 'legacy-output'
     tool.build(metadata, companion, output)
     assert (output / base.name).read_bytes() == base.read_bytes()
+    assert snapshots(original) == original
+
+
+def refuse_before_output(tool, monkeypatch, metadata, companion, output, alternate):
+    """A refused destination must not reach decoding, copying, or any output write."""
+    def forbidden(*args, **kwargs):
+        pytest.fail('Unsafe output reached image processing/copy/write')
+    opened = Path.open
+    def read_only(path, mode='r', *args, **kwargs):
+        if any(flag in mode for flag in 'wax+'):
+            forbidden()
+        return opened(path, mode, *args, **kwargs)
+    with monkeypatch.context() as patch:
+        patch.setattr(tool._register, 'opened', forbidden)
+        patch.setattr(tool, '_copy_art', forbidden)
+        patch.setattr(Path, 'mkdir', forbidden)
+        patch.setattr(Path, 'open', read_only)
+        with pytest.raises(ValueError, match='source director|inspect'):
+            tool.build(metadata, companion, output, gadget_base=alternate)
+
+
+@pytest.mark.parametrize('kind,explicit', [
+    ('metadata', True), ('companion', True), ('alternate', True), ('metadata', False)])
+@pytest.mark.parametrize('missing_levels', [0, 2])
+def test_output_case_spelling_uses_actual_directory_identity(
+        tmp_path, monkeypatch, kind, explicit, missing_levels):
+    tool = load(); metadata, base, companion, alternate = alternate_inputs(tmp_path)
+    source = {'metadata': metadata, 'companion': companion, 'alternate': alternate}[kind].parent
+    different_case = source.with_name(source.name.upper())
+    assert different_case != source
+    # Probe this filesystem, rather than assuming that upper/lowercase aliases exist.
+    try:
+        different_case.mkdir()
+    except FileExistsError:
+        pass
+    same = source.samefile(different_case)
+    identities = [[p.stat().st_dev, p.stat().st_ino] for p in (source, different_case)]
+    assert same == (identities[0] == identities[1])
+    output = different_case.joinpath(*(['not-created'] * missing_levels), 'bundle')
+    original = snapshots((metadata, base, companion, alternate))
+    proof = {'source': str(source), 'different_case': str(different_case),
+             'identities': identities, 'samefile': same, 'missing_levels': missing_levels,
+             'explicit': explicit, 'source_kind': kind,
+             'lexically_within': tool._within(output.resolve(), source.resolve())}
+    try:
+        if same:
+            refuse_before_output(tool, monkeypatch, metadata, companion, output,
+                                 alternate if explicit else None)
+        else:
+            # On a case-sensitive filesystem these really are distinct directories.
+            # This positive control would fail under blind lowercasing containment.
+            tool.build(metadata, companion, output, gadget_base=alternate if explicit else None)
+            assert (output / 'pet.json').is_file()
+    finally:
+        proof['inputs_unchanged'] = snapshots(original) == original
+        proof['output_exists'] = output.exists()
+        proof['source_hashes'] = {str(p): h for p, h in original.items()}
+        (tmp_path / 'filesystem-proof.json').write_text(json.dumps(proof, indent=2))
+        assert proof['inputs_unchanged']
+        if same:
+            assert not output.exists()
+            assert not (different_case / 'not-created').exists()
+
+
+def test_output_distinct_directory_identity_allows_fresh_nested_destination(tmp_path):
+    tool = load(); metadata, base, companion, alternate = alternate_inputs(tmp_path)
+    separate = tmp_path / 'separate'; separate.mkdir()
+    for source in (metadata.parent, companion.parent, alternate.parent):
+        assert not separate.samefile(source)
+    original = snapshots((metadata, base, companion, alternate))
+    output = separate / 'fresh-parent' / 'bundle'
+    tool.build(metadata, companion, output, gadget_base=alternate)
+    assert (output / 'pet.json').is_file()
+    assert snapshots(original) == original
+
+
+@pytest.mark.parametrize('kind', ['metadata', 'companion', 'alternate', 'ancestor'])
+@pytest.mark.parametrize('error', [errno.EACCES, errno.EIO])
+def test_output_directory_inspection_errors_fail_closed(tmp_path, monkeypatch, kind, error):
+    tool = load(); metadata, base, companion, alternate = alternate_inputs(tmp_path)
+    separate = tmp_path / 'separate'; separate.mkdir()
+    target = {'metadata': metadata.parent, 'companion': companion.parent,
+              'alternate': alternate.parent, 'ancestor': separate}[kind]
+    output = separate / 'not-created' / 'bundle'
+    original = snapshots((metadata, base, companion, alternate))
+    stat = Path.stat
+    def failed_stat(path, *args, **kwargs):
+        if path == target:
+            raise OSError(error, 'injected directory inspection failure', str(path))
+        return stat(path, *args, **kwargs)
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, 'stat', failed_stat)
+        refuse_before_output(tool, patch, metadata, companion, output, alternate)
+    assert not (separate / 'not-created').exists()
     assert snapshots(original) == original
