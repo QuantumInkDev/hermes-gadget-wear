@@ -1,5 +1,18 @@
 # Progress
 
+## 2026-10-19 — owner-approved profile pet installation
+
+Four approved private bundles are installed into their matching Hermes profile stores,
+with original-file/config backups, metadata published last and exact unchanged content
+outside the intended profile pet selections. Actual Hermes selection and SDK/hash checks
+verify all 269 poses. Twelve private-state files remain unchanged. No new artwork,
+agents, provider calls, plugin source changes or service restarts were needed.
+
+Watch delivery remains open: installed stock v0.2.0 plugins lack pet-transfer support,
+so the reviewed extension still needs its scoped live rollout. Physical devices are
+absent from ADB/mDNS; current connection addresses were requested. This does not close
+the pet feature, native/physical speech, lip-sync or battery gates.
+
 ## 2026-10-19 — focused head attachment and listening correction
 
 Follow-up removes the crossed procedural strokes from signature frame 3; all other

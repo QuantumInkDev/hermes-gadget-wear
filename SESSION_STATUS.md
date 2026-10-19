@@ -1,6 +1,26 @@
 <!-- Current focus: owner pet feedback after orchestration/capacity failure. Broad goal is blocked/incomplete; no automatic agent/provider fallback restart. Preserve existing work, enrollments and artwork. -->
 # Session status
 
+## Approved pet asset installation — 2026-10-19
+
+The owner approved the current artwork and authorized installation. The latest four
+private candidates are installed into their matching local Hermes profile pet stores.
+The existing critic slug is retained; three other profiles now select their own pet
+instead of the shared old figure. Original atlas files remain in place, with complete
+target/configuration backups and content-addressed new filenames. Metadata is published
+last. Actual Hermes selection and accepted SDK manifests match all 269 approved poses;
+all configuration bytes outside the intended slug edits and 12 private-state files
+are unchanged. The stale thumbnail for an updated slug is invalidated when present.
+
+This completes the profile asset installation, not watch delivery. All four installed
+Gadget plugins remain stock v0.2.0 without a pet packager or transfer hooks. The reviewed
+pet-delivery extension still requires its scoped server rollout; no plugin code or
+service was changed/restarted here. No physical phone/watch is visible on the saved
+ADB servers or mDNS. Current Wireless debugging connection addresses were requested.
+Do not claim installed watch pets, authenticated transfer, lip sync or power acceptance.
+Private receipts/backups are indexed under the approved-install latest record. No new
+agents, providers, generation calls or unrelated expansion queues were started.
+
 ## Focused head and gesture correction — 2026-10-19
 
 Follow-up: removed the crossed procedural impact strokes from the signature's third
