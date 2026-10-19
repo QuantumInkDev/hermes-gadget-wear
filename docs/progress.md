@@ -75,6 +75,13 @@ the earlier275 base passes remain historical. Actual pre-stop authority/bootstra
 unsupported; no installation or live stop/start authority follows from source acceptance.
 No maintenance prerequisite, continuation method or migration feature is live.
 
+The [Android sharing plan](superpowers/plans/2026-10-18-android-sharing.md) now covers
+encrypted drafts, scoped byte uploads, actual image/PDF/text admission and native/device
+acceptance. Existing core capture supports retained media, but its explicit native guard
+currently rejects it; PDF's local reader dependency also needs a bounded no-install path.
+No sharing implementation or support advertisement is claimed. Remote wake's sender plan
+is ready for a subsequent independent implementation slot.
+
 Latest integrated app source `dc1fb14` adds the independently reviewed playback-output
 and interruption foundation. Strict root checks pass: 11 client JVM cases, zero failures,
 errors or skips; affected lint/formatting and all four APK builds pass (200 tasks,

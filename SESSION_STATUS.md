@@ -58,6 +58,11 @@ source-review gate is accepted; broad checks, queued-marker integration, later s
 work and native/live acceptance remain unresolved.
 Task4 durable history projection is now in isolated implementation, including stable
 message/segment identity, authenticated cursors and restart reconciliation.
+The [Android sharing plan](docs/superpowers/plans/2026-10-18-android-sharing.md) now
+covers encrypted share drafts, scoped uploads and actual image/PDF/text ingestion.
+Its preflight identifies the existing native text-only guard and document-reader dependency;
+no sharing implementation or support advertisement is claimed. Remote wake's sender plan
+is likewise ready for the next implementation slot.
 Maintenance-observation fix2
 (`7ecfa8a3` / `9fe6dccd`) has a clean fresh source review. All original findings and
 the first-engagement process-birth I/O gap are closed. Four affected files pass208
