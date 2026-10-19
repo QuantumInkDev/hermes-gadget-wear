@@ -5,7 +5,8 @@ import importlib.util
 import io
 import json
 import shutil
-from pathlib import Path
+import unicodedata
+from pathlib import Path, PureWindowsPath
 
 from PIL import Image, ImageChops, ImageDraw
 
@@ -46,6 +47,58 @@ def record(path, limit=MAX_ART_BYTES):
 
 def _within(child, parent):
     return child == parent or parent in child.parents
+
+
+def _relative_path(value, field, limit=None):
+    if not isinstance(value, str) or not value.strip() or '\x00' in value:
+        raise ValueError(f'Invalid {field}')
+    try:
+        length = len(value.encode('utf-8'))
+    except UnicodeError as exc:
+        raise ValueError(f'Invalid {field} Unicode') from exc
+    windows = PureWindowsPath(value)
+    if (windows.drive or windows.root or ':' in value
+            or '..' in value.replace('\\', '/').split('/') or (limit is not None and length > limit)):
+        raise ValueError(f'{field} must be a bounded relative path')
+    return Path(value)
+
+
+def _unique_metadata(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError('Duplicate pet metadata field')
+        result[key] = value
+    return result
+
+
+def _output_collisions(paths):
+    # Also refuse file/directory and case/Unicode aliases on common macOS/Windows filesystems.
+    keys = [tuple(unicodedata.normalize('NFC', part).casefold() for part in path.parts) for path in paths]
+    for index, key in enumerate(keys):
+        for other in keys[:index]:
+            if key[:len(other)] == other or other[:len(key)] == key:
+                raise ValueError('Base filename collides with staging output')
+
+
+def _copy_art(source, output):
+    """Exclusive, bounded copy; final source and output hashes are checked by build."""
+    bounded_size(source)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with source.open('rb') as src, output.open('xb') as dst:
+        total = 0
+        while chunk := src.read(min(HASH_CHUNK_BYTES, MAX_ART_BYTES - total + 1)):
+            total += len(chunk)
+            if total > MAX_ART_BYTES:
+                raise ValueError('Input exceeds byte limit while copying')
+            dst.write(chunk)
+
+
+def _base_image(path):
+    image = _register.opened(path)
+    if image.width not in (1536, 1728) or image.height % 208 or not 1664 <= image.height <= 2496:
+        raise ValueError('Expected base atlas geometry')
+    return image
 
 
 def _changed(first, second):
@@ -164,34 +217,63 @@ def contact_sheet(base, sheet, output):
     preview.save(output)
 
 
-def build(metadata_path: Path, companion_path: Path, output_dir: Path, mouth_box=None, overlay_rect=None):
+def build(metadata_path: Path, companion_path: Path, output_dir: Path, mouth_box=None, overlay_rect=None,
+          gadget_base=None):
     if overlay_rect is not None and mouth_box is not None:
         raise ValueError('Full-frame mouth gate and expression overlay are mutually exclusive')
     metadata_path, companion_path, output_dir = map(Path, (metadata_path, companion_path, output_dir))
     directory = metadata_path.resolve().parent
     bounded_size(metadata_path, MAX_METADATA_BYTES)
-    metadata = json.loads(metadata_path.read_text())
-    relative = Path(metadata['spritesheetPath'])
-    if relative.is_absolute() or '..' in relative.parts:
-        raise ValueError('Base path must be confined to the pet directory')
-    base = (directory / relative).resolve()
-    if not _within(base, directory) or not base.is_file():
+    with metadata_path.open('rb') as stream:
+        raw_metadata = stream.read(MAX_METADATA_BYTES + 1)
+    if len(raw_metadata) > MAX_METADATA_BYTES:
+        raise ValueError('Pet metadata exceeds limit')
+    metadata = json.loads(raw_metadata.decode('utf-8'), object_pairs_hook=_unique_metadata)
+    if not isinstance(metadata, dict) or 'spritesheetPath' not in metadata:
+        raise ValueError('Invalid pet metadata')
+    if 'gadgetBasePath' in metadata:
+        if gadget_base is None:
+            raise ValueError('Metadata declares gadgetBasePath; supply explicit --gadget-base')
+        _relative_path(metadata['gadgetBasePath'], 'gadgetBasePath', 512)
+    relative = _relative_path(metadata['spritesheetPath'], 'spritesheetPath')
+    try:
+        base = (directory / relative).resolve()
+        base_exists = base.is_file()
+    except (OSError, RuntimeError) as exc:
+        raise ValueError('Invalid base path') from exc
+    if not _within(base, directory) or not base_exists:
         raise ValueError('Base path escapes pet directory or is missing')
-    if base.name in RESERVED:
-        raise ValueError('Base filename collides with staging output')
+    selected = Path(gadget_base).resolve() if gadget_base is not None else base
+    # The explicit variant retains the exact regular metadata path, including subdirectories.
+    base_output = relative if gadget_base is not None else Path(base.name)
+    alternate_output = Path('gadget-base' + (selected.suffix or '.png')) if gadget_base is not None else None
+    names = [*(Path(name) for name in RESERVED), base_output]
+    if alternate_output is not None:
+        names.append(alternate_output)
+    _output_collisions(names)
     destination = output_dir.resolve()
-    if output_dir.exists() or output_dir.is_symlink() or _within(destination, directory):
-        raise ValueError('Output must be a fresh directory outside the source pet')
+    source_dirs = {directory, companion_path.resolve().parent, selected.parent}
+    if output_dir.exists() or output_dir.is_symlink() or any(_within(destination, parent) for parent in source_dirs):
+        raise ValueError('Output must be a fresh directory outside all source directories')
     # Check every source before hashing any of them; invalid art never reaches a read.
-    for path, limit in ((metadata_path, MAX_METADATA_BYTES), (base, MAX_ART_BYTES), (companion_path, MAX_ART_BYTES)):
+    inputs = [(metadata_path, MAX_METADATA_BYTES), (base, MAX_ART_BYTES), (companion_path, MAX_ART_BYTES)]
+    if gadget_base is not None:
+        inputs.append((selected, MAX_ART_BYTES))
+    for path, limit in inputs:
         bounded_size(path, limit)
     sources = {'metadata': record(metadata_path, MAX_METADATA_BYTES), 'base': record(base), 'companion': record(companion_path)}
+    if sources['metadata']['sha256'] != hashlib.sha256(raw_metadata).hexdigest():
+        raise ValueError('Input changed during staging')
+    if gadget_base is not None:
+        sources['gadget_base'] = record(selected)
     # Decode/validate before creating staging files. extend repeats the bounded checks.
-    base_image = _register.opened(base)
+    regular_image = _base_image(base)
+    base_image = _base_image(selected) if gadget_base is not None else regular_image
     base_delivery = delivery_sheet(base_image, 'base')
     output_dir.mkdir(parents=True, exist_ok=False)
     try:
-        fragment = _register.extend(base, companion_path, output_dir / 'gadget-sheet.png')
+        fragment = _register.extend(selected, companion_path, output_dir / 'gadget-sheet.png')
+        companion_hash = sha256(output_dir / 'gadget-sheet.png')
         sheet = _register.opened(output_dir / 'gadget-sheet.png')
         talking = talking_metrics(sheet, overlay_rect if overlay_rect is not None else mouth_box,
                                   overlay=overlay_rect is not None)
@@ -200,10 +282,18 @@ def build(metadata_path: Path, companion_path: Path, output_dir: Path, mouth_box
         companion_delivery = delivery_sheet(sheet, 'companion')
         if overlay_rect is not None:
             companion_delivery['rows'][1]['overlay'] = fragment['gadgetSheet']['rows'][1]['overlay']
-        shutil.copyfile(base, output_dir / base.name)
-        metadata['spritesheetPath'] = base.name
+        _copy_art(base, output_dir / base_output)
+        if alternate_output is not None:
+            _copy_art(selected, output_dir / alternate_output)
+            metadata['gadgetBasePath'] = alternate_output.as_posix()
+        else:
+            metadata['spritesheetPath'] = base.name
         metadata.update(fragment)
-        (output_dir / 'pet.json').write_text(json.dumps(metadata, indent=2) + '\n')
+        proposed_metadata = (json.dumps(metadata, indent=2) + '\n').encode('utf-8')
+        if len(proposed_metadata) > MAX_METADATA_BYTES:
+            raise ValueError('Output pet metadata exceeds limit')
+        with (output_dir / 'pet.json').open('xb') as stream:
+            stream.write(proposed_metadata)
         frames = []
         for row, (name, count) in enumerate(COUNTS):
             for column in range(count):
@@ -214,8 +304,15 @@ def build(metadata_path: Path, companion_path: Path, output_dir: Path, mouth_box
             limit = MAX_METADATA_BYTES if name == 'metadata' else MAX_ART_BYTES
             if sha256(Path(source['path']), limit) != source['sha256']:
                 raise ValueError('Input changed during staging')
-        outputs = {path.name: {'sha256': sha256(path), 'bytes': path.stat().st_size}
-                   for path in sorted(output_dir.iterdir())}
+        outputs = {path.relative_to(output_dir).as_posix(): {'sha256': sha256(path), 'bytes': path.stat().st_size}
+                   for path in sorted(output_dir.rglob('*')) if path.is_file()}
+        expected = {base_output.as_posix(): sources['base']['sha256'],
+                    'pet.json': hashlib.sha256(proposed_metadata).hexdigest(),
+                    'gadget-sheet.png': companion_hash}
+        if alternate_output is not None:
+            expected[alternate_output.as_posix()] = sources['gadget_base']['sha256']
+        if any(outputs[name]['sha256'] != digest for name, digest in expected.items()):
+            raise ValueError('Output changed during staging')
         receipt = {'schema': 1, 'sources': sources, 'outputs': outputs,
                    'registration': 'median idle height, center and baseline; nearest neighbour',
                    'frames': frames, 'talking': talking, 'delivery': [base_delivery, companion_delivery],
@@ -235,6 +332,7 @@ if __name__ == '__main__':
     parser.add_argument('--metadata', type=Path)
     parser.add_argument('--prepare-grid', type=Path, help='Prepare a reviewed six-column/three-row raw grid instead of staging')
     parser.add_argument('--companion', type=Path)
+    parser.add_argument('--gadget-base', type=Path, help='Separate validated Gadget base; preserve the regular atlas and its metadata path')
     parser.add_argument('--output-dir', type=Path)
     parser.add_argument('--prepared-output', type=Path)
     parser.add_argument('--mouth-box', nargs=4, type=int, metavar=('LEFT', 'TOP', 'RIGHT', 'BOTTOM'))
@@ -244,7 +342,7 @@ if __name__ == '__main__':
     if args.expression_overlay and args.mouth_box:
         parser.error('--expression-overlay and --mouth-box are mutually exclusive')
     if args.prepare_grid:
-        if not args.prepared_output or args.metadata or args.companion or args.output_dir or args.mouth_box or args.expression_overlay:
+        if not args.prepared_output or args.metadata or args.companion or args.output_dir or args.mouth_box or args.expression_overlay or args.gadget_base:
             parser.error('--prepare-grid requires only --prepared-output')
         receipt = prepare_grid(args.prepare_grid, args.prepared_output)
         print(json.dumps(receipt, indent=2))
@@ -252,6 +350,6 @@ if __name__ == '__main__':
     if not args.metadata or not args.companion or not args.output_dir or args.prepared_output:
         parser.error('Staging requires --metadata, --companion and --output-dir')
     build(args.metadata, args.companion, args.output_dir, tuple(args.mouth_box) if args.mouth_box else None,
-          tuple(args.expression_overlay) if args.expression_overlay else None)
+          tuple(args.expression_overlay) if args.expression_overlay else None, args.gadget_base)
     # Paths and metadata stay in the private receipt; avoid leaking them in normal logs.
     print('Staged bundle and review receipt; human, live and physical acceptance remain pending.')

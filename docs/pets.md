@@ -1,10 +1,9 @@
 # Pets: verified atlas contract and missing states
 
-Planned optional metadata: `gadgetBasePath` will allow a separately validated Gadget
-base while retaining the original regular `spritesheetPath` and desktop atlas bytes.
-The [implementation plan](superpowers/plans/2026-10-18-pet-gadget-base.md) covers bounded
-relative paths, unchanged delivery limits, preserving staging and actual Hermes loading.
-No producer, stager or live support for this new field is claimed yet.
+Optional local metadata `gadgetBasePath` selects a separately validated Gadget base
+while retaining the regular `spritesheetPath` and desktop atlas bytes. The paired SDK
+and staging changes below implement the [preserving delivery plan](superpowers/plans/2026-10-18-pet-gadget-base.md).
+Source review, controller integration and live/physical acceptance are separate gates.
 
 ## Approved live-pet proof of concept — 2026-10-18
 
@@ -205,3 +204,66 @@ human mouth/identity/props/seam/reduced-size review and actual negotiated delive
 must pass separately before a bundle is deliverable. Raw generated inputs and original
 base files remain unchanged. This extension does not establish artwork or physical O2
 acceptance.
+
+## Optional Gadget base without replacing desktop art
+
+With the corresponding optional SDK producer, a local `pet.json` can contain:
+
+```json
+{
+  "id": "sample",
+  "displayName": "Original sample",
+  "spritesheetPath": "desktop/regular.webp",
+  "gadgetBasePath": "gadget-base.png"
+}
+```
+
+Hermes still loads `desktop/regular.webp`. Gadget packaging selects `gadget-base.png`
+and uses the existing base validator and ordinary manifest/channel-4 sender. The regular
+file and its row count stay untouched. The alternate can have different artwork; it must
+meet the same geometry, alpha, occupied-row, PNG and hash requirements. There is no new
+wire field or client capability. Existing companion ordering and expression-overlay
+negotiation remain unchanged. A producer without this refinement ignores the local field
+and continues to package the regular atlas; it may still refuse an oversized regular PNG.
+
+The field is optional. When absent, packaging retains its previous base selection.
+When present, it must be a nonempty relative string of at most 512 UTF-8 bytes. Invalid
+Unicode, NUL, absolute/drive/UNC paths, traversal in either POSIX or Windows spelling,
+missing files and symlinks escaping the pet directory refuse the package, with no fallback
+to the regular sheet. Metadata is parsed once and capped at 64 KiB; each source remains
+bounded at 8 MiB, each delivered PNG at 2 MiB and each decoded sheet at 3.2 million pixels.
+Invalid pet assets leave conversation handling independent of pet availability.
+
+Stage a fresh bundle using separately prepared inputs, outside every source directory:
+
+```sh
+python3 tools/pet-companion.py \
+  --metadata /work/source/pet.json \
+  --companion /work/poses/companion.png \
+  --gadget-base /work/prepared/watch-base.png \
+  --output-dir /work/staged/sample
+```
+
+The optional trailing Python argument is `build(metadata, companion, output_dir,
+mouth_box=None, overlay_rect=None, gadget_base=None)`. With an alternate, the stager keeps
+the exact regular `spritesheetPath` (including subdirectories), copies its bytes unchanged,
+copies the alternate to a distinct `gadget-base` filename with its source suffix, and
+registers the companion against that selected Gadget base. It does not resize or repaint
+either base. The receipt records all input and output hashes, delivery hashes, registration
+and the existing pending acceptance gates. Source hashes and copied/generated output hashes
+are rechecked; a failure removes the new staging directory and preserves the inputs.
+The receipt's `outputs` indexes the bundle files other than `manifest.json` itself.
+
+Output filename collisions, including case aliases and file/directory conflicts, refuse
+before copying or writing. Existing outputs and output directories inside source directories
+are refused. Metadata already declaring `gadgetBasePath` requires the explicit argument,
+even when it names the regular file; without it staging refuses before creating output.
+With it, a syntactically valid old reference may be replaced (it need not still exist), and
+the fresh metadata names the alternate actually copied. Malformed metadata is rejected.
+No-argument staging of metadata without the field keeps the legacy bundle layout and API.
+`--prepare-grid` still accepts only `--prepared-output`; it cannot combine with `--gadget-base`.
+Existing `--mouth-box` or `--expression-overlay` gates apply in registered output coordinates.
+
+Tests use original synthetic art, actual SDK packaging/sending, and an explicitly supplied
+isolated Hermes `load_pet` source with synthetic configuration. They do not establish live
+installation, personal artwork approval, native playback, physical lip sync or power cost.
