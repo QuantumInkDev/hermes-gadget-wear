@@ -14,6 +14,14 @@ The [runtime coverage matrix](docs/android-test-matrix.md) separates compatibili
 checks from modern emulators and physical devices. Direct inventory confirms Android 17/
 API 37 on the phone and Android 16/API 36 on the watch; both apps target API 37.
 
+Native QR/migration Task2 `f155a72` now awaits its first combined source/crypto review.
+It reports93 distinct native case/parameter combinations on each API29/API37 fixture,
+including real file/photo pickers and13 process-death recoveries. API29's exact APK/data/
+settings return passes. API37's original empty snapshot restores app/test/data absence,
+but53 global,10 secure and6 system setting differences remain. That restoration gate is
+open; an OS-initialization hypothesis is not attribution proof or a waiver. The fixture
+is retained for controller inspection. No physical update or source integration follows.
+
 Private pet native validation now passes three asset-specific API37 cases using
 production decoding, rendering and real AudioTrack callbacks:69 distinct decoded frames
 per pet,207 total,65 playback-level samples each. Android-derived mouth poses change

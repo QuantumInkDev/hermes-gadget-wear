@@ -10,6 +10,14 @@ or physical pass is claimed.
 
 ## Current expansion verification — 2026-10-18
 
+Native QR/migration Task2 `f155a72` now awaits its first combined source/crypto review.
+It reports93 distinct native case/parameter combinations on each API29/API37 fixture,
+including real file/photo pickers and13 process-death recoveries. API29's exact APK/data/
+settings return passes. API37's original empty snapshot restores app/test/data absence,
+but53 global,10 secure and6 system setting differences remain. That restoration gate is
+open; an OS-initialization hypothesis is not attribution proof or a waiver. The fixture
+is retained for controller inspection. No physical update or source integration follows.
+
 QR setup/migration Task1 pure format at`db515f4` has a clean fresh fix1 review:
 58 distinct format cases pass; protocol202 total has zero failures/errors and five
 inherited environment-gated skips. Native QR/store import/export and fresh-device gates
