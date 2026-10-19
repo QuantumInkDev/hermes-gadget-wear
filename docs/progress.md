@@ -10,7 +10,11 @@ or physical pass is claimed.
 
 ## Current expansion verification — 2026-10-18
 
-Native QR/migration Task2 `f155a72` now awaits its first combined source/crypto review.
+Native QR/migration Task2 `f155a72` failed its first combined source/crypto review:
+six Important source findings cover recovery deadlock, post-commit QR capacity checks,
+rollback artwork loss, full-format memory capacity, remapped action collisions and hidden
+publication failures. The original implementer is working on fix round1; no integration
+is accepted. Two picker/export UX corrections are included in that focused round.
 It reports93 distinct native case/parameter combinations on each API29/API37 fixture,
 including real file/photo pickers and13 process-death recoveries. API29's exact APK/data/
 settings return passes. API37's original empty snapshot restores app/test/data absence,
@@ -23,9 +27,9 @@ QR setup/migration Task1 pure format at`db515f4` has a clean fresh fix1 review:
 inherited environment-gated skips. Native QR/store import/export and fresh-device gates
 remain incomplete. Continuity Task3's delivery findings are closed by fresh scoped review
 through fix2; broad/integration/native acceptance remains open. The full offline
-M5 driver has275 distinct passes but four Important findings requiring fix1. Its observation
-producer is source-reviewed; independent live admission/bootstrap authority is still
-unavailable. No server changes.
+M5 driver has a clean fresh fix1 source review, with121 final affected passes; its earlier
+275 base passes remain historical. Its observation producer is source-reviewed; independent
+live admission/bootstrap authority is still unavailable. No server changes.
 
 Private pet native validation now passes three asset-specific API37 cases using
 production decoding, rendering and real AudioTrack callbacks:69 distinct decoded frames
@@ -43,8 +47,10 @@ both original APKs/signers, all settings and813 original app files: zero missing
 ordinary install marker changed, plus103 new fixture captures. This includes the earlier
 309 captures. An optional alternate-base producer/stager is implemented in isolated
 SDK/tool candidates (`2381700` / `9c6c03d`), with198 reported distinct affected passes.
-Fresh combined review is active; integration, final private restaging and live delivery
-remain open. It retains desktop detail alongside the watch sheet in one regular pet directory.
+Fresh combined review found one Important filesystem case-alias escape in the stager's
+source-directory fence. The original implementer is working on fix round1; integration,
+final private restaging and live delivery remain open. The proposed bundle retains desktop
+detail alongside the watch sheet in one regular pet directory.
 The standard test APK was rebuilt without private assets/classes. No physical device
 or quarantined emulator was touched.
 
