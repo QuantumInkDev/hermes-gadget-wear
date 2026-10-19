@@ -1,5 +1,16 @@
 # Progress
 
+## 2026-10-19 — private pet correction follow-up
+
+Owner-rejected walks, lighting and proportion changes are replaced with new candidates.
+Three packages pass actual SDK checks, each with 12 states/65 occupied poses and complete
+four-frame walking rows. The original error row is restored exactly; companion lighting
+is corrected across listening/talking/sleeping. Original-proportion comparisons are
+retained, and signature/working effects use the requested palette. A sleep-eye regression
+was caught and corrected separately. The previously approved walking artwork is unchanged.
+Ten built-in image calls, zero agents/provider fallbacks; no live or device changes.
+Visual acceptance and new native/physical checks remain open; no milestone is closed.
+
 ## 2026-10-18 — private pet feedback revision; broad goal still incomplete
 
 Following owner feedback about delegation/provider consumption, this pass launches zero

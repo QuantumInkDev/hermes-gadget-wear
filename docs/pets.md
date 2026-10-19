@@ -48,7 +48,14 @@ Cells are 192×208. Current sheets are 8×9 (1536×1872), legacy sheets 9×8 (17
 | running | 7 | 6 |
 | review | 8 | 6 |
 
-Short rows leave transparent trailing cells. Upstream `render._raw_frames` caps the default at six columns and stops at the first blank frame; generated eight-frame rows do not imply that existing renderers use all eight. Match that six-frame default for the base sheet, trim blank tails, and use explicit companion counts (three for talking). Never animate blank trailing columns. Canonical Hermes names `wave`, `jump`, and `run` alias `waving`, `jumping`, and `running`.
+Short rows leave transparent trailing cells. Upstream `render._raw_frames` caps the default at six columns and stops at the first blank frame; generated eight-frame rows do not imply that existing renderers use all eight. Respect the six-frame maximum for the base sheet, trim blank tails, and use explicit companion counts (three for talking). Never animate blank trailing columns. Canonical Hermes names `wave`, `jump`, and `run` alias `waving`, `jumping`, and `running`.
+
+The Gadget contract accepts one to six occupied base poses. A shorter row must contain
+a complete cycle; four-pose walks leave the remaining cells transparent and advertise
+four frames. Previews must use each row's actual count. Do not truncate an eight-pose
+source cycle to six and assume its last-to-first transition works. Geometry checks do
+not establish alternating limbs, natural gait, faithful proportions or consistent lighting;
+review the moving base and all companion states against the original artwork separately.
 
 `state_rows_for_grid` selects Codex rows for **any row count >= 9**, otherwise legacy rows. Thus adding 11 or 12 rows does not itself switch to a wrong taxonomy in this function; extra rows are unnamed and unavailable through normal state lookup. Existing consumers do not share a contract for them. Preserve the base sheet and use a companion rather than extending row count.
 

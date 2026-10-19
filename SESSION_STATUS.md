@@ -1,6 +1,24 @@
 <!-- Current focus: owner pet feedback after orchestration/capacity failure. Broad goal is blocked/incomplete; no automatic agent/provider fallback restart. Preserve existing work, enrollments and artwork. -->
 # Session status
 
+## Pet correction follow-up — 2026-10-19
+
+The owner rejected the previous walking candidates, companion-state rim lighting and
+the altered figure proportions. This pass keeps the previously approved walk artwork
+unchanged, restores the original error row exactly, and stages three revised private
+packages. New walks use complete four-pose loops with matching advertised row counts;
+the existing watch renderer already uses those counts. Companion lighting is checked
+across all three states, and the original figure silhouette is retained as a comparison
+reference. Signature/working effects use the newly requested palette. A further isolated
+sleep-row correction preserves the other eleven states.
+
+Ten built-in image calls, zero agents and zero provider fallbacks were used. Actual SDK
+packaging checks pass for all three candidates: 12 states and 65 poses each. These are
+format gates, not artistic acceptance. Before/after animated previews, light/dark backings
+and original-proportion comparisons are prepared; new device/live acceptance remains
+open. No live assignment, installed app or device setting was changed. Earlier revisions
+and original files remain retained. The broader expansion goal remains blocked/incomplete.
+
 ## Current owner feedback — 2026-10-18
 
 The owner reported excessive delegated model/fallback consumption and requested specific
