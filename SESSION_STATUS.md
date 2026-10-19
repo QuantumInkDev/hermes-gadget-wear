@@ -3,6 +3,10 @@
 
 ## Focused head and gesture correction — 2026-10-19
 
+Follow-up: removed the crossed procedural impact strokes from the signature's third
+frame. All other 61 poses, companion bytes and metadata match the prior candidate.
+SDK/source checks still pass; no new generation, agent or live/device operations.
+
 The latest private candidate supersedes the prior turning-signature revision for the
 one requested figure. Walks now reuse one original native head per direction; its short
 hairline details translate with those same pixels. The enlarged preview exposed a

@@ -2,6 +2,10 @@
 
 ## 2026-10-19 — focused head attachment and listening correction
 
+Follow-up removes the crossed procedural strokes from signature frame 3; all other
+61 poses, metadata and companion bytes are unchanged. SDK/source checks still pass.
+Zero additional image calls, agents or live/device operations.
+
 One private candidate now uses original native head pixels as a fixed rig per walking
 direction, with short details starting at the hairline. A shoulder-mask defect found in
 the enlarged preview was corrected before delivery. Listening uses a hand-to-ear edit;
