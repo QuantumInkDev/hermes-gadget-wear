@@ -50,7 +50,8 @@ trees and remain recorded. Minor test-coverage observations are deferred explici
 the shared status publisher's pre-existing process-birth I/O is outside the observer
 probe correction. The full offline driver has275 distinct passes, but fresh review finds
 four Important listener-diagnostic, source-ownership, marker-freshness and recovery-cleanup
-defects. Focused fix1 is in progress. Actual pre-stop authority/bootstrap stays unsupported.
+defects. Fix1 `3cf8c054` awaits fresh scoped review, reporting121 affected passes including
+24 new regression cases. Actual pre-stop authority/bootstrap stays unsupported.
 No maintenance prerequisite, continuation method or migration feature is live.
 
 Latest integrated app source `dc1fb14` adds the independently reviewed playback-output
