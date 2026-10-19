@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-10-19 — approved pets installed on physical watch
+
+A preserving update from the exact installed source adds the reviewed talking decoder
+and a bounded 16 MiB/64-file cache. Four full-detail packages exceed the former 8 MiB
+quota. No artwork resampling, server plugin change, gateway restart or new pairing was
+needed. A private owner-authorized import uses actual saved profiles and production
+parsing/hash/decode/cache methods, without recording or sending messages.
+
+One physical-watch case passes for all 269 poses/twelve states per pet, mouth-region
+composition, four-package retention and Pet mode. The running app visibly displays the
+selected pet. Build/lint/format pass; protocol coverage is 116 passes and five opt-in
+integration skips, including eleven passing affected pet cases. Installed asset/APK
+hashes and preserved vaults are checked. Original test APK and timeouts are restored;
+no original app files are missing. Runtime catalog/widget records changed during the
+check and are recorded privately. Automatic server delivery and owner speech/lip-sync/
+power acceptance remain open; local artwork installation is complete.
+
 ## 2026-10-19 — owner-approved profile pet installation
 
 Four approved private bundles are installed into their matching Hermes profile stores,

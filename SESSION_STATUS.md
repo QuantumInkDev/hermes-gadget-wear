@@ -1,6 +1,35 @@
 <!-- Current focus: owner pet feedback after orchestration/capacity failure. Broad goal is blocked/incomplete; no automatic agent/provider fallback restart. Preserve existing work, enrollments and artwork. -->
 # Session status
 
+## Approved pets installed on the physical watch — 2026-10-19
+
+The owner supplied current watch debugging and connected the phone over USB. A narrower
+local artwork install resolves the earlier watch-delivery gap without changing server
+plugins or restarting the shared gateway. The preserving watch update starts from its
+exact installed source, adds the reviewed expression-overlay decoder/fix and raises the
+bounded pet cache to 16 MiB/64 files. The four full-detail payloads total 8,850,722 bytes,
+exceeding the former 8 MiB quota; artwork pixels and per-sheet decode/transfer limits
+remain unchanged. The APK signer matches the original, and existing data is retained.
+
+The private owner-authorized importer resolves the four existing saved catalog/profile
+identities and uses production manifest parsing, hashing, Android decoding and cache
+writes. Its physical-watch case passes: 269 poses, twelve states per pet, all three
+talking poses with changes confined to the declared regions, all four packages retained
+together and Pet mode saved for their four pages. A production-app screenshot and UI
+description confirm the selected pet is visible. No microphone, message, new pairing or
+server transfer was used. Automatic server downloads still need the separate extension.
+
+Strict build/lint/format pass. Protocol coverage is 116 passes with five opt-in integration
+skips, not zero skips; the affected pet suite passes all eleven cases. Readback verifies
+the installed app, all asset lengths/hashes, 41 unchanged watch vault files and the
+unchanged phone vault/APK. No baseline files are missing. Observed byte changes are the
+watch install marker/catalog pages and phone catalog/widget records; do not claim all
+runtime data is byte-identical. The original watch test APK is restored byte-for-byte,
+import scratch files removed, watch timeout restored to 15 seconds and phone timeout
+unchanged at five minutes. Private receipts, backups, build source/patch and screenshot
+are retained. Owner speech/legibility/lip-sync/power observations remain separate gates.
+Zero new agents, providers or image calls; the broader expansion stays blocked/incomplete.
+
 ## Approved pet asset installation — 2026-10-19
 
 The owner approved the current artwork and authorized installation. The latest four

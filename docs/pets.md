@@ -122,7 +122,9 @@ SDK patch 2 (`2bcdfc7`, local branch `wear/optional-extensions`) adds disabled-b
 PNG conversion, occupied frame counts, bounded paced channel-4 delivery, and protocol
 documentation/tests. The watch requests after pairing, validates metadata, sequence,
 length and hash, and checks PNG bounds before decoding on a bounded worker. Its private
-cache uses endpoint/hash directories, an 8 MiB global quota and 64-file limit. Prepared
+cache uses endpoint/hash directories, a 16 MiB global quota and 64-file limit. The quota
+retains four full-detail base/companion packages together; per-sheet transfer and decode
+bounds remain unchanged. Prepared
 96×104 frames use nearest-neighbour scaling; no image decoding occurs on the UI thread.
 
 The renderer uses base/legacy aliases and companion fallbacks above. Completed turns

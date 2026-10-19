@@ -195,7 +195,7 @@ class PetCache(context: Context) {
         var total = files.sumOf { it.length() }
         var count = files.size
         for (file in files) {
-            if (total <= 8 * 1024 * 1024 && count <= 64) break
+            if (total <= 16 * 1024 * 1024 && count <= 64) break
             val length = file.length()
             if (file.delete()) {
                 total -= length
