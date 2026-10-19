@@ -13,8 +13,9 @@ or physical pass is claimed.
 Native QR/migration Task2 `f155a72` failed its first combined source/crypto review:
 six Important source findings cover recovery deadlock, post-commit QR capacity checks,
 rollback artwork loss, full-format memory capacity, remapped action collisions and hidden
-publication failures. The original implementer is working on fix round1; no integration
-is accepted. Two picker/export UX corrections are included in that focused round.
+publication failures. The original implementer's resumed model was at capacity before
+work began; a fresh isolated successor is working on fix round1. No integration is
+accepted. Two picker/export UX corrections are included in that focused round.
 It reports93 distinct native case/parameter combinations on each API29/API37 fixture,
 including real file/photo pickers and13 process-death recoveries. API29's exact APK/data/
 settings return passes. API37's original empty snapshot restores app/test/data absence,
@@ -48,9 +49,10 @@ ordinary install marker changed, plus103 new fixture captures. This includes the
 309 captures. An optional alternate-base producer/stager is implemented in isolated
 SDK/tool candidates (`2381700` / `9c6c03d`), with198 reported distinct affected passes.
 Fresh combined review found one Important filesystem case-alias escape in the stager's
-source-directory fence. The original implementer is working on fix round1; integration,
-final private restaging and live delivery remain open. The proposed bundle retains desktop
-detail alongside the watch sheet in one regular pet directory.
+source-directory fence. Fix round1 `98af954` reports117 affected tool/integration passes;
+the unchanged SDK's98 cases remain retained evidence. Fresh scoped independent review is
+active; integration, final private restaging and live delivery remain open. The proposed
+bundle retains desktop detail alongside the watch sheet in one regular pet directory.
 The standard test APK was rebuilt without private assets/classes. No physical device
 or quarantined emulator was touched.
 
