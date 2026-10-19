@@ -57,6 +57,13 @@ source cycle to six and assume its last-to-first transition works. Geometry chec
 not establish alternating limbs, natural gait, faithful proportions or consistent lighting;
 review the moving base and all companion states against the original artwork separately.
 
+When the owner requests edits to original pixels, retain those source cells without
+whole-body resampling and record the allowed edit regions. Compare the native raster
+alongside the original before evaluating watch-size samples. A shared character palette
+must cover every state, including error and companion rows; restoring an original row
+can reintroduce a previously removed lighting defect. Palette membership and unchanged
+pixels are measurable gates, but do not replace visual review of joints and movement.
+
 `state_rows_for_grid` selects Codex rows for **any row count >= 9**, otherwise legacy rows. Thus adding 11 or 12 rows does not itself switch to a wrong taxonomy in this function; extra rows are unnamed and unavailable through normal state lookup. Existing consumers do not share a contract for them. Preserve the base sheet and use a companion rather than extending row count.
 
 Hatching calls `compose_atlas(normalize_cells(frames_by_state))` once. Normalization aligns body column profiles and baselines, computes a global motion-envelope cap `K`, then scales each state by `K / median_pose_height`. This is shared normalization, not literally one identical scale factor for all input rows. A later independent pass lacks the original cap and registration, so it can create visible size/baseline jumps.

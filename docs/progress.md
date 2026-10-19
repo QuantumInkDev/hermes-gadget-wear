@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-10-19 — source-pixel correction after further owner rejection
+
+Private candidates now retain original visible figure pixels outside local edit masks,
+without body resampling. Walk candidates use source sprite segments with opposite-phase
+foot tracks and fixed limb widths. One palette and right-side shadow rule covers all
+twelve states, including the error row and every companion state. Original source,
+rejected redraw and current edit are compared at native resolution, with a watch-size
+toggle. Actual SDK checks pass for 200 poses; the browser renders all 200 and exercises
+the comparison controls. These are asset/package/browser checks, not artistic approval
+or new Android/physical acceptance. Two generated walk outputs were rejected; zero
+agents/provider fallbacks, live assignments or device changes. No milestone is closed.
+
 ## 2026-10-19 — private pet correction follow-up
 
 Owner-rejected walks, lighting and proportion changes are replaced with new candidates.

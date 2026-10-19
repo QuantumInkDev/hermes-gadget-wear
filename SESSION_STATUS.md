@@ -1,6 +1,27 @@
 <!-- Current focus: owner pet feedback after orchestration/capacity failure. Broad goal is blocked/incomplete; no automatic agent/provider fallback restart. Preserve existing work, enrollments and artwork. -->
 # Session status
 
+## Source-pixel pet correction — 2026-10-19
+
+Further owner feedback rejects the walk quality, inconsistent state palettes and loss
+of original pixel detail. The current private candidates supersede the earlier redraws.
+The original figure cells are now edited locally without body resampling, retaining
+original visible pixels outside recorded masks. Existing purple effect pixels are
+composited separately. The two other walk candidates use original sprite segments,
+explicit opposite-phase foot tracks and fixed perpendicular limb widths. A single
+palette and right-side shadow rule covers every base and companion state, including
+the error row; restoring its bright original pixels is no longer the acceptance goal.
+
+Actual SDK packaging and payload hashes pass for 200 poses across three candidates.
+A browser renders every candidate pose at native resolution; profile/state switching,
+speech-pose selection and display controls pass. Original-pixel, palette and unchanged
+artwork checks pass. These checks do not establish aesthetic or physical acceptance.
+Two built-in walk-generation calls were rejected; neither output is selected. Zero
+agents or provider fallbacks were started. No app, device or live assignment changed.
+The native-resolution comparison and private handoff are saved; owner review remains
+open. The broader expansion stays blocked/incomplete, and the earlier fan-spin item
+remains separate and open.
+
 ## Pet correction follow-up — 2026-10-19
 
 The owner rejected the previous walking candidates, companion-state rim lighting and
