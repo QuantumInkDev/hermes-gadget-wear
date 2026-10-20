@@ -44,6 +44,12 @@ fun PhoneSettingsPage(context: Context, navigate: (String) -> Unit) {
             ) {
                 navigate("home-widgets")
             }
+            SettingsLink(
+                "Move setup",
+                "Setup codes and encrypted configuration export or import"
+            ) {
+                navigate("setup-transfer")
+            }
             Row(
                 Modifier.fillMaxWidth().padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,

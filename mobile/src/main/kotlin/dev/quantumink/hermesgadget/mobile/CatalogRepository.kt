@@ -19,11 +19,11 @@ import kotlinx.coroutines.flow.asStateFlow
 
 class CatalogRepository internal constructor(
     private val context: Context,
-    private val vault: CatalogVault = CatalogVault(context),
-    private val setup: ProfileVault = ProfileVault(context),
-    private val portraits: PortraitStore =
+    internal val vault: CatalogVault = CatalogVault(context),
+    internal val setup: ProfileVault = ProfileVault(context),
+    internal val portraits: PortraitStore =
         PortraitStore(File(context.filesDir, "catalog-portraits")),
-    private val animations: dev.quantumink.hermesgadget.client.AnimationCache =
+    internal val animations: dev.quantumink.hermesgadget.client.AnimationCache =
         dev.quantumink.hermesgadget.client.AnimationCache(
             File(context.filesDir, "catalog-animations")
         ),
@@ -57,7 +57,8 @@ class CatalogRepository internal constructor(
             } else {
                 val normalized = if (remaining > 0) {
                     runCatching {
-                        portraits.normalize(fetchPortrait(source, asset, remaining))
+                        val bytes = fetchPortrait(source, asset, remaining)
+                        SetupTransferGate.mutation { portraits.normalize(bytes) }
                     }.getOrNull()
                 } else {
                     null
@@ -80,19 +81,20 @@ class CatalogRepository internal constructor(
         discovery.invalidate()
     }
 
-    @Synchronized fun sources(): List<CatalogSource> {
+    fun sources(): List<CatalogSource> = state {
         val order = sourceOrder()
         return vault.sources().sortedBy { order.indexOf(it.id) }
     }
 
-    @Synchronized fun sourceOrder(): List<String> = sourceOrder(vault.pages())
+    fun sourceOrder(): List<String> = state { sourceOrder(vault.pages()) }
 
-    private fun sourceOrder(previous: List<CatalogPage>): List<String> {
+    /** [persist] false gives the same order without normalizing storage (read-only views). */
+    private fun sourceOrder(previous: List<CatalogPage>, persist: Boolean = true): List<String> {
         val configured = vault.sources().map { it.id } + "manual"
         val saved = vault.sourceOrder()
         val initial = saved ?: CatalogOrder.group(previous).map { it.first().sourceId }
         val order = (initial.filter { it in configured } + configured).distinct()
-        if (saved != order) vault.saveSourceOrder(order)
+        if (persist && saved != order) vault.saveSourceOrder(order)
         return order
     }
 
@@ -100,7 +102,7 @@ class CatalogRepository internal constructor(
     fun portraitFile(hash: String): File? = portraits.file(hash)
 
     /** Catalog credentials are deliberately absent from this conversation projection. */
-    @Synchronized fun profileFor(page: CatalogPage): EndpointProfile? {
+    fun profileFor(page: CatalogPage): EndpointProfile? = state {
         val profiles = setup.profiles()
         val url = page.profile.gadgetUrl
         if (url == null) {
@@ -119,7 +121,7 @@ class CatalogRepository internal constructor(
         )
     }
 
-    @Synchronized fun savedPages(): List<CatalogPage> {
+    fun savedPages(): List<CatalogPage> = state {
         val previous = vault.pages()
         val raw = combined(previous, false)
         if (previous.map { it.key } != raw.map { it.key }) vault.savePages(raw)
@@ -129,7 +131,7 @@ class CatalogRepository internal constructor(
         }
     }
 
-    @Synchronized fun saveSource(source: CatalogSource) {
+    fun saveSource(source: CatalogSource) = state {
         val sources = vault.sources()
         vault.saveSources(
             if (sources.any { it.id == source.id }) {
@@ -149,7 +151,7 @@ class CatalogRepository internal constructor(
         invalidate()
     }
 
-    @Synchronized fun refresh(force: Boolean = false): CompletableFuture<List<CatalogPage>> {
+    fun refresh(force: Boolean = false): CompletableFuture<List<CatalogPage>> = state {
         active?.takeIf { !it.isDone }?.let { return it }
         val sources = vault.sources()
         val old = combined(vault.pages(), false)
@@ -202,7 +204,8 @@ class CatalogRepository internal constructor(
                                                 it == CatalogStatus.ATTENTION
                                             }
                                         ) {
-                                            "A catalog connection needs attention. Cached profiles were kept."
+                                            "A catalog connection needs attention. " +
+                                                "Cached profiles were kept."
                                         } else {
                                             "Profiles refreshed. New connections need watch review."
                                         }
@@ -349,8 +352,13 @@ class CatalogRepository internal constructor(
     private var lastPublication: CompletableFuture<Unit>? = null
 
     /** Mutations enqueue under the state monitor, then wait without holding that monitor. */
+    private inline fun <T> state(block: () -> T): T {
+        SetupTransferGate.ensureRecovered()
+        return synchronized(this, block)
+    }
+
     private fun change(action: () -> Unit) {
-        val completion = synchronized(this) {
+        val completion = state {
             val previous = lastPublication
             action()
             lastPublication.takeIf { it !== previous }
@@ -363,7 +371,8 @@ class CatalogRepository internal constructor(
     private fun publishCurrent(
         pages: List<CatalogPage>,
         version: Long = revision,
-        refresh: CompletableFuture<List<CatalogPage>>? = null
+        refresh: CompletableFuture<List<CatalogPage>>? = null,
+        preserveSettledArtwork: Boolean = false
     ): CompletableFuture<Unit> {
         dev.quantumink.hermesgadget.mobile.widgets.HomeWidgets.publish(context, pages)
         val pictureAnimations = vault.animations().toMap()
@@ -395,8 +404,10 @@ class CatalogRepository internal constructor(
                     )
                 synchronized(this) {
                     publishingPortraits = emptySet()
-                    cleanup()
-                    if (version == revision && refresh?.isCancelled != true) {
+                    if (!preserveSettledArtwork) cleanup()
+                    if (!preserveSettledArtwork && version == revision &&
+                        refresh?.isCancelled != true
+                    ) {
                         animations.retain(pictureAnimations.values.map { it.sha256 }.toSet())
                     }
                 }
@@ -404,7 +415,7 @@ class CatalogRepository internal constructor(
             } catch (error: Exception) {
                 synchronized(this) {
                     publishingPortraits = emptySet()
-                    runCatching { cleanup() }
+                    if (!preserveSettledArtwork) runCatching { cleanup() }
                 }
                 completion.completeExceptionally(error)
             }
@@ -412,8 +423,70 @@ class CatalogRepository internal constructor(
         return completion
     }
 
+    /** One consistent credential-bearing view for the export projection; IO worker only. */
+    internal fun <T> transferRead(read: () -> T): T = state {
+        SetupTransferGate.exclusive(read)
+    }
+
+    /** Read-only roster view: no ordering normalization is written. */
+    internal fun transferView(): CatalogTransferView = state {
+        // Read-only: preview and export must not normalize or otherwise write any store.
+        val raw = combined(vault.pages(), false, persistOrder = false)
+        val order = sourceOrder(raw, persist = false)
+        return CatalogTransferView(
+            vault.sources().sortedBy { order.indexOf(it.id) },
+            order,
+            vault.sourceOrder(),
+            raw,
+            vault.fallbacks(),
+            vault.overrides(),
+            vault.animations()
+        )
+    }
+
+    /**
+     * Runs an import commit with the repository monitor and then the exclusive transfer gate,
+     * after cancelling in-flight discovery results. Publishes catalog, watch and widget state
+     * once, only when [commit] returns. The returned future reports watch publication alone.
+     */
+    internal fun <T> importExclusive(
+        changed: (T) -> Boolean = { true },
+        commit: () -> T
+    ): Pair<T, CompletableFuture<Unit>?> = state {
+        invalidate()
+        val result = SetupTransferGate.exclusive(commit)
+        if (!changed(result)) return@state result to null
+        // The local commit is already final. Even a synchronous publication/enqueue failure
+        // must be returned as propagation failure, never disguised as a failed local import.
+        val publication = try {
+            val raw = combined(vault.pages(), false)
+            vault.savePages(raw)
+            val pages = combined(raw)
+            mutablePages.value = pages
+            portraits.protect(references(pages))
+            portraits.retain(references(pages))
+            publishCurrent(pages)
+        } catch (error: Exception) {
+            CompletableFuture<Unit>().also { it.completeExceptionally(error) }
+        }
+        result to publication
+    }
+
+    /** Republishes the stored state after journal recovery restored or finished an import. */
+    internal fun republish(preserveSettledArtwork: Boolean = true): CompletableFuture<Unit> =
+        state {
+            invalidate()
+            val raw = combined(vault.pages(), false, persistOrder = !preserveSettledArtwork)
+            if (!preserveSettledArtwork) vault.savePages(raw)
+            val pages = combined(raw, persistOrder = !preserveSettledArtwork)
+            mutablePages.value = pages
+            portraits.protect(references(pages))
+            // Recovery/retry must preserve even unreferenced original settled artwork.
+            publishCurrent(pages, preserveSettledArtwork = preserveSettledArtwork)
+        }
+
     /** Resolve a stable key and its endpoint together on the caller's IO worker. */
-    @Synchronized fun currentProfile(key: String): Pair<CatalogPage, EndpointProfile>? {
+    fun currentProfile(key: String): Pair<CatalogPage, EndpointProfile>? = state {
         val page = mutablePages.value.singleOrNull { it.key == key } ?: return null
         return profileFor(page)?.let { page to it }
     }
@@ -499,7 +572,8 @@ class CatalogRepository internal constructor(
 
     private fun combined(
         previous: List<CatalogPage>,
-        applyOverrides: Boolean = true
+        applyOverrides: Boolean = true,
+        persistOrder: Boolean = true
     ): List<CatalogPage> {
         val overrides = vault.overrides().associateBy { it.key }
         val ownerPictures = mutableSetOf<String>()
@@ -557,7 +631,7 @@ class CatalogRepository internal constructor(
         }.sortedBy {
             order[it.key] ?: Int.MAX_VALUE
         }
-        val sources = sourceOrder(previous)
+        val sources = sourceOrder(previous, persistOrder)
         return CatalogOrder.group(effective).sortedBy { group ->
             sources.indexOf(group.first().sourceId).takeIf { it >= 0 } ?: Int.MAX_VALUE
         }.flatten().also { ProfileCatalog.encodePages(it) }
@@ -575,7 +649,10 @@ class CatalogRepository internal constructor(
 
     override fun close() {
         discovery.close()
-        sync.shutdownNow()
+        // Never interrupt a running publication: an interrupted Keystore call fails on API29.
+        // Accepted publications finish before the stores can be released.
+        sync.shutdown()
+        sync.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS)
     }
 
     companion object {
@@ -583,3 +660,15 @@ class CatalogRepository internal constructor(
             (context.applicationContext as CompanionApplication).catalog
     }
 }
+
+/** Repository-owned values read together; [sources] still hold credentials and stay internal. */
+internal class CatalogTransferView(
+    val sources: List<CatalogSource>,
+    val sourceOrder: List<String>,
+    /** The stored record; null means the order is still derived from the roster. */
+    val storedSourceOrder: List<String>?,
+    val raw: List<CatalogPage>,
+    val fallbacks: List<CatalogPage>,
+    val overrides: List<CatalogPage>,
+    val animations: Map<String, dev.quantumink.hermesgadget.protocol.AnimationDescriptor>
+)

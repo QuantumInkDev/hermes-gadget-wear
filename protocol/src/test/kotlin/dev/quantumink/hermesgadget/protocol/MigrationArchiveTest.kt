@@ -628,6 +628,23 @@ class MigrationArchiveTest {
         for (deflated in listOf(false, true)) {
             val bytes = zip(listOf("manifest.json" to plain()), deflated)
             assertEquals(MigrationSnapshot(), MigrationArchive.decodeZip(bytes).snapshot)
+            val header = MigrationArchive.encrypt(MigrationSnapshot(), password).copyOfRange(0, 52)
+            big(header).putInt(16, bytes.size).putInt(20, bytes.size + 16)
+            val sealed = header + cipher(Cipher.ENCRYPT_MODE, header).doFinal(bytes)
+            val directory = java.nio.file.Files.createTempDirectory("deflated-stage").toFile()
+            try {
+                (
+                    MigrationArchive.readStaged(
+                        sealed.inputStream(),
+                        password,
+                        directory
+                    ) as MigrationStagedReadResult.Success
+                    ).use {
+                    assertEquals(MigrationSnapshot(), it.snapshot)
+                }
+            } finally {
+                directory.deleteRecursively()
+            }
         }
     }
 
@@ -782,6 +799,18 @@ class MigrationArchiveTest {
             }
             val sealed = header + cipher(Cipher.ENCRYPT_MODE, header).doFinal(hostile)
             assertSame(MigrationReadResult.Invalid, MigrationArchive.decrypt(sealed, password))
+            val directory = java.nio.file.Files.createTempDirectory(
+                "authenticated-hostile-stage"
+            ).toFile()
+            try {
+                assertSame(
+                    MigrationStagedReadResult.Invalid,
+                    MigrationArchive.readStaged(sealed.inputStream(), password, directory)
+                )
+                assertTrue(directory.listFiles().orEmpty().isEmpty())
+            } finally {
+                directory.deleteRecursively()
+            }
         }
     }
 

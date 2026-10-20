@@ -52,6 +52,9 @@ android {
         "androidTest"
     ).assets.directories.add(rootProject.file("protocol/src/test/resources/gif").path)
     sourceSets.getByName(
+        "androidTest"
+    ).assets.directories.add(rootProject.file("protocol/src/test/resources/migration").path)
+    sourceSets.getByName(
         "test"
     ).resources.directories.add(rootProject.file("protocol/src/test/resources").path)
 
@@ -80,6 +83,7 @@ dependencies {
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.serialization.json)
     implementation(libs.okhttp)
+    implementation(libs.zxing.core)
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.okhttp.tls)

@@ -1,6 +1,7 @@
 package dev.quantumink.hermesgadget.mobile.widgets
 
 import android.util.AtomicFile
+import dev.quantumink.hermesgadget.mobile.SetupTransferGate
 import dev.quantumink.hermesgadget.protocol.ProfileCatalog
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
@@ -17,28 +18,27 @@ class HomeWidgetStore(private val directory: File) {
         configs()[id]
     }
 
-    fun save(id: Int, config: WidgetConfig, expectedRevision: Long): WidgetConfig =
-        synchronized(lock) {
-            require(id > 0)
-            val previous = configs()
-            require((previous[id]?.revision ?: 0L) == expectedRevision) {
-                "Widget changed. Reopen its settings before saving."
-            }
-            val saved = config.copy(
-                slots = config.slots.toList(),
-                revision = Math.addExact(expectedRevision, 1)
-            )
-            saveConfigs(previous + (id to saved))
-            saved
+    fun save(id: Int, config: WidgetConfig, expectedRevision: Long): WidgetConfig = mutate {
+        require(id > 0)
+        val previous = configs()
+        require((previous[id]?.revision ?: 0L) == expectedRevision) {
+            "Widget changed. Reopen its settings before saving."
         }
+        val saved = config.copy(
+            slots = config.slots.toList(),
+            revision = Math.addExact(expectedRevision, 1)
+        )
+        saveConfigs(previous + (id to saved))
+        saved
+    }
 
-    fun delete(id: Int) = synchronized(lock) {
+    fun delete(id: Int) = mutate {
         require(id > 0)
         val previous = configs()
         if (id in previous) saveConfigs(previous - id)
     }
 
-    fun restore(oldIds: IntArray, newIds: IntArray, preset: HomeWidgetPreset) = synchronized(lock) {
+    fun restore(oldIds: IntArray, newIds: IntArray, preset: HomeWidgetPreset) = mutate {
         require(oldIds.size == newIds.size && oldIds.size <= 128)
         require((oldIds + newIds).all { it > 0 })
         require(oldIds.distinct().size == oldIds.size && newIds.distinct().size == newIds.size)
@@ -82,9 +82,12 @@ class HomeWidgetStore(private val directory: File) {
         }.orEmpty()
     }
 
-    fun saveProfiles(profiles: List<WidgetProfile>) = synchronized(lock) {
+    fun saveProfiles(profiles: List<WidgetProfile>) = mutate {
         write("profiles.json", WidgetJson.encodeProfiles(profiles), ProfileCatalog.MAX_BYTES)
     }
+
+    private fun <T> mutate(block: () -> T): T =
+        SetupTransferGate.mutation { synchronized(lock) { block() } }
 
     private fun configs(): Map<Int, WidgetConfig> {
         val destination = File(directory, "configs.json")

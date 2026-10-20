@@ -25,7 +25,11 @@ internal fun HomeWidgetsPage(back: () -> Unit) {
     val context = LocalContext.current
     var refresh by remember { mutableStateOf(0) }
     var widgets by remember { mutableStateOf(emptyList<Triple<Int, HomeWidgetPreset, Int>>()) }
+    var saved by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     LaunchedEffect(refresh) {
+        saved = withContext(Dispatchers.IO) {
+            runCatching { HomeWidgets.templates(context).templates().size }.getOrDefault(0)
+        }
         widgets =
             withContext(Dispatchers.IO) {
                 HomeWidgets.instances(context).map { (id, preset) ->
@@ -65,5 +69,14 @@ internal fun HomeWidgetsPage(back: () -> Unit) {
         }
     }
     if (widgets.isEmpty()) Text("No home screen widgets yet.")
+    if (saved > 0) {
+        SettingsSection {
+            Text("Saved layouts", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "$saved imported layouts are ready. Android decides where widgets go, so add a " +
+                    "widget from your home screen and choose a saved layout of the same size."
+            )
+        }
+    }
     TextButton({ refresh++ }) { Text("Refresh widgets") }
 }

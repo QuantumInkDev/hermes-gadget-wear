@@ -26,6 +26,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.bouncycastle.crypto.engines.AESEngine
+import org.bouncycastle.crypto.modes.GCMBlockCipher
+import org.bouncycastle.crypto.params.AEADParameters
+import org.bouncycastle.crypto.params.KeyParameter
 
 /** Wire names deliberately match native appearances without importing the Android client module. */
 enum class MigrationTheme { LIGHT, DARK, MOONLIGHT }
@@ -187,11 +191,15 @@ class MigrationSnapshot(
 }
 
 /**
- * One read of the caller's list (`toArray`), then a JDK 1.2 unmodifiable wrapper available on every
- * Android API level; a cast to MutableList cannot mutate it. Avoids Java 9+ `List.copyOf`.
+ * One element-wise pass over the caller's iterator into a fresh ArrayList, then a JDK 1.2
+ * unmodifiable wrapper available on every Android API level; a cast to MutableList cannot mutate
+ * it. Never `ArrayList(Collection)`: Android 10 libcore keeps an `Object[]` returned by the
+ * caller's `toArray()`, which would alias caller-owned storage. Avoids Java 9+ `List.copyOf`.
  */
 internal fun <T> ownedList(values: List<T>): List<T> = transferChecked("Invalid collection.") {
-    Collections.unmodifiableList(ArrayList(values))
+    val owned = ArrayList<T>(minOf(values.size, 1024))
+    for (value in values) owned.add(value)
+    Collections.unmodifiableList(owned)
 }
 
 /** As [ownedList], also rejecting nulls that a racing Java caller could otherwise smuggle in. */
@@ -206,9 +214,15 @@ sealed interface MigrationReadResult {
      */
     class Success internal constructor(
         val snapshot: MigrationSnapshot,
-        val artwork: Map<String, ByteArray>
+        artwork: Map<String, ByteArray>
     ) : MigrationReadResult,
         AutoCloseable {
+        var artwork: Map<String, ByteArray> = artwork
+            private set
+
+        /** Move buffer ownership to native staging without a second full artwork copy. */
+        fun takeArtwork(): Map<String, ByteArray> = artwork.also { artwork = emptyMap() }
+
         override fun close() {
             artwork.values.forEach { it.fill(0) }
         }
@@ -223,8 +237,33 @@ sealed interface MigrationReadResult {
     data object Invalid : MigrationReadResult
 }
 
+/** Owns encrypted random-access scratch; each artwork read returns one caller-owned buffer. */
+sealed interface MigrationStagedReadResult {
+    class Success internal constructor(
+        val snapshot: MigrationSnapshot,
+        private val load: (String) -> ByteArray,
+        private val dispose: () -> Unit
+    ) : MigrationStagedReadResult,
+        AutoCloseable {
+        private var closed = false
+        fun artwork(hash: String): ByteArray {
+            check(!closed)
+            require(snapshot.artwork.any { it.sha256 == hash })
+            return load(hash)
+        }
+        override fun close() {
+            if (!closed) {
+                closed = true
+                dispose()
+            }
+        }
+        override fun toString(): String = "MigrationStagedReadResult.Success(content=redacted)"
+    }
+    data object Invalid : MigrationStagedReadResult
+}
+
 /**
- * Synchronous pure codec; call on an IO worker. No files, networking or store mutations.
+ * Android-free codec; IO worker only. Staged reads own private encrypted scratch files.
  * Password entropy controls offline resistance. No key/passphrase is persisted. Caller owns its
  * passphrase/artwork and must not mutate inputs during encoding. Mutable owned buffers are cleared;
  * immutable JSON strings, returned content, caller inputs and JCA internals cannot be
@@ -289,8 +328,238 @@ object MigrationArchive {
     }
 
     /**
+     * Same v1 envelope, written without a whole ZIP/ciphertext allocation. The caller owns the
+     * output, snapshot and artwork until return. Each member is copied, checked and erased in
+     * turn. A failed write leaves an incomplete, unusable document; it must not be reported saved.
+     */
+    fun writeEncrypted(
+        snapshot: MigrationSnapshot,
+        passphrase: CharArray,
+        artwork: Map<String, ByteArray>,
+        output: java.io.OutputStream
+    ) = transferChecked("Could not create the migration archive.") {
+        requirePassphrase(passphrase)
+        val metadata = manifest(snapshot)
+        try {
+            require(parseManifest(metadata) == snapshot)
+            require(artwork.keys == snapshot.artwork.map { it.sha256 }.toSet())
+            val size = zipCapacity(snapshot, metadata)
+            val salt = ByteArray(16).also(random::nextBytes)
+            val nonce = ByteArray(12).also(random::nextBytes)
+            val header = ByteBuffer.allocate(HEADER_BYTES).order(ByteOrder.BIG_ENDIAN)
+                .put(magic).put(1).put(1).put(1).put(0)
+                .putInt(KDF_ITERATIONS).putInt(size).putInt(size + TAG_BYTES)
+                .put(salt).put(nonce).array()
+            val key = deriveKey(passphrase, salt, KDF_ITERATIONS)
+            try {
+                // Android 10 Conscrypt buffers the entire AEAD input and output. Use the pinned
+                // lightweight implementation here; do not register or replace a platform provider.
+                val cipher = GCMBlockCipher.newInstance(AESEngine.newInstance())
+                cipher.init(true, AEADParameters(KeyParameter(key), 128, nonce, header))
+                val chunk = ByteArray(64 * 1024 + 32)
+                output.write(header)
+                var written = 0
+                val encrypted = object : java.io.OutputStream() {
+                    override fun write(value: Int) = write(byteArrayOf(value.toByte()), 0, 1)
+                    override fun write(bytes: ByteArray, offset: Int, length: Int) {
+                        require(written.toLong() + length <= size)
+                        written += length
+                        var start = offset
+                        val end = offset + length
+                        while (start < end) {
+                            val count = minOf(64 * 1024, end - start)
+                            val produced = cipher.processBytes(bytes, start, count, chunk, 0)
+                            output.write(chunk, 0, produced)
+                            start += count
+                        }
+                    }
+                }
+                ZipOutputStream(encrypted).use { zip ->
+                    zipMember(zip, "manifest.json", metadata)
+                    snapshot.artwork.sortedBy { it.path }.forEach { asset ->
+                        val bytes = artwork.getValue(asset.sha256).copyOf()
+                        try {
+                            validateAsset(asset, bytes)
+                            zipMember(zip, asset.path, bytes)
+                        } finally {
+                            bytes.fill(0)
+                        }
+                    }
+                    zip.finish()
+                }
+                require(written == size)
+                val finalBytes = cipher.doFinal(chunk, 0)
+                output.write(chunk, 0, finalBytes)
+                chunk.fill(0)
+            } finally {
+                key.fill(0)
+            }
+        } finally {
+            metadata.fill(0)
+        }
+    }
+
+    /**
+     * Bounded streaming v1 reader. Caller supplies a stable, exclusively owned input and a
+     * private application directory. Scratch is encrypted with an ephemeral RAM-only key;
+     * complete GCM authentication and exact EOF precede all ZIP parsing. No plaintext file or
+     * aggregate artwork buffer is created. Close on cancellation or after native staging.
+     */
+    fun readStaged(
+        input: InputStream,
+        passphrase: CharArray,
+        privateDirectory: java.io.File
+    ): MigrationStagedReadResult {
+        var stage: MigrationPrivateStage? = null
+        return try {
+            requirePassphrase(passphrase)
+            val header = ByteArray(HEADER_BYTES)
+            readExactly(input, header)
+            val length = validateHeader(header)
+            val owned = MigrationPrivateStage.create(privateDirectory)
+            stage = owned
+            openStaged(input, header, length, passphrase, owned)
+            owned.seal()
+            val zip = StrictZip(StageZipBytes(owned))
+            val metadata = zip.member(0, MAX_METADATA_BYTES)
+            val snapshot = try {
+                parseManifest(metadata)
+            } finally {
+                metadata.fill(0)
+            }
+            require(
+                zip.names == listOf("manifest.json") + snapshot.artwork.map {
+                    it.path
+                }.sorted()
+            )
+            val indices = snapshot.artwork.associate { asset ->
+                val index = zip.names.indexOf(asset.path)
+                val data = zip.member(index, asset.bytes)
+                try {
+                    validateAsset(asset, data)
+                } finally {
+                    data.fill(0)
+                }
+                asset.sha256 to (index to asset)
+            }
+            MigrationStagedReadResult.Success(snapshot, { hash ->
+                val (index, asset) = indices.getValue(hash)
+                zip.member(index, asset.bytes).also { data ->
+                    try {
+                        validateAsset(asset, data)
+                    } catch (failure: Exception) {
+                        data.fill(0)
+                        throw failure
+                    }
+                }
+            }, owned::close)
+        } catch (_: Exception) {
+            runCatching { stage?.close() }
+            MigrationStagedReadResult.Invalid
+        }
+    }
+
+    private fun openStaged(
+        input: InputStream,
+        header: ByteArray,
+        length: Int,
+        passphrase: CharArray,
+        stage: MigrationPrivateStage
+    ) {
+        val key = deriveKey(passphrase, header.copyOfRange(24, 40), KDF_ITERATIONS)
+        val chunk = ByteArray(64 * 1024)
+        val plain = ByteArray(chunk.size + 32)
+        try {
+            val cipher = GCMBlockCipher.newInstance(AESEngine.newInstance())
+            cipher.init(
+                false,
+                AEADParameters(KeyParameter(key), 128, header.copyOfRange(40, 52), header)
+            )
+            var remaining = length
+            while (remaining > 0) {
+                if (Thread.currentThread().isInterrupted) throw java.io.InterruptedIOException()
+                val count = input.read(chunk, 0, minOf(chunk.size, remaining))
+                require(count > 0)
+                remaining -= count
+                val produced = cipher.processBytes(chunk, 0, count, plain, 0)
+                stage.append(plain, 0, produced)
+                plain.fill(0)
+                chunk.fill(0)
+            }
+            require(input.read() == -1)
+            val produced = cipher.doFinal(plain, 0)
+            stage.append(plain, 0, produced)
+            require(stage.size == length - TAG_BYTES)
+        } finally {
+            key.fill(0)
+            chunk.fill(0)
+            plain.fill(0)
+        }
+    }
+
+    /**
+     * Consumes a private, exclusively owned envelope. GCM authenticates before ZIP parsing;
+     * plaintext reuses this array and the entire array is erased on every outcome. No caller
+     * may read or mutate the array during this call. [decrypt] remains non-mutating.
+     */
+    fun decryptOwned(envelope: ByteArray, passphrase: CharArray): MigrationReadResult = try {
+        requirePassphrase(passphrase)
+        require(envelope.size in HEADER_BYTES..MAX_ENVELOPE_BYTES)
+        val header = envelope.copyOfRange(0, HEADER_BYTES)
+        val length = validateHeader(header)
+        require(envelope.size == HEADER_BYTES + length)
+        val size = openOwnedBuffer(header, envelope, length, passphrase)
+        decodeZip(envelope, size)
+    } catch (_: Exception) {
+        MigrationReadResult.Invalid
+    } finally {
+        envelope.fill(0)
+    }
+
+    // Unauthenticated plaintext remains exclusively in the private envelope. The tag MUST
+    // verify before decodeZip can observe a single byte; decryptOwned erases it on every failure.
+    private fun openOwnedBuffer(
+        header: ByteArray,
+        envelope: ByteArray,
+        length: Int,
+        passphrase: CharArray
+    ): Int {
+        val key = deriveKey(passphrase, header.copyOfRange(24, 40), KDF_ITERATIONS)
+        val input = ByteArray(64 * 1024)
+        try {
+            val cipher = GCMBlockCipher.newInstance(AESEngine.newInstance())
+            cipher.init(
+                false,
+                AEADParameters(
+                    KeyParameter(key),
+                    128,
+                    header.copyOfRange(40, 52),
+                    header
+                )
+            )
+            var read = HEADER_BYTES
+            var written = 0
+            while (read < envelope.size) {
+                val count = minOf(input.size, envelope.size - read)
+                envelope.copyInto(input, 0, read, read + count)
+                written += cipher.processBytes(input, 0, count, envelope, written)
+                read += count
+            }
+            written += cipher.doFinal(envelope, written)
+            require(written == length - TAG_BYTES)
+            return written
+        } finally {
+            input.fill(0)
+            key.fill(0)
+        }
+    }
+
+    /**
      * Opens a caller-held envelope in place: no stream or chunk copy of the ciphertext is made and
-     * the caller's array is never modified. See [MigrationReadResult.Invalid] for failure wording.
+     * the caller's array is never modified. The caller must own [envelope] privately and must not
+     * mutate it, or let another thread mutate it, until this call returns: a provider may
+     * authenticate and decrypt in separate passes over the same array. See
+     * [MigrationReadResult.Invalid] for failure wording.
      */
     fun decrypt(envelope: ByteArray, passphrase: CharArray): MigrationReadResult = try {
         requirePassphrase(passphrase)
@@ -726,6 +995,23 @@ object MigrationArchive {
         metadata: ByteArray,
         artwork: Map<String, ByteArray>
     ): ByteArray {
+        val capacity = zipCapacity(snapshot, metadata)
+        return WipingOutput(capacity).use { output ->
+            val zip = ZipOutputStream(output)
+            try {
+                zipMember(zip, "manifest.json", metadata)
+                snapshot.artwork.sortedBy { it.path }.forEach {
+                    zipMember(zip, it.path, artwork.getValue(it.sha256))
+                }
+                zip.finish()
+                output.detach()
+            } finally {
+                zip.close()
+            }
+        }.also { require(it.size <= MAX_ENVELOPE_BYTES - HEADER_BYTES - TAG_BYTES) }
+    }
+
+    private fun zipCapacity(snapshot: MigrationSnapshot, metadata: ByteArray): Int {
         require(
             metadata.size.toLong() + snapshot.artwork.sumOf { it.bytes.toLong() } <=
                 MAX_UNCOMPRESSED_BYTES
@@ -733,38 +1019,30 @@ object MigrationArchive {
         val capacity = 22L + metadata.size + 76 + 2 * "manifest.json".length +
             snapshot.artwork.sumOf { it.bytes.toLong() + 76 + 2 * it.path.length }
         require(capacity <= MAX_ENVELOPE_BYTES - HEADER_BYTES - TAG_BYTES)
-        return WipingOutput(capacity.toInt()).use { output ->
-            val zip = ZipOutputStream(output)
-            try {
-                fun member(name: String, bytes: ByteArray) {
-                    val entry = ZipEntry(name).apply {
-                        method = ZipEntry.STORED
-                        size = bytes.size.toLong()
-                        compressedSize = size
-                        crc = CRC32().also { it.update(bytes) }.value
-                        // 2000: inside the DOS range in every timezone; no timestamp extra.
-                        time = 946684800000L
-                    }
-                    zip.putNextEntry(entry)
-                    zip.write(bytes)
-                    zip.closeEntry()
-                }
-                member("manifest.json", metadata)
-                snapshot.artwork.sortedBy { it.path }.forEach {
-                    member(it.path, artwork.getValue(it.sha256))
-                }
-                zip.finish()
-                output.detach() // The stored-only layout normally fills the preflight exactly.
-            } finally {
-                zip.close()
-            }
-        }.also { require(it.size <= MAX_ENVELOPE_BYTES - HEADER_BYTES - TAG_BYTES) }
+        return capacity.toInt()
     }
 
-    internal fun decodeZip(bytes: ByteArray): MigrationReadResult.Success {
+    private fun zipMember(zip: ZipOutputStream, name: String, bytes: ByteArray) {
+        val entry = ZipEntry(name).apply {
+            method = ZipEntry.STORED
+            size = bytes.size.toLong()
+            compressedSize = size
+            crc = CRC32().also { it.update(bytes) }.value
+            // 2000: inside the DOS range in every timezone; no timestamp extra.
+            time = 946684800000L
+        }
+        zip.putNextEntry(entry)
+        zip.write(bytes)
+        zip.closeEntry()
+    }
+
+    internal fun decodeZip(
+        bytes: ByteArray,
+        length: Int = bytes.size
+    ): MigrationReadResult.Success {
         val assets = linkedMapOf<String, ByteArray>()
         try {
-            val zip = StrictZip(bytes)
+            val zip = StrictZip(ArrayZipBytes(bytes), length)
             val metadata = zip.member(0, MAX_METADATA_BYTES)
             val snapshot = try {
                 parseManifest(metadata)
@@ -892,7 +1170,37 @@ object MigrationArchive {
      * contiguous payloads and exact EOF before any decompression. No ZIP64, extras or comments.
      * Stored and raw DEFLATE are supported; only the standard signed 16-byte descriptor is allowed.
      */
-    private class StrictZip(private val bytes: ByteArray) {
+    private interface ZipBytes {
+        val size: Int
+        operator fun get(index: Int): Byte
+        fun copyInto(output: ByteArray, destination: Int, start: Int, end: Int)
+        fun copyOfRange(start: Int, end: Int): ByteArray = ByteArray(end - start).also {
+            copyInto(it, 0, start, end)
+        }
+    }
+    private class ArrayZipBytes(private val bytes: ByteArray) : ZipBytes {
+        override val size get() = bytes.size
+        override fun get(index: Int) = bytes[index]
+        override fun copyInto(output: ByteArray, destination: Int, start: Int, end: Int) {
+            bytes.copyInto(output, destination, start, end)
+        }
+    }
+    private class StageZipBytes(private val stage: MigrationPrivateStage) : ZipBytes {
+        override val size get() = stage.size
+        override fun get(index: Int): Byte {
+            val value = stage.bytes(index, 1)
+            return try {
+                value[0]
+            } finally {
+                value.fill(0)
+            }
+        }
+        override fun copyInto(output: ByteArray, destination: Int, start: Int, end: Int) {
+            stage.read(start, output, destination, end - start)
+        }
+    }
+
+    private class StrictZip(private val bytes: ZipBytes, private val length: Int = bytes.size) {
         private data class Member(
             val name: String,
             val method: Int,
@@ -905,8 +1213,8 @@ object MigrationArchive {
         val names: List<String> get() = members.map { it.name }
 
         init {
-            require(bytes.size in 22..MAX_ENVELOPE_BYTES)
-            val end = bytes.size - 22
+            require(length in 22..minOf(bytes.size, MAX_ENVELOPE_BYTES))
+            val end = length - 22
             require(u32(end) == 0x06054b50L && u16(end + 4) == 0 && u16(end + 6) == 0)
             val count = u16(end + 10)
             require(count in 1..MAX_ZIP_ENTRIES && u16(end + 8) == count && u16(end + 20) == 0)
@@ -988,22 +1296,40 @@ object MigrationArchive {
                 } else {
                     val inflater = Inflater(true)
                     val scratch = ByteArray(8192)
+                    val input = ByteArray(8192)
                     try {
-                        inflater.setInput(bytes, member.offset, member.compressed)
+                        var read = 0
                         var written = 0
                         while (!inflater.finished()) {
+                            if (inflater.needsInput()) {
+                                val count = minOf(input.size, member.compressed - read)
+                                require(count > 0)
+                                bytes.copyInto(
+                                    input,
+                                    0,
+                                    member.offset + read,
+                                    member.offset + read + count
+                                )
+                                inflater.setInput(input, 0, count)
+                                read += count
+                            }
                             val count = inflater.inflate(scratch)
                             require(
-                                count > 0 && written.toLong() + count <= member.size &&
+                                (count > 0 || inflater.finished() || inflater.needsInput()) &&
+                                    written.toLong() + count <= member.size &&
                                     written.toLong() + count <= limit
                             )
                             scratch.copyInto(output, written, 0, count)
                             written += count
                         }
-                        require(written == member.size && inflater.remaining == 0)
+                        require(
+                            written == member.size && read == member.compressed &&
+                                inflater.remaining == 0
+                        )
                     } finally {
                         inflater.end()
                         scratch.fill(0)
+                        input.fill(0)
                     }
                 }
                 require(CRC32().also { it.update(output) }.value == member.crc)
@@ -1015,7 +1341,7 @@ object MigrationArchive {
         }
 
         private fun u16(offset: Int): Int {
-            require(offset >= 0 && offset.toLong() + 2 <= bytes.size)
+            require(offset >= 0 && offset.toLong() + 2 <= length)
             return (bytes[offset].toInt() and 255) or ((bytes[offset + 1].toInt() and 255) shl 8)
         }
         private fun u32(offset: Int): Long =

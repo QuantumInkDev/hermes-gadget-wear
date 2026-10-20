@@ -21,16 +21,32 @@ class QuickActionStore(
 ) {
     private val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
     private val file get() = AtomicFile(File(directory, "actions"))
-    fun load(): List<QuickAction> = synchronized(lock) {
-        read() ?: QuickActions.seeds().also { write(it) }
+    fun load(): List<QuickAction> = SetupTransferGate.mutation {
+        synchronized(lock) { read() ?: QuickActions.seeds().also { write(it) } }
     }
-    fun save(actions: List<QuickAction>, expected: List<QuickAction>? = null) = synchronized(lock) {
-        val previous = read() // Refuse to overwrite corrupt data or a missing encryption key.
-        check(expected == null || previous == expected) {
-            "Actions changed. Reopen to review the latest data."
+    fun save(actions: List<QuickAction>, expected: List<QuickAction>? = null) =
+        SetupTransferGate.mutation {
+            synchronized(lock) {
+                // Refuse to overwrite corrupt data or a missing encryption key.
+                val previous = read()
+                check(expected == null || previous == expected) {
+                    "Actions changed. Reopen to review the latest data."
+                }
+                write(actions.toList())
+            }
         }
-        write(actions.toList())
+
+    /** Saved actions without seeding defaults; null before the first save. */
+    internal fun stored(): List<QuickAction>? = synchronized(lock) { read() }
+
+    /** Journal recovery only: restore the never-saved state so defaults seed as before. */
+    internal fun clearForRestore() = SetupTransferGate.mutation {
+        synchronized(lock) {
+            file.delete()
+            File(directory, "initialized").delete()
+        }
     }
+
     private fun read(): List<QuickAction>? {
         if (!file.baseFile.exists() && !File(directory, "actions.bak").exists()) {
             check(directory.listFiles().isNullOrEmpty()) {

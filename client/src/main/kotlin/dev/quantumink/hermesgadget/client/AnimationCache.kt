@@ -128,6 +128,21 @@ class AnimationCache(private val directory: File) {
         }
     }
 
+    /** Removes one unprotected settled asset; used only to undo an interrupted import. */
+    @Synchronized fun discard(hash: String) {
+        require(hash.matches(Regex("[a-f0-9]{64}")))
+        if (hash !in protected) AtomicFile(File(directory, "$hash.gif")).delete()
+    }
+
+    /** Snapshot settled assets for a recoverable import's capacity check and protection. */
+    @Synchronized fun hashes(): Set<String> = files().map { it.nameWithoutExtension }.toSet()
+
+    /** Settled files and bytes that would remain if only [hashes] were kept. */
+    @Synchronized fun usage(hashes: Set<String>): Pair<Int, Long> {
+        val kept = files().filter { it.nameWithoutExtension in hashes }
+        return kept.size to kept.sumOf { it.length() }
+    }
+
     @Synchronized fun reset() {
         if (directory.exists()) check(directory.deleteRecursively())
         protected = emptySet()

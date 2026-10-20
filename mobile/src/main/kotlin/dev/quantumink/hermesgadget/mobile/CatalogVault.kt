@@ -53,7 +53,7 @@ class CatalogVault(
         }
     }.orEmpty()
 
-    @Synchronized fun saveSources(sources: List<CatalogSource>) {
+    fun saveSources(sources: List<CatalogSource>) = mutate {
         write(
             "sources",
             ProfileCatalog.encodeSources(sources).toByteArray()
@@ -73,7 +73,7 @@ class CatalogVault(
         }
     }
 
-    @Synchronized fun saveSourceOrder(order: List<String>) {
+    fun saveSourceOrder(order: List<String>) = mutate {
         validateOrder(order)
         write(
             "source-order",
@@ -84,12 +84,17 @@ class CatalogVault(
         )
     }
 
+    /** Journal recovery only: return to a roster-derived order, as before the first save. */
+    internal fun clearSourceOrder() = mutate {
+        AtomicFile(File(directory, "source-order")).delete()
+    }
+
     private fun validateOrder(order: List<String>) {
         require(order.size <= ProfileCatalog.MAX_SOURCES + 1 && order.distinct().size == order.size)
         require(order.all { it.matches(Regex("[A-Za-z0-9_-]{1,64}")) })
     }
 
-    @Synchronized fun savePages(pages: List<CatalogPage>) {
+    fun savePages(pages: List<CatalogPage>) = mutate {
         write(
             "pages",
             ProfileCatalog.encodePages(pages).toByteArray()
@@ -104,7 +109,7 @@ class CatalogVault(
         }
     }.orEmpty()
 
-    @Synchronized fun saveFallbacks(pages: List<CatalogPage>) {
+    fun saveFallbacks(pages: List<CatalogPage>) = mutate {
         write("fallbacks", ProfileCatalog.encodePages(pages).toByteArray())
     }
 
@@ -116,7 +121,7 @@ class CatalogVault(
         }
     }.orEmpty()
 
-    @Synchronized fun saveOverrides(pages: List<CatalogPage>) {
+    fun saveOverrides(pages: List<CatalogPage>) = mutate {
         // Overrides are keyed artwork, not an endpoint roster. A dormant manual picture may
         // share the endpoint of a discovered page without replacing either picture choice.
         val pictures = pages.map { page ->
@@ -143,7 +148,7 @@ class CatalogVault(
         }
     }.orEmpty()
 
-    @Synchronized fun saveAnimations(animations: Map<String, AnimationDescriptor>) {
+    fun saveAnimations(animations: Map<String, AnimationDescriptor>) = mutate {
         write(
             "watch-animations",
             dev.quantumink.hermesgadget.protocol.PortraitAnimations.encode(animations).toByteArray()
@@ -185,6 +190,11 @@ class CatalogVault(
         cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, encrypted.copyOfRange(2, 14)))
         cipher.updateAAD((name + "|v1").toByteArray())
         return cipher.doFinal(encrypted.copyOfRange(14, encrypted.size))
+    }
+
+    /** Gate first, then this vault's monitor: the documented SetupTransferGate lock order. */
+    private fun <T> mutate(block: () -> T): T = SetupTransferGate.mutation {
+        synchronized(this) { block() }
     }
 
     private fun write(name: String, plaintext: ByteArray) {

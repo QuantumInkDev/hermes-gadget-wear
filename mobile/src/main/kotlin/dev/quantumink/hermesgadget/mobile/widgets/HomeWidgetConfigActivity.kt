@@ -34,6 +34,7 @@ import kotlinx.coroutines.withContext
 
 class HomeWidgetConfigActivity : ComponentActivity() {
     private var loaded by mutableStateOf<Pair<WidgetConfig, CatalogRepository>?>(null)
+    private var templates by mutableStateOf(emptyList<WidgetTemplate>())
     private var unavailable by mutableStateOf(false)
     private var saving by mutableStateOf(false)
     private var error by mutableStateOf("")
@@ -62,7 +63,10 @@ class HomeWidgetConfigActivity : ComponentActivity() {
                         val pages by value.second.pages.collectAsStateWithLifecycle()
                         HomeWidgetEditor(value.first, pages, saving, error, ::save, {
                             finish()
-                        }, ::load, Modifier.fillMaxSize().padding(padding)) { page, modifier ->
+                        }, ::load, Modifier.fillMaxSize().padding(padding), templates) {
+                                page,
+                                modifier
+                            ->
                             DirectoryPortrait(value.second, page, modifier)
                         }
                     } else {
@@ -97,6 +101,9 @@ class HomeWidgetConfigActivity : ComponentActivity() {
                             ?: WidgetConfig(preset, revision = saved?.revision ?: 0)
                     val repository = CatalogRepository.get(this@HomeWidgetConfigActivity)
                     repository.savedPages()
+                    templates = runCatching {
+                        HomeWidgets.templates(this@HomeWidgetConfigActivity).templates()
+                    }.getOrDefault(emptyList())
                     config to repository
                 }
             }

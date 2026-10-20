@@ -9,6 +9,7 @@ kotlin {
 dependencies {
     implementation(libs.serialization.json)
     implementation(libs.okhttp)
+    implementation(libs.bouncycastle)
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.tls)
 }

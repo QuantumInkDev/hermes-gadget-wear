@@ -11,6 +11,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,6 +38,7 @@ internal fun HomeWidgetEditor(
     cancel: () -> Unit,
     reload: () -> Unit,
     modifier: Modifier = Modifier,
+    templates: List<WidgetTemplate> = emptyList(),
     portrait: @Composable (CatalogPage, Modifier) -> Unit
 ) {
     var encoded by rememberSaveable(initial.preset, initial.revision) {
@@ -72,6 +74,27 @@ internal fun HomeWidgetEditor(
                 style = MaterialTheme.typography.bodyMedium
             )
             HomeWidgetPreview(draft, pages, { if (!saving) slot = it }, portrait)
+            val matching = templates.filter { it.preset == initial.preset }
+            if (matching.isNotEmpty()) {
+                Text("Saved layouts", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "Imported from another phone. Choosing one fills this widget; save to keep it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                val keys = pages.map { it.key }.toSet()
+                matching.forEachIndexed { index, template ->
+                    val slots = template.slots.map { it?.takeIf { key -> key in keys } }
+                    OutlinedButton({
+                        update(draft.copy(slots = slots, appearance = template.appearance))
+                    }, Modifier.fillMaxWidth(), enabled = !saving) {
+                        Text(
+                            "Use saved layout ${index + 1} · " +
+                                "${slots.count { it != null }} of ${initial.preset.capacity} bots"
+                        )
+                    }
+                }
+            }
             if (error.isNotBlank()) {
                 Text(error, color = MaterialTheme.colorScheme.error)
                 TextButton(reload, enabled = !saving) { Text("Reload widget settings") }

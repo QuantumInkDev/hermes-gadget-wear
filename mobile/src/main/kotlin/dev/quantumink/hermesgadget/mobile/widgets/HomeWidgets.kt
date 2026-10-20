@@ -26,6 +26,8 @@ object HomeWidgets {
     private val scheduled = AtomicBoolean(false)
 
     fun store(context: Context) = HomeWidgetStore(File(context.filesDir, "home-widgets"))
+    fun templates(context: Context) =
+        HomeWidgetTemplateStore(File(context.filesDir, "widget-templates"))
     fun pictures(context: Context) =
         HomeWidgetPictures(File(context.filesDir, "home-widgets/portraits"))
     fun enqueue(action: () -> Unit) {

@@ -166,7 +166,8 @@ class MainActivity : ComponentActivity() {
             it in
                 setOf(
                     "profiles", "conversation", "watch", "settings", "tiles", "boxes",
-                    "manual", "speech", "appearance", "home-widgets", "quick-actions"
+                    "manual", "speech", "appearance", "home-widgets", "quick-actions",
+                    "setup-transfer"
                 )
         } ?: "profiles"
         speechProfileKey = savedInstanceState?.getString("speech_profile_key")
@@ -390,6 +391,9 @@ class MainActivity : ComponentActivity() {
                                         navigate("settings")
                                     }
                                     "tiles" -> ProfileTilesPage { navigate("watch") }
+                                    "setup-transfer" -> SetupTransferPage(this@MainActivity, {
+                                        navigate("settings")
+                                    })
                                     "home-widgets" -> HomeWidgetsPage {
                                         navigate("settings")
                                     }

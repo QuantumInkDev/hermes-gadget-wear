@@ -9,6 +9,12 @@ import java.util.concurrent.TimeUnit
 
 object ProfileSync {
     fun publish(context: Context, vault: ProfileVault) {
+        publishSetup(context, vault)
+        CatalogRepository.get(context).refresh(true)
+    }
+
+    /** The watch's saved endpoint list only: no catalog discovery or other network request. */
+    fun publishSetup(context: Context, vault: ProfileVault) {
         val record = PutDataMapRequest.create(EndpointProfiles.SETUP_PATH)
         record.dataMap.putString("profiles", EndpointProfiles.encode(vault.profiles()))
         Tasks.await(
@@ -16,7 +22,6 @@ object ProfileSync {
             5,
             TimeUnit.SECONDS
         )
-        CatalogRepository.get(context).refresh(true)
     }
 
     @Synchronized fun publishCatalog(

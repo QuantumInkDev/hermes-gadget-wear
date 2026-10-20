@@ -29,7 +29,11 @@ class ProfileVault(
         }
     }
 
-    @Synchronized fun save(profile: EndpointProfile) {
+    fun save(profile: EndpointProfile) = SetupTransferGate.mutation {
+        synchronized(this) { saveUnlocked(profile) }
+    }
+
+    private fun saveUnlocked(profile: EndpointProfile) {
         val previous = profiles()
         val updated = if (previous.any { it.endpoint.url == profile.endpoint.url }) {
             previous.map {
@@ -41,7 +45,11 @@ class ProfileVault(
         write("catalog", EndpointProfiles.encode(updated).toByteArray())
     }
 
-    @Synchronized fun remove(url: String) {
+    fun remove(url: String) = SetupTransferGate.mutation {
+        synchronized(this) { removeUnlocked(url) }
+    }
+
+    private fun removeUnlocked(url: String) {
         write(
             "catalog",
             EndpointProfiles.encode(

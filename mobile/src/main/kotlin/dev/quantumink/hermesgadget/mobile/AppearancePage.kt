@@ -40,7 +40,7 @@ fun AppearancePage(context: Context, back: () -> Unit) {
                 Modifier.fillMaxWidth().selectable(
                     selected = mode == option,
                     role = Role.RadioButton,
-                    onClick = { preferences.set(option) }
+                    onClick = { SetupTransferGate.mutation { preferences.set(option) } }
                 ).padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
