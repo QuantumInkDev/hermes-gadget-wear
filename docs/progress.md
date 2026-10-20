@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-10-20 — reviewed native setup/migration source integrated
+
+The returned QR and configuration-transfer implementation and source fixes are integrated
+locally at `7bb0b0d`, with the user workflow in [Move setup](setup-migration.md). Imports
+provide explicit collision/recipient review, recoverable local changes and separate
+propagation status. Credentials, pairing, identities, approvals and history stay excluded.
+
+Fresh combined verification: 280 passing JVM cases, zero failures/errors, five opt-in
+SDK/server cases skipped; strict formatting, module debug lint and all four APK builds
+pass. The phone has four inherited lint Hints, zero warnings/errors. This run uses new
+build outputs and does not overwrite historical native evidence.
+
+Source integration does not close full N10 acceptance. The original API37 preservation
+failure and separate earlier native-data incident remain open and unwaived. Fresh-install,
+real-picker/theme/accessibility and preserving physical-device acceptance remain pending.
+No device, artwork, credential, service, power setting or live endpoint changed.
+
 ## 2026-10-19 — approved pets installed on physical watch
 
 A preserving update from the exact installed source adds the reviewed talking decoder
