@@ -1,5 +1,22 @@
 # Progress
 
+## 2026-10-20 — reviewed phone/watch reply cards integrated
+
+The native [reply cards](structured-replies.md), deliberate copy/open controls and
+response-scoped checklist state are integrated locally at `838318a`. The focused
+integration review found zero new Critical or Important source issues and verified that
+the newer phone/watch behavior outside the reply insertion remains exact.
+
+Fresh combined verification: 285 passing JVM cases, zero failures/errors, five explicit
+opt-in SDK/server integration skips; formatting, debug lint and all four APK builds pass
+with 213 tasks executed. Lint reports four inherited phone Hints and one watch boxing
+Hint, with zero warnings/errors. No device was installed or operated in this check.
+
+Source integration does not complete N6. Original quarantined emulator data/identity/
+Keystore recovery remains OPEN Critical. Qualified historical geometry evidence does
+not establish restoration, Wear API33/native480 physical legibility or delivered
+copy/open/check/full-text interactions. Preserving physical acceptance remains pending.
+
 ## 2026-10-20 — reviewed native setup/migration source integrated
 
 The returned QR and configuration-transfer implementation and source fixes are integrated

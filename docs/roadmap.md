@@ -1,6 +1,6 @@
 # Quantum Relay feature roadmap
 
-Updated 2026-10-18. The owner requested implementation of original feature backlog
+Updated 2026-10-20. The owner requested implementation of original feature backlog
 items 1–5 and all ten new ideas. All fifteen remain in scope until their individual
 acceptance contracts are met. The one-port/multiplexed Gadget gateway is excluded.
 
@@ -8,7 +8,8 @@ Design: [fifteen-feature expansion](superpowers/specs/2026-10-18-relay-expansion
 The owner approved the complete eleven-question batch, with one explicit amendment:
 build **Akuma only** as the personal pet proof of concept and a reusable pipeline for
 future custom pets. Staged live rollout/delegation, bounded provider testing and preserving
-device tests are authorized; wireless access to both devices is now confirmed.
+device tests are authorized. Wireless access was confirmed for earlier tests; recheck
+current connectivity and preservation baselines before further device operations.
 
 Later artwork scope amendment: finish Akuma first, then create full Kitana, SF6 C. Viper
 and Cthulhu pets from scratch, including standard and watch companion states. Kitana has
@@ -19,21 +20,21 @@ Personal references and output remain private.
 
 | ID | Feature | Starting point | Current state |
 | --- | --- | --- | --- |
-| O1 | Live per-profile Hermes pets | Isolated SDK delivery patch, watch renderer/cache and synthetic native coverage | Reviewed Portrait/Pet selector installed; configured portrait/default/footer physically observed; real pet delivery and power acceptance open |
+| O1 | Live per-profile Hermes pets | Isolated SDK delivery patch, watch renderer/cache and synthetic native coverage | Four approved private bundles installed on the physical watch with preserving verification; automatic authenticated server delivery and power acceptance open |
 | O2 | Akuma expressions/lip sync and reusable custom-pet pipeline | Reviewed companion tooling, fallback/state mapping and synthetic sheets | Fixed-body renderer/fix integrated; Akuma and all12states/69poses for Kitana/Viper/Cthulhu have actual Android decoder/playback evidence; alternate-base source reviewed/integrated with215 affected root passes; unified Cthulhu preserves desktop original and exact native-tested watch assets; full motion/live/physical power acceptance open |
 | O3 | End-to-end optional Opus | Reviewed phone audio integration, SDK/watch codecs and stock PCM fallback | Synthetic production codecs pass on both physical devices; live negotiated playback, speech comparison and power measurements open |
 | O4 | Optional phone ElevenLabs BYOK | Reviewed phone audio path and encrypted shared/per-profile vaults | Two bounded provider format probes pass; profile-aware settings/fix reviewed and integrated; API29/API37 settings fixtures reviewed; preserving phone update installed; live phone/watch playback and usage acceptance open |
 | O5 | Reconnect outbox | Reviewed durable storage/grants and actual-core hook v2; fresh public-patch reapplication passes | Windows patch6 reviewed/freshly reapplied; both hosts pass10/10 native methods; native drain/ACK, task events and live/physical acceptance open |
-| N1 | Durable history and phone/watch conversation continuation | In-memory per-profile drafts/replies; independent device conversations | Task1/Task2 source accepted; Task3 bridge/fix2 a4a0c37 source-review gate accepted; Task4 durable history projection in isolated implementation; broad verification, queued-marker integration, remaining server/native/live gates open |
+| N1 | Durable history and phone/watch conversation continuation | In-memory per-profile drafts/replies; independent device conversations | Task1/Task2 and Task3 bridge/fix2 source-review gates accepted; Task4 history corrections independently reviewed, but combined verification remains non-green because SDK recovery timed out; focused shutdown investigation active; queued-marker, remaining server/native/live gates open |
 | N2 | Cross-box task inbox and notifications | Current turn/tool status only | Task1 state foundation accepted; actual admissions/task projections/native acceptance open |
-| N3 | Share text, links and supported attachments to an agent | Native picture picker exists for profile art, not conversation sharing | [Full sharing plan](superpowers/plans/2026-10-18-android-sharing.md) and actual image/document source audit prepared; implementation and all acceptance open |
+| N3 | Share text, links and supported attachments to an agent | Native picture picker exists for profile art, not conversation sharing | [Full sharing plan](superpowers/plans/2026-10-18-android-sharing.md) and actual image/document source audit prepared; isolated default-OFF storage/RPC Task1 implementation active; native ingestion/sharing and all acceptance open |
 | N4 | Editable prompt actions and Android shortcuts | Exact-profile widgets/tiles already launch conversations | Implemented/reviewed/installed; physical entry/unbound guard/editor observed; all 13 API29 methods pass; profile-bound physical preview/shortcuts/live remain open |
 | N5 | Walking mode | Existing portrait/inline hold-to-talk, waveform and audio playback | Reviewed audio-output/interruption foundation integrated dc1fb14;11affected client JVM cases and four APK builds pass; full mode/concise speech/Replay/More and physical acceptance open |
-| N6 | Structured reply cards and actions | Reviewed bounded parser integrated; 137 protocol tests including Python fixtures pass | UI/state fixes and API29 helper fix3 source-reviewed; tail/large-font viewport passes have qualified keyboard evidence; original emulator data/Keystore preservation incident remains open; source not root-integrated |
+| N6 | Structured reply cards and actions | Reviewed bounded parser integrated; 137 protocol tests including Python fixtures pass | Reviewed native cards integrated at `838318a`; combined 285 JVM passes, five explicit skips and all four APK builds; qualified historical geometry evidence, original emulator data/Keystore preservation incident and physical acceptance remain open |
 | N7 | Previewed agent handoff | Independent profile routing, no cross-agent context operation | New implementation and all acceptance open |
 | N8 | Connection/request-stage diagnostics and redacted reports | Existing connection/status and error UI | Typed snapshots and native UI/export reviewed/integrated2284399, phone installed preserving data; API29/watch recreation/live/physical acceptance open |
 | N9 | Authenticated remote wake | No remote wake integration established | [Sender Task1](superpowers/plans/2026-10-18-remote-wake.md) in isolated implementation; historical WOL/VM readiness only; review/native/hardware acceptance open |
-| N10 | QR onboarding and safe configuration migration | Current manual review/import and encrypted setup/art stores | Pure format reviewed/integrated with58distinct focused passes; first full native review found6 Important source defects plus an unresolved API37 preservation gate; isolated fix1 active; integration/live/device acceptance open |
+| N10 | QR onboarding and safe configuration migration | Current manual review/import and encrypted setup/art stores | Reviewed source and six Important fixes integrated at `7bb0b0d`; combined checks pass 280 JVM cases with five explicit opt-in skips and all four APK builds; original API37 preservation failure, fresh native and physical acceptance remain open |
 
 ## Planned workstream order
 

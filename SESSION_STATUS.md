@@ -1,5 +1,208 @@
-<!-- Current focus: owner pet feedback after orchestration/capacity failure. Broad goal is blocked/incomplete; no automatic agent/provider fallback restart. Preserve existing work, enrollments and artwork. -->
+<!-- Current focus: active full expansion with two owner-authorized bounded Claude tasks. Preserve prior evidence, enrollments and artwork; no automatic worker/provider fallback restart. -->
 # Session status
+
+## Reviewed structured replies integrated locally — 2026-10-20
+
+The fourteen reviewed native reply paths are now integrated at `838318a` on the current
+migration/audio/pet baseline. Twelve files equal the worker's final reviewed source;
+the phone/watch insertion files retain later root changes outside that seam. The
+independent source integration review found zero new Critical/Important issues. The
+complete patch, hashes, review and root reconciliation are retained under ignored
+`.local/expansion/resume-20261020/n6-integration/`.
+
+Fresh combined checks finish successfully: 285 JVM passes, zero failures/errors, five
+explicit opt-in SDK/server skips, formatting, debug lint and all four APK builds (213
+executed tasks). Lint has four inherited phone Hints and one watch boxing Hint, no
+warnings/errors. Dirty status/roadmap/upstream and the pre-existing walking plan were
+byte-preserved through fast-forward. The user workflow is in docs/structured-replies.md.
+
+This is source integration, not full N6 or preserving delivery. Original quarantined
+emulator data/identity/Keystore recovery remains OPEN Critical. Qualified historical
+native checks do not establish restoration, WearAPI33/native480 physical legibility or
+real delivered interactions. No device, live endpoint/service, provider credential,
+artwork, enrollment, power setting or remote branch changed.
+
+The focused Claude SDK successor returned `5af84a3`: four new lifetime cases plus recovery
+and binding controls report the same38 distinct passes on each core. A fresh bounded
+Claude source/evidence review is active. The earlier300s timeout also failed to reproduce
+on unfixed source, so its cause and combined Task4 gate remain OPEN/NON-GREEN. Attachment
+storage Task1 remains active in its own private clone. No fallback queue is resumed.
+
+## Owner-authorized bounded Claude work — 2026-10-20
+
+The owner now permits Claude agents. Two fresh isolated T3 implementation tasks are
+running: a focused SDK shutdown regression/correction and default-OFF N3 attachment
+storage/authenticated byte RPCs. Each has one exclusive private source owner, explicit
+frozen inputs, strict offline test limits and no nested agents or automatic fallback.
+Exact task IDs, models and briefs are retained in ignored
+`.local/expansion/resume-20261020/claude-dispatch-20261020.json` and active-work.json.
+This supersedes serial-only execution below; it does not restart the earlier worker queue.
+
+The independent five-file I3 review accepts the history rewrite correction with zero
+new Critical/Important findings. Runtime retains 89 passes; clean retains 83 passes
+plus the unresolved SDK recovery timeout. Combined Task4 acceptance is still NON-GREEN.
+The SDK task must prove a deterministic regression before making a narrow correction;
+the shutdown hypothesis is not yet a diagnosis of that timeout. The attachment task
+builds from the earlier independently accepted Task3 source in its own private clone,
+while history/shutdown source remains isolated. Storage-only support will not be
+advertised as verified native attachment delivery. Both returns require fresh review
+before controller integration. No device, service, live endpoint, provider credential,
+artwork, power setting, public export or deployment changed in this checkpoint.
+
+## Owner-requested serial goal resumption — 2026-10-20
+
+The owner requested resumption of the complete fifteen-feature goal. Continue serially;
+no old worker queue or automatic provider fallback is resumed. The native goal tracker now
+reports active and automatic continuation is verified after the owner's Resume action.
+The full objective is retained without recreating or narrowing the goal.
+
+First concrete unit: controller re-review of the returned native migration fix at 66f18fb /
+b38602d. All 21 source/test fix paths were inspected; 54 distinct affected JVM cases pass
+freshly with zero failures/errors/skips in separate build outputs. All 33 final source-map
+paths, 33 historical numbered logs/32 command records and six process-recovery state pairs
+are verified. I1–I6 and M1/M2 source findings are closed. The original API37 I7 restoration
+failure remains FAILED/OPEN and unwaived; old fixtures and physical devices are untouched.
+The controller permits reversible source integration with fresh combined checks, while
+full N10/Task2/native acceptance and the separate N6 lost-data incident stay open. Private
+review/evidence and source-only integration patch are under `.local/expansion/resume-20261020/`.
+Reviewed source is now integrated locally at `7bb0b0d`. Fresh combined checks in separate
+outputs pass: 280 JVM passes, zero failures/errors, five explicitly unrun opt-in SDK/server
+cases, strict formatting, all module debug lint and all four APK compilations (213 executed
+tasks). Mobile retains four existing lint Hints, with no warnings/errors. Root status and
+the pre-existing walking plan were hash-preserved during fast-forward. A user workflow is
+documented in `docs/setup-migration.md`. No device install, live operation, N10 native/full
+acceptance or completed-goal claim follows. Controller history Task4 review is next, serially.
+
+History Task4 controller review subsequently found two Important issues at the returned
+heads: uncharged/unbounded classification metadata, and a prepared history response surviving
+an actual public visibility change under its socket output lock. Both are reproduced as real
+behavioral failures before fixes. Two separate private core clones now contain narrow fixes;
+45 distinct cases pass on each supported foundation, no failures/errors/skips, canonical
+one-worker/warning-strict runner and retries zero. Scoped quality checks pass with five
+inherited Ruff preview-selection warnings. Original candidate SDK/cores remain clean and
+unchanged. Evidence, exact commits, full net patches and the review are indexed under
+`.local/expansion/resume-20261020/history-review/`. Independent fix review and original broad,
+queued-marker, tombstone, native and live gates remain open. No new agents/fallbacks or live
+actions occurred in that unit. A subsequent bounded read-only reviewer is checking only the
+two history fixes and their retained evidence; no implementation queue or provider fallback
+was started. All other work remains controller-owned and serial.
+
+That scoped reviewer closes I1/I2 but records inherited Important I3: equal-length public
+and worker content rewrites escape the content-length fence. Two further actual output-lock
+probes fail before correction. A durable per-row revision is now maintained atomically by
+canonical SQLite content-change/delete triggers and included below the snapshot ceiling;
+no transcript hydration, new schema table, identity or retention change. The first broader
+run has 89 assertion passes but one strict teardown error, retained as NON-GREEN. The same
+unclosed sqlite fixture warning reproduces at the unchanged baseline. Its transaction and
+connection now close explicitly; full affected checks on both private cores are in progress.
+Original candidates/evidence and the first independent review remain unchanged.
+
+I3 candidates are committed privately at runtime `024faf36` / clean `5d725e6b`, with
+five-file deltas and full net packages in `history-review/i3-package`. Final runtime
+checks pass all 89 cases. Clean passes 83, but SDK recovery hits its original 300-second
+file timeout; this is NON-GREEN, not a pass or skip. The owned test process is terminal.
+Before cleanup a read-only synthetic DB snapshot confirms terminal/completed admission
+and delivered final; a native C stack sample shows a hot Python/asyncio loop. The attempted
+Python stack capture was denied by macOS and did not run. SDK shutdown's task/callback loop
+is an unproven hypothesis, not a diagnosed cause. No retry/source installation was performed.
+The same bounded reviewer is checking I3's five-file delta only. Next controller action:
+prepare a separate SDK successor and deterministic shutdown regression; preserve the exact
+original SDK and all timeout evidence. Goal remains active; no provider fallback/worker queue.
+
+
+## Directional walk poses rebuilt after rejection — 2026-10-20
+
+The owner accepted only the previous first frame and rejected the remaining five. That
+candidate is superseded and must not be installed. The new private candidate retains the
+first frame exactly and replaces the other five with individually drawn, connected lower-body
+key poses. The prior cut-joint/continuous texture deformation is not used. Upper artwork is
+fixed across all six frames; one shared palette/exposure mapping covers the new lower art.
+Seven other base rows, three companion states and metadata are unchanged.
+
+Actual staged SDK packaging passes for all 69 poses. Exact first-frame/upper-pixel checks,
+mirrored directions, six unique poses, connected opaque character, blank tails and sheet
+limits pass. Desktop/mobile previews decode every pose and nine control checks pass without
+horizontal overflow or console errors; mobile QA has a Canvas performance warning only.
+This is format/preservation evidence, not aesthetic approval. The updated private index at
+`.local/expansion/pets/cthulhu-walk-latest.json` points to the full comparison, source, prompts,
+proof and package. Owner review remains open. Nothing is installed; no other pet, app, device,
+profile, service or desktop source changed. Five built-in image calls, zero subagents and
+provider fallbacks. The broader expansion remains blocked/incomplete.
+
+
+## Directional walk artwork revision staged — 2026-10-19
+
+A focused private art iteration replaces only two directional rows with six alternating
+support/swing poses, grounded foot paths, continuous leg texture and a small body weight shift.
+The approved upper-body layer is retained; new lower-body art is a disclosed edit. Seven other
+base rows, all three companion states and metadata are unchanged. The actual staged SDK
+packages 69 poses; preservation, source and installed-art checks pass. Desktop/mobile inline
+previews decode all poses, nine control checks pass, and neither layout overflows horizontally.
+
+The self-contained comparison and reproducible candidate are in the ignored pet walk revision
+folder indexed by `.local/expansion/pets/cthulhu-walk-latest.json`. Visual approval remains open;
+no installed art, profile assignment, service, app binary or desktop source changed. Three
+built-in image calls, zero agents and zero provider fallbacks. Full generated gait sheets were
+rejected; only selected leg texture enters the controlled final assembly. The broad expansion
+remains blocked/incomplete. Do not auto-resume its queue.
+
+
+## Desktop bot-to-pet binding fixed — 2026-10-19
+
+The owner clarified that pet selection must follow bots in Hermes Desktop. The assets
+and saved assignments were correct, but the desktop pet read the primary gateway profile
+while focused bot tiles could belong to another profile. A focused desktop correction
+shares the existing authoritative focused-owner derivation with the pet surface, routes
+pet/gallery operations to that connection/profile, clears previous-owner artwork on
+selection and rejects delayed responses. No server, gateway, phone or watch changed.
+
+Two regression checks reproduce the old default-profile leak; 31 focused checks across
+six suites, renderer typecheck and scoped lint pass. The source baseline reproduces all
+1,062 installed renderer files exactly. The preserving update adds eleven hashed chunks
+and replaces entry/manifest files; Electron main code and all sixteen unrelated dirty
+source files are preserved. Existing ad-hoc signature metadata/entitlements are retained
+and deep strict signature verification passes. Complete rollback inputs and a hash-checked
+eight-file source patch are saved privately; no public source commit or PR is created.
+
+Actual desktop UI switches show the intended pets for the three changed bots, and the
+default pet loads at startup. Opening the default bot's canonical chat separately returns
+registry not_found; no replacement chat or history change was attempted. Further repeat
+checks stopped when computer use no longer found the app window. Do not claim complete
+default-chat navigation or a full desktop test suite. No new images, agents, provider
+fallbacks or typed test messages. The broader expansion remains blocked/incomplete.
+
+## Requested profile assignments verified — 2026-10-19
+
+The owner confirmed the four profile choices after the teleport preview. Actual local
+Hermes selection resolves the requested pets for critic, personal, business and default.
+The new directional candidate is published for critic using content-addressed atlas
+files and metadata last; its old atlas files and complete backup are retained. The SDK
+verifies 66 poses there and 69 in each other package. All four configuration files,
+the other three pet stores and twelve protected state files are byte-identical.
+No service, server code or device changed. The watch retains its preceding approved
+artwork; the new directional atlas has not been delivered to it. Existing renderer
+caches may need the owner to reopen their session to load updated same-slug artwork.
+Private installation/assignment receipts are indexed in the current-focus record.
+No new image calls, agents or provider fallbacks; broad expansion remains blocked.
+
+## Directional teleport artwork preview — 2026-10-19
+
+The owner authorized a focused preview replacing two directional walking rows with
+six-frame shadow-glide loops. One built-in raised-knee/crossed-arm pose edit is
+registered to the approved body landmarks; the exact native head pixels and fixed
+hairline details are restored. The new torso/legs are a disclosed pose-edit exception,
+not a claim that every original body pixel is retained. The other seven base rows,
+three companion states and metadata are unchanged; the signature remains untouched.
+
+The actual SDK packages all 66 poses within existing sheet limits. Hash, blank-tail,
+six-frame occupancy, fixed head, loop seam and original-input preservation checks pass.
+Inline desktop/dark and mobile/light previews decode all 66 poses; direction, pause,
+frame scrub, filmstrip, watch-size and backing controls pass without horizontal overflow
+or reported console errors. A private comparison and self-contained copy are saved.
+Visual approval remains open. Installed artwork, devices and profile assignments are
+unchanged. Directional rows remain unused by the watch conversation-state mapper;
+this artwork preview does not add watch roaming. One image call, zero agents/fallbacks.
+The broader expansion remains blocked/incomplete.
 
 ## Approved pets installed on the physical watch — 2026-10-19
 
