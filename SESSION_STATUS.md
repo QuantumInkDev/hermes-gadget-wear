@@ -1,6 +1,45 @@
 <!-- Current focus: active full expansion with two owner-authorized bounded Claude tasks. Preserve prior evidence, enrollments and artwork; no automatic worker/provider fallback restart. -->
 # Session status
 
+## Corrected history source frozen; wake work preserved — 2026-10-20
+
+Fresh combined checks pass the same93 distinct cases on each supported core foundation:
+fifteen files each, zero failures/errors/skips, one worker, warning-strict and retries0.
+Committed SDK5af84a3 and runtime024faf36/clean5d725e6b remain clean; command receipts
+bind actual imports, each selected test file and the affected source hashes. The SDK two-file hardening has a
+fresh scoped Claude ACCEPT with zero Critical/Important findings. It is defensive
+hardening; the old300s timeout is NOT explained or claimed fixed. Prior broad failures,
+queued-final/tombstone, native and live acceptance remain open and unchanged.
+
+This corrected source is frozen for further isolated Task5 development in ignored
+`.local/expansion/continuity-task5-foundation.json`, with complete net patches and current
+matrix under resume-20261020/history-review. Task5's focused brief is prepared. The controller now owns independent private SDK and
+core clones under resume-20261020/task5-controller. Two actual registered-runner tests
+reproduce the missing list/get methods after a real completed admission: both fail with
+unsupported (genuine RED), no fixture/import failures, canonical one-worker/retries0.
+No production Task5 code is implemented yet; the new test file and command/import/hash
+receipts remain private. The real bounded attach producer deliberately omits prompts; a new bounded
+actual-controls read is needed before truthful needs_input projection. No prompt expiry
+or response authority may be invented from relative timeout_s.
+
+The original remote-wake task is authoritatively failed at capacity with no pending run.
+Its five source files plus all prior evidence are preserved with hashes under ignored
+resume-20261020/remote-wake-wip-preservation. Earlier custom-runner42passes and seven
+final subprocess failures are retained as qualified evidence, not canonical acceptance.
+Its core copy lacks own Git metadata; a successor must use exact real core identity.
+A fresh isolated Claude successor owns finishing Task1, alongside the already-running
+attachment store Task1. Exact IDs/briefs are in claude-dispatch-20261020.json. No other
+implementation queue, nested agents or automatic fallback was started. No live/device,
+provider credential, artwork, enrollment, power or service changed.
+
+An owner decision is pending on an explicit exception for the earlier two quarantined
+synthetic emulator losses. The original exact-recovery gate remains OPEN Critical until
+an explicit answer; no waiver follows from elapsed time, new fixtures or passing tests.
+The question proposes retaining the old fixtures/evidence and using fresh fully backed-up
+fixtures; it does not propose erasing them or claim their restoration. Independent server
+work continues meanwhile. The separate N10 preservation finding is not included in this
+question or silently waived.
+
 ## Reviewed structured replies integrated locally — 2026-10-20
 
 The fourteen reviewed native reply paths are now integrated at `838318a` on the current

@@ -1,5 +1,20 @@
 # Progress
 
+## 2026-10-20 — corrected private history foundation verified
+
+The privately isolated history corrections and SDK shutdown hardening have scoped source
+reviews. A fresh combined fifteen-file matrix passes the same 93 distinct cases on each
+supported core foundation, with zero failures/errors/skips, one worker, warning-strict
+execution and retries disabled. Commands bind committed sources, actual imports and
+test-file hashes; all recorded bytes remain unchanged after execution.
+
+This permits further isolated task-projection development, not full N1/N2 acceptance or
+live activation. The original 300-second recovery timeout remains unexplained; a passing
+new run does not prove its cause or remediation. Earlier broad non-green matrices,
+queued-final and tombstone recovery, native consumers and real continuity remain open.
+The task-inbox source audit identifies a required bounded actual pending-control read;
+empty prompts in the existing bounded attach result cannot establish that none are pending.
+
 ## 2026-10-20 — reviewed phone/watch reply cards integrated
 
 The native [reply cards](structured-replies.md), deliberate copy/open controls and
