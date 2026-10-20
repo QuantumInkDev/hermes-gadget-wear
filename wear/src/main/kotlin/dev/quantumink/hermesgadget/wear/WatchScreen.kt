@@ -537,6 +537,7 @@ internal fun ConversationPage(
         ConnectionStatus.ERROR -> R.string.connection_error
     }
     val promptScroll = remember(prompt?.id) { TransformingLazyColumnState() }
+    val replyState = rememberWatchReply(conversation, page.key + ":" + watch.profile?.endpoint?.url)
     RoundPage(
         topPadding = if (prompt == null) 28.dp else 40.dp,
         state = if (prompt == null) pageScroll else promptScroll
@@ -649,7 +650,7 @@ internal fun ConversationPage(
                     }
                     item { Secondary(stringResource(R.string.dismiss), service::dismissDisplay) }
                 } else if (conversation.reply.isNotEmpty()) {
-                    item { Body(conversation.reply) }
+                    structuredReply(conversation, replyState, paired)
                 }
                 item { Secondary(stringResource(R.string.type_message), type) }
                 item { CancelControl(service::cancel) }

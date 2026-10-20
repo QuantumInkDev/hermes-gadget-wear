@@ -18,7 +18,7 @@ import org.junit.Test
 
 class ConversationPresentationTest {
     @Test fun conversationAndRemainingDestinationsRenderAllThemes() {
-        assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
+        assumeTrue(isAndroidEmulator())
         val profile = EndpointProfile(
             Endpoint.parse("wss://synthetic.example.invalid/gadget"),
             "Research companion",
@@ -111,7 +111,7 @@ class ConversationPresentationTest {
     }
 
     @Test fun pairingApprovalCardAndPictureKeepTheirNativeGuards() {
-        assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
+        assumeTrue(isAndroidEmulator())
         NativePhoneFixture().use { ui ->
             val state = androidx.compose.runtime.mutableStateOf(
                 PhoneConversationState(
@@ -184,7 +184,7 @@ class ConversationPresentationTest {
     }
 
     @Test fun reducedMotionUsesAStaticMeterWithoutKeepingAudioSamples() {
-        assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
+        assumeTrue(isAndroidEmulator())
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val original = android.provider.Settings.Global.getString(
             instrumentation.targetContext.contentResolver,
@@ -210,7 +210,7 @@ class ConversationPresentationTest {
     }
 
     @Test fun backgroundAndScreenOffCloseTheActualActivitySession() {
-        assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
+        assumeTrue(isAndroidEmulator())
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val activity = instrumentation.startActivitySync(
@@ -259,7 +259,7 @@ class ConversationPresentationTest {
     }
 
     @Test fun endpointReviewAndPermissionNoticeRemainReachableAndBackPreservesDraft() {
-        assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
+        assumeTrue(isAndroidEmulator())
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val model = PhoneConversation(context.applicationContext as Application)

@@ -192,7 +192,11 @@ internal fun ConversationContent(
                         }
                         if (conversation.reply.isNotBlank()) {
                             Text("Response", style = MaterialTheme.typography.labelLarge)
-                            Text(conversation.reply)
+                            StructuredReply(
+                                conversation,
+                                state.profile?.endpoint?.url.orEmpty() + ":" + state.sessionVersion,
+                                paired && !listening
+                            )
                         }
                         conversation.card?.let {
                             Text(it.title, style = MaterialTheme.typography.titleMedium)

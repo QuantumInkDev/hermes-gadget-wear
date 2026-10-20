@@ -121,7 +121,7 @@ class DirectoryNavigationTest {
     }
 
     private fun fixture(test: (MainActivity, CatalogRepository) -> Unit) {
-        assumeTrue(android.os.Build.MODEL.startsWith("sdk_"))
+        assumeTrue(isAndroidEmulator())
         val vault = CatalogVault(context)
         assumeTrue(
             "Never overwrite existing catalog setup",

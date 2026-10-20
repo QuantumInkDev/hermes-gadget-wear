@@ -56,9 +56,16 @@ data class ConversationState(
     val picture: Picture? = null,
     val level: Float = 0f,
     val microphoneFormat: String = "pcm16",
-    val speakerFormat: String = "pcm16"
+    val speakerFormat: String = "pcm16",
+    val replyRevision: ReplyRevision = ReplyRevision(),
+    val replyChanging: Boolean = false
 ) {
     override fun toString(): String = "ConversationState(mode=" + mode + ", content=redacted)"
+}
+
+/** Opaque, memory-only presentation revision. Never a server/session/message identity. */
+class ReplyRevision internal constructor() {
+    override fun toString(): String = "ReplyRevision(local)"
 }
 
 sealed interface ConversationEffect {
@@ -163,6 +170,8 @@ class Conversation(
         image = null
         actionsPending.clear()
         state = state.copy(
+            replyRevision = ReplyRevision(),
+            replyChanging = false,
             mode = if (state.reply.isEmpty()) ConversationMode.READY else ConversationMode.REPLY,
             status = "",
             prompt = null,
@@ -184,6 +193,7 @@ class Conversation(
                     if (id == turn || id in retiredTurns) return emptyList()
                     if (turn != id) retireTurn(now)
                     turn = id
+                    state = state.copy(replyRevision = ReplyRevision(), replyChanging = true)
                     if (upload == null && retiredHistoryTruncated) {
                         diagnostics.uncertainTurn(now)
                     } else if (upload == null) {
@@ -219,7 +229,12 @@ class Conversation(
                         if (diagnosticTurn(message)) {
                             diagnostics.request(RequestStage.RECEIVING, now)
                         }
-                        state = state.copy(reply = reply, mode = ConversationMode.REPLY)
+                        state = state.copy(
+                            reply = reply,
+                            mode = ConversationMode.REPLY,
+                            replyRevision = ReplyRevision(),
+                            replyChanging = message.type == "reply.delta"
+                        )
                         if (message.type ==
                             "reply"
                         ) {
@@ -245,6 +260,7 @@ class Conversation(
                     retireTurn(now)
                     if (upload == null) {
                         state = state.copy(
+                            replyChanging = false,
                             mode = if (state.reply.isEmpty()) {
                                 ConversationMode.READY
                             } else {
@@ -439,7 +455,13 @@ class Conversation(
         retireTurn(now)
         startDiagnosticRequest(RequestStage.WAITING, now)
         playback = null
-        state = state.copy(mode = ConversationMode.THINKING, status = "", transcript = "")
+        state = state.copy(
+            mode = ConversationMode.THINKING,
+            status = "",
+            transcript = "",
+            replyRevision = ReplyRevision(),
+            replyChanging = true
+        )
         return effects +
             listOf(
                 send("cancel"),
@@ -459,7 +481,14 @@ class Conversation(
         retireTurn(now)
         startDiagnosticRequest(RequestStage.RECORDING, now)
         state =
-            state.copy(mode = ConversationMode.LISTENING, level = 0f, status = "", transcript = "")
+            state.copy(
+                mode = ConversationMode.LISTENING,
+                level = 0f,
+                status = "",
+                transcript = "",
+                replyRevision = ReplyRevision(),
+                replyChanging = true
+            )
         return listOf(
             ConversationEffect.PlaybackStop,
             send("cancel"),
@@ -577,7 +606,12 @@ class Conversation(
         if (upload == null) return emptyList()
         diagnostics.request(RequestStage.CANCELLED, now)
         val effects = cancelUpload("cancelled")
-        state = state.copy(mode = ConversationMode.READY, level = 0f)
+        state = state.copy(
+            mode = ConversationMode.READY,
+            level = 0f,
+            replyRevision = ReplyRevision(),
+            replyChanging = false
+        )
         notice(reason, now)
         return effects + ConversationEffect.Haptic.LISTEN_END
     }
@@ -592,7 +626,12 @@ class Conversation(
         diagnostics.audio(false, now, interrupted = true)
         retireTurn(now)
         playback = null
-        state = state.copy(mode = ConversationMode.READY, status = "")
+        state = state.copy(
+            mode = ConversationMode.READY,
+            status = "",
+            replyRevision = ReplyRevision(),
+            replyChanging = false
+        )
         return effects +
             listOf(
                 ConversationEffect.PlaybackStop,
