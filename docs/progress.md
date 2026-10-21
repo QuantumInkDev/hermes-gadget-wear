@@ -1,5 +1,20 @@
 # Progress
 
+## Provider limit checkpoint; committed regression recovered — 2026-10-21
+
+Both Claude jobs stopped on a provider usage limit. No child remains active, and no
+replacement or automatic retry was launched. The mutation candidate's independent review
+has no completed verdict yet; its source and review package are preserved.
+
+The clock regression was committed before its worker stopped: 36 clock cases pass per
+core, and the specific expiry-forgetting mutant fails exactly the new case while the old
+35 pass. Production code is unchanged. The controller recovered the retained execution
+and patch evidence; fresh scoped review is still required. This is not a new full matrix
+or a completed worker report. All prior Minor findings and original recovery gates remain.
+
+The private handoff records exact failed tasks, worktrees, hashes, reports and the provider's
+reported reset. The full goal remains active; no deployment, reset or recovery exception.
+
 ## Search correction accepted within scope; core boundary active — 2026-10-21
 
 Independent review accepts Task7a fix1 for the pagination correction with zero Critical
