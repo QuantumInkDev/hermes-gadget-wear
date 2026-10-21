@@ -1,4 +1,4 @@
-<!-- Current focus: Task7a I1 correction scoped accepted; Task7b1 core mutation boundary and attachment I3 implementation active. No integration or enablement; original preservation requirements remain open. -->
+<!-- Current focus: Task7a I1 correction scoped accepted; Task7b1 core mutation implementation and attachment I3 review active. No integration or enablement; original preservation requirements remain open. -->
 # Session status
 
 ## Search correction accepted within scope; core boundary active — 2026-10-21
@@ -17,9 +17,11 @@ No privacy decision or activation gate is waived.
 
 The next bounded source slice is implementing actual-core rename/delete authorization at commit,
 metadata state and exact receipt reconciliation after deletion. SDK title/bookmark/delete
-orchestration and its storage/search integration remain required afterward. The independent
-attachment clock/evidence implementation continues in its existing isolated worker; no
-clock source acceptance yet. No nested agents or fallback queue; at most two active children.
+orchestration and its storage/search integration remain required afterward. The attachment
+clock candidate has returned with the same 387 affected cases passing per core. One fresh
+independent review is active; no clock source acceptance yet. Its constructed quota states,
+revised tests, weak mutation coverage and disclosed scope deviation remain explicit in the
+private evidence. No nested agents or fallback queue; at most two active children.
 
 Full Task7, Tasks8–10, remaining native/live/release gates, original N6 exact recovery and
 N10 preservation remain OPEN and unwaived. Private inputs, reports, hashes and decisions
