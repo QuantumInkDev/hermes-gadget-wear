@@ -31,8 +31,11 @@ internal class PhoneHistoryCache(factory: () -> EncryptedHistoryCache) {
     suspend fun put(
         scope: HistoryScope,
         thread: HistoryThread,
-        expectedRevision: Long
-    ): HistorySnapshot = withContext(Dispatchers.IO) { cache.put(scope, thread, expectedRevision) }
+        expectedRevision: Long,
+        afterMessageId: String? = null
+    ): HistorySnapshot = withContext(Dispatchers.IO) {
+        cache.put(scope, thread, expectedRevision, afterMessageId)
+    }
     suspend fun purge(
         scope: HistoryScope,
         conversationId: String?,

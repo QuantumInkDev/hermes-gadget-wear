@@ -47,3 +47,31 @@ is checked between bounded encrypted chunks; cancellation cannot undo a chunk a 
 has already accepted. Failed/cancelled output can retain ciphertext and is not announced
 as saved. The future UI must own and close/finish its destination successfully before a
 Saved message; provider cleanup, chooser/passphrase UI and native acceptance remain open.
+
+
+## Private cache ordering boundary
+
+The at-rest cache's encrypted plaintext schema is now 2; its authenticated record
+wrapper remains version 1 (`history.v1`). Schema 1 is refused without replacing the
+record: its timestamp/opaque-ID sort discarded canonical ordering and cannot be
+reconstructed from that record. This private candidate has never been activated.
+No automatic migration, deletion or reset is performed.
+
+`put(scope, thread, expectedRevision, afterMessageId)` accepts a contiguous ordered
+canonical page. A null anchor means the beginning of the cached conversation; a
+non-null anchor names the cached message immediately preceding this page. Every
+overlapping position must match exactly. New messages extend the tail. Unknown
+anchors, gaps, changed messages or reordered pages are refused before persistence.
+Timestamps and opaque IDs never determine ordering. Earlier pages can be replayed
+when their canonical positions are known; an unplaced later page must wait for its
+predecessor instead of being guessed into position. Replays do not renew retention.
+
+The future authenticated consumer must assemble complete segmented messages in
+wire order, maintain a current canonical snapshot/cursor, and supply the anchor.
+It must explicitly refetch/rebuild if deletion, retention or snapshot replacement
+invalidates that sequence; this cache is not canonical deletion or server authority.
+No input SDK DTO, transport, picker or history-screen consumer is enabled here.
+
+The API29 ownership regression uses an exposed caller array; until its native test
+runs on a safe fixture, only compilation is established. The JVM bulk-conversion
+tripwire proves the fixed constructors use element-wise copies on the host runtime.

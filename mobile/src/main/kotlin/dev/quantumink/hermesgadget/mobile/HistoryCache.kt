@@ -16,6 +16,7 @@ import java.nio.charset.CodingErrorAction
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
+import java.util.Collections
 import java.util.Locale
 import java.util.UUID
 import javax.crypto.Cipher
@@ -50,8 +51,8 @@ internal class HistoryThread(
     val bookmarked: Boolean,
     messages: List<HistoryMessage>
 ) {
-    private val content = messages.toList()
-    val messages: List<HistoryMessage> get() = content.toList()
+    private val content = ownedHistoryItems(messages, 1024)
+    val messages: List<HistoryMessage> get() = content
     override fun toString(): String = "HistoryThread(redacted)"
 }
 internal class HistorySnapshot(
@@ -59,9 +60,20 @@ internal class HistorySnapshot(
     val retentionDays: Int = 90,
     threads: List<HistoryThread> = emptyList()
 ) {
-    private val content = threads.toList()
-    val threads: List<HistoryThread> get() = content.toList()
+    private val content = ownedHistoryItems(threads, 256)
+    val threads: List<HistoryThread> get() = content
     override fun toString(): String = "HistorySnapshot(redacted)"
+}
+
+/** Element-wise ownership also on API29, whose ArrayList(Collection) can alias toArray(). */
+internal fun <T : Any> ownedHistoryItems(values: List<T>, maximum: Int): List<T> {
+    require(values.size <= maximum) { "History capacity exceeded." }
+    val owned = ArrayList<T>(minOf(values.size, maximum))
+    for (value in values) {
+        require(owned.size < maximum) { "History capacity exceeded." }
+        owned.add(requireNotNull(value) { "Invalid history item." })
+    }
+    return Collections.unmodifiableList(owned)
 }
 
 /**
@@ -107,67 +119,84 @@ internal class EncryptedHistoryCache(
         snapshot(scope, saveIfChanged(original, retained))
     }
 
-    /** The local revision prevents late callbacks from undoing a purge or newer cache write. */
-    fun put(scope: HistoryScope, thread: HistoryThread, expectedRevision: Long): HistorySnapshot =
-        update(scope, expectedRevision) { document, now ->
-            validate(thread)
-            if (document.days == 0) {
-                document
-            } else {
-                val previous = document.threads.singleOrNull {
-                    it.scope == scope && it.id == thread.id
-                }
-                if (previous != null) {
-                    check(thread.publicRevision >= previous.publicRevision) {
-                        "Stale history metadata."
-                    }
-                    check(
-                        thread.publicRevision != previous.publicRevision ||
-                            (
-                                thread.title == previous.title &&
-                                    thread.bookmarked == previous.bookmarked
-                                )
-                    ) {
-                        "Conflicting history metadata."
-                    }
-                }
-                val messages = previous?.messages?.associateByTo(linkedMapOf()) { it.message.id }
-                    ?: linkedMapOf()
-                var changed = previous == null || previous.publicRevision != thread.publicRevision
-                thread.messages.forEach { message ->
-                    val known = messages[message.id]
-                    check(known == null || known.message == message) {
-                        "Conflicting history message."
-                    }
-                    if (known == null) {
-                        messages[message.id] = CachedMessage(message, now)
-                        changed = true
-                    }
-                }
-                val saved = CachedThread(
-                    scope,
-                    thread.id,
-                    thread.publicRevision,
-                    thread.title,
-                    thread.bookmarked,
-                    if (changed) now else requireNotNull(previous).receivedAt,
-                    messages.values.sortedWith(
-                        compareBy({
-                            it.message.createdAtMs
-                        }, { it.message.id })
-                    )
-                )
-                val entries = document.threads.toMutableList()
-                if (previous ==
-                    null
-                ) {
-                    entries += saved
-                } else {
-                    entries[entries.indexOf(previous)] = saved
-                }
-                document.copy(threads = entries)
+    /**
+     * Ordered canonical page, beginning immediately after [afterMessageId], or at the beginning
+     * when null. The caller must assemble complete display messages from one current snapshot.
+     * Overlap must match the cached sequence; unknown anchors/gaps/conflicting order are refused.
+     * The local revision prevents late callbacks from undoing a purge or newer cache write.
+     */
+    fun put(
+        scope: HistoryScope,
+        thread: HistoryThread,
+        expectedRevision: Long,
+        afterMessageId: String? = null
+    ): HistorySnapshot = update(scope, expectedRevision) { document, now ->
+        validate(thread)
+        if (document.days == 0) {
+            document
+        } else {
+            val previous = document.threads.singleOrNull {
+                it.scope == scope && it.id == thread.id
             }
+            if (previous != null) {
+                check(thread.publicRevision >= previous.publicRevision) {
+                    "Stale history metadata."
+                }
+                check(
+                    thread.publicRevision != previous.publicRevision ||
+                        (
+                            thread.title == previous.title &&
+                                thread.bookmarked == previous.bookmarked
+                            )
+                ) {
+                    "Conflicting history metadata."
+                }
+            }
+            val messages = previous?.messages?.toMutableList() ?: mutableListOf()
+            val start = if (afterMessageId == null) {
+                0
+            } else {
+                token(afterMessageId, 256)
+                val index = messages.indexOfFirst { it.message.id == afterMessageId }
+                check(index >= 0) { "History anchor unavailable. Reload canonical history." }
+                index + 1
+            }
+            var changed = previous == null || previous.publicRevision != thread.publicRevision
+            thread.messages.forEachIndexed { offset, message ->
+                val position = start + offset
+                val known = messages.getOrNull(position)
+                if (known != null) {
+                    check(known.message == message) {
+                        "Conflicting history sequence. Reload canonical history."
+                    }
+                } else {
+                    check(messages.none { it.message.id == message.id }) {
+                        "Conflicting history sequence. Reload canonical history."
+                    }
+                    messages.add(CachedMessage(message, now))
+                    changed = true
+                }
+            }
+            val saved = CachedThread(
+                scope,
+                thread.id,
+                thread.publicRevision,
+                thread.title,
+                thread.bookmarked,
+                if (changed) now else requireNotNull(previous).receivedAt,
+                messages
+            )
+            val entries = document.threads.toMutableList()
+            if (previous ==
+                null
+            ) {
+                entries += saved
+            } else {
+                entries[entries.indexOf(previous)] = saved
+            }
+            document.copy(threads = entries)
         }
+    }
 
     /** Device cache only. This never cancels work or deletes a canonical conversation. */
     fun purge(
@@ -369,7 +398,7 @@ internal class EncryptedHistoryCache(
             }
         }
         DataOutputStream(bounded).use { data ->
-            data.writeInt(1)
+            data.writeInt(2)
             data.writeLong(document.revision)
             data.writeInt(document.days)
             data.writeInt(document.threads.size)
@@ -401,7 +430,9 @@ internal class EncryptedHistoryCache(
 
     private fun decode(bytes: ByteArray): Document =
         DataInputStream(ByteArrayInputStream(bytes)).use { data ->
-            require(data.readInt() == 1) { "Unsupported history format." }
+            require(data.readInt() == 2) {
+                "Unsupported history format. Existing record was preserved."
+            }
             val revision = data.readLong().also { require(it in 1..MAX_TIME) }
             val days = data.readInt().also { require(it in 0..365) }
             val count = data.readInt().also { require(it in 0..256 && (days != 0 || it == 0)) }

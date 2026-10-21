@@ -56,6 +56,54 @@ class PhoneHistoryExporterTest {
     private fun review(revision: Long = 2, ids: List<String> = listOf(first)) =
         HistoryExportReview(scope, revision, ids, "Example / Profile")
 
+    @Test fun reviewedIdsNeverUseTheCallersBulkArrayConversion() {
+        val backing = arrayOf(first, second)
+        val ids = object : java.util.AbstractList<String>() {
+            override val size: Int get() = backing.size
+            override fun get(index: Int): String = backing[index]
+            override fun toArray(): Array<Any?> = error("Caller array must never be retained")
+        }
+        val selected = review(ids = ids)
+        backing[0] = second
+        assertEquals(listOf(first, second), selected.conversationIds)
+    }
+
+    @Test fun cacheDtosNeverUseTheCallersBulkArrayConversion() {
+        val messages = object : java.util.AbstractList<HistoryMessage>() {
+            override val size: Int get() = 2
+            override fun get(index: Int) = HistoryMessage("m$index", HistoryRole.USER, "Text", 123)
+            override fun toArray(): Array<Any?> = error("Caller array must never be retained")
+        }
+        val entry = HistoryThread(first, 1, "Title", false, messages)
+        assertEquals(listOf("m0", "m1"), entry.messages.map { it.id })
+        val threads = object : java.util.AbstractList<HistoryThread>() {
+            override val size: Int get() = 2
+            override fun get(index: Int) = entry
+            override fun toArray(): Array<Any?> = error("Caller array must never be retained")
+        }
+        assertEquals(2, HistorySnapshot(1, threads = threads).threads.size)
+    }
+
+    @Test fun exportedHistoryKeepsCanonicalEqualTimePromptAndReplyOrder() = runBlocking {
+        val cache = fixture()
+        val third = "00000000-0000-4000-8000-000000000005"
+        val messages = listOf(
+            HistoryMessage("z-user", HistoryRole.USER, "Question", 123),
+            HistoryMessage("a-answer", HistoryRole.ASSISTANT, "Answer", 123)
+        )
+        cache.put(scope, HistoryThread(third, 1, "Ordered", false, messages), 2)
+        val output = ByteArrayOutputStream()
+        PhoneHistoryExporter(cache).write(review(3, listOf(third)), password, output)
+        val opened = HistoryArchive.decrypt(output.toByteArray(), password)
+            as HistoryArchiveReadResult.Success
+        assertEquals(
+            listOf("z-user", "a-answer"),
+            opened.snapshot.conversations.single().messages.map {
+                it.id
+            }
+        )
+    }
+
     @Test fun cancelledReviewDuringEncodingCannotPublishItsCiphertext() = runBlocking {
         val cache = fixture()
         val entered = CountDownLatch(1)
@@ -142,7 +190,8 @@ class PhoneHistoryExporterTest {
                 true,
                 listOf(HistoryMessage("large", HistoryRole.ASSISTANT, "x".repeat(200_000), 124))
             ),
-            2
+            2,
+            afterMessageId = "m0"
         )
         val review = review(3)
         val entered = CountDownLatch(1)

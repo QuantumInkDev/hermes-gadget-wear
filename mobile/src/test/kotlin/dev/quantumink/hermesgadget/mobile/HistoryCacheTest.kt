@@ -84,10 +84,76 @@ class HistoryCacheTest {
                     HistoryMessage("m3", HistoryRole.ASSISTANT, "A private answer 🌙", 125)
                 )
             ),
-            1
+            1,
+            afterMessageId = "m1"
         )
         assertEquals(listOf("m1", "m2", "m3"), merged.threads.single().messages.map { it.id })
         assertEquals(merged.revision, store.put(scope, thread(), merged.revision).revision)
+    }
+
+    @Test fun canonicalListOrderSurvivesEqualTimesClockRollbackAndReopen() {
+        val directory = temporary.newFolder()
+        val messages = listOf(
+            HistoryMessage("z-user", HistoryRole.USER, "Question", 123),
+            HistoryMessage("a-answer", HistoryRole.ASSISTANT, "Answer", 123),
+            HistoryMessage("earlier-clock", HistoryRole.USER, "Next question", 100)
+        )
+        cache(directory).put(scope, thread(messages = messages), 0)
+        assertEquals(messages, cache(directory).read(scope).threads.single().messages)
+    }
+
+    @Test fun equalTimePrefixReplayAndExtensionKeepTheCanonicalSequence() {
+        val store = cache(temporary.newFolder())
+        val question = HistoryMessage("z-user", HistoryRole.USER, "Question", 123)
+        val answer = HistoryMessage("a-answer", HistoryRole.ASSISTANT, "Answer", 123)
+        store.put(scope, thread(messages = listOf(question)), 0)
+        val extended = store.put(scope, thread(messages = listOf(question, answer)), 1)
+        assertEquals(listOf(question, answer), extended.threads.single().messages)
+        assertEquals(
+            extended.revision,
+            store.put(scope, thread(messages = listOf(question)), 2).revision
+        )
+    }
+
+    @Test fun reorderedOrUnanchoredPagesNeverReplaceTheCommittedSequence() {
+        val directory = temporary.newFolder()
+        val store = cache(directory)
+        store.put(scope, thread(), 0)
+        val before = File(directory, "history.v1").readBytes()
+        refuses { store.put(scope, thread(messages = thread().messages.reversed()), 1) }
+        refuses {
+            store.put(
+                scope,
+                thread(
+                    messages = listOf(
+                        HistoryMessage("new", HistoryRole.USER, "Unplaced page", 125)
+                    )
+                ),
+                1
+            )
+        }
+        assertTrue(before.contentEquals(File(directory, "history.v1").readBytes()))
+        assertEquals(1L, store.read(scope).revision)
+    }
+
+    @Test fun anchoredPagesCanExtendOrReplayButNeverGuessAnUnknownPosition() {
+        val directory = temporary.newFolder()
+        val store = cache(directory)
+        val user = HistoryMessage("z", HistoryRole.USER, "Question", 123)
+        val answer = HistoryMessage("a", HistoryRole.ASSISTANT, "Answer", 100)
+        val next = HistoryMessage("next", HistoryRole.USER, "Next", 100)
+        store.put(scope, thread(messages = listOf(user)), 0)
+        val extended = store.put(scope, thread(messages = listOf(answer, next)), 1, "z")
+        assertEquals(listOf(user, answer, next), extended.threads.single().messages)
+        assertEquals(2L, store.put(scope, thread(messages = listOf(answer)), 2, "z").revision)
+        val before = File(directory, "history.v1").readBytes()
+        refuses { store.put(scope, thread(messages = listOf(next)), 2, "unknown") }
+        refuses { store.put(scope, thread(messages = listOf(next)), 2, "z") }
+        assertTrue(before.contentEquals(File(directory, "history.v1").readBytes()))
+        assertEquals(
+            listOf(user, answer, next),
+            cache(directory).read(scope).threads.single().messages
+        )
     }
 
     @Test fun conflictingIdsOrStaleMetadataNeverOverwriteSavedBytes() {
@@ -166,7 +232,8 @@ class HistoryCacheTest {
                     HistoryMessage("m3", HistoryRole.USER, "Recent thought", 125)
                 )
             ),
-            1
+            1,
+            afterMessageId = "m2"
         )
         now += DAY
         assertEquals(listOf("m3"), store.read(scope).threads.single().messages.map { it.id })
@@ -324,7 +391,8 @@ class HistoryCacheTest {
                         HistoryMessage("large-$it", HistoryRole.USER, large, 200L + it)
                     }
                 ),
-                1
+                1,
+                afterMessageId = "m2"
             )
         }
         assertTrue(before.contentEquals(File(directory, "history.v1").readBytes()))
@@ -353,11 +421,35 @@ class HistoryCacheTest {
                         HistoryMessage("one-too-many", HistoryRole.USER, "New thought", 2000)
                     )
                 ),
-                1
+                1,
+                afterMessageId = "id-1023"
             )
         }
         assertEquals(1024, store.read(scope).threads.single().messages.size)
         assertEquals(1L, store.read(scope).revision)
+    }
+
+    @Test fun legacyTimestampSortedSchemaIsRefusedWithoutReplacingItsBytes() {
+        val directory = temporary.newFolder()
+        cache(directory).put(scope, thread(), 0)
+        val record = File(directory, "history.v1")
+        val original = record.readBytes()
+        val decrypt = Cipher.getInstance("AES/GCM/NoPadding")
+        decrypt.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, original.copyOfRange(2, 14)))
+        decrypt.updateAAD("quantum-relay|phone-history|v1".toByteArray())
+        val legacy = decrypt.doFinal(original.copyOfRange(14, original.size))
+        try {
+            ByteBuffer.wrap(legacy).putInt(0, 1)
+            val encrypt = Cipher.getInstance("AES/GCM/NoPadding")
+            encrypt.init(Cipher.ENCRYPT_MODE, key)
+            encrypt.updateAAD("quantum-relay|phone-history|v1".toByteArray())
+            val sealed = byteArrayOf(1, 12) + encrypt.iv + encrypt.doFinal(legacy)
+            record.writeBytes(sealed)
+            refuses { cache(directory).read(scope) }
+            assertTrue(sealed.contentEquals(record.readBytes()))
+        } finally {
+            legacy.fill(0)
+        }
     }
 
     @Test fun authenticatedButInvalidBinaryDocumentsNeverBecomeReadableHistory() {
@@ -371,7 +463,7 @@ class HistoryCacheTest {
         decrypt.updateAAD("quantum-relay|phone-history|v1".toByteArray())
         val plain = decrypt.doFinal(original.copyOfRange(14, original.size))
         val invalid = listOf(
-            plain.copyOf().also { ByteBuffer.wrap(it).putInt(0, 2) },
+            plain.copyOf().also { ByteBuffer.wrap(it).putInt(0, 3) },
             plain.copyOf().also { ByteBuffer.wrap(it).putInt(16, Int.MAX_VALUE) },
             plain.copyOf().also { ByteBuffer.wrap(it).putInt(20, -1) },
             plain + byteArrayOf(1),

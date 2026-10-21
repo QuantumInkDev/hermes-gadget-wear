@@ -8,7 +8,6 @@ import dev.quantumink.hermesgadget.protocol.HistoryArchiveSnapshot
 import dev.quantumink.hermesgadget.protocol.HistoryArchiveSource
 import dev.quantumink.hermesgadget.protocol.MigrationArchive
 import java.io.OutputStream
-import java.util.Collections
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -24,10 +23,10 @@ internal class HistoryExportReview(
 ) {
     val conversationIds: List<String>
     init {
-        require(expectedRevision >= 0 && conversationIds.size in 1..256)
-        val owned = ArrayList(conversationIds)
-        require(owned.size == owned.toSet().size)
-        this.conversationIds = Collections.unmodifiableList(owned)
+        require(expectedRevision >= 0)
+        val owned = ownedHistoryItems(conversationIds, 256)
+        require(owned.isNotEmpty() && owned.size == owned.toSet().size)
+        this.conversationIds = owned
     }
     private val active = AtomicBoolean(true)
     fun cancel() {
