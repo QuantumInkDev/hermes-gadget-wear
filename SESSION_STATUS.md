@@ -1,5 +1,33 @@
-<!-- Current focus: Task7a search implementation and one attachment I3 design review active; clock proposal unaccepted, original preservation requirements remain open. -->
+<!-- Current focus: Task7a source review and a bounded attachment I3 design amendment; neither candidate is accepted or enabled, original preservation requirements remain open. -->
 # Session status
+
+## Search candidate returned; clock review objections retained — 2026-10-21
+
+Task7a read-only conversation listing/search returns private SDK c182270 and core successors
+ba87a7c/9b009e3. The retained final commands show the same 180 affected cases/seven files pass
+once per core with retries disabled, source hashes unchanged and zero test warnings. Core
+capability-absent RED and weaker SDK failures remain separately classified. Full two-commit
+review packages and one independent source/evidence review are prepared; no acceptance or
+integration is claimed. Candidate-budget refusals, recency approximation, cursor behavior,
+global-term-frequency latency and branch coverage remain explicit review concerns.
+
+The independent attachment clock design review returns 0 Critical, 4 Important and 5 Minor. It
+confirms a sustained offset can poison the global identity floor, an unobserved rollback
+can extend relative lifetimes, and unrelated grant changes can revive expired authority
+under the proposed generation-based memory. The separate continuity-store clock also
+remains affected. All four findings are retained; the original proposal is not approved.
+
+One bounded design amendment checks per-key identity floors and exact grant-binding expiry
+memory with fixed non-evicting capacity, preserving old evidence across removal/re-add.
+Capacity exhaustion must refuse new scopes rather than discard replay protection. This is
+a proposed bounded tradeoff, still requiring source/migration verification. Relative TTL
+precision across an unobserved wall-clock rollback must be disclosed; no terminal-handle
+or expired-grant revival is allowed. No clock code, reset, schema migration or live change.
+
+Only two bounded children are active: search review and clock amendment, with no nested
+agents or fallback queue. Task7b metadata/delete, sharing ingestion and remaining native/
+live work stay required. Original N6 exact recovery and N10 preservation remain OPEN and
+unwaived. Current ownership, exact source/report hashes and decisions are recorded privately.
 
 ## Clock proposal needs validation before code — 2026-10-20
 
