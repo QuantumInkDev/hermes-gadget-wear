@@ -1,6 +1,6 @@
 # Progress
 
-## Search correction accepted within scope; next core boundary prepared — 2026-10-21
+## Search correction accepted within scope; core boundary active — 2026-10-21
 
 Independent review accepts Task7a fix1 for the pagination correction with zero Critical
 or Important findings. The same 219 affected cases pass once per core, with retries
@@ -14,7 +14,7 @@ accepts a wider integer timestamp range than the SDK. Prior recency, timing, err
 and send-lock limitations remain explicit. Native CJK-index SQL was not exercised.
 No privacy decision or activation gate is waived.
 
-The next bounded source slice prepares actual-core rename/delete authorization at commit,
+The next bounded source slice is implementing actual-core rename/delete authorization at commit,
 metadata state and exact receipt reconciliation after deletion. SDK title/bookmark/delete
 orchestration and its storage/search integration remain required afterward. The independent
 attachment clock/evidence implementation continues in its existing isolated worker; no
