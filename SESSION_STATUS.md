@@ -1,4 +1,4 @@
-<!-- Current focus: Task7a I1 correction scoped accepted; Task7b1 core mutation implementation and attachment I3 test-only correction active. No integration or enablement; original preservation requirements remain open. -->
+<!-- Current focus: Task7a I1 correction scoped accepted; Task7b1 core mutation review and attachment I3 test-only correction active. No integration or enablement; original preservation requirements remain open. -->
 # Session status
 
 ## Search correction accepted within scope; core boundary active — 2026-10-21
@@ -15,9 +15,10 @@ accepts a wider integer timestamp range than the SDK. Prior recency, timing, err
 and send-lock limitations remain explicit. Native CJK-index SQL was not exercised.
 No privacy decision or activation gate is waived.
 
-The next bounded source slice is implementing actual-core rename/delete authorization at commit,
-metadata state and exact receipt reconciliation after deletion. SDK title/bookmark/delete
-orchestration and its storage/search integration remain required afterward. The attachment
+The actual-core rename/delete candidate has returned with 86 passes and two existing
+Linux-only skips per core; all 16 new routed-mutation cases pass. One independent review
+is active for commit authorization, metadata state and receipt reconciliation after deletion.
+SDK title/bookmark/delete orchestration and storage/search integration remain required. The attachment
 clock candidate has the same 387 affected cases passing per core. Independent review found
 one Important test gap and six Minor findings. One bounded test-only correction now covers
 first observation of an already-expired grant; it must prove sensitivity with a mutant and
