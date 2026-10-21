@@ -1,16 +1,18 @@
 # Progress
 
-## Search candidate returned; clock review objections retained — 2026-10-21
+## Search correction in review; clock implementation active — 2026-10-21
 
-Task7a read-only conversation listing/search returns private SDK c182270 and core successors
-ba87a7c/9b009e3. The retained final commands show the same 180 affected cases/seven files pass
-once per core with retries disabled, source hashes unchanged and zero test warnings. Core
-capability-absent RED and weaker SDK failures remain separately classified. Full two-commit
-review packages are retained. Independent review rejects the candidate with 0 Critical,
-1 Important and 6 Minor findings: index-only candidates in one conversation can permanently
-block a query. One bounded correction adds progress within that conversation to the cursor.
-Six Minors remain for final triage, including recency coupling, error/tool-only matches and
-send-lock bounds; the global-frequency timing residual is not approved for activation.
+Task7a fix1 returns private SDK 936f059 and cores d6f11e6/cb74292. The same 219 affected
+cases/seven files pass once per core, with retries disabled, recorded source hashes unchanged
+and zero test warnings. RED has 27 behavioral failures plus 4 weaker wait timeouts; invalid
+and revised test generations remain explicit. The correction adds exact progress within a
+conversation to the cursor, so ordinary candidate exhaustion can return an empty progress
+page. One independent scoped re-review is active; no source acceptance or integration yet.
+
+Prior Minors remain recorded: recency coupling, error/tool-only matches, send-lock bounds
+and global-frequency timing, which is not approved for activation. Content-only routes and
+guard corrections are partial candidate changes awaiting review. CJK LIKE was tested; the
+native CJK tokenizer/index path was not exercised. Full fix-range packages are retained.
 
 The independent attachment clock design review returns 0 Critical, 4 Important and 5 Minor. It
 confirms a sustained offset can poison the global identity floor, an unobserved rollback
@@ -27,7 +29,7 @@ facts remain intact; canonical migration is lazy. These choices still require ac
 failure/quota tests and independent review. Relative TTL precision across unobserved wall
 rollback remains disclosed. No clock source acceptance, reset, integration or live change.
 
-Only two bounded children are active: search correction and clock implementation, with no nested
+Only two bounded children are active: search re-review and clock implementation, with no nested
 agents or fallback queue. Task7b metadata/delete, sharing ingestion and remaining native/
 live work stay required. Original N6 exact recovery and N10 preservation remain OPEN and
 unwaived. Current ownership, exact source/report hashes and decisions are recorded privately.
