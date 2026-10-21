@@ -1,5 +1,58 @@
-<!-- Current focus: active full expansion; scoped real recovery/capacity evidence accepted, attachment incomplete-index correction active. Exact emulator recovery remains required; no fallback queue. -->
+<!-- Current focus: active full expansion; profile/Unknown evidence accepted, portable Task6 source next, attachment fix4 fresh review active. Exact emulator recovery remains required; no fallback queue. -->
 # Session status
+
+## Real task states, replacement identity and independent profiles — 2026-10-20
+
+Queue/reset evidence is independently accepted with zero new Critical/Important findings.
+New task-state and new-ID evidence also receives scoped acceptance: three actual wire
+cases per core prove Working to Failed through real settlement, and NeedsInput to Working
+to Finished through a real native clarification waiter answered or actually timed out.
+Task/admission/run identities remain stable; task DTOs expose no private question/prompt.
+Native-owner answers are synthetic; Task8 wire controls and full TurnRunner card production
+are not implemented or accepted by this evidence.
+
+A separate one-case matrix per core proves actual new-derived-ID enrollment after an
+explicit same-group grant replacement. Old identity reads refuse; new binding accepts B
+with A history under its explicitly granted group. Its distinct O5 owner inherits no old
+pending deliveries, while the phone retains A+B. Old cursor refusal combines identity and
+grant-generation changes; it does not isolate those dimensions. This is synthetic enrollment,
+not physical reinstall or Keystore recovery. Eight hashed receipts are scoped-review accepted
+in task5-controller/evidence/two-device-task-identity-review.md.
+
+Two further separate one-case matrices pass per core and receive scoped independent
+acceptance with zero new Critical/Important findings. Sequential
+independent gateway processes deliberately share keys/device IDs/server/group UUIDs but
+use separate homes/stores and Relay profile UUIDs. Foreign conversation/task/cursor/binding
+calls refuse while each own transcript/admission survives. This does not test concurrent,
+named-core or multiplexed profiles, nor a shared DB containing foreign rows.
+
+Actual executing-owner crash calls os._exit(73) after real hub admission/Working metadata.
+A new process authenticates via HMAC, and real startup recovery leaves Unknown with the
+original task/admission/run identities. Author receipt/exact retry stay Unknown, with one
+admission and only the dead process's one execution. Watch task metadata stays readable;
+its receipt read correctly refuses without explicit shared-receipt permission. Initial
+runtime-only fixture incorrectly expected that permission; exact failed helper/parent/log
+are retained, not production RED. Corrected final matrix passes both cores with empty child
+stderr and clean scoped quality. Preflight fixture errors remain retained separately.
+
+Current reports/manifests: ignored two-device-task-states-probe-1, new-identity-probe-1,
+independent-profiles-probe-1 and unknown-owner-targeted-2. Separate 3/1/1/1-case matrices,
+not a combined/global run. Frozen SDK97/corea32/clean632 and shared audit guard unchanged;
+new process tests add their own exact helper/argv/hash pins. The exact Task6 requirements
+and next portable named core-test implementation are recorded in the ignored explicit
+gate ledger and portable-task6-next-step.md; external fixtures alone do not supply that
+source artifact. Actual branch production and prerequisite acceptance remain open.
+
+Attachment fix4 returns private f9836d9 with same254 affected passes per core/five files.
+It refuses incomplete/zero canonical indexes, commits to a staging name, then publishes
+without replacing an existing canonical file. Genuine RED counterexamples, new protocol
+specification failures, one fixture leak, invalid commands and inherited Ruff findings
+remain separately classified. A fresh bounded Sonnet review is active, including a
+specific concern that committed staging clocks are deliberately not carried. No clock
+reset or data-loss risk is approved; I3 remains open. Candidate is not accepted or enabled.
+No duplicate or fallback queue. Full Task5/Task6 and later tasks,
+native/live, exact original N6 app-data/identity/Keystore recovery and N10 preservation
+remain OPEN and unwaived. No product integration or live/device change.
 
 ## Accepted queue and canonical reset checks — 2026-10-20
 

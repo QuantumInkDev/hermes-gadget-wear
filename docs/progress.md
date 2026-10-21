@@ -1,5 +1,28 @@
 # Progress
 
+## 2026-10-20 — real task-state and enrollment boundaries
+
+Independent review accepts prior queue/reset checks and new separate task-state/new-ID
+matrices with zero new Critical/Important findings. Three real wire cases pass per core:
+failed settlement, answered native clarification and actual waiter expiry; task/admission/
+run IDs stay stable and prompt text stays private. Task8 wire controls remain open.
+One separate case per core proves explicit new-ID group enrollment, no old O5 delivery
+inheritance, old identity/binding/cursor refusal and one fresh native B with prior A history.
+
+Separate independent-profile and executing-owner-loss cases also pass once per core,
+with scoped zero-new-Critical/Important acceptance. Matching keys/server/group across sequential separate home/profile
+instances cannot borrow foreign registry/task/cursor/binding authority. Real abrupt running
+owner death/restart exposes Unknown to both clients without changing IDs or rerunning work.
+Author exact retry returns Unknown; watch receipt correctly needs explicit shared permission.
+An initial fixture assumption about that permission failed and is retained, not production
+RED. Preflight fixture errors and corrected generations remain explicit. Exact manifests,
+twelve synthetic receipts across separate 3/1/1/1-case matrices and scoped quality retained;
+not a combined/global suite. Frozen sources/guard unchanged. Attachment fix4 returns private
+f9836d9 with same254 affected passes per core/five files; a fresh bounded review assesses
+staging publication, refusal/preservation and its uncarried staging-clock concern. Candidate
+is not accepted or enabled. Portable named Task6 test source and actual branch boundary remain open.
+Full Task5/Task6/later tasks, native/live and original N6/N10 exact preservation remain open.
+
 ## 2026-10-20 — accepted queued work survives loss of author/transport
 
 Same two actual hub cases pass per core: C is truly queued behind held running B;
