@@ -1,5 +1,23 @@
-<!-- Current focus: Task7a list/search implementation and attachment I3 clock design active; fix5 preservation scoped accepted with deferred Minors. Full expansion/exact recovery remain open. -->
+<!-- Current focus: Task7a search implementation and one attachment I3 design review active; clock proposal unaccepted, original preservation requirements remain open. -->
 # Session status
+
+## Clock proposal needs validation before code — 2026-10-20
+
+The I3 source investigation returned a conditional proposal separating relative lifetimes,
+request-identity rejection floors and per-generation grant-expiry memory. No clock fix or
+schema migration is implemented or accepted. The report identifies a separate continuity
+store clock dependency, so an attachment-only change cannot close end-to-end delivery.
+
+Two parent arithmetic checks challenge the proposed guarantees: a bad-clock episode plus
+a future-dated accepted identity can still raise a global rejection floor; an unobserved
+rollback interval can extend a live upload despite summing positive wall deltas. These are
+checks of the proposed model, not actual SDK tests or production RED. One bounded fresh
+design review evaluates those cases, migration and the unavoidable clock-policy choices
+before any implementation. Exact inputs, report, witnesses and task IDs are kept privately.
+
+Conversation listing/search continues in its existing isolated implementation run. Full
+Task7 metadata/delete, N3 ingestion, remaining native/live work and original N6 exact
+recovery/N10 preservation remain OPEN and unwaived. No clock reset or live/device change.
 
 ## Attachment preservation accepted within scope; clock design remains open — 2026-10-20
 
