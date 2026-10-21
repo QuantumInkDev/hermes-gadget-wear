@@ -1,5 +1,24 @@
 # Progress
 
+## Attachment preservation accepted within scope; clock design remains open — 2026-10-20
+
+Fresh independent review accepts fix5 dda6672 with zero Critical/Important findings in
+that diff. Five new Minor findings and the carried partial-staging recovery Minor are
+recorded for final triage: unreached fault-coverage claims, missing legacy flush-order
+test, page-size availability assumption, RED classification and a loose assertion.
+The 352-case matrix on each core stands; it is not 44 independent defects or proof of every
+listed recovery fault. Original I3 unbounded forward-clock poisoning remains OPEN,
+including complete first-init clocks now preserved by this fix. No full Task1/N3 acceptance,
+integration or enablement. One bounded read-only design investigation must resolve those
+clock/expiry/replay/offline/reboot constraints before implementation; no reset is authorized.
+
+Conversation list/search implementation continues separately. Task7b preflight now records
+the actual public mutation API, distinct core/public revisions and commit-time grant seam
+needed for correct edits/deletion, plus the existing post-tombstone receipt-read obstacle.
+No fake authority method, direct plugin SQL mutation or global tombstone bypass is planned.
+Metadata/deletion and all remaining features remain required. Original N6 exact recovery
+and N10 preservation stay OPEN/unwaived; no physical, live or provider change.
+
 ## Conversation search started; attachment preservation candidate returned — 2026-10-20
 
 Independent review accepts the actual authenticated API branch-boundary characterization
