@@ -640,7 +640,7 @@ object MigrationArchive {
     }
 
     /** v1 policy: at least 12 code points after NFC; see [kdfInput]. */
-    private fun requirePassphrase(passphrase: CharArray) {
+    internal fun requirePassphrase(passphrase: CharArray) {
         val bytes = kdfInput(passphrase)
         try {
             // Strict UTF-8: every code point has exactly one non-continuation (lead) byte.
