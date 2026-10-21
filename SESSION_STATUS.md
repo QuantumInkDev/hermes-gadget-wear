@@ -1,4 +1,4 @@
-<!-- Current focus: Task7a search-progress correction and a bounded attachment I3 design amendment; neither candidate is accepted or enabled, original preservation requirements remain open. -->
+<!-- Current focus: Task7a search-progress correction and attachment I3 clock/evidence implementation; neither candidate is accepted or enabled, original preservation requirements remain open. -->
 # Session status
 
 ## Search candidate returned; clock review objections retained — 2026-10-21
@@ -19,14 +19,16 @@ can extend relative lifetimes, and unrelated grant changes can revive expired au
 under the proposed generation-based memory. The separate continuity-store clock also
 remains affected. All four findings are retained; the original proposal is not approved.
 
-One bounded design amendment checks per-key identity floors and exact grant-binding expiry
-memory with fixed non-evicting capacity, preserving old evidence across removal/re-add.
-Capacity exhaustion must refuse new scopes rather than discard replay protection. This is
-a proposed bounded tradeoff, still requiring source/migration verification. Relative TTL
-precision across an unobserved wall-clock rollback must be disclosed; no terminal-handle
-or expired-grant revival is allowed. No clock code, reset, schema migration or live change.
+The clock amendment returned source analysis, with no executed evidence. One bounded
+implementation is underway to add per-key floors and exact grant expiry observations in
+fixed reserved metadata slots. Clock and expiry evidence must commit together at the index size limit;
+the first over-cap grant batch permanently refuses unseen bindings instead of discarding
+evidence or later admitting a refused tuple. Frozen first-init recovery and legacy clock
+facts remain intact; canonical migration is lazy. These choices still require actual
+failure/quota tests and independent review. Relative TTL precision across unobserved wall
+rollback remains disclosed. No clock source acceptance, reset, integration or live change.
 
-Only two bounded children are active: search correction and clock amendment, with no nested
+Only two bounded children are active: search correction and clock implementation, with no nested
 agents or fallback queue. Task7b metadata/delete, sharing ingestion and remaining native/
 live work stay required. Original N6 exact recovery and N10 preservation remain OPEN and
 unwaived. Current ownership, exact source/report hashes and decisions are recorded privately.
