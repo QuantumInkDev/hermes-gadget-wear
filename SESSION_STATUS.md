@@ -1,5 +1,34 @@
-<!-- Current focus: full expansion active; portable Task6 first slice accepted, branch matrix passed/review active, attachment fix5 active. Exact recovery remains required. -->
+<!-- Current focus: full expansion active; Task7a list/search implementation and attachment fix5 review active. Continuation/branch evidence scoped accepted; exact recovery remains required. -->
 # Session status
+
+## Conversation search started; attachment preservation candidate returned — 2026-10-20
+
+Independent review accepts the actual authenticated API branch-boundary characterization
+with zero Critical/Important/Minor findings. It proves a settled API fork stays outside the
+original Relay compression owner/history/task route; prior API/profile/CLI/active-work limits
+remain. Portable continuation source acceptance also stands. Full Task6 release acceptance
+and original N6 exact recovery/N10 preservation are still OPEN and unwaived.
+
+One bounded Sonnet implementation now owns read-only conversation listing/search in new
+private SDK/core successors. Authorization must restrict the native query before search,
+ranking or pagination; existing global search followed by filtering is forbidden. This is
+Task7a only; title/bookmark mutations and canonical deletion remain mandatory Task7b, with
+controls, existing-source opt-ins and native consumers still required afterward.
+
+Sequencing decision: accepted source interfaces permit this disabled private development
+while earlier release gates remain open. No integration or activation follows; interface
+changes would require rebasing/reviewing the candidate. Existing ledger and exact frozen
+foundation hashes are retained; no duplicate Tasks1–6 work or wider completion claim.
+
+Attachment fix5 returns private dda6672 (matrix at8175ff9; final commit changes docs only).
+It reports the same352 affected cases/six files pass per core. Legacy recovery keeps its
+verified clock-bearing image instead of removing it; complete staging images carry their
+clock and directory publication is synced before removing the staging name. RED is split
+into44 data-loss counterexamples,11 new protocol specifications and2 changed-policy guards;
+invalid attempts and inherited Ruff findings remain explicit. One fresh bounded review
+assesses the exact five-commit diff, evidence and preservation semantics. Not accepted,
+integrated or enabled. I3 forward-clock policy/native/platform/full-disk/power-loss/Task2
+and exact recovery gates remain open. No physical/AVD/live/provider/power/art change.
 
 ## Portable continuation source accepted; attachment crash fix continues — 2026-10-20
 
