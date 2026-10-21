@@ -18,6 +18,21 @@ required. NeedsInput is display-only; no prompt deadline or response authority i
 invented. The owner explicitly keeps exact original emulator data/identity/Keystore
 recovery required. Those fixtures stay quarantined; fresh fixtures cannot substitute.
 
+Additional external acceptance probes exercise actual owned-process death and a real
+captured-result settlement outage. A fresh four-file matrix passes the same 34 cases
+per core, including three new cases. Unknown work stays unknown, committed completion
+and its exact history recover, and original-request replay does not execute again.
+The final three probes pass per core after adding direct comparison to the real public
+task/run IDs captured before death. The earlier 34-case matrix and final targeted run
+remain separate. Source bytes are unchanged; focused evidence review is pending.
+Initial child-fixture failures remain retained; no production fix is claimed from them.
+
+The separate private remote-wake fix is source-reviewed at 9f1b692: malformed method
+shapes, wake clock discovery and blocking dispatch checks are corrected. Its 447-case
+matrix retains two failed test expectations per core; the corrected 170-case wake file
+then passes on both cores. This is not a single clean final 447-case run. Real connection,
+stock speech/packaging, native and live wake acceptance remain open; no activation occurred.
+
 ## 2026-10-20 — corrected private history foundation verified
 
 The privately isolated history corrections and SDK shutdown hardening have scoped source

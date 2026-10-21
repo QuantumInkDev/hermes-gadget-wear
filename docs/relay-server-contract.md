@@ -316,6 +316,12 @@ labels; UUID request/target IDs; expiry ≤30 seconds ahead; one request per tar
 burst one. Status `accepted|unavailable|unsupported` describes dispatch, not proven boot.
 Keep an idempotency receipt for ten minutes; duplicate ID/different target is conflict.
 
+The private wake-enabled candidate adds optional `server_time_ms` to `relay.info`,
+including wake-only and outbox clients, so the client can form that expiry against
+server time. A missing or invalid clock is not permission to extend an expiry or
+silently retry a wake. Wake-disabled discovery retains its existing fields. This
+additive field is source-reviewed; native integration and live wake remain unverified.
+
 Backends are server-allowlisted `wol` and `vm_start_resume`; mappings contain the private
 MAC or VM UUID and platform command. Client cannot supply a MAC, UUID, command, binary,
 address or arguments. Other profile endpoints may report wake unavailable and direct

@@ -1,4 +1,4 @@
-<!-- Current focus: active full expansion; task-state source increment reviewed, with one bounded Claude attachment fix and a fresh wake-fix review. Preserve original evidence and exact emulator recovery; no automatic fallback queue. -->
+<!-- Current focus: active full expansion; task-state and wake source increments reviewed, bounded attachment fix active, actual task-lifecycle probes under evidence review. Preserve original evidence and exact emulator recovery; no automatic fallback queue. -->
 # Session status
 
 ## Private task-state source increment reviewed — 2026-10-20
@@ -39,16 +39,31 @@ All matrix generations bind actual imports and
 the affected source/test bytes; the same cases repeated across cores are not summed
 as distinct coverage.
 
+Three additional controller-owned lifecycle probes now pass in a four-file matrix:
+the same 34 cases on each foundation, zero failures/errors/skips. An actual owned
+process exits abruptly after native start or committed completion; a fresh authority
+preserves unknown/completed state, admission/run identity and original-request deduplication.
+Fresh completed history returns the exact stored answer. A separate real settlement
+write outage stays unknown until local operator recovery commits its retained result.
+The initial two child-fixture error runs are retained separately and are not production
+RED. The helper then captured the actual public task/run IDs before death; all three
+final probes pass on each core after that stronger assertion. The earlier 34-case
+matrix is retained separately, and its unchanged 31 task/counter cases were not rerun.
+Source bytes remain unchanged; a bounded evidence review is pending.
+These probes do not prove recovery of an uncommitted result lost with a dead process.
+
 This is an incomplete development increment, not full Task5/N1/N2 acceptance. The
-remaining unknown/recovery/rejected/capacity/race lifecycle coverage, Tasks6–10,
+remaining full unknown/recovery/rejected/capacity/race lifecycle coverage, Tasks6–10,
 native inbox/notifications and real-device/live gates remain open. The earlier Claude
 attachment and wake implementations have returned and had bounded independent reviews.
-The narrow wake fix has returned at private SDK 9f1b692 and is under a fresh bounded
-source/evidence review. Its 447-case matrix has two failed parity-test expectations
+The narrow wake fix at private SDK 9f1b692 has a fresh bounded source/evidence review:
+I1/I2/I4 are closed in scope, with zero new Critical/Important findings. Its 447-case
+matrix has two failed parity-test expectations
 per core; after a test-only correction, the affected 170-case wake file passes on
 each core. The other eleven unchanged files were not rerun, so this is not a single
 clean final 447-case gate. Real connect/disconnect, stock speech/packaging and live
-wake proof remain open. A separate attachment fix addresses unsupported imports, safe
+wake proof remain open. The additive server-time field is recorded in the app-side
+contract. A separate attachment fix addresses unsupported imports, safe
 empty-init recovery, docs and missing boundary proof; clock policy must preserve
 fail-closed authority and remains open if no compatible correction is proved. Their
 original qualified failures/skips are retained, not treated as clean full gates.
