@@ -1,6 +1,29 @@
 <!-- Current focus: active full expansion; scoped real recovery/capacity evidence accepted, attachment incomplete-index correction active. Exact emulator recovery remains required; no fallback queue. -->
 # Session status
 
+## Accepted queue and canonical reset checks — 2026-10-20
+
+Two new actual hub cases pass once each on both frozen cores: hold running B, admit C
+as queued, then revoke the author's on-disk grant or close its WebSocket. The revoked
+author cannot read; releasing B lets the real FIFO execute C exactly once with A/B's
+canonical history. Watch sees six messages and the same three completed task/admission
+IDs. Before release, actual rows show started/queued and task metadata shows working.
+
+A separate one-case matrix passes both cores after a retained fixture correction.
+Actual SessionStore reset creates a new route whose parent metadata names the old row,
+but whose compression lineage/logical owner is only itself. Old Relay attach, submit and
+history read refuse conflict; original transcript/admission/registry/task persist and
+the new route stays empty. Initial runtime fixture incorrectly expected historical reads
+to succeed. Its failed log and exact old test are retained, not production RED; this
+does not implement historic reset browsing or a branch producer.
+
+Four queue and two reset receipts, exact canonical commands/source hashes/exits and
+clean scoped quality are retained in ignored task5-controller/evidence. Separate
+two/one-case matrices, not a combined/global result. Narrow read-only review is active.
+One bounded Sonnet attachment fix4 continues independently. No frozen source, device,
+live server or remote branch changed. Full goal, original N6 exact recovery and N10
+preservation remain OPEN and unwaived.
+
 ## Real recovery/capacity evidence and attachment refusal — 2026-10-20
 
 Independent review accepts the earlier nine authority and two precommit-fence cases,

@@ -1,5 +1,19 @@
 # Progress
 
+## 2026-10-20 — accepted queued work survives loss of author/transport
+
+Same two actual hub cases pass per core: C is truly queued behind held running B;
+post-admission author grant removal or actual socket close does not cancel either.
+Revoked reads refuse; B/C finish exactly once under the original owner and watch sees
+stable history/task/admission identities. Separate canonical-reset case passes both
+cores: new parent-linked route has its own compression owner, old Relay reads/writes
+refuse conflict, original accepted data stays intact and the replacement stays empty.
+Initial runtime-only reset test expected historical readability incorrectly; exact
+failed fixture/log retained and corrected against actual route guard, not production RED.
+Six receipts, strict commands/hashes/exits and scoped quality retained; narrow review
+active. No combined/global, historical-browser or branch acceptance claim. One bounded
+attachment fix4 active; full goal/N6 exact recovery/N10 preservation remain open/unwaived.
+
 ## 2026-10-20 — scoped frame-gap recovery and configured connection capacity
 
 The nine authority and two precommit-fence cases receive scoped independent acceptance.
