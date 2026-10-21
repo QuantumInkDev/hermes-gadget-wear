@@ -1,5 +1,47 @@
-<!-- Current focus: active full expansion; actual ordered two-device restart/compression/ACK evidence, two bounded read-only reviews. Exact emulator recovery remains required; no automatic fallback queue. -->
+<!-- Current focus: active full expansion; real crash-window/expiry/conflict proof under review, one attachment content-proof correction active. Exact emulator recovery remains required; no fallback queue. -->
 # Session status
+
+## Actual crash windows and attachment review correction — 2026-10-20
+
+Independent review now accepts the ordered continuation, actual graceful process
+restart/compression and separate lost-ACK-response characterizations, with zero new
+Critical/Important findings. Their whole-tail/lease/catalog/pull-only/gap limits remain.
+The exact report is task5-controller/evidence/two-device-process-review.md.
+
+Two additional actual process-crash cases pass on both core foundations. One abruptly
+exits at the core committed observer BEFORE Relay records the queued admission: the
+actual Relay request is still intent/result-null, with no execution. The other exits
+before the real socket can send the initial submit response, after real settlement and
+Relay journaling, with one execution. Both use os._exit(73), bypassing cleanup. New
+processes retain the exact admission/payload/principal/logical target and perform actual
+gateway native startup recovery. A deliberate same-UUID retry after the actual deadline
+returns the original completed result: queued work executes once after restart; already
+completed work never executes again. Both clients see one identical message pair/task.
+
+The final strengthened same-two-case matrix also proves changed text and target conflict,
+expired first attempts refuse, and global native admission/execution counts remain one.
+Evidence generations remain separate: two-device-crash-probe-1 then only changed
+helper/test rerun in two-device-crash-targeted-2, same two cases/one file per core,
+zero failures/errors/skips, unchanged source/test hashes, empty child stderr and clean
+scoped Ruff. No new app/server source integrated. A bounded native review is active.
+
+Attachment fix2's 103-case passes did NOT close its gate: fresh review finds one new
+Important data-preservation issue. SQLite counter1/size/magic cannot prove that a
+nonempty index has no content; startup could delete a foreign/restored single-commit
+index. Scope acceptance was refused. The journal-disappearance fix and release/repr
+correction were accepted; prior populated-index cases only partly close preservation.
+One bounded Sonnet fix3 now requires actual content proof/non-destructive recovery,
+real single-commit negative controls and retained genuine first-init recovery where
+provable. No destructive reset, risk waiver or clock-policy change. I3 unbounded clock
+high-water remains OPEN. Prior missing/overwritten probe commands and source-commit
+RED provenance qualifications remain explicit. Report: t3-817afa57 ignored
+attachment-store-fix2-review/report.md; exact worker/source paths in active-work.json.
+
+Next: complete negative authority/key/group/profile/cursor/binding/reset/capacity/race
+and real task-state gates, then Tasks7–10 and PDF/strict-UTF-8 attachment admission.
+Full Task5/Task6/N1/N2/N3/native/live and historical N6 exact data/identity/Keystore
+recovery plus separate N10 preservation remain OPEN and unwaived. No live/device,
+power, artwork, enrollment or remote-branch change. At most two bounded child tasks.
 
 ## Ordered two-device restart, compression and lost ACK — 2026-10-20
 
@@ -32,7 +74,7 @@ One server-WebSocket send leaf discards only the successful response after real 
 commit. HMAC reconnect, exact ACK retry and remaining-copy ACK preserve history/tasks,
 with exactly two admissions/executions and no duplicate final. This is lost ACK-response
 proof, not a crash/precommit ACK-loss proof. Evidence: two-device-final-ack-probe-1.
-Scoped quality checks are clean. A bounded native evidence review is active.
+Scoped quality checks are clean. The later scoped review accepts this evidence; see current entry.
 
 Attachment fix2 returned at 5e85076 (private, default OFF): the same 103 affected cases
 pass each core. It narrows disappearing-journal handling and refuses populated indexes

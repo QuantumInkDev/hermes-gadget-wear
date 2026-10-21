@@ -1,5 +1,27 @@
 # Progress
 
+## 2026-10-20 — actual committed-turn crash recovery and expired retries
+
+Narrow independent review accepts prior ordered continuation, graceful process restart,
+compression and lost-ACK-response evidence, with zero new Critical/Important findings.
+Two new cases abruptly exit the real gateway process at core-commit-before-Relay-record
+and settlement-before-socket-response. A fresh process uses actual native startup recovery;
+same-UUID retry after the real deadline retains the original admission/payload and exactly
+one execution across both processes. Changed text/target refuse as conflict, expired first
+attempt refuses, and global admission count stays one. Both clients have the same message
+pair/finished task. Final same-two-case/one-file matrix passes each core, no failures,
+errors/skips, stable hashes, empty child stderr, scoped quality clean. Initial and stronger
+final generations are separate, not four distinct cases. Narrow evidence review is active.
+
+Attachment fix2 review refuses acceptance despite its 103 affected passes per core: one
+new Important finding permits deleting contentful single-commit indexes based on a header
+counter. A bounded fix3 must prove contents or recover non-destructively; no data-loss waiver,
+clock reset or enablement. Journal-disappearance and release/repr fixes are accepted within
+scope. Unbounded high-water, full Task1/N3, missing historical probe/provenance evidence and
+native/live remain open. Full Task5/Task6 negative-authority/reset/capacity/race/state gates,
+later tasks and exact original N6 recovery plus separate N10 preservation remain unwaived.
+No app/server integration or live/device change occurred.
+
 ## 2026-10-20 — actual ordered continuation, process restart, compression and ACK response loss
 
 The original authenticated socket evidence received limited zero-new-Critical/Important
