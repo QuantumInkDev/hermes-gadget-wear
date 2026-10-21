@@ -1,5 +1,26 @@
 # Progress
 
+## 2026-10-20 — scoped frame-gap recovery and configured connection capacity
+
+The nine authority and two precommit-fence cases receive scoped independent acceptance.
+Two new recovery cases pass per core: actual 256-frame overflow after 64 completed turns
+produces a gap; reattach restores 128 messages and 64 task/admission identities with no
+extra execution. Temporary accepted-store absence refuses without new-file creation;
+same-inode/exact-byte restoration retains full history/tasks. This is not deletion recovery.
+A separate one-case matrix passes per core at the unchanged 128-binding limit: roster
+replacement permits a new enrolled peer but attach stays busy until real disconnect frees
+one occupied slot. Prior contexts become stale on roster rollover; healthy-peer load is
+not claimed. Six receipts and exact source/import/command hashes pass independent review,
+with zero new Critical/Important findings and clean scoped quality. Separate matrices,
+not a combined/global pass. No source change in either frozen core or SDK.
+
+Attachment fix3 review refuses scope acceptance (two Important findings) despite its
+140 affected passes per core: prefix/zero-byte recovery could discard unknown authority.
+One bounded fix4 requires refusal of uncertain canonical files and durable initialization
+before publication; safe full-image recovery stays required. I3 clock policy, full Task1/N3,
+PDF/strict-UTF-8 ingestion and native/live remain open. Full Task5/Task6/later tasks and
+original N6 exact recovery plus N10 preservation remain OPEN/unwaived. No live/device change.
+
 ## 2026-10-20 — real hub authority and guarded commit waits
 
 The two actual crash-window cases receive scoped zero-new-Critical/Important review.

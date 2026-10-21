@@ -1,5 +1,37 @@
-<!-- Current focus: active full expansion; real authority/output/commit-fence evidence under review, one attachment content-proof correction active. Exact emulator recovery remains required; no fallback queue. -->
+<!-- Current focus: active full expansion; scoped real recovery/capacity evidence accepted, attachment incomplete-index correction active. Exact emulator recovery remains required; no fallback queue. -->
 # Session status
+
+## Real recovery/capacity evidence and attachment refusal — 2026-10-20
+
+Independent review accepts the earlier nine authority and two precommit-fence cases,
+and the new separate recovery/capacity matrices, with zero new Critical/Important findings.
+The recovery matrix passes the same two cases per core: actual completed turns hit the
+unchanged 256-frame limit after 64 executions, yielding one gap; reattach recovers 128
+unique messages and 64 completed tasks/admissions without another execution. Temporarily
+renaming an accepted Relay store refuses without recreating it; restoring the same inode
+and exact bytes retains history/tasks. This is reversible absence, not lost-data recovery.
+
+The separate same-one-case capacity matrix passes each core: 128 authenticated bindings
+fill the configured limit, a newly enrolled peer with a replaced roster entry receives
+busy, and actual old-transport closure frees its slot. Roster rollover makes earlier
+contexts stale; this does not prove 128 healthy peers under turn load or 129 current grants.
+Six hashed receipts, command/source provenance, scoped quality and the accepted review
+are in ignored task5-controller/evidence/two-device-recovery-capacity-review.md. These
+are separate two/one-case matrices, not a combined/global result. Frozen sources unchanged.
+
+Attachment fix3's same140 affected passes per core do not close its gate. Fresh review
+refuses scope acceptance with two Important findings: incomplete prefixes cannot prove
+that omitted pages held no tombstones/clock, and zero-byte preexisting indexes silently
+reset unknown authority. One bounded Sonnet fix4 now requires incomplete/zero-file refusal
+and committed temporary initialization before non-clobbering publication, retaining safe
+full-image recovery and clock floors. I3 remains open; no data-loss waiver or clock reset.
+Exact candidate, brief and task ownership are in ignored active-work.json.
+
+Full Task5/Task6 still needs independent profile instances, new-ID accepted-history privacy,
+canonical reset/branch, accepted-queue grant changes, byte/other capacities, remaining
+faults/races and real task states. Tasks7–10, attachment PDF/strict UTF-8/native/live, original
+N6 app-data/identity/Keystore exact recovery and N10 preservation remain OPEN and unwaived.
+No product source integration, physical/live/provider/power/artwork or remote-branch change.
 
 ## Real hub authority boundaries and precommit fences — 2026-10-20
 
