@@ -1,5 +1,48 @@
-<!-- Current focus: active full expansion; profile/Unknown evidence accepted, portable Task6 source next, attachment fix4 fresh review active. Exact emulator recovery remains required; no fallback queue. -->
+<!-- Current focus: full expansion active; portable Task6 first slice accepted, branch matrix passed/review active, attachment fix5 active. Exact recovery remains required. -->
 # Session status
+
+## Portable continuation source accepted; attachment crash fix continues — 2026-10-20
+
+The required portable `tests/gateway/test_relay_two_device_continuation.py` is committed
+only in two independent ignored core successors: runtime fcdd89164cac02503a545dba3cb22176b017e609
+and clean 24ed41c3cba1d109ad2c64472a49be58e7f6f9ac. Each delta adds that one identical test,
+with no product-source change. Same one case/file passes once per core through the canonical
+warning-strict runner: actual plugin registration, TOFU enrollment, phone A before watch B,
+shared canonical history/owner, distinct principals and actual HMAC reconnect. Scope is
+macOS/AF_UNIX with deterministic provider/catalog leaves, not TCP/TLS/device acceptance.
+
+Independent read-only review accepts this portable first-slice artifact with zero
+Critical/Important/Minor findings. Five inherited Ruff preview-selection warnings remain
+recorded; no warning-free/global-suite or production-RED claim. Exact reports, two receipts,
+source/import hashes and net/series packages are retained in ignored task5-controller/evidence
+and package-task6-portable. Frozen original cores/SDK and audit guard remain unchanged.
+Branch review, full Tasks1–5 prerequisites and full Task6/later gates remain open.
+
+Attachment fix4 is REFUSED with one Important finding despite 254 affected passes per core:
+legacy recovery can unlink its only retained future clock before a durable replacement
+exists. Review also retains six Minor findings/qualifications, including directory-sync
+ordering and evidence classification. One bounded Sonnet fix5 requires a durable clock
+carrier before unlink, full-image clock preservation, actual crash/error regressions and
+preserved uncertain files. No clock reset, waiver, acceptance or enablement is approved.
+
+Actual authenticated API branch characterization also passes one case per frozen core.
+The real decorated fork handler is selected from its production route table, uses the
+runner's actual SessionDB and receives real HTTP over AF_UNIX. Requests without a Bearer
+token return HTTP 401; the configured synthetic token returns 201. Branch metadata is real;
+both compression lineages/logical owners remain independent. Original Relay history IDs,
+registry, route and tasks stay unchanged; branch-only text is excluded, with one original
+admission/execution and none on the child. Full API connect/profile middleware/CLI/Desktop,
+TCP/TLS and explicit existing-branch adoption are not claimed. Narrow review is active.
+
+Initial runtime-only external-marker collection error and raw-message expectation failure
+are retained, including two API-resource teardown warnings in the latter. Final fixture
+loads actual core config/conftest, compares real human rows and calls actual API disconnect;
+both final logs have no resource warning. These are fixture corrections, not production RED.
+Two receipts, exact source/command/exit hashes and inherited Ruff warnings remain recorded
+in ignored two-device-canonical-branch-targeted-3. No frozen source changed.
+
+Original N6 exact app-data/identity/Keystore recovery and separate N10 preservation remain
+OPEN and unwaived. No physical/AVD/live/provider/power/art/enrollment or remote-branch change.
 
 ## Real task states, replacement identity and independent profiles — 2026-10-20
 
