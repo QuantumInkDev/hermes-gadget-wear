@@ -1,5 +1,30 @@
 # Progress
 
+## 2026-10-20 — actual ordered continuation, process restart, compression and ACK response loss
+
+The original authenticated socket evidence received limited zero-new-Critical/Important
+review. Watch attach/read-A-before-B is now directly asserted. Distinct real gateway
+processes preserve owned synthetic core/Relay state, HMAC enrollment, exact message/task
+objects and admission IDs without reexecution. Actual compression publication/routing
+runs the next turn on the physical child with the original logical owner and prior human
+history. The handoff carries the whole tail and bypasses lease acquisition; omitted-tail
+retrieval and normal compression lease/provider behavior are not claimed.
+
+Same two cases pass each core initially; only the changed process case is rerun once
+per core after stronger history assertions and a deterministic provider catalog leaf.
+Final child stderr is empty; earlier guard-denied catalog attempt stays recorded.
+A separate same-one-case-per-core pass verifies actual pull-only final events, stable
+outbox IDs, lost successful ACK response, reconnect and idempotent retry without another
+final/admission/execution. Exact manifests/quality/receipts are under ignored
+`task5-controller/evidence/two-device-process-*` and `two-device-final-ack-probe-1`.
+These are separate generations, not a claimed final combined suite. Narrow review is active.
+
+Attachment fix2 returns private 5e85076 with same103 affected passes each core; fresh
+review assesses startup journal disappearance and uncertain-index preservation. The
+unbounded clock issue remains open; no enablement or reset. Full Task5/Task6 crash,
+authority/reset/capacity/task-state gates, later tasks, native/live, exact original N6
+recovery and separate N10 preservation remain open and unwaived. No live/device change.
+
 ## 2026-10-20 — task integrity corrected; first real two-device socket slice
 
 Four genuine corruption probes reproduce impossible stored task states being silently

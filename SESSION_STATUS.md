@@ -1,43 +1,56 @@
-<!-- Current focus: active full expansion; private task-integrity successor reviewed, first real two-device socket slice under evidence review, one bounded attachment fix2 active. Preserve original evidence and exact emulator recovery; no automatic fallback queue. -->
+<!-- Current focus: active full expansion; actual ordered two-device restart/compression/ACK evidence, two bounded read-only reviews. Exact emulator recovery remains required; no automatic fallback queue. -->
 # Session status
 
-## Task integrity and first two-device socket slice — 2026-10-20
+## Ordered two-device restart, compression and lost ACK — 2026-10-20
 
-Four additional genuine RED probes show impossible saved task state/outcome pairs
-being silently rewritten by reads. A separate private SDK successor now refuses
-these combinations without changing accepted bytes or executing again. The three-path
-fix is committed at 97eaa4d; the original e4850ef freeze remains unchanged. The same
-68 affected cases pass on each core, seven files, zero failures/errors/skips. Narrow
-Ruff checks pass and fresh scoped source review finds zero new Critical/Important
-issues. Full Task5 rejection/capacity/authority/race acceptance is still open.
+Task5 SDK successor 97eaa4d remains clean/private, with cores a32f5ca and 6328e74.
+Its same 68 affected cases per core and scoped zero-new-Critical/Important review
+remain unchanged; full Task5 acceptance is open. No app/server source integrated here.
 
-The first actual two-device socket slice now passes the same one case on both core
-foundations. Real plugin registration, adapter connect/disconnect, hub enrollment,
-HMAC authentication, native admissions, transcript and settlement are exercised.
-Only the TCP listener leaf is replaced by a private AF_UNIX listener and the provider
-leaf is deterministic. Phone and watch share the exact canonical conversation with
-distinct native principals. The watch's executor receives the phone exchange; both
-clients see identical message/task IDs. New authenticated transport sessions and
-bindings retain those IDs without a new execution. Actual synthetic receipts and
-hashes are in task5-controller/evidence/two-device-socket-matrix-3. A bounded evidence
-review is pending. Four earlier fixture failures, including initial setup ResourceWarnings,
-remain separate; they are not production RED or additional distinct passing cases.
+The original one-case socket characterization received a limited evidence review with
+zero new Critical/Important findings. Its explicitly missing watch-read-before-B order
+is now directly tested: phone submits A; watch attaches and reads A/final before B.
+A second characterization launches distinct gateway processes over preserved synthetic
+core/Relay state. Real enrolled HMAC, new transports and owner epoch retain complete
+message/task objects and native admission identities without a new execution. Actual
+compression publication/route advancement then executes C on the physical child under
+the original logical owner. C receives the four prior human messages and one hidden
+summary. Compression lease acquisition is not exercised; the handoff carries the whole
+prior tail, so parent-only omitted-tail retrieval remains a separate gate.
 
-This is initial Task6 development evidence, not its full release gate. Gateway-process
-restart, actual compression, crash/ACK/expiry windows, the negative authority/capacity
-suite, remaining task states and native/live delivery still require proof. No TLS,
-LTE, Android hardware or restored original emulator state is inferred from the local
-socket fixture. The exact N6 app-data/identity/Keystore recovery and separate N10
-preservation requirements remain open and unwaived.
+Initial ordered/process matrix: same two cases/two files pass each core. Only the changed
+process case was then rerun once per core after adding C-history assertions and a
+deterministic provider catalog fallback; unchanged ordered test was not rerun. Earlier
+process stderr records a catalog attempt blocked by the network guard; final child
+stderr is empty. No warning suppression or network permission changed. Do not claim
+a single final combined-two-case run. Evidence: task5-controller/evidence/
+two-device-process-probe-1 and two-device-process-targeted-2.
 
-Attachment fix1 returned at cf2bb32. Its fresh review retains the clock high-water
-issue and identifies a disappearing-journal startup race plus missing uncertain-index
-preservation proof. One bounded fix2 addresses the latter two and corrects the clock
-limitation documentation; no clock reset, new time policy or live enablement is
-authorized by that task. Its qualified 189-pass/42-failure/21-skip evidence remains
-retained. Exact source/review/worker ownership is in ignored active-work.json and
-claude-dispatch-20261020.json. No physical device, live profile, artwork, enrollment,
-power setting or remote branch changed.
+A third separate characterization passes the same one case on each core. Actual
+pull-only final events and repeated O5 outbox reads retain canonical message IDs.
+One server-WebSocket send leaf discards only the successful response after real ACK
+commit. HMAC reconnect, exact ACK retry and remaining-copy ACK preserve history/tasks,
+with exactly two admissions/executions and no duplicate final. This is lost ACK-response
+proof, not a crash/precommit ACK-loss proof. Evidence: two-device-final-ack-probe-1.
+Scoped quality checks are clean. A bounded native evidence review is active.
+
+Attachment fix2 returned at 5e85076 (private, default OFF): the same 103 affected cases
+pass each core. It narrows disappearing-journal handling and refuses populated indexes
+beside stale zero-page journals before SQLite can roll them back; independent review
+is active, including whether its first-init header test sufficiently proves safe
+recovery. The unbounded forward-clock high-water issue stays OPEN. No reset, new time
+policy, feature enablement or full N3 acceptance is implied. Prior guard failures,
+simulator skips and overwritten early probe outputs remain qualified, not repaired
+by this targeted pass.
+
+Next: actual core-commit-before-Relay-journal/before-response crashes, exact retry after
+expiry/conflict, full negative authority/reset/capacity/race suite and task transitions;
+then remaining Tasks7–10 and attachment PDF/strict-UTF-8 admission. No full Task6/N1/N2,
+native/live/TLS/LTE/hardware or recovery acceptance. Exact original N6 app-data/identity/
+Keystore recovery and separate N10 preservation remain OPEN and unwaived. No physical
+device, live profile, artwork, enrollment, power setting or remote branch changed.
+Exact review/worker ownership and manifests remain in ignored active-work.json and
+claude-dispatch-20261020.json. At most two bounded review tasks are active.
 
 ## Private task-state source increment reviewed — 2026-10-20
 
