@@ -1,5 +1,60 @@
-<!-- Current focus: active full expansion with two owner-authorized bounded Claude tasks. Preserve prior evidence, enrollments and artwork; no automatic worker/provider fallback restart. -->
+<!-- Current focus: active full expansion; task-state source increment reviewed, with one bounded Claude attachment fix and a fresh wake-fix review. Preserve original evidence and exact emulator recovery; no automatic fallback queue. -->
 # Session status
+
+## Private task-state source increment reviewed — 2026-10-20
+
+The controller's independent private Task5 clones now implement default-OFF task
+list/get and a narrow versioned native admission/control-state read on both core
+foundations. SQL scopes metadata before request hydration; actual admissions and
+current-generation approval/clarify liveness drive state. No prompt text, invented
+deadline or response authority is exposed. Reads reconcile without a live binding;
+publication checks actual source state under the socket lock. Unchanged task state
+retains its saved timestamp, and corrupt metadata refuses without rewriting it.
+
+The first affected matrix passes the same 301 distinct cases on each core, 24 files,
+zero failures. Source review nevertheless finds four Important issues: receipt-only
+observers clear needs_input, returning states reuse event IDs, concurrently added
+rows escape the source capture and control events do not trigger reconciliation.
+Corrected probes reproduce six actual behavior failures before fixes; the earlier
+replay-fixture KeyError is retained separately. A further toggle probe reproduces an
+event-revision reset. Fix1 SDK d5cffc2 corrects these paths with persisted transition
+revisions, exact captured result sets, authoritative control reads for every writer
+and control-event/poll reconciliation. The next combined matrix passes the same 308
+cases on each core at d5cffc2. Review accepts I1–I4 but finds I5: corrupt persisted zero
+can reset event identity. Its genuine RED retains two passing invalid-value controls.
+The positive-counter correction passes 112 cases per core, then a separate genuine
+MAX-boundary RED catches rejection of the final valid revision. Final SDK e4850ef
+keeps that revision readable and refuses overflow without rewriting accepted data.
+Final 31-case checks pass on each core with unchanged source/test hashes. Counter
+review accepts I5/MAX handling with zero new Critical/Important findings. These are
+successive scoped runs, not a single final 308-case matrix or full Task5 acceptance.
+
+Original core candidates a32f5ca/6328e74 are unchanged. Quality checks find no new
+Ruff diagnostics: SDK retains inherited adapter/store diagnostics, both cores retain
+five preview-selection warnings without diagnostic errors. Source diffs pass whitespace
+checks. Exact retained failures, hashes and reviews are in ignored
+resume-20261020/task5-controller. Complete private net patches, exact clean heads,
+source hashes and retained qualifications are in package-task-state/manifest.json.
+All matrix generations bind actual imports and
+the affected source/test bytes; the same cases repeated across cores are not summed
+as distinct coverage.
+
+This is an incomplete development increment, not full Task5/N1/N2 acceptance. The
+remaining unknown/recovery/rejected/capacity/race lifecycle coverage, Tasks6–10,
+native inbox/notifications and real-device/live gates remain open. The earlier Claude
+attachment and wake implementations have returned and had bounded independent reviews.
+The narrow wake fix has returned at private SDK 9f1b692 and is under a fresh bounded
+source/evidence review. Its 447-case matrix has two failed parity-test expectations
+per core; after a test-only correction, the affected 170-case wake file passes on
+each core. The other eleven unchanged files were not rerun, so this is not a single
+clean final 447-case gate. Real connect/disconnect, stock speech/packaging and live
+wake proof remain open. A separate attachment fix addresses unsupported imports, safe
+empty-init recovery, docs and missing boundary proof; clock policy must preserve
+fail-closed authority and remains open if no compatible correction is proved. Their
+original qualified failures/skips are retained, not treated as clean full gates.
+Exact task IDs are in active-work.json and
+claude-dispatch-20261020.json. No device, live service, provider credential, enrollment,
+art, power setting or remote branch changed.
 
 ## Corrected history source frozen; wake work preserved — 2026-10-20
 
@@ -17,10 +72,10 @@ matrix under resume-20261020/history-review. Task5's focused brief is prepared. 
 core clones under resume-20261020/task5-controller. Two actual registered-runner tests
 reproduce the missing list/get methods after a real completed admission: both fail with
 unsupported (genuine RED), no fixture/import failures, canonical one-worker/retries0.
-No production Task5 code is implemented yet; the new test file and command/import/hash
-receipts remain private. The real bounded attach producer deliberately omits prompts; a new bounded
-actual-controls read is needed before truthful needs_input projection. No prompt expiry
-or response authority may be invented from relative timeout_s.
+This initial RED checkpoint is retained; the later private source increment is described
+above. The real bounded attach producer deliberately omits prompts; the separate narrow
+actual-controls read supplies only current-generation liveness. No prompt expiry or
+response authority may be invented from relative timeout_s.
 
 The original remote-wake task is authoritatively failed at capacity with no pending run.
 Its five source files plus all prior evidence are preserved with hashes under ignored
@@ -32,13 +87,12 @@ attachment store Task1. Exact IDs/briefs are in claude-dispatch-20261020.json. N
 implementation queue, nested agents or automatic fallback was started. No live/device,
 provider credential, artwork, enrollment, power or service changed.
 
-An owner decision is pending on an explicit exception for the earlier two quarantined
-synthetic emulator losses. The original exact-recovery gate remains OPEN Critical until
-an explicit answer; no waiver follows from elapsed time, new fixtures or passing tests.
-The question proposes retaining the old fixtures/evidence and using fresh fully backed-up
-fixtures; it does not propose erasing them or claim their restoration. Independent server
-work continues meanwhile. The separate N10 preservation finding is not included in this
-question or silently waived.
+The owner explicitly answered **Keep exact recovery required** for the earlier two
+quarantined synthetic emulator losses. The original exact-recovery gate remains OPEN
+Critical and unwaived. Retain the affected fixtures/evidence; fresh fixtures, elapsed
+time and passing source tests cannot substitute for their exact data/identity/Keystore
+restoration. Independent server work continues meanwhile. The separate N10 preservation
+finding also remains open and unwaived.
 
 ## Reviewed structured replies integrated locally — 2026-10-20
 

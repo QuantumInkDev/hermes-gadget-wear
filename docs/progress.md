@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-10-20 — private task-state source correction reviewed
+
+A default-OFF private Task5 increment adds task list/get and an authorized scalar read
+of actual admissions and current-generation controls. The first combined matrix passes
+the same 301 distinct cases on each core foundation, but independent source review
+finds four Important state/event/race integration defects. Genuine corrected RED probes
+and all earlier fixture failures are retained. Subsequent combined checks pass 308
+cases per core before a narrow counter correction. The final counter/state checks pass
+31 cases per core, and scoped source review finds zero remaining Critical/Important
+issues. Complete private patches and source/import/test hashes are retained. The runs
+cover successive changes and are not presented as one final combined 308-case gate.
+
+This is not Task5/N1/N2 acceptance or live delivery. Unknown/recovery/rejection/capacity
+coverage, later server tasks, native inbox/notifications and real continuity remain
+required. NeedsInput is display-only; no prompt deadline or response authority is
+invented. The owner explicitly keeps exact original emulator data/identity/Keystore
+recovery required. Those fixtures stay quarantined; fresh fixtures cannot substitute.
+
 ## 2026-10-20 — corrected private history foundation verified
 
 The privately isolated history corrections and SDK shutdown hardening have scoped source
