@@ -1,38 +1,28 @@
 # Progress
 
-## Search correction in review; clock implementation active — 2026-10-21
+## Search correction accepted within scope; next core boundary prepared — 2026-10-21
 
-Task7a fix1 returns private SDK 936f059 and cores d6f11e6/cb74292. The same 219 affected
-cases/seven files pass once per core, with retries disabled, recorded source hashes unchanged
-and zero test warnings. RED has 27 behavioral failures plus 4 weaker wait timeouts; invalid
-and revised test generations remain explicit. The correction adds exact progress within a
-conversation to the cursor, so ordinary candidate exhaustion can return an empty progress
-page. One independent scoped re-review is active; no source acceptance or integration yet.
+Independent review accepts Task7a fix1 for the pagination correction with zero Critical
+or Important findings. The same 219 affected cases pass once per core, with retries
+disabled and no test warnings. Ordinary candidate exhaustion now returns cursor progress,
+including empty pages. This is scoped acceptance; full conversation features and
+integration remain open.
 
-Prior Minors remain recorded: recency coupling, error/tool-only matches, send-lock bounds
-and global-frequency timing, which is not approved for activation. Content-only routes and
-guard corrections are partial candidate changes awaiting review. CJK LIKE was tested; the
-native CJK tokenizer/index path was not exercised. Full fix-range packages are retained.
+Three new Minor findings are recorded for final triage: hard deadlines can discard scan
+progress, writes to a partially scanned conversation can invalidate its cursor, and core
+accepts a wider integer timestamp range than the SDK. Prior recency, timing, error handling
+and send-lock limitations remain explicit. Native CJK-index SQL was not exercised.
+No privacy decision or activation gate is waived.
 
-The independent attachment clock design review returns 0 Critical, 4 Important and 5 Minor. It
-confirms a sustained offset can poison the global identity floor, an unobserved rollback
-can extend relative lifetimes, and unrelated grant changes can revive expired authority
-under the proposed generation-based memory. The separate continuity-store clock also
-remains affected. All four findings are retained; the original proposal is not approved.
+The next bounded source slice prepares actual-core rename/delete authorization at commit,
+metadata state and exact receipt reconciliation after deletion. SDK title/bookmark/delete
+orchestration and its storage/search integration remain required afterward. The independent
+attachment clock/evidence implementation continues in its existing isolated worker; no
+clock source acceptance yet. No nested agents or fallback queue; at most two active children.
 
-The clock amendment returned source analysis, with no executed evidence. One bounded
-implementation is underway to add per-key floors and exact grant expiry observations in
-fixed reserved metadata slots. Clock and expiry evidence must commit together at the index size limit;
-the first over-cap grant batch permanently refuses unseen bindings instead of discarding
-evidence or later admitting a refused tuple. Frozen first-init recovery and legacy clock
-facts remain intact; canonical migration is lazy. These choices still require actual
-failure/quota tests and independent review. Relative TTL precision across unobserved wall
-rollback remains disclosed. No clock source acceptance, reset, integration or live change.
-
-Only two bounded children are active: search re-review and clock implementation, with no nested
-agents or fallback queue. Task7b metadata/delete, sharing ingestion and remaining native/
-live work stay required. Original N6 exact recovery and N10 preservation remain OPEN and
-unwaived. Current ownership, exact source/report hashes and decisions are recorded privately.
+Full Task7, Tasks8–10, remaining native/live/release gates, original N6 exact recovery and
+N10 preservation remain OPEN and unwaived. Private inputs, reports, hashes and decisions
+are recorded in the existing ledgers. No integration, live change or enablement.
 
 ## Clock proposal needs validation before code — 2026-10-20
 
