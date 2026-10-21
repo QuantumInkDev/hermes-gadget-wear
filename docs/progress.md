@@ -1,5 +1,24 @@
 # Progress
 
+## 2026-10-20 — real hub authority and guarded commit waits
+
+The two actual crash-window cases receive scoped zero-new-Critical/Important review.
+New real hub checks pass nine cases per core: outsider/group/profile/read/key changes,
+stolen binding/cursor, stale epoch and revocation behind a held output lock. Accepted
+baseline admission/execution stays exactly one; refusal frames contain no result/text.
+A separate two-case-per-core matrix holds an initially unexpired request at the actual
+pre-insert check until real expiry or submit revocation; original guard then refuses,
+with zero admissions/messages/executions and an unresolved Relay intent. No clock override.
+
+Exact manifests, logs, imports/hashes, clean scoped quality and 22 synthetic receipts
+are retained in ignored authority-probe-1 and commit-fence-probe-1. These are separate
+nine/two-case matrices, not a combined11/global pass. Independent narrow review is active.
+Profile replacement is a hot document change and key replacement retains the existing ID;
+two independent profiles/new-ID enrollment remain unproven. Full Task5/Task6 reset/store/
+capacity/gap/race/task-state gates, later tasks, attachment content/clock/ingestion work,
+native/live and original N6/N10 preservation remain OPEN/unwaived. No product source,
+physical device, live server or remote branch changed.
+
 ## 2026-10-20 — actual committed-turn crash recovery and expired retries
 
 Narrow independent review accepts prior ordered continuation, graceful process restart,

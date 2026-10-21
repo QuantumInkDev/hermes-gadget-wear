@@ -1,5 +1,42 @@
-<!-- Current focus: active full expansion; real crash-window/expiry/conflict proof under review, one attachment content-proof correction active. Exact emulator recovery remains required; no fallback queue. -->
+<!-- Current focus: active full expansion; real authority/output/commit-fence evidence under review, one attachment content-proof correction active. Exact emulator recovery remains required; no fallback queue. -->
 # Session status
+
+## Real hub authority boundaries and precommit fences — 2026-10-20
+
+The actual crash-window evidence is now independently accepted within scope, with
+zero new Critical/Important findings (two-device-crash-review.md). It still does not
+complete Task6 or the full goal.
+
+Nine actual wire authority cases pass once each on both core foundations: independently
+enrolled other-group outsider, changed group, replaced profile namespace with the same
+group UUID, removed read permission, actual key replacement under an existing enrolled
+ID, stolen binding, stale authority epoch, stolen history cursor, and read revocation
+while the actual prepared history response waits behind the real socket send lock.
+Each refusal withholds result/text and retains exactly the original admission and one
+execution. Profile test is a hot grant-document replacement, not two separate running
+profiles; key test replaces an existing ID, not a new-derived-ID reenrollment ceremony.
+
+Two separate actual guard-wait cases also pass on both cores. A request is still
+unexpired at the real pre-insert check's entry; a timing wrapper waits then forwards
+its original check after the actual deadline, or after submit permission is removed.
+The wire refuses expired/permission_denied respectively, with zero global admissions,
+messages or executions and the real Relay intent/result-null retained. No wall/store
+clock is overridden. This tests precommit waiting, not cancellation of accepted work.
+It supplies the initially-unexpired-held-across-deadline proof missing from the earlier
+crash characterization.
+
+Evidence: two-device-authority-probe-1 (same9 cases/1file per core) and separate
+two-device-commit-fence-probe-1 (same2 cases/1file per core), zero failures/errors/skips,
+stable exact source/import/test/guard hashes, clean scoped quality, 22 actual synthetic
+receipt files. No combined11/global-suite or production-RED claim. Frozen private SDK97,
+corea32/clean632 remain unchanged. A bounded native evidence review is active while the
+one bounded Sonnet attachment content-proof correction continues.
+
+Full Task6 still needs actual independent profile instances, new-ID enrollment, canonical
+reset/branch, unavailable store, capacity/overflow/gap, remaining races and complete real
+task states. Full Task5/Tasks7–10, attachment I3/PDF/strict-UTF-8/native/live and exact
+original N6 app-data/identity/Keystore recovery plus N10 preservation remain OPEN and
+unwaived. No physical/live/provider/power/artwork/enrollment or remote-branch changes.
 
 ## Actual crash windows and attachment review correction — 2026-10-20
 
@@ -23,7 +60,7 @@ expired first attempts refuse, and global native admission/execution counts rema
 Evidence generations remain separate: two-device-crash-probe-1 then only changed
 helper/test rerun in two-device-crash-targeted-2, same two cases/one file per core,
 zero failures/errors/skips, unchanged source/test hashes, empty child stderr and clean
-scoped Ruff. No new app/server source integrated. A bounded native review is active.
+scoped Ruff. No new app/server source integrated. The later scoped crash review accepts this evidence.
 
 Attachment fix2's 103-case passes did NOT close its gate: fresh review finds one new
 Important data-preservation issue. SQLite counter1/size/magic cannot prove that a
