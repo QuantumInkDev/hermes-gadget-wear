@@ -1,5 +1,43 @@
-<!-- Current focus: active full expansion; task-state and wake source increments reviewed, bounded attachment fix active, actual task-lifecycle probes under evidence review. Preserve original evidence and exact emulator recovery; no automatic fallback queue. -->
+<!-- Current focus: active full expansion; private task-integrity successor reviewed, first real two-device socket slice under evidence review, one bounded attachment fix2 active. Preserve original evidence and exact emulator recovery; no automatic fallback queue. -->
 # Session status
+
+## Task integrity and first two-device socket slice — 2026-10-20
+
+Four additional genuine RED probes show impossible saved task state/outcome pairs
+being silently rewritten by reads. A separate private SDK successor now refuses
+these combinations without changing accepted bytes or executing again. The three-path
+fix is committed at 97eaa4d; the original e4850ef freeze remains unchanged. The same
+68 affected cases pass on each core, seven files, zero failures/errors/skips. Narrow
+Ruff checks pass and fresh scoped source review finds zero new Critical/Important
+issues. Full Task5 rejection/capacity/authority/race acceptance is still open.
+
+The first actual two-device socket slice now passes the same one case on both core
+foundations. Real plugin registration, adapter connect/disconnect, hub enrollment,
+HMAC authentication, native admissions, transcript and settlement are exercised.
+Only the TCP listener leaf is replaced by a private AF_UNIX listener and the provider
+leaf is deterministic. Phone and watch share the exact canonical conversation with
+distinct native principals. The watch's executor receives the phone exchange; both
+clients see identical message/task IDs. New authenticated transport sessions and
+bindings retain those IDs without a new execution. Actual synthetic receipts and
+hashes are in task5-controller/evidence/two-device-socket-matrix-3. A bounded evidence
+review is pending. Four earlier fixture failures, including initial setup ResourceWarnings,
+remain separate; they are not production RED or additional distinct passing cases.
+
+This is initial Task6 development evidence, not its full release gate. Gateway-process
+restart, actual compression, crash/ACK/expiry windows, the negative authority/capacity
+suite, remaining task states and native/live delivery still require proof. No TLS,
+LTE, Android hardware or restored original emulator state is inferred from the local
+socket fixture. The exact N6 app-data/identity/Keystore recovery and separate N10
+preservation requirements remain open and unwaived.
+
+Attachment fix1 returned at cf2bb32. Its fresh review retains the clock high-water
+issue and identifies a disappearing-journal startup race plus missing uncertain-index
+preservation proof. One bounded fix2 addresses the latter two and corrects the clock
+limitation documentation; no clock reset, new time policy or live enablement is
+authorized by that task. Its qualified 189-pass/42-failure/21-skip evidence remains
+retained. Exact source/review/worker ownership is in ignored active-work.json and
+claude-dispatch-20261020.json. No physical device, live profile, artwork, enrollment,
+power setting or remote branch changed.
 
 ## Private task-state source increment reviewed — 2026-10-20
 
@@ -49,7 +87,8 @@ The initial two child-fixture error runs are retained separately and are not pro
 RED. The helper then captured the actual public task/run IDs before death; all three
 final probes pass on each core after that stronger assertion. The earlier 34-case
 matrix is retained separately, and its unchanged 31 task/counter cases were not rerun.
-Source bytes remain unchanged; a bounded evidence review is pending.
+Source bytes remain unchanged; the bounded lifecycle evidence review accepts these
+three narrow probes with zero new Critical/Important findings.
 These probes do not prove recovery of an uncommitted result lost with a dead process.
 
 This is an incomplete development increment, not full Task5/N1/N2 acceptance. The

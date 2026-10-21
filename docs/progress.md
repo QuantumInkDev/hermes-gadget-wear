@@ -1,5 +1,23 @@
 # Progress
 
+## 2026-10-20 — task integrity corrected; first real two-device socket slice
+
+Four genuine corruption probes reproduce impossible stored task states being silently
+rewritten. The isolated three-path SDK correction at 97eaa4d refuses them without
+rewriting accepted data. The same 68 affected cases pass per core, with clean scoped
+quality checks and zero new Critical/Important review findings.
+
+The same one actual socket case passes per core: independent hub enrollment and HMAC
+reconnect, one canonical phone/watch conversation, the phone's prior exchange received
+by the watch executor, distinct persisted principals and identical durable message/task
+IDs on both clients. Reconnection changes transport/binding IDs and performs no new
+execution. Only the listener is mapped to a private AF_UNIX socket and the provider is
+deterministic. Earlier fixture failures remain retained; focused evidence review is
+pending. Full Task5/Task6 restart/compression/crash/authority gates, native/live delivery
+and exact original N6 recovery plus separate N10 preservation remain open. Attachment
+fix2 is active after its review found two further startup/preservation issues; the
+clock high-water issue stays open. No live activation or physical change occurred.
+
 ## 2026-10-20 — private task-state source correction reviewed
 
 A default-OFF private Task5 increment adds task list/get and an authorized scalar read
@@ -24,7 +42,7 @@ per core, including three new cases. Unknown work stays unknown, committed compl
 and its exact history recover, and original-request replay does not execute again.
 The final three probes pass per core after adding direct comparison to the real public
 task/run IDs captured before death. The earlier 34-case matrix and final targeted run
-remain separate. Source bytes are unchanged; focused evidence review is pending.
+remain separate. Source bytes are unchanged; focused lifecycle evidence review is clean.
 Initial child-fixture failures remain retained; no production fix is claimed from them.
 
 The separate private remote-wake fix is source-reviewed at 9f1b692: malformed method
