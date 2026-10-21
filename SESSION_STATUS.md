@@ -1,4 +1,4 @@
-<!-- Current focus: Task7a source review and a bounded attachment I3 design amendment; neither candidate is accepted or enabled, original preservation requirements remain open. -->
+<!-- Current focus: Task7a search-progress correction and a bounded attachment I3 design amendment; neither candidate is accepted or enabled, original preservation requirements remain open. -->
 # Session status
 
 ## Search candidate returned; clock review objections retained — 2026-10-21
@@ -7,9 +7,11 @@ Task7a read-only conversation listing/search returns private SDK c182270 and cor
 ba87a7c/9b009e3. The retained final commands show the same 180 affected cases/seven files pass
 once per core with retries disabled, source hashes unchanged and zero test warnings. Core
 capability-absent RED and weaker SDK failures remain separately classified. Full two-commit
-review packages and one independent source/evidence review are prepared; no acceptance or
-integration is claimed. Candidate-budget refusals, recency approximation, cursor behavior,
-global-term-frequency latency and branch coverage remain explicit review concerns.
+review packages are retained. Independent review rejects the candidate with 0 Critical,
+1 Important and 6 Minor findings: index-only candidates in one conversation can permanently
+block a query. One bounded correction adds progress within that conversation to the cursor.
+Six Minors remain for final triage, including recency coupling, error/tool-only matches and
+send-lock bounds; the global-frequency timing residual is not approved for activation.
 
 The independent attachment clock design review returns 0 Critical, 4 Important and 5 Minor. It
 confirms a sustained offset can poison the global identity floor, an unobserved rollback
@@ -24,7 +26,7 @@ a proposed bounded tradeoff, still requiring source/migration verification. Rela
 precision across an unobserved wall-clock rollback must be disclosed; no terminal-handle
 or expired-grant revival is allowed. No clock code, reset, schema migration or live change.
 
-Only two bounded children are active: search review and clock amendment, with no nested
+Only two bounded children are active: search correction and clock amendment, with no nested
 agents or fallback queue. Task7b metadata/delete, sharing ingestion and remaining native/
 live work stay required. Original N6 exact recovery and N10 preservation remain OPEN and
 unwaived. Current ownership, exact source/report hashes and decisions are recorded privately.
