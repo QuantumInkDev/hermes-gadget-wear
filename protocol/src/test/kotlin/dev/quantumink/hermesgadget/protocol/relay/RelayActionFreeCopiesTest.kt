@@ -324,4 +324,33 @@ class RelayActionFreeCopiesTest {
             decodeItem(relayOrigin) is RelayOutcome.Invalid
         )
     }
+
+    @Test fun aWantedInputCopyStillRefusesAPromptThatBelongsToItsOwnTask() {
+        val item = RelayVectors.forMethod(RelayMethod.OUTBOX_READ).filter {
+            it.isSuccess &&
+                it.discrepancy == null
+        }
+            .flatMap { (it.result["items"] as JsonArray).map { entry -> entry as JsonObject } }
+            .first { entry ->
+                val payload = entry["payload"] as JsonObject
+                (payload["origin"] as? JsonPrimitive)?.content == "relay" &&
+                    ((payload["task"] as JsonObject)["state"] as JsonPrimitive).content ==
+                    "needs_input"
+            }
+        val payload = item["payload"] as JsonObject
+        val task = payload["task"] as JsonObject
+        // A fully coherent fetched prompt, rewritten to belong to this exact waiting task.
+        val prompt = RelayVectors.forMethod(RelayMethod.TASK_GET).filter { it.isSuccess }
+            .mapNotNull { it.result["prompt"] as? JsonObject }
+            .first { (it["actionable"] as JsonPrimitive).content == "true" }
+        val own = JsonObject(prompt + ("task_id" to task["task_id"]!!))
+        val taskWithPrompt = JsonObject(task + ("prompt" to own))
+        val withPrompt =
+            JsonObject(item + ("payload" to JsonObject(payload + ("task" to taskWithPrompt))))
+        assertTrue(decodeItem(item) is RelayOutcome.Success<*>)
+        assertTrue(decodeItem(withPrompt) is RelayOutcome.Invalid)
+        // The same task and prompt ARE a valid pair when fetched with relay.task.get (the one path to an answer).
+        val fetched = RelayCalls.resultDecoder(RelayMethod.TASK_GET)(taskWithPrompt) as Task
+        assertNotNull(fetched.prompt?.asActionable())
+    }
 }

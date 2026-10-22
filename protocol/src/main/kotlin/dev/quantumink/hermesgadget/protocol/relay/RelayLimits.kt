@@ -19,6 +19,12 @@ object RelayLimits {
     const val OUTBOX_READ_BYTES = 65_536
 
     const val PAGE_ITEMS = 50
+
+    /**
+     * Rows of a history page: at most 50 messages, each possibly split into segments (an existing-session page
+     * is segmented per row), within 65,536 bytes. A generous structural bound; never a truncation.
+     */
+    const val HISTORY_PAGE_ROWS = 400
     const val DEFAULT_PAGE_ITEMS = 25
     const val CURSOR_BYTES = 512
     const val QUERY_BYTES = 256

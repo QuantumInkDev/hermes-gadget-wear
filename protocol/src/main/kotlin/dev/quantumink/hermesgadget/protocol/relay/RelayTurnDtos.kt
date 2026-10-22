@@ -143,7 +143,7 @@ data class HistoryMessage(
 
 /** A page of history rows. An empty page with a cursor is valid progress; it is never "the end". */
 class HistoryPage(items: List<HistoryMessage>, val nextCursor: String?) {
-    val items: List<HistoryMessage> = ownedBounded(items, RelayLimits.PAGE_ITEMS * 8)
+    val items: List<HistoryMessage> = ownedBounded(items, RelayLimits.HISTORY_PAGE_ROWS)
 
     init {
         require(nextCursor == null || validCursor(nextCursor))
@@ -165,7 +165,7 @@ class HistoryPage(items: List<HistoryMessage>, val nextCursor: String?) {
             val reader = FieldReader.of("history", result, setOf("items", "next_cursor"))
             val items = reader.objects(
                 "items",
-                RelayLimits.PAGE_ITEMS * 8,
+                RelayLimits.HISTORY_PAGE_ROWS,
                 HistoryMessage.KEYS,
                 decode = HistoryMessage::decode
             )
