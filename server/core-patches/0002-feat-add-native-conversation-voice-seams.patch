@@ -991,10 +991,10 @@ index 0000000000000000000000000000000000000000..07a74e2487eda4f44f27f5f07a9a5984
 +    return _make(configured_state, None, None, provider)
 diff --git a/gateway/session_native_voice_tts.py b/gateway/session_native_voice_tts.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..971a964a7a15049f73c2aed7930730d923ccc47e
+index 0000000000000000000000000000000000000000..bafeffa69bc7ff36c8101850148247c13d1c665d
 --- /dev/null
 +++ b/gateway/session_native_voice_tts.py
-@@ -0,0 +1,328 @@
+@@ -0,0 +1,330 @@
 +"""Configured one-request-per-chunk text-to-speech for the native voice seam (``session_native_voice``).
 +
 +The profile's own TTS configuration (provider, voice, model) is read at call time through the stock
@@ -1254,7 +1254,9 @@ index 0000000000000000000000000000000000000000..971a964a7a15049f73c2aed7930730d9
 +        with native_send_policy.activate(policy):
 +            verdict = _run_chunks(run, text)
 +    except native_send_policy.NativeSendRefused as exc:
-+        verdict = _Synth('failed', declined=getattr(exc, 'engine_declined', False))  # the policy recorded why
++        # the policy recorded why. A helper decline is an unsent refusal only when NO chunk was completed before it: ``run.done``
++        # (completed, answered chunks), never the attempted-path count, is the accounting boundary
++        verdict = _Synth('failed', declined=getattr(exc, 'engine_declined', False) and run.done == 0)
 +    except Exception:  # health: allow BLE001 -- provider/library failure becomes the stable 'failed' token; its text must not leave
 +        verdict = _Synth('failed')
 +    finally:
@@ -6070,10 +6072,10 @@ index 0000000000000000000000000000000000000000..c26a92331c20544fe981acc58dafa5e4
 +    assert 'PROVIDER-TEXT-2099' not in caplog.text and not [r for r in caplog.records if r.name.startswith('mistralai')]
 diff --git a/tests/gateway/test_native_voice_pipeline.py b/tests/gateway/test_native_voice_pipeline.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..2a7b48d6c965f4a26daffeead95bba21f3b74dfb
+index 0000000000000000000000000000000000000000..23319c0131ca55357ad9448b098f36f5cbdf8185
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_pipeline.py
-@@ -0,0 +1,568 @@
+@@ -0,0 +1,597 @@
 +"""Native voice seam: the usable multi-chunk join (Task4 B) for remote and local routes.
 +
 +REAL: the pinned OpenAI SDK + httpx (synthetic bytes only), the real runner / process group / pipes, the real ``ffmpeg`` for
@@ -6641,6 +6643,35 @@ index 0000000000000000000000000000000000000000..2a7b48d6c965f4a26daffeead95bba21
 +    result = await speak(out, text='MODE:ok one short chunk')
 +    assert len(engine_spawns(spawns)) == 1
 +    assert (result.state, result.path, result.provider) == ('failed', None, 'not_started')
++    assert os.listdir(out) == [] and os.listdir(scratch) == []
++
++
++# ---- amendment: the helper-decline compatibility pin is for a decline BEFORE any completed local work only --------------------
++DECLINE_TEXTS = {
++    'first': ('MODE:unavailable The first sentence is rather long. MODE:ok The second sentence is also rather long. '
++              'MODE:ok The third one.'),
++    'late': 'MODE:ok The first sentence is rather long. MODE:unavailable The second sentence is also rather long. MODE:ok The third one.',
++}
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('when, state, helper_runs', [('first', 'unavailable', 1), ('late', 'failed', 2)])
++async def test_a_helper_decline_is_unavailable_only_before_any_completed_local_work(
++        monkeypatch, out, scratch, launcher, engine, when, state, helper_runs):
++    """Through the ACTUAL multi-chunk helper/launcher seam (the owned finite engine stand-in answers ``unavailable`` for the
++    chunk whose text says so). A decline for the FIRST chunk produced nothing: the documented unsent refusal. A decline for a
++    LATER chunk comes after real completed local work (a converted chunk file): ``failed``/``not_started``, the third helper is
++    never started, every chunk and sidecar is removed and no provider is ever reached."""
++    support.ffmpeg_path()
++    assert chunk_total(DECLINE_TEXTS[when], 60) == 3
++    spawns = support.record_spawns(monkeypatch)
++    cb = support.Callbacks()
++    wire = support.Wire([('ok', {'audio': b'ID3x'})] * 3)
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb, text=DECLINE_TEXTS[when])
++    assert (result.state, result.path, result.provider) == (state, None, 'not_started')
++    assert len(engine_spawns(spawns)) == helper_runs  # the chunk after the decline is never attempted
++    assert wire.count == 0 and cb.before_send_calls == 0  # no provider, no send, no durable callback
 +    assert os.listdir(out) == [] and os.listdir(scratch) == []
 diff --git a/tests/gateway/test_native_voice_rest_fences.py b/tests/gateway/test_native_voice_rest_fences.py
 new file mode 100644
@@ -13682,7 +13713,7 @@ index b60cdf372f35761b70ea6ed686579335f4d013b1..42622a269a8777b80840d342ca4571d7
  
  
 diff --git a/tools/tts_tool_local.py b/tools/tts_tool_local.py
-index 81c23cdbe52435023d2a76c6d7932379c338af2a..d68883bd2c00ebba88e957f6424e205eb218ca8a 100644
+index 81c23cdbe52435023d2a76c6d7932379c338af2a..81f2b044fb110bb85c46e5af26f0fd5c2be53637 100644
 --- a/tools/tts_tool_local.py
 +++ b/tools/tts_tool_local.py
 @@ -8,11 +8,13 @@ container. Piper and KittenTTS keep loaded models in small LRU caches registered
@@ -13922,7 +13953,7 @@ index 81c23cdbe52435023d2a76c6d7932379c338af2a..d68883bd2c00ebba88e957f6424e205e
 +        answer = _parse_engine_reply(result.stdout)
 +        if answer["status"] == "unavailable":
 +            declined = _refuse_unsupported()
-+            declined.engine_declined = True  # the helper itself reports a missing prerequisite: nothing was produced
++            declined.engine_declined = True  # the helper itself reports a missing prerequisite for THIS chunk (the seam decides whether earlier chunks completed)
 +            raise declined
 +        if answer["status"] != "ok":
 +            raise RuntimeError("native engine failed")

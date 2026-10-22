@@ -171,7 +171,9 @@ at 48 kHz/320 kbps stereo, thousands with a large tag, and negative without an I
 every measured format kept every audio packet (the DTS diagnostics ffmpeg prints at the boundaries of inputs that carry an Info
 frame did not coincide with any lost packet). A join that kept only the first input or lost only a short final chunk is refused.
 The caller's output directory is checked for eligibility before any payment, and a join problem after payment, or after a local
-engine chunk was produced, is `failed`, never `unavailable`. A multi-chunk native call therefore needs a qualified launcher (on this
+engine chunk was produced, is `failed`, never `unavailable`. A local engine helper's own "unavailable" reply is the documented unsent
+refusal only while NO chunk of the call has completed; the same reply for a later chunk, after completed local work, is `failed`/`not_started`
+(the next chunk is not attempted, every file is removed). A multi-chunk native call therefore needs a qualified launcher (on this
 release: Darwin 27.0.0 arm64) AND a usable `ffprobe` on `PATH` (a new native-host prerequisite of the multi-chunk join only,
 proved by an actual launcher-wrapped packet count BEFORE any chunk; missing or broken is `unavailable`/`not_started`); single-chunk
 speech (every Edge text of 600 code points or fewer) and the stock shared concat never need it. Elsewhere multi-chunk is unavailable,
