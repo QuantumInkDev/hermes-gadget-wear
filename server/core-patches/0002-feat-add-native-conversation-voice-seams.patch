@@ -991,10 +991,10 @@ index 0000000000000000000000000000000000000000..07a74e2487eda4f44f27f5f07a9a5984
 +    return _make(configured_state, None, None, provider)
 diff --git a/gateway/session_native_voice_tts.py b/gateway/session_native_voice_tts.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..c738bf9d3422fb34bce62799e4b9567f5a72d9db
+index 0000000000000000000000000000000000000000..971a964a7a15049f73c2aed7930730d923ccc47e
 --- /dev/null
 +++ b/gateway/session_native_voice_tts.py
-@@ -0,0 +1,329 @@
+@@ -0,0 +1,328 @@
 +"""Configured one-request-per-chunk text-to-speech for the native voice seam (``session_native_voice``).
 +
 +The profile's own TTS configuration (provider, voice, model) is read at call time through the stock
@@ -1035,7 +1035,7 @@ index 0000000000000000000000000000000000000000..c738bf9d3422fb34bce62799e4b9567f
 +    code_points: int = 0
 +    answered: bool = False  # every request that was sent got a usable answer
 +    unaccounted: bool = False  # audio was produced (or a send happened) outside the gate: accounting is unknown
-+    produced: bool = False  # at least one chunk was completed (paid and answered, or a local engine chunk converted)
++    declined: bool = False  # the local engine helper itself reported a missing prerequisite (a launch that produced nothing)
 +
 +
 +def _make(state, path, code_points, source, provider):
@@ -1253,8 +1253,8 @@ index 0000000000000000000000000000000000000000..c738bf9d3422fb34bce62799e4b9567f
 +    try:
 +        with native_send_policy.activate(policy):
 +            verdict = _run_chunks(run, text)
-+    except native_send_policy.NativeSendRefused:
-+        verdict = _Synth('failed')  # the policy recorded why
++    except native_send_policy.NativeSendRefused as exc:
++        verdict = _Synth('failed', declined=getattr(exc, 'engine_declined', False))  # the policy recorded why
 +    except Exception:  # health: allow BLE001 -- provider/library failure becomes the stable 'failed' token; its text must not leave
 +        verdict = _Synth('failed')
 +    finally:
@@ -1263,7 +1263,6 @@ index 0000000000000000000000000000000000000000..c738bf9d3422fb34bce62799e4b9567f
 +            _remove([_final_path(output_dir, run_id)])
 +    verdict.answered = run.answered
 +    verdict.unaccounted = run.unaccounted
-+    verdict.produced = run.done > 0
 +    return verdict
 +
 +
@@ -1283,9 +1282,9 @@ index 0000000000000000000000000000000000000000..c738bf9d3422fb34bce62799e4b9567f
 +    if policy.refusal == 'closed':  # closed by the deadline fence, else by Stop/cancellation (N-2: a probe may notice first)
 +        return 'timeout' if policy.deadline is not None and time.monotonic() >= policy.deadline else 'cancelled'
 +    if policy.refusal == 'unsupported':
-+        # nothing is "unavailable" once a chunk was paid OR a local engine chunk was produced (a vanished joiner, a lost launcher);
-+        # a helper that replies "unavailable" for its FIRST chunk, or any prelaunch refusal, still is
-+        return 'unavailable' if not (policy.sends or synth.produced) else 'failed'
++        # nothing is "unavailable" once a chunk was paid OR a local child really started (a vanished joiner or converter, a lost
++        # launcher); a prelaunch refusal, and a helper that itself reports a missing prerequisite, still are
++        return 'unavailable' if synth.declined or not (policy.sends or policy.local_launched) else 'failed'
 +    if policy.local_launched:
 +        return 'failed'  # a local child really started: a failure after a local invocation, never "nothing was tried"
 +    return 'unavailable' if not policy.sends else 'failed'
@@ -6071,10 +6070,10 @@ index 0000000000000000000000000000000000000000..c26a92331c20544fe981acc58dafa5e4
 +    assert 'PROVIDER-TEXT-2099' not in caplog.text and not [r for r in caplog.records if r.name.startswith('mistralai')]
 diff --git a/tests/gateway/test_native_voice_pipeline.py b/tests/gateway/test_native_voice_pipeline.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..2e86661125c3b389d2ac06adb38b7e74f1b8940f
+index 0000000000000000000000000000000000000000..2a7b48d6c965f4a26daffeead95bba21f3b74dfb
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_pipeline.py
-@@ -0,0 +1,546 @@
+@@ -0,0 +1,568 @@
 +"""Native voice seam: the usable multi-chunk join (Task4 B) for remote and local routes.
 +
 +REAL: the pinned OpenAI SDK + httpx (synthetic bytes only), the real runner / process group / pipes, the real ``ffmpeg`` for
@@ -6621,6 +6620,28 @@ index 0000000000000000000000000000000000000000..2e86661125c3b389d2ac06adb38b7e74
 +    result = await speak(out, text=LOCAL_TEXT)
 +    assert (result.state, result.path, result.provider) == ('unavailable', None, 'not_started')
 +    assert engine_spawns(spawns) == [] and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_a_converter_refusal_after_the_engine_child_ran_is_failed_while_the_helpers_own_decline_stays_unavailable(
++        monkeypatch, out, scratch, launcher, engine):
++    """NM-1 at the actual seam, first chunk: the engine child really ran (``local_launched``) and then the chunk conversion was
++    refused as unsupported (a lost launcher): ``failed``/``not_started``. The helper's OWN ``unavailable`` reply is a launch that
++    produced nothing and stays ``unavailable`` (pinned by ``test_local_engine_failures_are_truthful_and_leave_nothing``)."""
++    from tools import tts_tool_local, native_send_policy
++    support.ffmpeg_path()
++    real = tts_tool_local._native_convert
++
++    def refuse_chunk_conversion(ffmpeg, wav_path, mp3_path, policy, cwd, probe=False):
++        if probe:
++            return real(ffmpeg, wav_path, mp3_path, policy, cwd, probe=probe)
++        raise native_send_policy.refuse('unsupported')
++    monkeypatch.setattr(tts_tool_local, '_native_convert', refuse_chunk_conversion)
++    spawns = support.record_spawns(monkeypatch)
++    result = await speak(out, text='MODE:ok one short chunk')
++    assert len(engine_spawns(spawns)) == 1
++    assert (result.state, result.path, result.provider) == ('failed', None, 'not_started')
++    assert os.listdir(out) == [] and os.listdir(scratch) == []
 diff --git a/tests/gateway/test_native_voice_rest_fences.py b/tests/gateway/test_native_voice_rest_fences.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..2d32781e677e84eeddbd3a9da5acf2c6ba45bd27
@@ -13661,7 +13682,7 @@ index b60cdf372f35761b70ea6ed686579335f4d013b1..42622a269a8777b80840d342ca4571d7
  
  
 diff --git a/tools/tts_tool_local.py b/tools/tts_tool_local.py
-index 81c23cdbe52435023d2a76c6d7932379c338af2a..e33d951d1624b0dcb15905c9d2637cbfb1cc093d 100644
+index 81c23cdbe52435023d2a76c6d7932379c338af2a..d68883bd2c00ebba88e957f6424e205eb218ca8a 100644
 --- a/tools/tts_tool_local.py
 +++ b/tools/tts_tool_local.py
 @@ -8,11 +8,13 @@ container. Piper and KittenTTS keep loaded models in small LRU caches registered
@@ -13679,7 +13700,7 @@ index 81c23cdbe52435023d2a76c6d7932379c338af2a..e33d951d1624b0dcb15905c9d2637cbf
  
  from tools.tts_tool_delivery import _finalize_wav_output, _origin, _section, _wav_sidecar_path
  
-@@ -193,3 +195,233 @@ def _generate_kittentts(text: str, output_path: str, tts_config: dict[str, Any])
+@@ -193,3 +195,235 @@ def _generate_kittentts(text: str, output_path: str, tts_config: dict[str, Any])
      wav_path = _wav_sidecar_path(output_path)
      sf.write(wav_path, audio, 24000)
      return _finalize_wav_output(wav_path, output_path)
@@ -13900,7 +13921,9 @@ index 81c23cdbe52435023d2a76c6d7932379c338af2a..e33d951d1624b0dcb15905c9d2637cbf
 +                                 max_stream_bytes=_ENGINE_STREAM_BYTES)
 +        answer = _parse_engine_reply(result.stdout)
 +        if answer["status"] == "unavailable":
-+            raise _refuse_unsupported()
++            declined = _refuse_unsupported()
++            declined.engine_declined = True  # the helper itself reports a missing prerequisite: nothing was produced
++            raise declined
 +        if answer["status"] != "ok":
 +            raise RuntimeError("native engine failed")
 +        _validate_wav(wav_path, limit)
