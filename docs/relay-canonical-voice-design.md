@@ -82,7 +82,9 @@ Key witnesses (path:lines, SHA-256 prefix):
 * Core `tools/tts_tool_providers.py` (d8dd3b16…): the 60 s timeout 153–155 belongs to the streaming
   `requests.post` helper used by other providers, **not** ElevenLabs; `_generate_elevenlabs` builds the SDK
   client with no timeout or retry arguments and the profile `voice_id`/`model_id` 219–229, so its effective
-  timeout and retry behaviour are unpinned SDK defaults.
+  timeout and retry behaviour are the installed SDK's own. Measured at V1 correction round 1 on the lock-pinned
+  wheels, no network: `elevenlabs==1.59.0` sends once on a 5xx or read timeout without `request_options` (60 s client
+  timeout, SDK `max_retries` default 0); `edge-tts==7.2.7` re-handshakes after a 403 (two handshakes).
 * SDK `plugin/relay_history_store.py` (ab10412f…): durable message aliases map a display id (and, for history
   rows, a physical id) to the public `message_id`, ≤ 4,096 rows with oldest-first eviction ("deterministically
   recoverable") 57–111; `commit_page` re-creates aliases for every paged row 113–136; `commit_final` 138–190.
@@ -299,7 +301,7 @@ Server (SDK, PROPOSED module `relay_voice`, re-using `Conversations.context/rech
 | S6 | Response send | `send_json(reply, authorize=check)` re-runs S5 under the send lock |
 | P1L | `speak` `live` | `context(session,'relay:read')`; current active binding of the same conversation, epoch match; journal `find_request` item with `device_id`/`key_generation` == ctx (author only, no shared receipt); core exact lookup terminal with `final_display_id`; `message_id(row, display)` equals `message_id` when given; live window; no prior `live` row; voice policy; exact display read (§9.2) |
 | P1D | `speak` `replay`/`more` | `context(session,'relay:read')`; current active binding whose conversation is the message's conversation, epoch match; current membership; `message_id` resolved to a display identity by a verified alias or the core locate seam under the device's **own** principal (`session:read`); role `assistant`; exact display read and source digest; for `more`, `source_sha256` and `start_cp` provenance (§9.4) |
-| P2 | After the TTS await | Grant, membership, binding identity and core epoch again, the identity still visible and unrevised (PROPOSED `check_native_display`), attempt not stopped |
+| P2 | After the TTS await | Grant, membership, binding identity and core epoch again, the identity still visible and **unrevised**: the scalar `NativeDisplayToken` from `check_native_display` equals the token taken before the first segment read (§9.2.3), attempt not stopped |
 | P3 | Each downlink batch | Under `DeviceSession._send_lock`, once per lock hold covering ≤ 200 ms of audio: the full `output_check` closure (grant, membership, binding identity, core epoch) plus attempt-not-stopped; failure → no further bytes, attempt `aborted(revoked/stale)` (§7.3) |
 | P4 | `speak.stop` | `context(session,'relay:read')`; row `device_id`/`key_generation` == ctx |
 
@@ -620,10 +622,14 @@ something could actually be sent (M1). The seam (core, PROPOSED):
 * uses the runner's own single active profile STT configuration (the bridge already refuses multiplexed
   profiles); no client profile, model, provider, language or path input;
 * invokes the configured provider **once** with SDK/client automatic retries disabled and no re-send after a
-  request may have reached the provider (pre-send transcode only, no post-rejection retry; OAuth refresh retry only
-  after a definite authentication refusal that billed nothing); explicit timeouts replace unpinned SDK defaults;
-* if the configured attempt does not succeed, tries the **already installed** local backend once
-  (`transcribe_audio_local_fallback` semantics: never lazy-install, never another cloud provider);
+  request may have reached the provider (pre-send transcode only, no post-rejection retry; a refresh-and-resend after a
+  401/403 is NOT performed in a native call — an answered request is never re-sent; the cost is that an expired
+  OAuth token yields `failed/failed_after_send` and the local fallback, and pre-send credential freshness belongs to
+  V1-P with synthetic transport proof); explicit timeouts replace unpinned SDK defaults; redirects are not followed;
+* if the configured attempt does not succeed, tries the **already installed and already cached** local
+  `faster-whisper` backend once (`transcribe_audio_local_fallback` semantics under the native context: never
+  lazy-install, never download a model — a cache miss is a failure at the model-creation boundary — never run a user
+  command template, never another cloud provider);
 * returns `NativeTranscription(state, transcript, source, provider)` with stable enums only; never provider
   messages, credentials, paths or exception text; adds no log lines containing them.
 
@@ -735,13 +741,28 @@ The design therefore adds the minimal reviewed core display seam (PROPOSED, §12
    authority; (b) on a miss, call `locate_native_display(actor, ref, *, authorize, matches, max_rows=65536)`,
    which streams only identity scalars of currently visible display rows newest-first (no content), evaluates the
    SDK's recompute predicate, and stops at the first match, the row bound or the existing 2 s read deadline. A
-   hit re-writes the alias through the existing `_alias` path (cache only). Bound reached → `unavailable
-   (beyond_index)`; deadline → `temporarily_unavailable`.
-3. **Text**: `read_native_display(actor, ref, *, authorize, identity, segment, max_bytes)` returns exactly the
+   hit re-writes the alias through the existing `_alias` path (cache only). Either budget — the row bound or the
+   2 s deadline — ends the search with `RuntimeStoreError('read_budget')` whose `field` is `locate_rows` or
+   `locate_deadline`; the bridge maps both to `unavailable(beyond_index)` (a search that did not complete never
+   reports absence, and there is no endless same-work `temporarily_unavailable` loop). A completed search without a
+   match returns `None` → `not_found`. A field-less `read_budget` (the matched or requested row is too large to
+   project) maps to `unavailable(source_refused)`.
+3. **Text**: `read_native_display(actor, ref, *, authorize, identity, segment=0, max_bytes=65536)` returns exactly the
    `HistoryFragment` shape and segmentation of the existing reader for that one visible identity. The bridge reads
    segments 0..k until the speakable bound (262,144 UTF-8 B, ≤ 32 calls, each within the 2 s deadline), computes
    `source.sha256` over exactly the bytes read through `speakable_end_cp`, `total_cp` and `limited`. Live and
    deliberate playback use this same source, so offsets agree across devices and restarts.
+   **Unrevised fence (P2).** `check_native_display(actor, ref, *, authorize, identity)` is synchronous and
+   scalar-only: it returns `NativeDisplayToken(identity, physical_id, revision)` from the visible-row projection and
+   the row's existing content-revision stamp (`display.content.revision.v1.<physical>`), reads no content column
+   and is fail-closed on a malformed stamp (`temporarily_unavailable`). The bridge takes token **A** immediately before
+   the first segment read, token **B** after the last, and token **C** at P2: `A != B` means the row changed during
+   the read (a torn read, `conflict`); `A != C` means it changed after (`conflict`); equal tokens mean the digested text
+   is the text now. An edit before token A is not an inconsistency: the read sees the revised text, which is the
+   current canonical text. A compaction that republishes the row changes `physical_id` and is refused the same way
+   (deliberate Replay repeats it). A carrier the canonical normalizer hides is a projection row the scalar fence
+   cannot judge: only a READ refuses it (`not_found`), and the bridge always reads before it fences. Existing sources
+   use `check_existing_display(actor, target, *, adapter, source, authorize, row_id)` with the same token.
 4. **Actor and fences**: every core call uses `core.actor(ctx.device_id, row, ...)` (the reading device's own
    principal with `session:read`) and the request's `output_check` as `authorize`; nothing is cached across
    requests except the verified alias.
@@ -970,17 +991,40 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   and on `SessionAuthority`), validated like `CoreBridge`: exact dataclass fields
   `NativeTranscription(state, transcript, source, provider)`,
   `NativeSpeech(state, path, code_points, source, provider)`,
-  `NativeDisplayLocation(identity, role, created_at_ms, segment_count, size_bytes)`; signatures
-  `transcribe_native_once(path, *, authorize, before_send, deadline_s)`,
-  `synthesize_native_once(text, *, output_dir, authorize, before_send, deadline_s)`, `speakable_text(text)`,
-  `locate_native_display(actor, ref, *, authorize, matches, max_rows)`,
-  `read_native_display(actor, ref, *, authorize, identity, segment, max_bytes)` (returns the existing
-  `HistoryFragment`), `check_native_display(actor, ref, *, authorize, identity)`, and the existing-source analogs
-  `locate_existing_display(actor, target, *, authorize, matches, max_rows)` and
-  `read_existing_display(actor, target, *, authorize, row_id, segment, max_bytes)`; single-profile runner
-  (existing refusal of `multiplex_profiles`). Display functions authorize `session:read` for the actor before and
+  `NativeDisplayLocation(identity, physical_id, role, created_at_ms, segment_count, size_bytes)` (`physical_id` is an
+  int equal to `HistoryFragment.physical_id`) and `NativeDisplayToken(identity, physical_id, revision)`; ABI, with
+  parameter kinds and defaults exactly as implemented (the consumer validates `inspect.signature`):
+  `transcribe_native_once(path, *, authorize, before_send, deadline_s)` and
+  `synthesize_native_once(text, *, output_dir, authorize, before_send, deadline_s)` (both coroutines),
+  `speakable_text(text)`, and on `SessionAuthority`:
+  `locate_native_display(actor, ref, *, authorize, matches, max_rows=65536)` (coroutine; `matches(identity: str) -> bool`),
+  `read_native_display(actor, ref, *, authorize, identity, segment=0, max_bytes=65536)` (coroutine, returns the existing
+  `HistoryFragment`), `check_native_display(actor, ref, *, authorize, identity)` (sync, returns the token), and the
+  existing-source analogs, which also take `adapter` and `source` like every existing-source reader because they prove
+  the actual device principal: `locate_existing_display(actor, target, *, adapter, source, authorize, matches,
+  max_rows=65536)`, `read_existing_display(actor, target, *, adapter, source, authorize, row_id, segment=0,
+  max_bytes=65536)` and `check_existing_display(actor, target, *, adapter, source, authorize, row_id)`; single-profile
+  runner (existing refusal of `multiplex_profiles`). Display functions authorize `session:read` for the actor before and
   after the read, use the existing visible-row projection, 2 s deadline and progress handler, never hydrate other
   rows' content, and raise the existing `RuntimeStoreError` reasons.
+* **Result vocabulary and accounting (the mapping V2/V3 consume).** STT `state` ∈ `transcribed, empty, too_long,
+  unavailable, failed, timeout, refused, cancelled`; TTS adds `synthesized` in place of `transcribed`. `provider` ∈
+  `not_started` (no request left, and the consumer's `before_send` did not commit), `completed` (every sent request was
+  answered), `failed_after_send`, `unknown` (a request may have left, or audio/transcript came back through a path the
+  gate never saw: reported as `failed`/`unknown`, never `synthesized`/`not_started`). `refused` with `completed` means
+  authority was lost after the provider answered: the result is withheld, the attempt stays billed. `source` is
+  `configured` once the configured provider was used, `local_fallback`, or `null`. `cancelled` is returned only when a
+  callback raises `asyncio.CancelledError`; a real cancellation of the awaiting task propagates `CancelledError` and
+  fences the worker (no later callback, send or file), so the consumer's durable `before_send` row is the only
+  record of a possible send. Exceptions: `speakable_text` propagates a normalizer failure (no silent `strip()`
+  fallback); an exception from the consumer's `matches` predicate escapes `locate_native_display` unchanged; neither
+  is mapped by the core. The mapping from each `(state, provider)` pair to the wire `state`/`reason` is V2/V3's
+  reviewed contract: no new wire value is introduced.
+* **V1 prerequisite provider coverage (stage amendment, plan V1/V1-P).** The V1 seam holds to one request: STT
+  `openai`, `groq`, `deepinfra` (pinned model), `xai`, `elevenlabs`, cached local `faster-whisper` fallback; TTS
+  `edge`, `elevenlabs`, `openai`, `deepinfra` (pinned model). Everything else is refused **unsent**
+  (`unavailable`) — never replaced by another provider — until its V1-P gate passes. This is not the final
+  provider scope and is not configured-provider acceptance.
 * Voice output is listed only with the complete seam (TTS **and** display read): there is no reduced
   live-only mode that would narrow approved deliberate playback.
 * Hub: PROPOSED `DeviceSession.send_binary(data, *, authorize=None)` mirroring `send_json`; channel-5 routing in
@@ -1096,7 +1140,7 @@ guests.
 | Risk | Mitigation / status |
 | --- | --- |
 | Logical-chat auto-TTS paid waste (§2.8) | Source-derived, unproven; V2 registered RED then guard |
-| Provider SDK hidden retries (ElevenLabs) | Seam must pin retries off and prove call counts; review the installed SDK version at V1 |
+| Provider SDK hidden retries (ElevenLabs, Edge) | The seam proves the SDK sends through the client it hooked BEFORE calling it and requires exactly one gated send AFTER; a bypass is `failed`/`unknown`. V1 round 1 ran the real lock-pinned SDKs (ElevenLabs 1.59.0, Edge 7.2.7) with a synthetic transport; stock counts recorded in the V1 report |
 | Output fence cost on the hub loop (M4) | Full check per ≤ 200 ms batch under the lock; V3 thresholds; one pre-approved cached-snapshot fallback (§7.3) |
 | Display seam cost on very large lineages | Locate ≤ 65,536 rows within the 2 s deadline, newest-first, identity scalars only; V1 measurement; `beyond_index`/`temporarily_unavailable` are truthful |
 | Alias eviction (4,096 global rows) | Alias is only a verified hint; locate fallback re-creates it |

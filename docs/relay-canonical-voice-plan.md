@@ -31,7 +31,7 @@ obligations. Approved Replay/More/notification playback, concise speech and rout
 ## 1. Dependency order
 
 ```
-V0 design review ─► V1 core voice seam ─► V2 SDK voice input ─► V3 SDK voice output
+V0 design review ─► V1 core voice seam ─► V1-P provider parity ─► V2 SDK voice input ─► V3 SDK voice output
                                               │                       │
                                               └──► V4 native voice codec + pure capture ledger (vectors from V2/V3)
                                                                    │
@@ -43,7 +43,8 @@ V0 design review ─► V1 core voice seam ─► V2 SDK voice input ─► V3 S
                     V8 staged server rollout + authorized physical/owner-observed checks (inside Task8)
 ```
 
-V2 depends on V1 (the bridge refuses to advertise without the exact seam). V3 depends on V2 (store, flags,
+V2 depends on V1 **and V1-P** (the bridge refuses to advertise without the exact seam; V2 must not start, and
+configured-provider voice must not be claimed, until V1-P passes). V3 depends on V2 (store, flags,
 channel routing). V4 needs V2/V3 fixtures for captured vectors. V5 needs V4 and the Task3 controller base; V6 needs
 V4 and the Task6 base. V7 needs V5/V6. V8 needs V7 and the Task10/server gates. Task3/Task6 may implement their
 typed-text parts before V5/V6, but **no build may expose hold-to-talk inside a selected Relay conversation before
@@ -94,7 +95,35 @@ Tests (core canonical runner, synthetic home, synthetic provider transport at th
 * Stock-off controls: existing `run_inbound` STT/echo, `text_to_speech_tool`, history fragment reader and runner
   voice reply behaviour unchanged.
 
+V1 prerequisite coverage (stage amendment, correction round 1) — STT `openai/groq/deepinfra/xai/elevenlabs` and the
+cached local `faster-whisper` fallback; TTS `edge/elevenlabs/openai/deepinfra`; every other provider, including the
+`local_command` template and all command/plugin providers, is refused UNSENT. Binding corrections: the display fence is
+a scalar `NativeDisplayToken` (design §9.2.3), a hooked SDK must be proven to send through the injected client before
+it is called and must produce exactly one gated send, consumer callbacks are fenced against close/cancel/deadline on the
+owning loop, and the local fallback is cached-only at the model-creation boundary.
+
 Exit: exported patch applies with `git apply --check` to a fresh pinned core checkout; focused report; ONE review.
+
+### V1-P — Provider parity (mandatory, immediately after V1 and BEFORE V2 activation)
+
+The full approved scope is "the runner's single active profile STT/TTS configuration". V1 deliberately covers only the
+set above; V1-P closes the rest, each with an explicit exit gate. Never enable a provider by removing the send or
+no-install guard; a custom implementation that cannot meet the contract answers truthful unsupported capability
+(refused UNSENT). V1-P preserves current profile config/voice semantics for supported built-ins and exercises every
+category below on the registered fixtures, then ONE source review and a current-profile integration proof:
+
+| Provider | Exit gate |
+| --- | --- |
+| STT Mistral | real installed SDK transport, one gated send, zero hidden retries |
+| STT command and plugin (including `local_command`) | native-once capability adapter: no implicit install/download, explicit cancellation and output bounds; incapable custom implementations refuse UNSENT |
+| TTS MiniMax / xAI / Gemini | instrument each actual HTTP boundary, including auxiliary transformations (tag rewrite calls); no hidden second paid request; fail closed before a disallowed send |
+| TTS Mistral | real installed SDK boundary and zero-retry proof |
+| TTS NeuTTS / Kitten / Piper | installed AND cached assets only, no downloads, bounded local execution, truthful `not_started` remote accounting, no paid-provider fallback |
+| TTS command and plugin | the same native-once capability contract as STT; an arbitrary program cannot be certified single-attempt by a provider-name allowlist |
+| Pre-send credential freshness (xAI OAuth, M2) | refresh BEFORE the paid send with synthetic transport proof; never refresh-and-resend after a send |
+
+Until V1-P passes, V1 alone is not configured-provider acceptance and V2 cannot start. The full fifteen-feature scope is
+unchanged.
 
 ### V2 — SDK voice input (SDK patch, flags default false)
 
@@ -285,7 +314,7 @@ acceptance item of design §15 has its own evidence.
 | Routing, stop-first loss and walking controls (I3) | V5/V6 JVM, V7 native, V8 owner observation |
 | M1 billing evidence (`preparing`, `before_send`) | V1, V2, V3 |
 | M2 content-free logs, confined content responses | V2, V3 log capture; N8 |
-| M3 provider timeout/retry provenance and measured RED | V1 |
+| M3 provider timeout/retry provenance and measured RED | V1 (covered providers), V1-P (the rest) |
 | M4 output fence cost gate | V3 |
 | M5 registry gaps (removed; canonical read) | V1, V3 |
 | M6 BYOK live row, chunk limits, watch delegation boundary | V3, V5, V6 |

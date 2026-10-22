@@ -46,40 +46,49 @@ admission route; `NativeAdmissionOptions` stays TEXT-only; ordinary voice/STT/TT
 
 * `gateway.session_native_voice` (`NATIVE_VOICE_VERSION = 1`, also on `SessionAuthority`) with the
   frozen results `NativeTranscription(state, transcript, source, provider)`,
-  `NativeSpeech(state, path, code_points, source, provider)` and
-  `NativeDisplayLocation(identity, physical_id, role, created_at_ms, segment_count, size_bytes)`.
+  `NativeSpeech(state, path, code_points, source, provider)`,
+  `NativeDisplayLocation(identity, physical_id, role, created_at_ms, segment_count, size_bytes)` and
+  `NativeDisplayToken(identity, physical_id, revision)`.
 * `transcribe_native_once(path, *, authorize, before_send, deadline_s)` — the profile's configured
   STT, read at call time, sent at most once: explicit timeout (≤ 60 s and the deadline), zero SDK
-  retries, no transcode or OAuth-refresh retry after a provider answer, `authorize` before every send
-  and after each await, `before_send` immediately before the transport send (a raise refuses it),
-  one installed-only local fallback after a configured failure (never an install, never another
-  cloud provider). Providers it can hold to one request: OpenAI-compatible (`openai`, `groq`,
-  `deepinfra` with a pinned model), `xai`, `elevenlabs` and local backends; anything else is
-  refused unsent (`unavailable`).
+  retries, redirects not followed, no transcode or OAuth-refresh retry after a provider answer,
+  `authorize` before every send and after each await, `before_send` immediately before the transport
+  send (a raise refuses it), one installed-and-cached local `faster-whisper` fallback after a configured
+  failure (never an install, never a model download, never a user command, never another cloud provider).
 * `synthesize_native_once(text, *, output_dir, authorize, before_send, deadline_s)` — the profile's
   configured voice, one request per core chunk, stop at the first failed chunk, audio only inside
-  the caller-owned directory and streamed under a byte cap. The 60 s request timeout is **new
-  policy**, not a fact about the current ElevenLabs client. Voices it can hold to one request per
-  chunk: `elevenlabs`, `openai`, `deepinfra` (pinned model) and `edge`; others are `unavailable`.
+  the caller-owned directory and streamed under a byte cap; a multi-chunk call is refused unsent when the
+  join tool is missing. The 60 s request timeout is **new policy**, not a fact about the ElevenLabs client
+  (lock-pinned 1.59.0 measured: no retry, 60 s client timeout, without it).
 * `speakable_text(text)` — the reviewed spoken-text normalization of `text_to_speech_tool`, uncapped.
 * `SessionAuthority.locate_native_display`, `read_native_display`, `check_native_display` and the
-  existing-source analogs `locate_existing_display` / `read_existing_display` — identity-addressed
-  reads over the existing visible-row projection and `HistoryFragment` segments with `session:read`
-  proved before and after, the existing 2 s deadline and progress handler, newest-first locate bounded
-  at 65,536 rows and hydrating only the matched row. Both locate bounds (rows, deadline) end with
-  `RuntimeStoreError('read_budget')` whose `field` is `locate_rows` / `locate_deadline`: only a
-  completed search reports absence. The existing-source analogs also take `adapter` and `source`
-  (like every existing-source reader) so the actual device principal is proved; the design text
-  omitted them. The Relay SDK's 8,192/65,536 response-bound regression for existing-source history
-  is not addressed here.
+  existing-source analogs `locate_existing_display` / `read_existing_display` / `check_existing_display` —
+  identity-addressed reads over the existing visible-row projection and `HistoryFragment` segments with
+  `session:read` proved before and after, the existing 2 s deadline and progress handler, newest-first locate
+  bounded at 65,536 rows and hydrating only the matched row. The check is scalar: it returns the
+  `NativeDisplayToken` (physical row id and content-revision stamp) and reads no content; the consumer brackets
+  the read with equal tokens (design §9.2.3). Both locate bounds end with `RuntimeStoreError('read_budget')` whose
+  `field` is `locate_rows` / `locate_deadline`: only a completed search reports absence. The existing-source
+  analogs also take `adapter` and `source`, as every existing-source reader does. The Relay SDK's 8,192/65,536
+  response-bound regression for existing-source history is not addressed here.
+
+Send accounting is fail-closed: a hooked SDK is proven to send through the client that carries the gate before it
+is called and must produce exactly one gated send, else the result is `failed` with `provider='unknown'`; the
+consumer's `authorize`/`before_send` are fenced on the owning loop against close, cancellation and the deadline.
+
+**Stage coverage (explicit amendment).** This stage covers a prerequisite provider set: STT `openai`, `groq`,
+`deepinfra` (pinned model), `xai`, `elevenlabs` and the cached local fallback; TTS `edge`, `elevenlabs`, `openai`,
+`deepinfra` (pinned model). Every other configured provider — STT Mistral, user command (including the
+`local_command` template) and plugin providers; TTS MiniMax, xAI, Gemini, Mistral, NeuTTS/Kitten/Piper, command and
+plugin providers — is refused UNSENT (`unavailable`). They are the mandatory V1-P provider-parity gate of the plan,
+which must pass before V2; V1 alone is not configured-provider acceptance.
 
 Outcomes are stable tokens only: results carry no provider message, exception text, credential or
-path except the audio file a successful synthesis wrote. `provider` is billing evidence about the
-configured remote provider (`not_started`, `completed`, `failed_after_send`, `unknown`).
+path except the audio file a successful synthesis wrote, and the stock provider helpers' log lines are suppressed
+during a native call. `provider` is billing evidence about the configured remote provider (`not_started`,
+`completed`, `failed_after_send`, `unknown`).
 
 Focused evidence is in the stage report, not in this directory: warning-strict canonical-runner suites over the
-real OpenAI SDK/httpx client and `requests` with only the network transport replaced, the registered
-core owner for display reads, and stock-off controls. The ElevenLabs and Edge SDKs are not installed
-in the owned offline environment, so those two engines are exercised through labelled stand-ins that
-prove what the seam passes and what its transport guard refuses, not the real SDK's defaults. No
-provider, SDK, native, live or physical acceptance is claimed.
+real OpenAI SDK, the real lock-pinned ElevenLabs 1.59.0 and Edge 7.2.7 SDKs and `requests` with only the network
+transport (for Edge, the socket) replaced, the real ffmpeg on local synthetic audio, the registered core owner for
+display reads, and stock-off controls. No provider, SDK-in-production, native, live or physical acceptance is claimed.
