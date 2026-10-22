@@ -324,10 +324,31 @@ class RelayStateSnapshotTest {
             "unknown error code" to
                 (valid.copy(lastErrorCode = "made_up") to RestoreRefusal.INVALID_FIELD)
         )
+        val field = mapOf(
+            "bad profile" to "scope",
+            "blank endpoint" to "scope",
+            "bad conversation" to "conversationId",
+            "uppercase request id" to "requestId",
+            "version-4 request id" to "requestId",
+            "id not stamped with its preparation time" to "preparedAtMs",
+            "deadline not after preparation" to "expiresAtMs",
+            "deadline beyond five minutes" to "expiresAtMs",
+            "fingerprint not hex" to "fingerprint",
+            "text changed under the fingerprint" to "fingerprint",
+            "empty text" to "text",
+            "unknown receipt status" to "facts",
+            "queued with a generation" to "facts",
+            "started without a generation" to "facts",
+            "outcome that is not a token" to "facts",
+            "unknown closure" to "closure",
+            "negative anomalies" to "anomalies",
+            "unknown error code" to "lastErrorCode"
+        ) // the shape rules (closed and admitted, held but never sent, ...) name the whole turn
         for ((name, case) in bad) {
             val result = refusal(restore(withTurn(case.first)))
             assertEquals(name, case.second, result.reason)
-            assertTrue(name, result.path.startsWith("ledger.turns[0]"))
+            // The refusal names the very field that was tampered with (not just any later check).
+            assertEquals(name, "ledger.turns[0]" + (field[name]?.let { ".$it" } ?: ""), result.path)
             assertFalse(name, result.toString().contains(valid.text!!))
         }
     }
