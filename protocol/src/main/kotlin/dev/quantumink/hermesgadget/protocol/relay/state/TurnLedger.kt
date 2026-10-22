@@ -624,9 +624,7 @@ class TurnLedger private constructor(
     }
 
     private fun revoked(cleared: TurnEntry, ref: CallRef, submit: Boolean): TurnEntry =
-        if (submit ||
-            cleared.facts == null
-        ) {
+        if (submit || cleared.facts == null) {
             uncertainAfter(cleared, ref.asSubmit(), UncertainReason.STALE_AUTHORITY)
         } else {
             cleared
@@ -636,11 +634,8 @@ class TurnLedger private constructor(
         CallRef(serial, correlation, CallKind.SUBMIT, bindingSerial, scope)
 
     private fun lookupFoundNothing(entry: TurnEntry, cleared: TurnEntry): LedgerStep<ReplyOutcome> {
-        if (entry.facts !=
-            null
-        ) {
-            return anomalous(entry, cleared, AnomalyKind.ABSENT_AFTER_ADMISSION)
-        }
+        val admitted = entry.facts != null
+        if (admitted) return anomalous(entry, cleared, AnomalyKind.ABSENT_AFTER_ADMISSION)
         val sentAt = entry.lookupSentAtMs
         return if (sentAt != null && sentAt >= entry.expiresAtMs) {
             close(entry, cleared, TurnClosure.NotAdmitted(NotAdmittedProof.ABSENT_AFTER_DEADLINE))
@@ -849,11 +844,8 @@ class TurnLedger private constructor(
          */
         internal fun merge(current: AdmissionFacts?, incoming: AdmissionFacts): Merge {
             if (current == null) return Merge.Changed(incoming)
-            if (incoming.admissionId !=
-                current.admissionId
-            ) {
-                return Merge.Conflict(AnomalyKind.ADMISSION_MISMATCH)
-            }
+            val sameAdmission = incoming.admissionId == current.admissionId
+            if (!sameAdmission) return Merge.Conflict(AnomalyKind.ADMISSION_MISMATCH)
             if (incoming.authorityEpoch != current.authorityEpoch) {
                 return Merge.Conflict(AnomalyKind.AUTHORITY_EPOCH_MISMATCH)
             }
@@ -868,11 +860,8 @@ class TurnLedger private constructor(
             }
             if (incoming.status == current.status) {
                 if (incoming.status == ReceiptStatus.TERMINAL) {
-                    if (incoming.outcome !=
-                        current.outcome
-                    ) {
-                        return Merge.Conflict(AnomalyKind.OUTCOME_CONFLICT)
-                    }
+                    val sameOutcome = incoming.outcome == current.outcome
+                    if (!sameOutcome) return Merge.Conflict(AnomalyKind.OUTCOME_CONFLICT)
                     if (after != before) return Merge.Conflict(AnomalyKind.GENERATION_REGRESSION)
                     return Merge.Unchanged
                 }
