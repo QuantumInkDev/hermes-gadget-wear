@@ -256,14 +256,6 @@ class HistoryStep<out R>(
     override fun toString(): String = "HistoryStep($result, effects=${effects.size})"
 }
 
-/** A committed message identity kept for duplicate detection (no text is kept). */
-class KnownMessageRecord internal constructor(
-    val messageId: MessageId,
-    val role: HistoryRole,
-    val createdAtMs: Long,
-    val segmentCount: Int
-)
-
 /**
  * The pure assembly of history fragments into whole messages.
  *

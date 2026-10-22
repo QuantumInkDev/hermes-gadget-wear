@@ -80,7 +80,7 @@ sealed interface DedupKey {
 }
 
 /** A local resource limit of the delivery state (policy). The page is NOT consumed and nothing is dropped. */
-enum class DeliveryLimit { SEEN_KEYS, PENDING_ACKS, OBLIGATIONS }
+enum class DeliveryLimit { SEEN_KEYS, PENDING_ACKS }
 
 enum class DeliveryIgnore { UNKNOWN_CALL, NO_SESSION, STALE_BINDING, WRONG_BATCH }
 

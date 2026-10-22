@@ -11,6 +11,10 @@ import org.junit.Test
 class HistoryAssemblyQuotaTest {
     private val f = HistoryHarness.Companion
 
+    /** A fragment is cut at a nominal 8,192 bytes, moved forward by at most three continuation bytes. */
+    private val maxFragmentBytes =
+        StateLimits.SEGMENT_NOMINAL_BYTES + StateLimits.SEGMENT_BOUNDARY_SLACK_BYTES
+
     private fun segments(n: Int, count: Int, text: (Int) -> String): List<HistoryMessage> =
         (0 until count).map { f.fragment(n, it, count, text(it)) }
 
@@ -59,7 +63,7 @@ class HistoryAssemblyQuotaTest {
     @Test fun theByteQuotaOfOneMessageIsExactToTheByte() {
         val max = StateLimits.MAX_MESSAGE_SEGMENTS
         // 127 segments of 8,195 bytes (a boundary may move up to three bytes) plus a last one that lands on 1 MiB.
-        val last = StateLimits.MAX_MESSAGE_UTF8_BYTES - 127 * 8_195
+        val last = StateLimits.MAX_MESSAGE_UTF8_BYTES - 127 * maxFragmentBytes
         assertEquals(7_811, last)
         val exact = HistoryHarness()
         val atLimit = exact.accepted(
@@ -71,7 +75,7 @@ class HistoryAssemblyQuotaTest {
                             if (it <
                                 127
                             ) {
-                                8_195
+                                maxFragmentBytes
                             } else {
                                 last
                             }
@@ -96,7 +100,7 @@ class HistoryAssemblyQuotaTest {
                             if (it <
                                 127
                             ) {
-                                8_195
+                                maxFragmentBytes
                             } else {
                                 last + 1
                             }
@@ -164,7 +168,7 @@ class HistoryAssemblyQuotaTest {
 
     @Test fun theUncommittedByteQuotaIsExactAndAFifthMebibyteMessageWaitsForACommit() {
         val h = HistoryHarness()
-        val block = "a".repeat(8_192)
+        val block = "a".repeat(StateLimits.SEGMENT_NOMINAL_BYTES)
         fun mebibyte(n: Int) =
             segments(n, StateLimits.MAX_MESSAGE_SEGMENTS) { block }.toTypedArray()
         for (n in 1..4) h.accepted(h.feed(f.page(f.cursor(n), *mebibyte(n))))
