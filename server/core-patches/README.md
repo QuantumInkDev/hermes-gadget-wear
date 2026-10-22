@@ -105,8 +105,9 @@ with an ordinary registered `pre_transcription` callback is refused UNSENT (`una
 native combination until a bounded hook contract exists. A recorded `closed`/`timeout` credential refusal is terminal
 (`timeout`, or `cancelled` before the deadline; no fallback). Inside a native call only, the shared command runner is
 bounded by the call's absolute deadline, Stop and per-stream/transcript-file caps, killing the same-session process
-group (a `setsid` descendant is not reached); command providers themselves stay refused until an OS network-deny
-launcher is admitted. The runner also now closes the child's pipes after every run (a stock file-object leak).
+group (a `setsid` descendant is not reached). At this Phase1A stage command providers stayed refused; Phase1B (below)
+admits them only inside the qualified launcher and only when configured `native: local-sandboxed`. The runner also now
+closes the child's pipes after every run (a stock file-object leak).
 
 **Launcher-qualified local execution (V1-P Task3 Phase1B, source only).** Every native local child — the Piper,
 KittenTTS and NeuTTS engines, a command provider configured `native: local-sandboxed`, and the managed whisper.cpp
@@ -120,9 +121,24 @@ only, output descriptors pointed at null before any vendor import, one bounded J
 WAV watch, and a complete-cache preflight before inference (Piper espeak/text/hebrew incl. Arabic Tashkeel; KittenTTS
 through `try_to_load_from_cache` and the lower `KittenTTS_1_Onnx`, never the downloading wrapper; NeuTTS a local GGUF,
 the stock Torch neucodec with its nested w2v-bert encoder files and the Perth resources, refused before any import on
-Python 3.14). ffmpeg must be usable before any engine and converts WAV to MP3. Managed whisper.cpp runs only with both
-pinned models verified by `_existing_dest_ok` (never the downloader). Local routes make no gated send (`not_started`); a
-failure after a local invocation is `failed`. No real engine, model, cache, sandbox or audio acceptance is claimed.
+Python 3.14). Managed whisper.cpp runs only with both pinned models verified by `_existing_dest_ok` (never the
+downloader). Local routes make no gated send (`not_started`). No real engine, model, cache, sandbox or audio acceptance
+is claimed.
+
+**Task3 review fix1 (source only).** The per-call policy records an actual successful local spawn (a prerequisite probe
+or a failed spawn is not one): any native local failure after it — a stream or transcript cap, a symlinked or directory
+transcript, an unreadable result — is `failed`/`not_started`, never `unavailable`; explicit Stop/deadline/refusal states
+are kept. The helper runs as an isolated interpreter (`python -I`, explicit minimal child env, exact request fields)
+and, before any preflight or vendor import, requires every module the engine imports at load and each source-backed
+distribution at its exact supported version from installed metadata (Piper 1.8.0, KittenTTS 0.8.1, NeuTTS 1.4.1,
+huggingface-hub 1.24.0, transformers 5.17.0, neucodec 0.0.4, misaki 0.9.4, phonemizer-fork 3.3.2, espeakng-loader 0.2.4,
+num2words 0.5.14; an installed resemble-perth must be 1.0.1): missing is `not_installed`, another version
+`unsupported_version`. NeuTTS 1.4.1's own metadata pins transformers 5.1.0 against the supported 5.17.0, so a NeuTTS
+install that satisfies both is not established. Before any engine, a tiny synthetic WAV→MP3 conversion must succeed
+under the same launcher (a missing or broken ffmpeg refuses unsent); each chunk's conversion is the same wrapped,
+Stop-aware, WAV-forced, file-only child bounded by the exact remaining deadline. A multi-chunk join still uses the shared
+stock joiner (Task4). A NeuTTS language is passed only for a local GGUF. The pre-existing faster-whisper local path is
+unchanged: cached-only by source (`local_files_only`), not launcher-wrapped and not network-denial proof.
 
 **Disclosures that bind this stage (carried review findings).** (1) *Process-global telemetry (M1):* the pinned Mistral
 SDK's own key-carrying trace exporter is switched off for a native call, but a process-global OpenTelemetry tracer

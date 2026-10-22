@@ -771,10 +771,10 @@ index 0000000000000000000000000000000000000000..168d53e853fbe0b8aff939269e09ee44
 +    return PROVIDER_COMPLETED if answered else PROVIDER_FAILED
 diff --git a/gateway/session_native_voice_stt.py b/gateway/session_native_voice_stt.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..82e9b040a8a39fb56b6fc9aae3389f07dcdac307
+index 0000000000000000000000000000000000000000..d26eb28b3ef008748e4f80dd3eadd21544ab85a0
 --- /dev/null
 +++ b/gateway/session_native_voice_stt.py
-@@ -0,0 +1,203 @@
+@@ -0,0 +1,205 @@
 +"""Configured-once speech-to-text for the native voice seam (see ``session_native_voice``).
 +
 +The profile's own STT configuration is read at call time through the stock resolvers, the audio is
@@ -882,6 +882,8 @@ index 0000000000000000000000000000000000000000..82e9b040a8a39fb56b6fc9aae3389f07
 +        return policy.refusal
 +    if policy.refusal == 'closed':  # closed by the deadline fence, else by Stop/cancellation
 +        return 'timeout' if policy.deadline is not None and time.monotonic() >= policy.deadline else 'cancelled'
++    if policy.local_launched:
++        return 'failed'  # a local child really started (cap, transcript or read failure after it): never "nothing tried"
 +    if policy.refusal in ('unsupported', 'unsupported_hook'):
 +        return 'unavailable'
 +    local_attempt = _is_local(attempt.provider, policy) and attempt.result is not None
@@ -980,10 +982,10 @@ index 0000000000000000000000000000000000000000..82e9b040a8a39fb56b6fc9aae3389f07
 +    return _make(configured_state, None, None, provider)
 diff --git a/gateway/session_native_voice_tts.py b/gateway/session_native_voice_tts.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..07a64d996fc412d288e94a8e2630a52d7f358499
+index 0000000000000000000000000000000000000000..d5c413ee4bcb14bcbf06c80d4956769aaebcf727
 --- /dev/null
 +++ b/gateway/session_native_voice_tts.py
-@@ -0,0 +1,317 @@
+@@ -0,0 +1,316 @@
 +"""Configured one-request-per-chunk text-to-speech for the native voice seam (``session_native_voice``).
 +
 +The profile's own TTS configuration (provider, voice, model) is read at call time through the stock
@@ -1024,7 +1026,6 @@ index 0000000000000000000000000000000000000000..07a64d996fc412d288e94a8e2630a52d
 +    code_points: int = 0
 +    answered: bool = False  # every request that was sent got a usable answer
 +    unaccounted: bool = False  # audio was produced (or a send happened) outside the gate: accounting is unknown
-+    local_attempted: bool = False  # a local child (engine helper or command) was started for this call
 +
 +
 +def _make(state, path, code_points, source, provider):
@@ -1057,7 +1058,6 @@ index 0000000000000000000000000000000000000000..07a64d996fc412d288e94a8e2630a52d
 +    paths: list
 +    done: int = 0  # chunks whose request was answered and whose audio was kept
 +    unaccounted: bool = False  # an engine produced audio without exactly one gated send
-+    local_attempted: bool = False  # a launcher-wrapped local child was started
 +
 +    @property
 +    def answered(self):
@@ -1079,11 +1079,9 @@ index 0000000000000000000000000000000000000000..07a64d996fc412d288e94a8e2630a52d
 +        _synthesize_native_plugin(engine[1:], chunk, path, config)
 +    elif kind == 'local':
 +        from tools.tts_tool_local import native_engine_chunk
-+        run.local_attempted = True
 +        native_engine_chunk(engine[1], chunk, path, config, run.paths.append)
 +    elif kind == 'command':
 +        from tools.tts_command_provider import _generate_command_tts
-+        run.local_attempted = True
 +        _generate_command_tts(chunk, path, engine[1], engine[2], config)
 +    else:
 +        tts._synthesize_builtin(engine, chunk, path, config, None)
@@ -1168,8 +1166,9 @@ index 0000000000000000000000000000000000000000..07a64d996fc412d288e94a8e2630a52d
 +
 +
 +def _local_preflight(engine, config):
-+    """Before any local child: a usable ffmpeg for an engine's real WAV→MP3 conversion (Q5), the engine's
-+    parent-visible prerequisites, and a qualified launcher. ``None`` when ready, else the unsent state."""
++    """Before any engine child: the engine's parent-visible prerequisites, a qualified launcher, then a converter that
++    actually turns a tiny synthetic WAV into MP3 under that launcher (Q5; a broken one refuses unsent). ``None`` when
++    ready, else the unsent state."""
 +    from tools.native_local_launcher import qualified_prefix
 +    kind = _route_kind(engine)
 +    if kind == 'local':
@@ -1180,6 +1179,9 @@ index 0000000000000000000000000000000000000000..07a64d996fc412d288e94a8e2630a52d
 +        native_engine_options(engine[1], config)  # refuses unsent (package, interpreter, cached voice)
 +    if kind in ('local', 'command') and qualified_prefix() is None:
 +        return 'unavailable'
++    if kind == 'local':
++        from tools.tts_tool_local import native_converter_preflight
++        native_converter_preflight()
 +    return None
 +
 +
@@ -1244,7 +1246,6 @@ index 0000000000000000000000000000000000000000..07a64d996fc412d288e94a8e2630a52d
 +            _remove([_final_path(output_dir, run_id)])
 +    verdict.answered = run.answered
 +    verdict.unaccounted = run.unaccounted
-+    verdict.local_attempted = run.local_attempted
 +    return verdict
 +
 +
@@ -1263,8 +1264,8 @@ index 0000000000000000000000000000000000000000..07a64d996fc412d288e94a8e2630a52d
 +        return policy.refusal
 +    if policy.refusal == 'unsupported':
 +        return 'unavailable'
-+    if synth.local_attempted:
-+        return 'failed'  # a local child was started: a failure after a local invocation, never "nothing was tried"
++    if policy.local_launched:
++        return 'failed'  # a local child really started: a failure after a local invocation, never "nothing was tried"
 +    return 'unavailable' if not policy.sends else 'failed'
 +
 +
@@ -2146,10 +2147,10 @@ index 0000000000000000000000000000000000000000..1f184b31bd1cecf70673a66bcf008dbc
 +        super().before_send()
 diff --git a/tests/gateway/test_native_voice_custom.py b/tests/gateway/test_native_voice_custom.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..8131691ae064d978a130e848edb4a77544b78491
+index 0000000000000000000000000000000000000000..5eae2a7976a4a12de4d5fb1cfcf624429ff04693
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_custom.py
-@@ -0,0 +1,576 @@
+@@ -0,0 +1,660 @@
 +"""Native voice seam: configured custom (plugin) STT/TTS providers, and terminal credential refusals.
 +
 +The plugins below are ordinary registered ``TranscriptionProvider``/``TTSProvider`` subclasses. A plugin that
@@ -2307,8 +2308,9 @@ index 0000000000000000000000000000000000000000..8131691ae064d978a130e848edb4a775
 +class LegacyTTS(TTSProvider):
 +    """A TTS plugin with only the legacy ABC surface (no native-once opt-in)."""
 +
-+    def __init__(self, plan='one'):
-+        self.plan, self.rec = plan, Recorder()
++    def __init__(self, plan='one', label='A'):
++        self.plan, self.label, self.rec = plan, label, Recorder()
++        self.entered, self.finished = threading.Event(), threading.Event()
 +
 +    @property
 +    def name(self):
@@ -2327,14 +2329,37 @@ index 0000000000000000000000000000000000000000..8131691ae064d978a130e848edb4a775
 +
 +
 +class CustomTTS(LegacyTTS):
++    """Opted in. ``plan``: 'one' (one send per chunk), 'two' (tries a second send), 'none' (audio with no send),
++    'wait' (waits for Stop/deadline, then tries to send and write audio)."""
++
 +    def synthesize_native_once_v1(self, request, transport):
 +        from agent.native_once import NativeTtsAnswer
 +        self.rec.native.append(request)
++        self.entered.set()
++        try:
++            return self._answer(request, transport, NativeTtsAnswer)
++        finally:
++            self.finished.set()
++
++    def _answer(self, request, transport, NativeTtsAnswer):
 +        if self.plan == 'none':
 +            with open(request.output_path, 'wb') as handle:
 +                handle.write(b'ID3unsent-audio')
 +            return NativeTtsAnswer('ok')
-+        response = transport.client.post('https://tts.custom.invalid/v1/speech', json={'text': request.text})
++        if self.plan == 'wait':
++            for _ in range(2000):  # bounded poll: waits for Stop or the deadline to close the call
++                if request.cancelled():
++                    break
++                time.sleep(0.01)
++            try:
++                transport.client.post('https://tts.custom.invalid/v1/speech', json={'text': request.text})
++            except native_send_policy.NativeSendRefused as exc:
++                self.rec.refusals.append(exc.reason)
++            with open(request.output_path, 'wb') as handle:  # a late write after the close: must never surface
++                handle.write(b'ID3late-audio')
++            return NativeTtsAnswer('ok')
++        response = transport.client.post('https://tts.custom.invalid/v1/speech', json={'text': request.text},
++                                         headers={'x-label': self.label, 'x-voice': str(request.voice)})
 +        if self.plan == 'two':
 +            try:
 +                transport.client.post('https://tts.custom.invalid/v1/speech', json={'text': request.text})
@@ -2609,6 +2634,66 @@ index 0000000000000000000000000000000000000000..8131691ae064d978a130e848edb4a775
 +    plugin = register_tts(CustomTTS('one'))
 +    result = await speak(out, support.Callbacks())
 +    assert (result.state, result.provider) == ('unavailable', 'not_started') and plugin.rec.native == []
++
++
++@pytest.mark.asyncio
++async def test_stop_while_a_tts_plugin_runs_leaves_nothing_sent_or_played(monkeypatch, out):
++    support.write_config(get_hermes_home(), tts_config())
++    plugin = register_tts(CustomTTS('wait'))
++    cb = support.Callbacks()
++    wire = support.Wire()
++    with support.provider_wire(monkeypatch, wire):
++        task = asyncio.create_task(speak(out, cb))
++        assert await asyncio.to_thread(plugin.entered.wait, 10)
++        task.cancel()
++        with pytest.raises(asyncio.CancelledError):
++            await task
++        assert await asyncio.to_thread(plugin.finished.wait, 10)
++    for _ in range(100):  # bounded poll: the fenced worker removes the late file once the plugin returned
++        if not os.listdir(out):
++            break
++        await asyncio.sleep(0.05)
++    assert plugin.rec.refusals == ['closed'] and wire.count == 0 and cb.before_send_calls == 0
++    assert os.listdir(out) == [] and len(plugin.rec.native) == 1 and plugin.rec.legacy == []
++
++
++@pytest.mark.asyncio
++async def test_the_deadline_while_a_tts_plugin_runs_is_timeout_with_no_late_audio(monkeypatch, out):
++    support.write_config(get_hermes_home(), tts_config())
++    plugin = register_tts(CustomTTS('wait'))
++    cb = support.Callbacks()
++    wire = support.Wire()
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb, deadline_s=0.5)
++        assert await asyncio.to_thread(plugin.finished.wait, 10)
++    for _ in range(100):  # bounded poll: the late write happens after the result; the fence removes it
++        if not os.listdir(out):
++            break
++        await asyncio.sleep(0.05)
++    assert (result.state, result.path, result.provider) == ('timeout', None, 'not_started')
++    assert plugin.rec.refusals == ['closed'] and wire.count == 0 and cb.before_send_calls == 0
++    assert os.listdir(out) == [] and len(plugin.rec.native) == 1
++
++
++@pytest.mark.asyncio
++async def test_each_served_profile_reaches_only_its_own_tts_plugin_instance_and_options(monkeypatch, out, tmp_path):
++    homes = {label: tmp_path / f'profile-{label}' for label in 'AB'}
++    plugins = {}
++    for label, home in homes.items():
++        support.write_config(home, {'tts': {'provider': NAME, 'voice': f'voice-{label}'}})
++        plugins[label] = register_tts(CustomTTS('one', label=label), scope=str(home))
++    seen = []
++    for label in 'ABA':
++        monkeypatch.setenv('HERMES_HOME', str(homes[label]))
++        wire = support.Wire([('ok', {'audio': f'ID3audio-{label}'.encode()})])
++        with support.provider_wire(monkeypatch, wire):
++            result = await speak(out, support.Callbacks())
++        assert (result.state, result.provider) == ('synthesized', 'completed')
++        assert Path(result.path).read_bytes() == f'ID3audio-{label}'.encode()
++        seen.append((wire.requests[0].headers['x-label'], wire.requests[0].headers['x-voice'], wire.count))
++    assert seen == [('A', 'voice-A', 1), ('B', 'voice-B', 1), ('A', 'voice-A', 1)]
++    assert (len(plugins['A'].rec.native), len(plugins['B'].rec.native)) == (2, 1)
++    assert [r.voice for r in plugins['A'].rec.native] == ['voice-A', 'voice-A']
 +
 +
 +def test_stock_tts_outside_a_native_call_keeps_the_legacy_plugin_call(monkeypatch, tmp_path, registries):
@@ -4001,10 +4086,10 @@ index 0000000000000000000000000000000000000000..e6a7f24d179c82266125dbdba2aa88f1
 +    assert transcribe_audio_local_fallback(clip)['transcript'] == 'by command' and ran == [1]
 diff --git a/tests/gateway/test_native_voice_local.py b/tests/gateway/test_native_voice_local.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..c7eb3415206d1a7dbf39797b60149d3e95b0f295
+index 0000000000000000000000000000000000000000..507cdf9ec3568789c84a684ef5794a13711c79d1
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_local.py
-@@ -0,0 +1,282 @@
+@@ -0,0 +1,368 @@
 +"""Native voice seam: local engines, launcher-wrapped command adapters and managed whisper.cpp ``local_command``.
 +
 +HARNESS, stated plainly: no engine package, model or host sandbox exists or runs here. The qualification table is
@@ -4099,6 +4184,12 @@ index 0000000000000000000000000000000000000000..c7eb3415206d1a7dbf39797b60149d3e
 +    return [s for s in spawns if isinstance(s['args'], list) and str(FIXTURES / 'engine_fixture.py') in s['args']]
 +
 +
++def converter_spawns(spawns):
++    """Launcher-wrapped converter children (argv after the 4-word launcher prefix starts with an ffmpeg-named file)."""
++    return [s for s in spawns if isinstance(s['args'], list) and len(s['args']) > 4 and s['args'][1] == str(STAND_IN)
++            and os.path.basename(s['args'][4]) in ('ffmpeg', 'ffprobe')]
++
++
 +# ---- local engines ---------------------------------------------------------------------------------------------------
 +@pytest.mark.asyncio
 +@pytest.mark.parametrize('mode', ['ok', 'noise'])
@@ -4113,7 +4204,10 @@ index 0000000000000000000000000000000000000000..c7eb3415206d1a7dbf39797b60149d3e
 +    assert audio[:4] != b'RIFF'
 +    (spawn,) = engine_spawns(spawns)
 +    assert spawn['args'][:4] == [sys.executable, str(STAND_IN), '-p', launcher.PROFILE]
++    assert spawn['args'][4:6] == [sys.executable, '-I']  # M-2: an isolated interpreter for the helper
 +    assert spawn['env']['HF_HUB_OFFLINE'] == spawn['env']['TRANSFORMERS_OFFLINE'] == '1'
++    assert set(spawn['env']) <= {'PATH', 'HOME', 'LANG', 'LC_ALL', 'LC_CTYPE', 'TMPDIR', 'HF_HOME', 'HF_HUB_CACHE',
++                                 'HUGGINGFACE_HUB_CACHE', 'XDG_CACHE_HOME', 'HF_HUB_OFFLINE', 'TRANSFORMERS_OFFLINE'}
 +    joined = repr(spawn['args']) + repr(spawn['env']) + repr(spawn['cwd'])
 +    assert 'hello local voice' not in joined and not os.path.exists(spawn['cwd'])  # text on stdin only; cwd removed
 +
@@ -4182,6 +4276,54 @@ index 0000000000000000000000000000000000000000..c7eb3415206d1a7dbf39797b60149d3e
 +    assert spawns == [] and os.listdir(out) == []
 +
 +
++@pytest.mark.asyncio
++async def test_the_converter_is_proven_wrapped_before_the_engine_and_converts_inside_the_launcher(
++        monkeypatch, launcher, engine, spawns, out):
++    """CV-F: a tiny synthetic WAV -> MP3 probe under the launcher BEFORE the engine; the chunk's conversion is the same
++    wrapped, file-only, WAV-forced child bounded by the exact remaining deadline (no integer floor, no 1 s minimum)."""
++    from tools import tts_command_provider
++    support.ffmpeg_path()
++    timeouts = []
++    real = tts_command_provider.run_native_argv
++
++    def recording(argv, **kw):
++        timeouts.append((os.path.basename(argv[0]), kw['timeout']))
++        return real(argv, **kw)
++    monkeypatch.setattr(tts_command_provider, 'run_native_argv', recording)
++    result = await speak('MODE:ok hello local voice', out, deadline_s=20.5)
++    assert (result.state, result.provider) == ('synthesized', 'not_started')
++    audio = Path(result.path).read_bytes()
++    assert audio[:3] == b'ID3' or audio[0] == 0xFF
++    probe, convert = converter_spawns(spawns)
++    order = [id(s) for s in spawns]
++    assert order.index(id(probe)) < order.index(id(engine_spawns(spawns)[0])) < order.index(id(convert))
++    for spawn in (probe, convert):
++        assert spawn['args'][:4] == [sys.executable, str(STAND_IN), '-p', launcher.PROFILE]
++        assert spawn['args'][5:15] == ['-nostdin', '-hide_banner', '-loglevel', 'error', '-protocol_whitelist', 'file',
++                                       '-f', 'wav', '-i', spawn['args'][14]] and spawn['args'][-3:-1] == ['-f', 'mp3']
++        assert spawn['env']['HF_HUB_OFFLINE'] == '1' and 'MY_TTS_TOKEN' not in spawn['env']
++    ffmpeg_timeouts = [t for name, t in timeouts if name == 'ffmpeg']
++    assert len(ffmpeg_timeouts) == 2 and all(0 < t <= 20.5 and t != int(t) for t in ffmpeg_timeouts)
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('converter', ['missing', 'broken'])
++async def test_a_missing_or_broken_converter_refuses_before_any_engine(monkeypatch, launcher, engine, spawns, out,
++                                                                       converter):
++    """A broken converter is an owned executable that cannot turn WAV into MP3 (the owned ffprobe): ``which`` + X_OK
++    alone would admit it; the wrapped synthetic probe refuses it unsent with zero engine children."""
++    import shutil
++    broken = str(Path(support.ffmpeg_path()).with_name('ffprobe'))
++    assert os.access(broken, os.X_OK)
++    real = shutil.which
++    replacement = None if converter == 'missing' else broken
++    monkeypatch.setattr(shutil, 'which', lambda name, *a, **k: replacement if name == 'ffmpeg' else real(name, *a, **k))
++    result = await speak('MODE:ok words', out)
++    assert (result.state, result.path, result.provider) == ('unavailable', None, 'not_started')
++    assert engine_spawns(spawns) == [] and os.listdir(out) == []
++    assert len(converter_spawns(spawns)) == (0 if converter == 'missing' else 1)
++
++
 +# ---- command adapters ------------------------------------------------------------------------------------------------
 +def stt_command(native='local-sandboxed'):
 +    import shlex
@@ -4211,6 +4353,21 @@ index 0000000000000000000000000000000000000000..c7eb3415206d1a7dbf39797b60149d3e
 +    result = await hear(clip)
 +    assert (result.state, result.transcript, result.provider) == ('unavailable', None, 'not_started')
 +    assert spawns == []
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('mode', ['stdout', 'file', 'symlink'])
++async def test_an_stt_command_failing_after_it_really_started_is_failed_never_unavailable(launcher, spawns, clip, mode):
++    """I-1: the stdout cap, the transcript cap and a symlinked transcript all happen AFTER a real local launch."""
++    import shlex
++    command = shlex.join([sys.executable, str(FIXTURES / 'stt_flood.py'), mode]) + ' {output_path}'
++    support.write_config(get_hermes_home(), {'stt': {'provider': 'local-cli', 'providers': {'local-cli': {
++        'type': 'command', 'command': command, 'native': 'local-sandboxed'}}}})
++    cb = support.Callbacks()
++    result = await hear(clip, cb)
++    assert (result.state, result.transcript, result.provider) == ('failed', None, 'not_started')
++    assert cb.before_send_calls == 0
++    assert [s for s in spawns if isinstance(s['args'], list) and s['args'][:2] == [sys.executable, str(STAND_IN)]]
 +
 +
 +@pytest.mark.asyncio
@@ -4287,6 +4444,20 @@ index 0000000000000000000000000000000000000000..c7eb3415206d1a7dbf39797b60149d3e
 +    result = await hear(clip)
 +    assert (result.state, result.transcript, result.provider) == ('unavailable', None, 'not_started')
 +    assert ensured == [] and [s for s in spawns if isinstance(s['args'], list) and str(STAND_IN) in s['args']] == []
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('mode', ['big', 'dir'])
++async def test_managed_whisper_cpp_failing_after_launch_is_failed_never_unavailable(monkeypatch, launcher, managed,
++                                                                                    spawns, clip, mode):
++    """I-1: an oversized ``.txt`` or a ``.txt`` directory is found only after the managed binary really ran."""
++    from tools import transcription_whisper_cpp as wcpp
++    template = wcpp.whisper_cpp_command() + f' --fixture-mode {mode}'
++    monkeypatch.setattr(wcpp, 'whisper_cpp_command', lambda: template)
++    result = await hear(clip)
++    assert (result.state, result.transcript, result.provider) == ('failed', None, 'not_started')
++    assert managed[1] == []
++    assert [s for s in spawns if isinstance(s['args'], list) and s['args'][:2] == [sys.executable, str(STAND_IN)]]
 diff --git a/tests/gateway/test_native_voice_mistral.py b/tests/gateway/test_native_voice_mistral.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..5e8df5a1ed9d852eba621ad17f9233e22377c62f
@@ -7712,6 +7883,33 @@ index 0000000000000000000000000000000000000000..99b15d742fd55d1103e49fbccfd620ba
 +for _ in range(seconds * 10):  # bounded: at most SECONDS s of output, one line per 0.1 s
 +    print('progress', file=sys.stderr, flush=True)
 +    time.sleep(0.1)  # health: allow HX013 -- the steady, never-idle output IS the behaviour under test
+diff --git a/tests/tools/native_command_fixtures/stt_flood.py b/tests/tools/native_command_fixtures/stt_flood.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..ccca0ce6214a2a93d9b619a17d6a7d92759d054a
+--- /dev/null
++++ b/tests/tools/native_command_fixtures/stt_flood.py
+@@ -0,0 +1,21 @@
++"""Native local STT command fixture: ``stt_flood.py MODE OUT`` fails the call AFTER it really started, in one bounded
++way: ``stdout`` writes 1 MiB + 128 KiB of 'x' to stdout (past the per-stream cap); ``file`` writes 1 MiB + 1 byte to
++OUT (past the transcript cap); ``symlink`` makes OUT a symlink to a small sibling file. Network-free; writes only OUT
++and ``OUT.target``; no child process."""
++import os
++import sys
++
++mode, out = sys.argv[1], sys.argv[2]
++if mode == 'stdout':
++    for _ in range(144):  # bounded: 144 x 8 KiB
++        sys.stdout.write('x' * 8192)
++    sys.stdout.flush()
++elif mode == 'file':
++    with open(out, 'w', encoding='utf-8') as handle:
++        handle.write('x' * (1024 * 1024 + 1))
++elif mode == 'symlink':
++    with open(out + '.target', 'w', encoding='utf-8') as handle:
++        handle.write('words through a link')
++    os.symlink(out + '.target', out)
++else:
++    raise SystemExit(64)
 diff --git a/tests/tools/native_command_fixtures/tree.py b/tests/tools/native_command_fixtures/tree.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..bb735af425875c59a4c57f7efd16bc9f94c9917b
@@ -7748,20 +7946,28 @@ index 0000000000000000000000000000000000000000..bb735af425875c59a4c57f7efd16bc9f
 +    progress(20)
 diff --git a/tests/tools/native_command_fixtures/whisper_fixture.py b/tests/tools/native_command_fixtures/whisper_fixture.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..8bf0f9331d33a0987593b0653643fff2b1f5f3e2
+index 0000000000000000000000000000000000000000..071e1fad08f1f18348cc99aea9afb2607f5fb0df
 --- /dev/null
 +++ b/tests/tools/native_command_fixtures/whisper_fixture.py
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,18 @@
 +"""HARNESS stand-in for the managed whisper.cpp CLI (NOT whisper.cpp): takes its real argument grammar
 +(``-m MODEL -f INPUT -l LANG … -of OUTPUT_PREFIX …``), checks the model and input files exist and writes
-+``OUTPUT_PREFIX.txt``. Network-free; the only file written is that transcript; no child process."""
++``OUTPUT_PREFIX.txt``. An optional trailing ``--fixture-mode big|dir`` instead writes a transcript of 1 MiB + 1 byte
++or makes ``OUTPUT_PREFIX.txt`` a directory. Network-free; the only path written is that transcript; no child process."""
 +import sys
 +from pathlib import Path
 +
 +args = sys.argv[1:]
 +value = {flag: args[args.index(flag) + 1] for flag in ('-m', '-f', '-l', '-of')}
++mode = args[args.index('--fixture-mode') + 1] if '--fixture-mode' in args else 'ok'
 +assert Path(value['-m']).is_file() and Path(value['-f']).is_file() and value['-l'] == 'en'
-+Path(value['-of'] + '.txt').write_text('managed whisper words', encoding='utf-8')
++transcript = Path(value['-of'] + '.txt')
++if mode == 'big':
++    transcript.write_text('x' * (1024 * 1024 + 1), encoding='utf-8')
++elif mode == 'dir':
++    transcript.mkdir()
++else:
++    transcript.write_text('managed whisper words', encoding='utf-8')
 diff --git a/tests/tools/test_mistral_stock_transport.py b/tests/tools/test_mistral_stock_transport.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..d71fd2d793a816adf175fd6c226b941427dd54b5
@@ -7862,10 +8068,10 @@ index 0000000000000000000000000000000000000000..d71fd2d793a816adf175fd6c226b9414
 +    measured('stock_mistral_tts_redirect_and_5xx', followed_requests=2, failed_requests=wire.count)
 diff --git a/tests/tools/test_native_command_runner.py b/tests/tools/test_native_command_runner.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..473a2e0a4b0ec6e8700aea9aab4056d0d8db50f0
+index 0000000000000000000000000000000000000000..d568d7221cb6d67e5824eedc0a387ddccf7c253a
 --- /dev/null
 +++ b/tests/tools/test_native_command_runner.py
-@@ -0,0 +1,126 @@
+@@ -0,0 +1,182 @@
 +"""Native-only bounds of the shared command runner, through the REAL ``run_command_provider`` (real ``/bin/sh``, real
 +child interpreter, real pipes and process-tree cleanup).
 +
@@ -7992,6 +8198,62 @@ index 0000000000000000000000000000000000000000..473a2e0a4b0ec6e8700aea9aab4056d0
 +    with native_send_policy.activate(native(cap=65536)):
 +        result = _transcribe_command_stt(str(audio), 'fixture-cli', config, {})
 +    assert result == {'success': True, 'transcript': 'x' * 1000, 'provider': 'fixture-cli'}
++
++
++# ---- I-1: the actual local launch is recorded on the call's policy (never a declaration or a probe) -----------------
++def test_a_successful_spawn_is_the_call_s_local_launch():
++    policy = native()
++    assert policy.local_launched is False
++    with native_send_policy.activate(policy):
++        run_command_provider(command('flood.py', 'stdout', 10), timeout=10)
++    assert policy.local_launched is True
++
++
++def test_a_failed_popen_or_a_refused_prespawn_is_not_a_launch(monkeypatch):
++    import subprocess
++    policy = native()
++
++    def no_spawn(*a, **k):
++        raise OSError('spawn failed')
++    monkeypatch.setattr(subprocess, 'Popen', no_spawn)
++    with native_send_policy.activate(policy), pytest.raises(OSError):
++        run_command_provider(command('flood.py', 'stdout', 10), timeout=10)
++    monkeypatch.undo()
++    stopped = native()
++    stopped.close()
++    with native_send_policy.activate(stopped), pytest.raises(NativeSendRefused):
++        run_command_provider(command('flood.py', 'stdout', 10), timeout=10)
++    assert policy.local_launched is False and stopped.local_launched is False
++
++
++def test_a_timed_out_run_does_not_wait_on_its_already_joined_readers():
++    """M-7: the pipe close after a timeout neither re-joins the readers nor closes a pipe under a live one."""
++    from tools.tts_command_provider import _close_command_pipes
++    joins, closed = [], []
++
++    class Reader:
++        def __init__(self, alive):
++            self.alive = alive
++
++        def join(self, timeout=None):
++            joins.append(timeout)
++
++        def is_alive(self):
++            return self.alive
++
++    class Stream:
++        def __init__(self, name):
++            self.name = name
++
++        def close(self):
++            closed.append(self.name)
++
++    class Proc:
++        stdout, stderr = Stream('stdout'), Stream('stderr')
++    _close_command_pipes(Proc(), [Reader(False), Reader(True)], wait=0)
++    assert joins == [] and closed == ['stdout']
++    _close_command_pipes(Proc(), [Reader(False), Reader(False)])
++    assert joins == [2.0, 2.0] and closed == ['stdout', 'stdout', 'stderr']
 diff --git a/tests/tools/test_native_local_launcher.py b/tests/tools/test_native_local_launcher.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..c521db8da2b9230ce98119d5f54fe89ae36df505
@@ -8314,10 +8576,10 @@ index 0000000000000000000000000000000000000000..32d4685aac0932c8598b7b4c007e8f7f
 +        assert refused.value.reason == 'unsupported'
 diff --git a/tests/tools/test_native_tts_engine_helper.py b/tests/tools/test_native_tts_engine_helper.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..4a50873b4687df7be0406461314484d04dec661f
+index 0000000000000000000000000000000000000000..09d91cd7866b0457415bd7a2b6f9572b6a36c53b
 --- /dev/null
 +++ b/tests/tools/test_native_tts_engine_helper.py
-@@ -0,0 +1,298 @@
+@@ -0,0 +1,444 @@
 +"""Native local-engine helper: request validation and complete-cache preflight (unit), plus the REAL helper as a
 +launcher-wrapped child on this runtime.
 +
@@ -8388,7 +8650,9 @@ index 0000000000000000000000000000000000000000..4a50873b4687df7be0406461314484d0
 +
 +@pytest.mark.parametrize('bad', [
 +    {'api': 2}, {'engine_name': 'other'}, {'text': ''}, {'text': 'x' * 5001}, {'wav_path': 'relative.wav'},
-+    {'wav_path': '/nonexistent-dir/out.wav'}, {'max_wav_bytes': 10}, {'max_wav_bytes': True}, {'piper': {'extra': 1}}])
++    {'wav_path': '/nonexistent-dir/out.wav'}, {'max_wav_bytes': 10}, {'max_wav_bytes': True}, {'piper': {'extra': 1}},
++    {'extra_field': 1}, {'kittentts': {'repo_id': 'KittenML/x', 'voice': 'Jasper', 'speed': 1.0, 'clean_text': True}}],
++    ids=lambda bad: next(iter(bad)))
 +def test_an_invalid_request_is_refused(tmp_path, bad):
 +    with pytest.raises(helper.Unavailable) as refused:
 +        helper.parse_request(request(tmp_path, **bad))
@@ -8575,6 +8839,135 @@ index 0000000000000000000000000000000000000000..4a50873b4687df7be0406461314484d0
 +    assert resolved['backbone_path'] == str(local)
 +
 +
++# ---- I-2: supported versions and complete import chains (metadata only, no import) -----------------------------------
++# The pinned expectation is spelled out here (never read from the helper) so each case is measured on its own on any tree.
++VERSIONS = {'piper-tts': '1.8.0', 'kittentts': '0.8.1', 'neutts': '1.4.1', 'huggingface-hub': '1.24.0',
++            'transformers': '5.17.0', 'neucodec': '0.0.4', 'resemble-perth': '1.0.1', 'misaki': '0.9.4',
++            'phonemizer-fork': '3.3.2', 'espeakng-loader': '0.2.4', 'num2words': '0.5.14'}
++DISTS = {'piper': 'piper-tts', 'kittentts': 'kittentts', 'neutts': 'neutts', 'huggingface_hub': 'huggingface-hub',
++         'transformers': 'transformers', 'neucodec': 'neucodec', 'perth': 'resemble-perth', 'misaki': 'misaki',
++         'phonemizer': 'phonemizer-fork', 'espeakng_loader': 'espeakng-loader', 'num2words': 'num2words',
++         'onnxruntime': 'onnxruntime', 'numpy': 'numpy', 'soundfile': 'soundfile', 'spacy': 'spacy', 'torch': 'torch',
++         'torchaudio': 'torchaudio', 'librosa': 'librosa', 'llama_cpp': 'llama-cpp-python', 'einops': 'einops',
++         'local_attention': 'local-attention', 'torchtune': 'torchtune', 'vector_quantize_pytorch': 'vector-quantize-pytorch'}
++CHAINS = {'piper': ('piper', 'onnxruntime', 'numpy'),
++          'kittentts': ('kittentts', 'misaki', 'num2words', 'spacy', 'transformers', 'torch', 'phonemizer',
++                        'espeakng_loader', 'onnxruntime', 'numpy', 'soundfile', 'huggingface_hub'),
++          'neutts': ('neutts', 'llama_cpp', 'neucodec', 'transformers', 'torch', 'torchaudio', 'librosa', 'phonemizer',
++                     'soundfile', 'numpy', 'huggingface_hub', 'einops', 'local_attention', 'torchtune',
++                     'vector_quantize_pytorch')}
++
++
++def supported(missing=(), wrong=(), absent_modules=()):
++    """``(find, version_of)`` for a synthetic installation: every distribution at its supported version (others at an
++    arbitrary one) except ``missing`` (no metadata) and ``wrong`` (another version); ``absent_modules`` have metadata
++    but no module."""
++    import importlib.metadata
++
++    def version_of(distribution):
++        if distribution in missing:
++            raise importlib.metadata.PackageNotFoundError(distribution)
++        return '0.0.0-other' if distribution in wrong else VERSIONS.get(distribution, '9.9.9')
++    return (lambda name: name not in absent_modules), version_of
++
++
++def test_the_helper_pins_exactly_these_versions_chains_and_distributions():
++    assert (helper.SUPPORTED_VERSIONS, helper.CHAINS, helper.DISTRIBUTIONS) == (VERSIONS, CHAINS, DISTS)
++
++
++@pytest.mark.parametrize('engine', CHAINS)
++def test_a_complete_supported_chain_passes(engine):
++    helper.require_packages(CHAINS[engine], *supported())
++
++
++@pytest.mark.parametrize('engine,name', [(e, n) for e in CHAINS for n in CHAINS[e]])
++def test_each_missing_dependency_is_not_installed(engine, name):
++    for missing in (dict(missing={DISTS[name]}), dict(absent_modules={name})):
++        with pytest.raises(helper.Unavailable) as refused:
++            helper.require_packages(CHAINS[engine], *supported(**missing))
++        assert refused.value.reason == 'not_installed'
++
++
++@pytest.mark.parametrize('engine,name', [(e, n) for e in CHAINS for n in CHAINS[e] if DISTS[n] in VERSIONS])
++def test_each_other_source_backed_version_is_unsupported(engine, name):
++    with pytest.raises(helper.Unavailable) as refused:
++        helper.require_packages(CHAINS[engine], *supported(wrong={DISTS[name]}))
++    assert refused.value.reason == 'unsupported_version'
++
++
++def test_an_optional_perth_is_absent_or_exactly_supported(tmp_path):
++    import importlib.metadata
++    assert helper.optional_perth(None, lambda d: (_ for _ in ()).throw(AssertionError('no lookup when absent'))) is None
++    assert helper.optional_perth(tmp_path, lambda d: '1.0.1') == tmp_path
++    for version_of in (lambda d: '1.0.0', lambda d: (_ for _ in ()).throw(importlib.metadata.PackageNotFoundError(d))):
++        with pytest.raises(helper.Unavailable) as refused:
++            helper.optional_perth(tmp_path, version_of)
++        assert refused.value.reason == 'unsupported_version'
++
++
++@pytest.mark.parametrize('engine', ['piper', 'kittentts'])
++@pytest.mark.parametrize('case', ['missing-new-dependency', 'other-version'])
++def test_run_refuses_before_any_preflight_or_vendor_code(monkeypatch, tmp_path, engine, case):
++    """No preflight (cache API) and no engine function runs once a prerequisite fails."""
++    calls = []
++    for name in ('preflight_piper', 'preflight_kittentts', '_synthesize_piper', '_synthesize_kittentts', 'HubCache'):
++        monkeypatch.setattr(helper, name, lambda *a, _n=name, **k: calls.append(_n))
++    target = {'piper': 'onnxruntime', 'kittentts': 'num2words'}[engine] if case.startswith('missing') else engine
++    distribution = DISTS[target]
++    find, version_of = supported(**({'missing': {distribution}} if case.startswith('missing') else {'wrong': {distribution}}))
++    monkeypatch.setattr(helper, '_installed', find)
++    monkeypatch.setattr(helper, '_version_of', version_of)
++    with pytest.raises(helper.Unavailable) as refused:
++        helper.run(helper.parse_request(request(tmp_path, engine)))
++    assert refused.value.reason == ('not_installed' if case.startswith('missing') else 'unsupported_version')
++    assert calls == []
++
++
++# ---- M-1: an explicit NeuTTS language only for an actual local GGUF -------------------------------------------------
++def test_the_parent_passes_a_configured_language_only_for_a_local_gguf(tmp_path):
++    from tools.tts_tool_local import _native_neutts_options
++    local = tmp_path / 'custom.gguf'
++    local.write_bytes(b'gguf')
++    repo = _native_neutts_options({'neutts': {'model': 'neuphonic/neutts-air-q4-gguf', 'language': 'de'}})
++    own = _native_neutts_options({'neutts': {'model': str(local), 'language': 'de'}})
++    assert (repo['original_repo'], repo['language']) == ('neuphonic/neutts-air-q4-gguf', None)
++    assert (own['original_repo'], own['language']) == (str(local), 'de')
++
++
++def test_the_helper_keeps_the_original_repo_language_for_a_repo_backbone(monkeypatch, tmp_path):
++    """Synthetic in-process stand-ins for ``neutts.neutts`` and ``soundfile`` (NOT the vendor modules) record the
++    language the helper constructs NeuTTS with."""
++    import types
++    made = []
++
++    class FakeNeuTTS:
++        def __init__(self, **kw):
++            made.append(kw['language'])
++
++        def encode_reference(self, path):
++            return path
++
++        def infer(self, text, ref, ref_text):
++            return [0.0]
++    fake = types.ModuleType('neutts.neutts')
++    fake.BACKBONE_LANGUAGE_MAP, fake.NeuTTS = {'neuphonic/neutts-air-q4-gguf': 'en-us'}, FakeNeuTTS
++    sound = types.ModuleType('soundfile')
++    sound.write = lambda path, wav, rate: None
++    monkeypatch.setitem(sys.modules, 'neutts', types.ModuleType('neutts'))
++    monkeypatch.setitem(sys.modules, 'neutts.neutts', fake)
++    monkeypatch.setitem(sys.modules, 'soundfile', sound)
++    ref_text = tmp_path / 'ref.txt'
++    ref_text.write_text('reference words')
++    local = tmp_path / 'custom.gguf'
++    local.write_bytes(b'gguf')
++    resolved = {'backbone_path': str(local), 'ref_audio': str(tmp_path / 'ref.wav'), 'ref_text': str(ref_text)}
++    for original, language in (('neuphonic/neutts-air-q4-gguf', 'de'), (str(local), 'de')):
++        req = json.loads(request(tmp_path, 'neutts'))
++        req['neutts'].update(original_repo=original, language=language)
++        helper._synthesize_neutts(req, resolved)
++    assert made == ['en-us', 'de']
++
++
 +# ---- the real helper as a launcher-wrapped child ---------------------------------------------------------------------
 +@pytest.fixture
 +def harness_launcher(monkeypatch):
@@ -8598,7 +8991,7 @@ index 0000000000000000000000000000000000000000..4a50873b4687df7be0406461314484d0
 +                                           deadline=time.monotonic() + 20, require_launcher=True)
 +    policy.set_credential_probe(lambda: None)
 +    with native_send_policy.activate(policy):
-+        result = run_native_argv([sys.executable, NATIVE_ENGINE_HELPER], timeout=15, env={**os.environ, 'HF_HUB_OFFLINE': '1'},
++        result = run_native_argv([sys.executable, '-I', NATIVE_ENGINE_HELPER], timeout=15, env={**os.environ, 'HF_HUB_OFFLINE': '1'},
 +                                 cwd=str(tmp_path), stdin_bytes=request(tmp_path, engine))
 +    assert json.loads(result.stdout) == {'api': 1, 'status': 'unavailable', 'reason': reason, 'sample_rate': 0,
 +                                         'wav_bytes': 0}
@@ -8613,9 +9006,24 @@ index 0000000000000000000000000000000000000000..4a50873b4687df7be0406461314484d0
 +                                           deadline=time.monotonic() + 20, require_launcher=True)
 +    policy.set_credential_probe(lambda: None)
 +    with native_send_policy.activate(policy):
-+        result = run_native_argv([sys.executable, NATIVE_ENGINE_HELPER], timeout=15, env=dict(os.environ),
++        result = run_native_argv([sys.executable, '-I', NATIVE_ENGINE_HELPER], timeout=15, env=dict(os.environ),
 +                                 cwd=str(tmp_path), stdin_bytes=b'not json')
 +    assert json.loads(result.stdout)['reason'] == 'invalid_request' and result.stderr == ''
++
++
++@pytest.mark.parametrize('probe', [False, True])
++def test_only_a_non_probe_spawn_is_recorded_as_the_call_s_local_launch(tmp_path, harness_launcher, probe):
++    """I-1/CV-F: the converter prerequisite probe runs a real wrapped child but is not the call's local launch."""
++    from tools import native_send_policy
++    from tools.tts_command_provider import run_native_argv
++    from tools.tts_tool_local import NATIVE_ENGINE_HELPER
++    policy = native_send_policy.SendPolicy(timeout_s=10, providers=frozenset(), max_output_bytes=1 << 20,
++                                           deadline=time.monotonic() + 20, require_launcher=True)
++    policy.set_credential_probe(lambda: None)
++    with native_send_policy.activate(policy):
++        run_native_argv([sys.executable, '-I', NATIVE_ENGINE_HELPER], timeout=15, env=dict(os.environ),
++                        cwd=str(tmp_path), stdin_bytes=b'not json', probe=probe)
++    assert policy.local_launched is (not probe)
 diff --git a/tests/tools/test_native_voice_stock_transport.py b/tests/tools/test_native_voice_stock_transport.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..5ff5c62f947ca0aba0872f5934717bef0a40443c
@@ -8856,10 +9264,10 @@ index 0000000000000000000000000000000000000000..9121cefc3da1639d4df00bf8967b67ad
 +    return None
 diff --git a/tools/native_send_policy.py b/tools/native_send_policy.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..6c0be780a75a5eadaa6b2599bc96e7139d04f7ab
+index 0000000000000000000000000000000000000000..2a61fb783f1ff3cb162569ec06a40f41ebb5e8aa
 --- /dev/null
 +++ b/tools/native_send_policy.py
-@@ -0,0 +1,577 @@
+@@ -0,0 +1,596 @@
 +"""One-send transport policy for a native (Relay) voice call.
 +
 +``gateway.session_native_voice`` activates a :class:`SendPolicy` around exactly one configured
@@ -8929,6 +9337,7 @@ index 0000000000000000000000000000000000000000..6c0be780a75a5eadaa6b2599bc96e713
 +        self.require_launcher = require_launcher
 +        self._custom: Optional[str] = None
 +        self._local: Optional[str] = None
++        self._local_launched = False
 +        self._gate = gate
 +        self._credential_probe: Optional[Callable[[], None]] = None
 +        self._lock = threading.Lock()
@@ -9072,6 +9481,17 @@ index 0000000000000000000000000000000000000000..6c0be780a75a5eadaa6b2599bc96e713
 +    def local_route(self) -> Optional[str]:
 +        """The local route admitted for this call, or None."""
 +        return self._local
++
++    def mark_local_launch(self) -> None:
++        """A local child of this call was actually started (its ``Popen`` returned). Set by the runner only."""
++        with self._lock:
++            self._local_launched = True
++
++    @property
++    def local_launched(self) -> bool:
++        """True once a local child of this call was actually started: a later failure is a failure after a local
++        invocation (``failed``), never "nothing was tried"."""
++        return self._local_launched
 +
 +    def require_provider(self, provider: str) -> None:
 +        if provider not in self.providers and (self._custom is None or provider != self._custom):
@@ -9258,6 +9678,13 @@ index 0000000000000000000000000000000000000000..6c0be780a75a5eadaa6b2599bc96e713
 +        policy.probe_credentials()
 +
 +
++def mark_local_launch() -> None:
++    """Inside a native call: record that a local child was actually started (see :meth:`SendPolicy.mark_local_launch`)."""
++    policy = _current.get()
++    if policy is not None:
++        policy.mark_local_launch()
++
++
 +def admit_local(name: str) -> None:
 +    """Inside a native call: admit the one held local route (see :meth:`SendPolicy.admit_local`)."""
 +    policy = _current.get()
@@ -9439,23 +9866,28 @@ index 0000000000000000000000000000000000000000..6c0be780a75a5eadaa6b2599bc96e713
 +            'receive_timeout': max(1, int(policy.timeout_s))}
 diff --git a/tools/native_tts_engine_helper.py b/tools/native_tts_engine_helper.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..72f5d9b52d2825dd2051726fb7b53811f97eb09f
+index 0000000000000000000000000000000000000000..dc0a08db84aff8592ddf705f2430719d480529ce
 --- /dev/null
 +++ b/tools/native_tts_engine_helper.py
-@@ -0,0 +1,350 @@
+@@ -0,0 +1,415 @@
 +"""Native (Relay) local TTS engine helper: ONE chunk of Piper, KittenTTS or NeuTTS in a separate, launcher-wrapped child.
 +
-+Run only by ``tools.tts_tool_local.native_engine_chunk`` as ``[<launcher…>, sys.executable, <this file>]`` in a new
-+session with a private empty cwd and the scrubbed child env (offline flags set before any import). Protocol (api 1):
++Run only by ``tools.tts_tool_local.native_engine_chunk`` as ``[<launcher…>, sys.executable, -I, <this file>]`` (an
++isolated interpreter: no PYTHON* environment, no user site, no script-directory path entry) in a new session with a
++private empty cwd and an explicit minimal child env (offline flags set before any import). Site/.pth startup of the
++trusted interpreter still runs: isolation is not hostile-code containment. Protocol (api 1):
 +
-+* stdin: ONE JSON object (≤ 64 KiB): ``api``, ``engine``, ``text``, ``wav_path``, ``max_wav_bytes`` and the engine's
-+  option object (exact fields: :data:`OPTION_FIELDS`). Text travels only here: never argv, env, file names or logs.
++* stdin: ONE JSON object (≤ 64 KiB) with exactly these top-level fields: ``api``, ``engine``, ``text``, ``wav_path``,
++  ``max_wav_bytes`` and the engine's option object (exact fields: :data:`OPTION_FIELDS`); anything else is refused.
++  Text travels only here: never argv, env, file names or logs.
 +* stdout: ONE JSON line (≤ 4 KiB) on a private close-on-exec descriptor: ``api``, ``status`` (``ok`` | ``failed`` |
 +  ``unavailable``), ``reason`` (a stable token), ``sample_rate``, ``wav_bytes``. Before anything else the helper points
 +  file descriptors 1 and 2 at the null device, so vendor and native-library prints (KittenTTS prints the input text,
 +  NeuTTS prints paths) never reach the parent; no traceback or text is reported.
 +
-+Order: request validation → runtime/package presence (no import) → complete-cache preflight on the filesystem (no
++Order: request validation → runtime, then every module the engine imports at load present AND each source-backed
++distribution at its exact supported version (:data:`SUPPORTED_VERSIONS`, read from installed metadata, no import;
++missing → ``not_installed``, other version → ``unsupported_version``) → complete-cache preflight on the filesystem (no
 +vendor model API is called to discover anything) → only then the vendor import and inference. Every missing
 +prerequisite is ``unavailable`` before the engine runs; nothing is downloaded, installed or substituted. The child's own
 +``RLIMIT_FSIZE`` bounds every file it writes while it runs. Trust: installed engine packages are trusted code; network
@@ -9463,6 +9895,7 @@ index 0000000000000000000000000000000000000000..72f5d9b52d2825dd2051726fb7b53811
 +"""
 +from __future__ import annotations
 +
++import importlib.metadata
 +import importlib.util
 +import json
 +import os
@@ -9485,6 +9918,33 @@ index 0000000000000000000000000000000000000000..72f5d9b52d2825dd2051726fb7b53811
 +NEUCODEC_FILES = ('pytorch_model.bin', 'meta.yaml', 'config.json')  # neucodec 0.0.4 model.py:69-92 + hub mixin config
 +W2V_BERT_REPO = 'facebook/w2v-bert-2.0'  # NeuCodec.__init__ nested encoder + feature extractor (model.py:29-34)
 +PERTH_FILES = ('hparams.yaml', 'id.txt', 'perth_net_250000.pth.tar')
++# The source-backed combination this helper's lower-level calls and cache conclusions were verified against (staged
++# inert sources and the locked dependency set). Any other installed version is refused, never guessed at.
++SUPPORTED_VERSIONS = {'piper-tts': '1.8.0', 'kittentts': '0.8.1', 'neutts': '1.4.1', 'huggingface-hub': '1.24.0',
++                      'transformers': '5.17.0', 'neucodec': '0.0.4', 'resemble-perth': '1.0.1', 'misaki': '0.9.4',
++                      'phonemizer-fork': '3.3.2', 'espeakng-loader': '0.2.4', 'num2words': '0.5.14'}
++# Import name → the distribution that must provide it (metadata read only). Modules without a SUPPORTED_VERSIONS entry
++# are required present (metadata and module) at any version: the helper relies on no version-specific API of theirs.
++DISTRIBUTIONS = {'piper': 'piper-tts', 'kittentts': 'kittentts', 'neutts': 'neutts', 'huggingface_hub': 'huggingface-hub',
++                 'transformers': 'transformers', 'neucodec': 'neucodec', 'perth': 'resemble-perth', 'misaki': 'misaki',
++                 'phonemizer': 'phonemizer-fork', 'espeakng_loader': 'espeakng-loader', 'num2words': 'num2words',
++                 'onnxruntime': 'onnxruntime', 'numpy': 'numpy', 'soundfile': 'soundfile', 'spacy': 'spacy',
++                 'torch': 'torch', 'torchaudio': 'torchaudio', 'librosa': 'librosa', 'llama_cpp': 'llama-cpp-python',
++                 'einops': 'einops', 'local_attention': 'local-attention', 'torchtune': 'torchtune',
++                 'vector_quantize_pytorch': 'vector-quantize-pytorch'}
++# Every module the engine path imports at module load (vendor source lines in the docstrings of the preflights).
++CHAINS = {
++    'piper': ('piper', 'onnxruntime', 'numpy'),  # piper/voice.py:14-21
++    # kittentts/onnx_model.py:1-6 → misaki/en.py:4,10,12-13 (num2words, spacy, transformers, torch) + misaki.espeak
++    'kittentts': ('kittentts', 'misaki', 'num2words', 'spacy', 'transformers', 'torch', 'phonemizer', 'espeakng_loader',
++                  'onnxruntime', 'numpy', 'soundfile', 'huggingface_hub'),
++    # neutts/neutts.py (librosa, torch, transformers, phonemizer, neucodec, llama_cpp at the GGUF backbone) → neucodec
++    # model.py/modules (torchaudio, einops, local_attention, torchtune, vector_quantize_pytorch, huggingface_hub)
++    'neutts': ('neutts', 'llama_cpp', 'neucodec', 'transformers', 'torch', 'torchaudio', 'librosa', 'phonemizer',
++               'soundfile', 'numpy', 'huggingface_hub', 'einops', 'local_attention', 'torchtune',
++               'vector_quantize_pytorch'),
++}
++REQUEST_FIELDS = frozenset({'api', 'engine', 'text', 'wav_path', 'max_wav_bytes'})
 +
 +
 +class Unavailable(Exception):
@@ -9505,7 +9965,7 @@ index 0000000000000000000000000000000000000000..72f5d9b52d2825dd2051726fb7b53811
 +    except (UnicodeDecodeError, ValueError):
 +        raise Unavailable('invalid_request') from None
 +    engine = req.get('engine') if isinstance(req, dict) else None
-+    if engine not in ENGINES or req.get('api') != API:
++    if engine not in ENGINES or req.get('api') != API or set(req) != REQUEST_FIELDS | {engine}:
 +        raise Unavailable('invalid_request')
 +    text, wav, cap, opts = req.get('text'), req.get('wav_path'), req.get('max_wav_bytes'), req.get(engine)
 +    if (not isinstance(text, str) or not text.strip() or len(text) > MAX_TEXT_CHARS
@@ -9539,10 +9999,42 @@ index 0000000000000000000000000000000000000000..72f5d9b52d2825dd2051726fb7b53811
 +    return Path(locations[0]) if locations else None
 +
 +
-+def require_packages(names: tuple[str, ...], find: Callable[[str], bool]) -> None:
++def _version_of(distribution: str) -> str:
++    """The installed distribution's version from its metadata: no import of the package."""
++    return importlib.metadata.version(distribution)
++
++
++def require_packages(names: tuple[str, ...], find: Callable[[str], bool],
++                     version_of: Optional[Callable[[str], str]] = None) -> None:
++    """Every module present (spec found, no import) with its distribution's metadata, at the supported version when
++    one is pinned. Missing → ``not_installed``; other version → ``unsupported_version``."""
++    version_of = version_of or _version_of
 +    for name in names:
++        distribution = DISTRIBUTIONS[name]
++        try:
++            installed = version_of(distribution)
++        except importlib.metadata.PackageNotFoundError:
++            raise Unavailable('not_installed') from None
 +        if not find(name):
 +            raise Unavailable('not_installed')
++        wanted = SUPPORTED_VERSIONS.get(distribution)
++        if wanted is not None and installed != wanted:
++            raise Unavailable('unsupported_version')
++
++
++def optional_perth(pkg: Optional[Path], version_of: Optional[Callable[[str], str]] = None) -> Optional[Path]:
++    """The optional watermarker: absent keeps stock semantics (None); an installed one must be the supported version
++    with its metadata, or the call is refused — it can never silently lose watermarking."""
++    if pkg is None:
++        return None
++    version_of = version_of or _version_of
++    try:
++        installed = version_of(DISTRIBUTIONS['perth'])
++    except importlib.metadata.PackageNotFoundError:
++        raise Unavailable('unsupported_version') from None
++    if installed != SUPPORTED_VERSIONS['resemble-perth']:
++        raise Unavailable('unsupported_version')
++    return pkg
 +
 +
 +def _installed(name: str) -> bool:
@@ -9732,7 +10224,9 @@ index 0000000000000000000000000000000000000000..72f5d9b52d2825dd2051726fb7b53811
 +    import soundfile
 +    from neutts.neutts import BACKBONE_LANGUAGE_MAP, NeuTTS
 +    opts = req['neutts']
-+    language = opts['language'] or BACKBONE_LANGUAGE_MAP.get(opts['original_repo'])  # from the ORIGINAL repo id
++    original = opts['original_repo']
++    # an explicit language ONLY for an actual local GGUF; a repo backbone keeps its ORIGINAL repo id's mapping (stock)
++    language = opts['language'] if os.path.isfile(original) else BACKBONE_LANGUAGE_MAP.get(original)
 +    if language is None:
 +        raise Unavailable('language_required')
 +    device = opts['device']
@@ -9747,20 +10241,18 @@ index 0000000000000000000000000000000000000000..72f5d9b52d2825dd2051726fb7b53811
 +def run(req: dict[str, Any]) -> dict[str, Any]:
 +    engine = req['engine']
 +    if engine == 'piper':
-+        require_packages(('piper', 'onnxruntime', 'numpy'), _installed)
++        require_packages(CHAINS['piper'], _installed)
 +        resolved = preflight_piper(req['piper'], package_dir('piper'))
 +        rate = _synthesize_piper(req, resolved)
 +    elif engine == 'kittentts':
-+        require_packages(('kittentts', 'misaki', 'phonemizer', 'espeakng_loader', 'onnxruntime', 'numpy', 'soundfile',
-+                          'huggingface_hub'), _installed)
++        require_packages(CHAINS['kittentts'], _installed)
 +        resolved = preflight_kittentts(req['kittentts'], HubCache(), package_dir('espeakng_loader'))
 +        rate = _synthesize_kittentts(req, resolved)
 +    else:
 +        if sys.version_info[:2] >= (3, 14):
 +            raise Unavailable('runtime_unsupported')  # before ANY engine import (NeuTTS 1.4.1 Requires-Python <3.14)
-+        require_packages(('neutts', 'llama_cpp', 'neucodec', 'transformers', 'torch', 'phonemizer', 'soundfile',
-+                          'huggingface_hub'), _installed)
-+        resolved = preflight_neutts(req['neutts'], HubCache(), package_dir('neutts'), package_dir('perth'))
++        require_packages(CHAINS['neutts'], _installed)
++        resolved = preflight_neutts(req['neutts'], HubCache(), package_dir('neutts'), optional_perth(package_dir('perth')))
 +        rate = _synthesize_neutts(req, resolved)
 +    size = os.path.getsize(req['wav_path']) if os.path.isfile(req['wav_path']) else 0
 +    if size <= 44:
@@ -9921,7 +10413,7 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..c3adaf1db23f4d59a62ff55387bfe2b0
      if not model_name:
          return _error_result(
 diff --git a/tools/transcription_command.py b/tools/transcription_command.py
-index 868d8ac833c4269123b7cea07f5241687fdd04b6..901f77dc269d712bc28bd99253f1d4e28ba75059 100644
+index 868d8ac833c4269123b7cea07f5241687fdd04b6..868fc4e03e7a7c52378b84b077d5f3bc4d05fbad 100644
 --- a/tools/transcription_command.py
 +++ b/tools/transcription_command.py
 @@ -9,6 +9,8 @@ is read lazily from ``tools.transcription_tools``.
@@ -9941,24 +10433,25 @@ index 868d8ac833c4269123b7cea07f5241687fdd04b6..901f77dc269d712bc28bd99253f1d4e2
  from tools.tts_command_provider import (
      _command_output_format, _command_timeout, _is_command_provider_config as _is_command_stt_provider_config,
      _named_provider_config, _resolve_command_config, command_env_passthrough as _command_stt_env_passthrough,
-@@ -59,7 +62,15 @@ _get_command_stt_output_format = partial(_command_output_format, formats=COMMAND
+@@ -59,7 +62,16 @@ _get_command_stt_output_format = partial(_command_output_format, formats=COMMAND
  
  
  def _read_command_stt_output(output_path: Path, stdout: str, fmt: str) -> str:
 -    """Transcript: non-empty output file > non-empty stdout (curl one-liners) > RuntimeError. JSON is returned raw."""
 +    """Transcript: non-empty output file > non-empty stdout (curl one-liners) > RuntimeError. JSON is returned raw.
-+    Inside a native call the file must be a regular file within the call's output cap BEFORE it is read."""
-+    bounds = native_send_policy.command_bounds()
-+    if bounds is not None and output_path.exists():
++    Inside a native call the file must be a regular file within the call's output cap BEFORE it is read (the cap is the
++    policy's own; the launcher is not re-qualified after the child already ran)."""
++    policy = native_send_policy.current()
++    if policy is not None and os.path.lexists(output_path):
 +        info = os.lstat(output_path)
 +        if not stat.S_ISREG(info.st_mode):
 +            raise RuntimeError(f"Command STT provider output at {output_path} is not a regular file")
-+        if info.st_size > bounds.max_stream_bytes:
++        if policy.max_output_bytes is None or info.st_size > policy.max_output_bytes:
 +            raise native_send_policy.refuse('too_long')
      content = (output_path.read_text(encoding="utf-8-sig", errors="replace").strip()
                 if output_path.exists() else "")
      if content or (stdout or "").strip():
-@@ -125,6 +136,8 @@ def _transcribe_command_stt(
+@@ -125,6 +137,8 @@ def _transcribe_command_stt(
              logger.info("Transcribing %s via command STT provider '%s'...", audio.name, provider_name)
              result = _run_command_stt(command, timeout, env_passthrough=_command_stt_env_passthrough(config))
              transcript_text = _read_command_stt_output(output_path, result.stdout or "", output_format)
@@ -9967,7 +10460,7 @@ index 868d8ac833c4269123b7cea07f5241687fdd04b6..901f77dc269d712bc28bd99253f1d4e2
      except subprocess.TimeoutExpired:
          return fail(f"STT command provider '{provider_name}' timed out after {timeout:g}s")
      except subprocess.CalledProcessError as exc:
-@@ -211,6 +224,52 @@ def _dispatch_to_plugin_provider(
+@@ -211,6 +225,52 @@ def _dispatch_to_plugin_provider(
      return result
  
  
@@ -10020,7 +10513,7 @@ index 868d8ac833c4269123b7cea07f5241687fdd04b6..901f77dc269d712bc28bd99253f1d4e2
  # Fields a pre_transcription hook may mutate; ``file_path`` is read-only (logged and dropped).
  # --------------------------------------------------------------------------- pre_transcription plugin hook
  # (issue #64168 — STT prompt/vocab threading)
-@@ -238,6 +297,17 @@ def _enforce_prompt_length_limit(prompt: Optional[str], provider: str) -> Option
+@@ -238,6 +298,17 @@ def _enforce_prompt_length_limit(prompt: Optional[str], provider: str) -> Option
      return prompt[-max_chars:]
  
  
@@ -10038,7 +10531,7 @@ index 868d8ac833c4269123b7cea07f5241687fdd04b6..901f77dc269d712bc28bd99253f1d4e2
  def _apply_pre_transcription_hook(
      *, file_path: str, provider: str, model: Optional[str], language: Optional[str],
      prompt: Optional[str], source: Optional[str],
-@@ -246,7 +316,14 @@ def _apply_pre_transcription_hook(
+@@ -246,7 +317,14 @@ def _apply_pre_transcription_hook(
      Gated on ``has_hook`` (the no-hook path never builds kwargs) and fail-open: any plumbing error
      leaves the dispatch untouched. Results apply field-by-field in registration order (last hook
      wins). ``language_override`` is None unless a hook explicitly set ``language``, so backends keep
@@ -10055,10 +10548,17 @@ index 868d8ac833c4269123b7cea07f5241687fdd04b6..901f77dc269d712bc28bd99253f1d4e2
          from hermes_cli.plugins import has_hook, invoke_hook
          if not has_hook("pre_transcription"):
 diff --git a/tools/transcription_local.py b/tools/transcription_local.py
-index 3a4a7610fdc392af6c0b6ebfbeedd56d10ed6cf6..9bc2cd8455bc0d44e072ad9cc9de64029eb13e09 100644
+index 3a4a7610fdc392af6c0b6ebfbeedd56d10ed6cf6..3f6c5b5d4a96d859bba01657299e1fc214ce0717 100644
 --- a/tools/transcription_local.py
 +++ b/tools/transcription_local.py
-@@ -18,6 +18,7 @@ import importlib.util as _ilu
+@@ -12,12 +12,14 @@ import logging
+ import os
+ import platform
+ import shlex
++import stat
+ import subprocess
+ import tempfile
+ import importlib.util as _ilu
  from pathlib import Path
  from typing import Any, Dict, Optional
  
@@ -10066,7 +10566,7 @@ index 3a4a7610fdc392af6c0b6ebfbeedd56d10ed6cf6..9bc2cd8455bc0d44e072ad9cc9de6402
  from tools.transcription_audio import _find_whisper_binary, _prepare_local_audio, _run_quiet
  from tools.transcription_common import (
      DEFAULT_LOCAL_MODEL, DEFAULT_LOCAL_STT_LANGUAGE, GROQ_MODELS, LOCAL_STT_COMMAND_ENV, RETIRED_GROQ_MODELS,
-@@ -182,6 +183,9 @@ def _create_whisper_model(model_name: str, *, device: str, compute_type: str):
+@@ -182,6 +184,9 @@ def _create_whisper_model(model_name: str, *, device: str, compute_type: str):
          # snapshot_download still returns it and ctranslate2 raises "Unable to open file".
          if isinstance(exc, RuntimeError) and "Unable to open file" not in str(exc):
              raise
@@ -10076,7 +10576,7 @@ index 3a4a7610fdc392af6c0b6ebfbeedd56d10ed6cf6..9bc2cd8455bc0d44e072ad9cc9de6402
          logger.info("faster-whisper model '%s' is not cached; downloading it from the Hugging Face Hub", model_name)
  
      # huggingface_hub surfaces every Hub/network failure as an OSError subclass
-@@ -342,3 +346,44 @@ def _transcribe_local_command(
+@@ -342,3 +347,47 @@ def _transcribe_local_command(
      except Exception as e:
          logger.error("Unexpected error during local command transcription: %s", e, exc_info=True)
          return _error_result(f"Local transcription failed: {e}")
@@ -10118,7 +10618,10 @@ index 3a4a7610fdc392af6c0b6ebfbeedd56d10ed6cf6..9bc2cd8455bc0d44e072ad9cc9de6402
 +        txt_files = sorted(Path(output_dir).glob("*.txt"))
 +        if not txt_files:
 +            return _error_result("Local STT command completed but did not produce a .txt transcript")
-+        if txt_files[0].is_symlink() or txt_files[0].stat().st_size > policy.max_output_bytes:
++        info = os.lstat(txt_files[0])
++        if not stat.S_ISREG(info.st_mode):
++            raise RuntimeError("Local STT transcript is not a regular file")
++        if info.st_size > policy.max_output_bytes:
 +            raise native_send_policy.refuse("too_long")
 +        return _ok_result(txt_files[0].read_text(encoding="utf-8-sig").strip(), "local_command")
 diff --git a/tools/transcription_tools.py b/tools/transcription_tools.py
@@ -10199,7 +10702,7 @@ index 072eed5f03a0ea2eba2deec36fbf4e13526144d2..a87b618a07cd6e62472143324e09c085
          return _transcribe_local_command(file_path, _normalize_local_model(local_model))
      return _error_result("No installed local STT backend is available.", provider="local")
 diff --git a/tools/tts_command_provider.py b/tools/tts_command_provider.py
-index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..1e6837eba8eb88bf1566aad29244ce0a5d2410e2 100644
+index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..a1da5facdfe7a258ba57672caf10cbbfc3dee996 100644
 --- a/tools/tts_command_provider.py
 +++ b/tools/tts_command_provider.py
 @@ -11,18 +11,22 @@ process runner and the generic ``<section>.providers.<name>`` readers, re-import
@@ -10226,7 +10729,7 @@ index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..1e6837eba8eb88bf1566aad29244ce0a
  from utils import is_truthy_value
  
  
-@@ -155,58 +159,61 @@ def provider_popen_group_kwargs(os_name: str) -> dict[str, Any]:
+@@ -155,58 +159,63 @@ def provider_popen_group_kwargs(os_name: str) -> dict[str, Any]:
      return {"start_new_session": True}
  
  
@@ -10290,12 +10793,14 @@ index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..1e6837eba8eb88bf1566aad29244ce0a
 +        proc.wait(timeout=2)
 +
 +
-+def _close_command_pipes(proc: subprocess.Popen, readers: list) -> None:
++def _close_command_pipes(proc: subprocess.Popen, readers: list, wait: float = 2.0) -> None:
 +    """Close the child's stdout/stderr pipe objects once their reader threads are done (never under a live
-+    reader). Without this every run leaked two open file objects (``ResourceWarning: unclosed file``)."""
++    reader). Without this every run leaked two open file objects (``ResourceWarning: unclosed file``). ``wait`` = 0
++    when the caller already joined the readers (no second wait)."""
      for reader in readers:
 -        reader.start()
-+        reader.join(timeout=2)
++        if wait:
++            reader.join(timeout=wait)
 +    for reader, stream in zip(readers, (proc.stdout, proc.stderr)):
 +        close = getattr(stream, "close", None)
 +        if callable(close) and not reader.is_alive():
@@ -10333,7 +10838,7 @@ index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..1e6837eba8eb88bf1566aad29244ce0a
          try:
              name, chunk = output_queue.get(timeout=min(0.05, remaining))
          except queue.Empty:
-@@ -214,13 +221,73 @@ def run_command_provider(
+@@ -214,13 +223,73 @@ def run_command_provider(
          if chunk is None:
              open_streams.discard(name)
              continue
@@ -10409,15 +10914,15 @@ index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..1e6837eba8eb88bf1566aad29244ce0a
      if timed_out:
          terminate_command_process_tree(proc)
          for reader in readers:
-@@ -230,6 +297,7 @@ def run_command_provider(
+@@ -230,6 +299,7 @@ def run_command_provider(
              if chunk:
                  chunks[name].append(chunk)
      stdout, stderr = "".join(chunks["stdout"]), "".join(chunks["stderr"])
-+    _close_command_pipes(proc, readers)
++    _close_command_pipes(proc, readers, wait=0 if timed_out else 2.0)  # a timed-out run's readers were joined above
      if timed_out:
          raise subprocess.TimeoutExpired(command, timeout, output=stdout, stderr=stderr) from (
              subprocess.TimeoutExpired(command, timeout))
-@@ -238,6 +306,95 @@ def run_command_provider(
+@@ -238,6 +308,101 @@ def run_command_provider(
      return subprocess.CompletedProcess(command, proc.returncode, stdout, stderr)
  
  
@@ -10475,15 +10980,19 @@ index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..1e6837eba8eb88bf1566aad29244ce0a
 +    proc = subprocess.Popen(args, shell=not (bounds is not None and bounds.argv_prefix), stdout=subprocess.PIPE,
 +                            stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", env=env,
 +                            stdin=subprocess.DEVNULL, **group)
++    if bounds is not None:
++        native_send_policy.mark_local_launch()  # the child really started: a later failure is after a local invocation
 +    return _collect_command(proc, command, timeout, bounds)
 +
 +
 +def run_native_argv(argv: list[str], *, timeout: float, env: dict[str, str], cwd: Optional[str] = None,
 +                    stdin_bytes: Optional[bytes] = None, watch: Watch = None,
-+                    max_stream_bytes: Optional[int] = None) -> subprocess.CompletedProcess:
++                    max_stream_bytes: Optional[int] = None, probe: bool = False) -> subprocess.CompletedProcess:
 +    """Native call only: run ``argv`` (no shell) inside the qualified network-deny launcher, in its own session, under
 +    the native bounds (+ ``watch``; ``max_stream_bytes`` may only tighten the per-stream cap), feeding ``stdin_bytes``.
-+    Without a seam policy and a qualified launcher it refuses unsent: a native local child never runs unwrapped."""
++    Without a seam policy and a qualified launcher it refuses unsent: a native local child never runs unwrapped. A
++    successful spawn is recorded on the policy as the call's local launch, except a ``probe`` (a prerequisite check
++    that runs no provider work)."""
 +    bounds = native_send_policy.command_bounds()
 +    if bounds is None or not bounds.argv_prefix:
 +        raise native_send_policy.refuse('unsupported')
@@ -10493,6 +11002,8 @@ index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..1e6837eba8eb88bf1566aad29244ce0a
 +    proc = subprocess.Popen([*bounds.argv_prefix, *argv], stdin=subprocess.DEVNULL if stdin_bytes is None else subprocess.PIPE,
 +                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8",
 +                            errors="replace", env=env, cwd=cwd, start_new_session=True)
++    if not probe:
++        native_send_policy.mark_local_launch()
 +    writer = None
 +    if stdin_bytes is not None:
 +        def feed() -> None:
@@ -10551,7 +11062,7 @@ index b60cdf372f35761b70ea6ed686579335f4d013b1..42622a269a8777b80840d342ca4571d7
  
  
 diff --git a/tools/tts_tool_local.py b/tools/tts_tool_local.py
-index 81c23cdbe52435023d2a76c6d7932379c338af2a..6a367f3379d1b8f8cd8f9cc0a732b5645b5de679 100644
+index 81c23cdbe52435023d2a76c6d7932379c338af2a..e4ff24f88297e4c76a9e32f6856b75e38fcd2159 100644
 --- a/tools/tts_tool_local.py
 +++ b/tools/tts_tool_local.py
 @@ -8,11 +8,13 @@ container. Piper and KittenTTS keep loaded models in small LRU caches registered
@@ -10569,7 +11080,7 @@ index 81c23cdbe52435023d2a76c6d7932379c338af2a..6a367f3379d1b8f8cd8f9cc0a732b564
  
  from tools.tts_tool_delivery import _finalize_wav_output, _origin, _section, _wav_sidecar_path
  
-@@ -193,3 +195,165 @@ def _generate_kittentts(text: str, output_path: str, tts_config: dict[str, Any])
+@@ -193,3 +195,227 @@ def _generate_kittentts(text: str, output_path: str, tts_config: dict[str, Any])
      wav_path = _wav_sidecar_path(output_path)
      sf.write(wav_path, audio, 24000)
      return _finalize_wav_output(wav_path, output_path)
@@ -10624,11 +11135,12 @@ index 81c23cdbe52435023d2a76c6d7932379c338af2a..6a367f3379d1b8f8cd8f9cc0a732b564
 +
 +
 +def _native_neutts_options(tts_config: dict[str, Any]) -> dict[str, Any]:
-+    """The stock NeuTTS helper arguments (:func:`_generate_neutts`); ``language`` (optional) is required only for a local
-+    GGUF file, whose language cannot be derived from a repo id."""
++    """The stock NeuTTS helper arguments (:func:`_generate_neutts`). ``language`` is passed ONLY for a local GGUF file,
++    whose language cannot be derived from a repo id; a repo backbone keeps the stock mapping from its original repo."""
 +    neutts_config = tts_config.get("neutts") or {}
-+    language = neutts_config.get("language")
-+    return {"original_repo": neutts_config.get("model", "neuphonic/neutts-air-q4-gguf"),
++    original = neutts_config.get("model", "neuphonic/neutts-air-q4-gguf")
++    language = neutts_config.get("language") if isinstance(original, str) and os.path.isfile(original) else None
++    return {"original_repo": original,
 +            "device": neutts_config.get("device", "cpu"),
 +            "ref_audio_path": str(Path(neutts_config.get("ref_audio", "") or _NEUTTS_SAMPLES / "jo.wav").expanduser()),
 +            "ref_text_path": str(Path(neutts_config.get("ref_text", "") or _NEUTTS_SAMPLES / "jo.txt").expanduser()),
@@ -10682,23 +11194,86 @@ index 81c23cdbe52435023d2a76c6d7932379c338af2a..6a367f3379d1b8f8cd8f9cc0a732b564
 +        raise RuntimeError("native engine output is not PCM/float WAV")
 +
 +
++_NATIVE_CHILD_ENV_KEYS = ("PATH", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "HF_HOME", "HF_HUB_CACHE",
++                          "HUGGINGFACE_HUB_CACHE", "XDG_CACHE_HOME")
++_CONVERT_INPUT = ("-nostdin", "-hide_banner", "-loglevel", "error", "-protocol_whitelist", "file", "-f", "wav", "-i")
++
++
++def _native_child_env() -> dict[str, str]:
++    """The explicit environment of a native local child (helper or converter): only these keys from this process (the
++    cache-location keys keep the stock cache resolution), plus offline flags set before any of its imports."""
++    env = {key: os.environ[key] for key in _NATIVE_CHILD_ENV_KEYS if key in os.environ}
++    env.update(HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")
++    return env
++
++
++def _remaining(policy: Any) -> float:
++    import time
++    return max(0.05, policy.deadline - time.monotonic())
++
++
++def _native_convert(ffmpeg: str, wav_path: str, mp3_path: str, policy: Any, cwd: str, probe: bool = False) -> None:
++    """WAV -> MP3 by the real ffmpeg as a native local child: inside the qualified launcher, Stop-aware, bounded by the
++    call's exact absolute deadline, forced WAV input and file-only protocols, no stdin."""
++    from tools.tts_command_provider import run_native_argv
++    run_native_argv([ffmpeg, *_CONVERT_INPUT, wav_path, "-y", "-f", "mp3", mp3_path], timeout=_remaining(policy),
++                    env=_native_child_env(), cwd=cwd, max_stream_bytes=_ENGINE_STREAM_BYTES, probe=probe)
++
++
++def _write_probe_wav(path: str) -> None:
++    import wave
++    with wave.open(path, "wb") as handle:
++        handle.setnchannels(1)
++        handle.setsampwidth(2)
++        handle.setframerate(24000)
++        handle.writeframes(b"\x00\x00" * 2400)  # 0.1 s of silence: synthetic, no text, no model
++
++
++def native_converter_preflight() -> None:
++    """Native call only, BEFORE any engine: prove the converter can actually turn a tiny synthetic WAV into a real MP3
++    under the same launcher and bounds (``-version`` would not). Missing or broken -> the policy's ``unsupported``
++    refusal (unsent); Stop/deadline refusals pass through unchanged."""
++    import shutil
++    import tempfile
++    from tools import native_send_policy
++    policy = native_send_policy.current()
++    ffmpeg = shutil.which("ffmpeg")
++    if policy is None or policy.deadline is None or ffmpeg is None or not os.access(ffmpeg, os.X_OK):
++        raise _refuse_unsupported()
++    work = tempfile.mkdtemp(prefix="hermes-native-convert-")
++    try:
++        probe_wav, probe_mp3 = os.path.join(work, "probe.wav"), os.path.join(work, "probe.mp3")
++        _write_probe_wav(probe_wav)
++        try:
++            _native_convert(ffmpeg, probe_wav, probe_mp3, policy, work, probe=True)
++            with open(probe_mp3, "rb") as handle:
++                head = handle.read(3)
++        except subprocess.TimeoutExpired:
++            raise native_send_policy.refuse("timeout") from None  # its timeout IS the call's remaining deadline
++        except (subprocess.CalledProcessError, OSError):
++            raise _refuse_unsupported() from None
++        if not (head[:3] == b"ID3" or head[:1] == b"\xff"):
++            raise _refuse_unsupported()
++    finally:
++        shutil.rmtree(work, ignore_errors=True)
++
++
 +def native_engine_chunk(engine: str, text: str, mp3_path: str, tts_config: dict[str, Any],
 +                        track: Callable[[str], Any]) -> None:
 +    """Native call only: synthesize ONE chunk with a local engine into ``mp3_path``.
 +
-+    A separate child (:mod:`tools.native_tts_engine_helper`) in a new session, inside the qualified network-deny
-+    launcher, private empty cwd, scrubbed env with offline flags set before its imports; the text travels on stdin only.
-+    The WAV sidecar is tracked BEFORE the spawn (the caller removes it on any failure, cancel or late completion) and
-+    watched while the child runs; the reply is one bounded JSON line; the WAV is validated and converted to MP3 by the
-+    real ffmpeg (no extension rename). ``unavailable`` from the helper is an unsent refusal; anything else is a failure
-+    after a local invocation. No gated send exists: the seam accounts it local (``not_started``)."""
++    A separate isolated child (``python -I`` :mod:`tools.native_tts_engine_helper`) in a new session, inside the
++    qualified network-deny launcher, private empty cwd, an explicit minimal env with offline flags set before its
++    imports; the text travels on stdin only. The WAV sidecar is tracked BEFORE the spawn (the caller removes it on any
++    failure, cancel or late completion) and watched while the child runs; the reply is one bounded JSON line; the WAV is
++    validated and converted to MP3 by the real ffmpeg as another launcher-wrapped, Stop-aware child bounded by the exact
++    deadline (no extension rename). ``unavailable`` from the helper is an unsent refusal; anything else after the launch
++    is a failure after a local invocation. No gated send exists: the seam accounts it local (``not_started``)."""
 +    import shutil
 +    import tempfile
-+    import time
 +    from tools import native_send_policy
-+    from tools.environments.local import hermes_subprocess_env
 +    from tools.tts_command_provider import run_native_argv
-+    from tools.tts_tool_delivery import _ffmpeg_run, _remove_quietly
++    from tools.tts_tool_delivery import _remove_quietly
 +    policy = native_send_policy.current()
 +    if policy is None or policy.deadline is None or policy.max_output_bytes is None:
 +        raise _refuse_unsupported()
@@ -10706,8 +11281,6 @@ index 81c23cdbe52435023d2a76c6d7932379c338af2a..6a367f3379d1b8f8cd8f9cc0a732b564
 +    request = json.dumps({"api": 1, "engine": engine, "text": text, "wav_path": wav_path, "max_wav_bytes": limit,
 +                          engine: native_engine_options(engine, tts_config)}).encode("utf-8")
 +    track(wav_path)
-+    env = hermes_subprocess_env(inherit_credentials=False)
-+    env.update(HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")
 +
 +    def watch() -> Optional[str]:
 +        try:
@@ -10717,23 +11290,23 @@ index 81c23cdbe52435023d2a76c6d7932379c338af2a..6a367f3379d1b8f8cd8f9cc0a732b564
 +
 +    cwd = tempfile.mkdtemp(prefix="hermes-native-engine-")
 +    try:
-+        result = run_native_argv([sys.executable, NATIVE_ENGINE_HELPER], timeout=max(0.05, policy.deadline - time.monotonic()),
-+                                 env=env, cwd=cwd, stdin_bytes=request, watch=watch, max_stream_bytes=_ENGINE_STREAM_BYTES)
++        result = run_native_argv([sys.executable, "-I", NATIVE_ENGINE_HELPER], timeout=_remaining(policy),
++                                 env=_native_child_env(), cwd=cwd, stdin_bytes=request, watch=watch,
++                                 max_stream_bytes=_ENGINE_STREAM_BYTES)
++        answer = _parse_engine_reply(result.stdout)
++        if answer["status"] == "unavailable":
++            raise _refuse_unsupported()
++        if answer["status"] != "ok":
++            raise RuntimeError("native engine failed")
++        _validate_wav(wav_path, limit)
++        ffmpeg = shutil.which("ffmpeg")
++        if ffmpeg is None:
++            raise RuntimeError("ffmpeg disappeared")
++        _native_convert(ffmpeg, wav_path, mp3_path, policy, cwd)
 +    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-+        raise RuntimeError("native engine helper failed") from None
++        raise RuntimeError("native engine helper or converter failed") from None
 +    finally:
 +        shutil.rmtree(cwd, ignore_errors=True)
-+    answer = _parse_engine_reply(result.stdout)
-+    if answer["status"] == "unavailable":
-+        raise _refuse_unsupported()
-+    if answer["status"] != "ok":
-+        raise RuntimeError("native engine failed")
-+    _validate_wav(wav_path, limit)
-+    ffmpeg = shutil.which("ffmpeg")
-+    if ffmpeg is None:
-+        raise RuntimeError("ffmpeg disappeared")
-+    _ffmpeg_run(ffmpeg, ["-i", wav_path, "-y", "-loglevel", "error", "-f", "mp3", mp3_path], check=True,
-+                timeout=max(1, int(policy.deadline - time.monotonic())))
 +    _remove_quietly(wav_path)
 diff --git a/tools/tts_tool_openai.py b/tools/tts_tool_openai.py
 index aa10ff3607bcf460f3585c9e5e0e11d7bc55348f..407445daecc1dd237bd360b57ba7953f74970323 100644
