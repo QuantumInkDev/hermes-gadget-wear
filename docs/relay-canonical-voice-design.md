@@ -1094,7 +1094,10 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   fallback stays available as for any ordinary failure. Native Gemini needs the qualified launcher and a working ffmpeg, proved by a converter
   preflight before the first request (single chunk included), and never writes a WAV under an `.mp3` name. Costs: unqualified or tool-less hosts
   lose the optional trim/measurement (STT) or Gemini speech (`unavailable`/`not_started`); a standalone CAF expanding beyond the 64 MiB
-  preparation bound is refused terminally. Not evidence of any installation, decoder, launcher, `afconvert` or runtime behaviour.
+  preparation bound is refused terminally, also when the child exits non-zero after leaving the oversized file. A command-STT provider configured
+  `native: local-sandboxed` with `normalize: true` needs the same qualified converter (required work: it counts as a local launch). When the outer
+  deadline wins after a send may have left, the existing gate reports provider `unknown`, not `completed`. Not evidence of any installation, decoder,
+  launcher, `afconvert` or runtime behaviour.
 * Voice output is listed only with the complete seam (TTS **and** display read): there is no reduced
   live-only mode that would narrow approved deliberate playback.
 * Hub: PROPOSED `DeviceSession.send_binary(data, *, authorize=None)` mirroring `send_json`; channel-5 routing in

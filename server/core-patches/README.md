@@ -217,6 +217,15 @@ converted by the same wrapped, size-watched converter; a vanished or failing con
 an empty output keeps the existing `failed`/`completed` accounting, there is no retry, and the stock raw-WAV-under-`.mp3` fallback is never reached
 natively. Cost: native Gemini needs a qualified launcher and a working ffmpeg (as multi-chunk Edge and the local engines already do) and is
 otherwise `unavailable`/`not_started`; the single-chunk output is validated by its MP3 head only (no ffprobe prerequisite is added for single chunks).
+*Fix1 clarifications.* (1) A non-zero child exit that left an output over its bound (the 64 MiB preparation file, the chunk cap) is the same terminal
+`too_long` as a watched runaway - the optional trim does not then upload the original, the CAF does not try the next candidate and a paid Gemini chunk is
+`too_long`; an under-cap non-zero exit stays an ordinary failure. (2) The named command-STT provider configured `native: local-sandboxed` with
+`normalize: true` already reached the shared transcode: it now needs the qualified converter as REQUIRED work and counts as a local launch, so a normalization
+that ran followed by an unsent command refusal is `failed`/`not_started`, while a missing capability runs nothing (reported `failed`/`not_started` by the
+unchanged local-route map). (3) NM-A deadline label: when the call's outer deadline wins after a send may have left, the existing bounded gate reports
+provider `unknown` (conservative, never authorizes a retry); a runner-noticed deadline can retain `completed`; Stop raises and carries no label.
+(4) Coverage limit: unbound existing native-voice test modules run as an unqualified host (hermetic default; explicit stand-in bindings win), so qualified
+preparation is exercised only by the three AUX test files and the command-STT controls.
 Not claimed: actual launcher, `afconvert`, codec, platform or sandbox qualification, real provider output, per-spawn latency under the real launcher,
 or any runtime result.
 

@@ -4540,10 +4540,10 @@ index 0000000000000000000000000000000000000000..29c25388889f3b0c32d24a9a54f2932d
 +    assert transcribe_audio_local_fallback(clip)['transcript'] == 'by command' and ran == [1]
 diff --git a/tests/gateway/test_native_voice_gemini_convert.py b/tests/gateway/test_native_voice_gemini_convert.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..5575f7cff5b1f389374780cc93da44b396e1081f
+index 0000000000000000000000000000000000000000..aa749bc215bd4e009771697e5a48e36f5b4f41ee
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_gemini_convert.py
-@@ -0,0 +1,247 @@
+@@ -0,0 +1,278 @@
 +"""Native voice seam, Gemini PCM -> MP3 (AUX-audio): a usable qualified converter is proved BEFORE the first paid request (single chunk
 +included), the paid PCM becomes a real MP3 through the wrapped, bounded converter, and a converter that disappears, fails, lies or runs
 +away AFTER payment is a truthful failure of the paid chunk (never the stock raw-WAV-under-.mp3 file, never a retry).
@@ -4565,6 +4565,7 @@ index 0000000000000000000000000000000000000000..5575f7cff5b1f389374780cc93da44b3
 +from hermes_constants import get_hermes_home
 +from tests.gateway import native_voice_support as support
 +from tests.gateway import rest_voice_support as rest
++from tests.gateway.mistral_voice_support import watch_worker
 +from tests.waiting import async_wait_until
 +
 +KEY = 'rest-synthetic-key'
@@ -4752,6 +4753,8 @@ index 0000000000000000000000000000000000000000..5575f7cff5b1f389374780cc93da44b3
 +        gemini_profile()
 +        state = support.joiner(monkeypatch, tmp_path, 'hold-convert-2')
 +        spawns = support.record_spawns(monkeypatch)
++        from gateway import session_native_voice_tts as tts_module
++        finished = watch_worker(monkeypatch, tts_module, '_synthesize')  # set when the TTS worker has fully returned
 +        cb = support.Callbacks()
 +        wire = rest.RestWire(script(1) + script(1))
 +        clock = support.ReadinessClock(monkeypatch)
@@ -4769,10 +4772,38 @@ index 0000000000000000000000000000000000000000..5575f7cff5b1f389374780cc93da44b3
 +                result = await task
 +                assert (result.state, result.path, result.provider) == ('timeout', None, 'unknown')
 +            await async_wait_until(lambda: support.pid_gone(state), timeout=15, what='the held conversion child to be ended')
++            assert await asyncio.to_thread(finished.wait, 15)  # the abandoned worker itself has RETURNED
 +            await async_wait_until(lambda: not os.listdir(out) and not os.listdir(scratch), timeout=15, what='the fenced worker to clean up')
 +        assert len(ffmpeg_children(spawns, support.FAULTY)) == held_at and (wire.count, cb.before_send_calls) == (1, 1)
 +    finally:
 +        Path(str(tmp_path / 'launcher-state') + '.release').write_text('')
++
++
++@pytest.mark.asyncio
++async def test_a_paid_conversion_that_exits_nonzero_after_an_oversized_output_is_too_long_not_an_ordinary_failure(monkeypatch, out, scratch, no_stock_writer):
++    """LABELLED FINITE SYNTHETIC BOUNDARY (not a real-subprocess timing proof): the lowest runner call leaves a small LOWERED-LIMIT oversized
++    chunk file and raises CalledProcessError BEFORE any final watch (an exit between two watch polls). Terminal ``too_long`` after one paid send."""
++    from tools import tts_command_provider
++    gemini_profile()
++    support.qualify(monkeypatch)
++    monkeypatch.setattr('gateway.session_native_voice.MAX_CHUNK_AUDIO_BYTES', 64 * 1024)  # LOWERED-LIMIT (production: 16 MiB)
++    real = tts_command_provider.run_native_argv
++    left = []
++
++    def wrapper(argv, **kw):
++        if kw.get('cwd') and 'hermes-native-gemini-' in kw['cwd']:  # the real conversion of the paid answer (not the preflight)
++            Path(argv[-1]).write_bytes(b'\0' * (70 * 1024))
++            left.append(argv[-1])
++            raise subprocess.CalledProcessError(1, argv)
++        return real(argv, **kw)
++    monkeypatch.setattr(tts_command_provider, 'run_native_argv', wrapper)
++    cb = support.Callbacks()
++    wire = rest.RestWire([rest.gemini_answer(rest.pcm_bytes(0.1)), rest.gemini_answer(rest.pcm_bytes(0.1))])
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.path, result.provider) == ('too_long', None, 'failed_after_send')
++    assert (wire.count, cb.before_send_calls, len(left)) == (1, 1, 1)  # one paid send, one conversion, no retry
++    assert os.listdir(out) == [] and os.listdir(scratch) == []
 +
 +
 +# ---- stock-off pins -------------------------------------------------------------------------------------------------------------------
@@ -6977,10 +7008,10 @@ index 0000000000000000000000000000000000000000..23319c0131ca55357ad9448b098f36f5
 +    assert os.listdir(out) == [] and os.listdir(scratch) == []
 diff --git a/tests/gateway/test_native_voice_pipeline_probe.py b/tests/gateway/test_native_voice_pipeline_probe.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..5e658c1534faf523a56f8e3b4bfbdda077f0456b
+index 0000000000000000000000000000000000000000..2492424a286d1161b94d5cd3b3b609b85ede080a
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_pipeline_probe.py
-@@ -0,0 +1,203 @@
+@@ -0,0 +1,210 @@
 +"""Native voice seam, the ffprobe packet-count children of the multi-chunk join (AUX-audio NM-A) and the exact remainder of every native
 +preparation / conversion child.
 +
@@ -7005,6 +7036,7 @@ index 0000000000000000000000000000000000000000..5e658c1534faf523a56f8e3b4bfbdda0
 +from gateway.session_native_voice import speakable_text, synthesize_native_once
 +from hermes_constants import get_hermes_home
 +from tests.gateway import native_voice_support as support
++from tests.gateway.mistral_voice_support import watch_worker
 +from tests.waiting import async_wait_until
 +
 +KEY = 'sk-synthetic-probe'
@@ -7055,6 +7087,8 @@ index 0000000000000000000000000000000000000000..5e658c1534faf523a56f8e3b4bfbdda0
 +async def test_stop_or_the_deadline_while_the_preflight_packet_count_is_held_sends_nothing(monkeypatch, tmp_path, out, scratch, paid_chunks, how):
 +    try:
 +        state = support.joiner(monkeypatch, tmp_path, 'hold-ffprobe-1')  # the 1st ffprobe child is the preflight's first count
++        from gateway import session_native_voice_tts as tts_module
++        finished = watch_worker(monkeypatch, tts_module, '_synthesize')  # set when the TTS worker has fully returned
 +        cb = support.Callbacks()
 +        wire = support.Wire([('ok', {'audio': audio}) for audio in paid_chunks])
 +        clock = support.ReadinessClock(monkeypatch)
@@ -7070,6 +7104,7 @@ index 0000000000000000000000000000000000000000..5e658c1534faf523a56f8e3b4bfbdda0
 +                result = await task
 +                assert (result.state, result.path, result.provider) == ('timeout', None, 'not_started')
 +            await async_wait_until(lambda: support.pid_gone(state), timeout=15, what='the held ffprobe child to be ended')
++            assert await asyncio.to_thread(finished.wait, 15)  # the abandoned worker itself has RETURNED
 +            await async_wait_until(lambda: not os.listdir(out) and not os.listdir(scratch), timeout=15, what='the fenced worker to clean up')
 +        assert (wire.count, cb.before_send_calls) == (0, 0)  # the packet count is a probe, never a send
 +    finally:
@@ -7083,6 +7118,8 @@ index 0000000000000000000000000000000000000000..5e658c1534faf523a56f8e3b4bfbdda0
 +        monkeypatch, tmp_path, out, scratch, paid_chunks, how):
 +    try:
 +        state = support.joiner(monkeypatch, tmp_path, 'hold-ffprobe-4')  # preflight made 3 counts; the 4th is the first after the real join
++        from gateway import session_native_voice_tts as tts_module
++        finished = watch_worker(monkeypatch, tts_module, '_synthesize')  # set when the TTS worker has fully returned
 +        cb = support.Callbacks()
 +        wire = support.Wire([('ok', {'audio': audio}) for audio in paid_chunks])
 +        clock = support.ReadinessClock(monkeypatch)
@@ -7099,6 +7136,7 @@ index 0000000000000000000000000000000000000000..5e658c1534faf523a56f8e3b4bfbdda0
 +                result = await task
 +                assert (result.state, result.path, result.provider) == ('timeout', None, 'unknown')
 +            await async_wait_until(lambda: support.pid_gone(state), timeout=15, what='the held ffprobe child to be ended')
++            assert await asyncio.to_thread(finished.wait, 15)  # the abandoned worker itself has RETURNED
 +            await async_wait_until(lambda: not os.listdir(out) and not os.listdir(scratch), timeout=15, what='the fenced worker to clean up')
 +        assert (wire.count, cb.before_send_calls) == (len(paid_chunks), len(paid_chunks))  # no extra send, no late callback
 +        assert os.listdir(out) == [] and os.listdir(scratch) == []
@@ -7186,10 +7224,10 @@ index 0000000000000000000000000000000000000000..5e658c1534faf523a56f8e3b4bfbdda0
 +            assert seen == [pytest.approx(expect, abs=1e-9)]
 diff --git a/tests/gateway/test_native_voice_prep.py b/tests/gateway/test_native_voice_prep.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..742bf5c0819ce49b5ef5e97f00f58a14194218f2
+index 0000000000000000000000000000000000000000..c2004e416d597997480bd15ac2780669b69f0ece
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_prep.py
-@@ -0,0 +1,656 @@
+@@ -0,0 +1,882 @@
 +"""Native voice seam, STT PREPARATION (AUX-audio): the cloud pre-upload probe / trim / CAF / full compaction run only as
 +launcher-wrapped, Stop-aware, bounded children, and an unusable optional capability never changes the unchanged full upload.
 +
@@ -7214,6 +7252,7 @@ index 0000000000000000000000000000000000000000..742bf5c0819ce49b5ef5e97f00f58a14
 +from gateway.session_native_voice import transcribe_native_once
 +from hermes_constants import get_hermes_home
 +from tests.gateway import native_voice_support as support
++from tests.gateway.mistral_voice_support import watch_worker
 +from tests.waiting import async_wait_until
 +
 +KEY = 'sk-synthetic-prep'
@@ -7258,7 +7297,9 @@ index 0000000000000000000000000000000000000000..742bf5c0819ce49b5ef5e97f00f58a14
 +        calls.append(command)
 +        raise AssertionError(STOCK_RUNNER)
 +    monkeypatch.setattr(transcription_audio, '_run_quiet', tripwire)
-+    return calls
++    yield calls
++    # TEARDOWN: the stock trim/probe bodies swallow the tripwire's own AssertionError, so the record is what must stay empty
++    assert calls == [], STOCK_RUNNER
 +
 +
 +def children(spawns, stand_in=support.PASSTHROUGH):
@@ -7429,11 +7470,13 @@ index 0000000000000000000000000000000000000000..742bf5c0819ce49b5ef5e97f00f58a14
 +    support.joiner(monkeypatch, tmp_path, mode)
 +    clip = support.tone_and_silence_wav(tmp_path / 'long.wav')
 +    upload = Upload()
++    spawns = support.record_spawns(monkeypatch)
 +    wire = support.Wire([words(), ('status', 500)], tap=upload)
 +    with support.provider_wire(monkeypatch, wire):
 +        ok = await hear(clip, support.Callbacks())
 +        failed = await hear(clip, support.Callbacks())
 +    assert (ok.state, ok.provider) == ('transcribed', 'completed')
++    assert names(spawns, support.FAULTY).count('ffmpeg') == 2  # the wrapped trim child really ran (and failed) once per call
 +    assert all(b'RIFF' in body and b'ftyp' not in body for body in upload.bodies) and wire.count == 2  # the FULL recording, twice
 +    # a later 5xx is a counted failed send: a poisoned (recorded unsupported) policy would have said "unavailable"
 +    assert (failed.state, failed.source, failed.provider) == ('failed', None, 'failed_after_send')
@@ -7468,6 +7511,7 @@ index 0000000000000000000000000000000000000000..742bf5c0819ce49b5ef5e97f00f58a14
 +async def test_a_real_caf_converts_with_the_stock_arguments_inside_the_wrapper_and_uploads_the_wav(monkeypatch, tmp_path, scratch, stock_runner):
 +    support.write_config(get_hermes_home(), config(cloud_trim_silence=False))
 +    support.qualify(monkeypatch)
++    afconvert_stand_in(monkeypatch, tmp_path)  # the host afconvert is unreachable here even if ffmpeg failed
 +    upload = Upload()
 +    spawns = support.record_spawns(monkeypatch)
 +    wire = support.Wire([words()], tap=upload)
@@ -7699,6 +7743,8 @@ index 0000000000000000000000000000000000000000..742bf5c0819ce49b5ef5e97f00f58a14
 +        fallback = []
 +        monkeypatch.setattr('tools.transcription_tools.transcribe_audio_local_fallback',
 +                            lambda path, model=None: fallback.append(path) or {'success': True, 'transcript': 'never'})
++        from gateway import session_native_voice_stt as stt_module
++        finished = watch_worker(monkeypatch, stt_module, '_checked')  # set when the STT worker has fully returned
 +        cb = support.Callbacks()
 +        wire = support.Wire([words()])
 +        clock = support.ReadinessClock(monkeypatch)
@@ -7715,6 +7761,7 @@ index 0000000000000000000000000000000000000000..742bf5c0819ce49b5ef5e97f00f58a14
 +                result = await task
 +                assert (result.state, result.transcript, result.source, result.provider) == ('timeout', None, None, 'not_started')
 +            await async_wait_until(lambda: support.pid_gone(state), timeout=15, what='the held child to be ended')
++            assert await asyncio.to_thread(finished.wait, 15)  # the abandoned worker itself has RETURNED: only now is "no late child" a fact
 +            await async_wait_until(lambda: not os.listdir(scratch), timeout=15, what='the fenced worker to clean up')
 +        assert len(children(spawns, support.FAULTY)) == held_at  # no next child (no second CAF candidate, no later probe)
 +        assert (wire.count, cb.before_send_calls, fallback) == (0, 0, [])  # no upload, no callback, no local fallback
@@ -7726,13 +7773,26 @@ index 0000000000000000000000000000000000000000..742bf5c0819ce49b5ef5e97f00f58a14
 +@pytest.mark.asyncio
 +async def test_a_lost_authority_at_the_first_preparation_spawn_is_a_terminal_refusal_with_no_child_and_no_upload(
 +        monkeypatch, tmp_path, scratch, stock_runner):
++    from tools import native_send_policy
 +    support.write_config(get_hermes_home(), config())
 +    support.qualify(monkeypatch)
++    real = native_send_policy.authorize_local_start
++    attempts = []
++
++    def observing():  # the native pre-spawn authorization attempt and its outcome
++        try:
++            real()
++        except native_send_policy.NativeSendRefused as exc:
++            attempts.append(exc.reason)
++            raise
++        attempts.append('allowed')
++    monkeypatch.setattr(native_send_policy, 'authorize_local_start', observing)
 +    spawns = support.record_spawns(monkeypatch)
 +    cb = support.Callbacks(refuse_authorize_at=2)  # 1 = the entry check, 2 = the authorization probe right before the first child
 +    wire = support.Wire([words()])
 +    with support.provider_wire(monkeypatch, wire):
 +        result = await hear(support.tone_and_silence_wav(tmp_path / 'long.wav'), cb)
++    assert attempts == ['refused']  # the FIRST preparation spawn asked and was refused (on BASE no spawn authorization exists at all)
 +    assert (result.state, result.source, result.provider) == ('refused', None, 'not_started')
 +    assert names(spawns) == [] and wire.count == 0 and cb.before_send_calls == 0
 +
@@ -7846,6 +7906,210 @@ index 0000000000000000000000000000000000000000..742bf5c0819ce49b5ef5e97f00f58a14
 +                         '/in.wav'], 30)
 +    assert calls[1] == (['/x/ffmpeg', '-y', '-i', '/in.wav', '-af', 'silenceremove=a', *audio._STT_M4A_ENCODE_ARGS, '/out.m4a'], 120)
 +    assert calls[2] == (['/x/ffmpeg', '-y', '-i', '/in.caf', str(tmp_path / 'in.wav')], 300)
++
++
++# ---- fix1 M3: a non-zero exit that leaves an oversized output is a terminal bound violation -----------------------------------------
++# LABELLED FINITE SYNTHETIC BOUNDARY (not a real-subprocess timing proof): the lowest runner call writes a small LOWERED-LIMIT oversized
++# output and then raises ``CalledProcessError`` BEFORE any final watch, which models "the child left the file between two watch polls and
++# exited non-zero". The existing watched-runaway behaviour (``grow-convert``) and an ordinary under-cap failure are kept separate.
++def bounded_policy():
++    from tools import native_send_policy
++    return native_send_policy.SendPolicy(timeout_s=5.0, providers=frozenset(), deadline=time.monotonic() + 60, max_output_bytes=1024,
++                                         require_launcher=True)
++
++
++@pytest.mark.parametrize('written, terminal', [(101, True), (50, False)])
++def test_prep_helper_a_nonzero_exit_after_an_oversized_output_is_too_long_but_an_under_cap_failure_stays_ordinary(
++        monkeypatch, tmp_path, written, terminal):
++    from tools import native_send_policy, transcription_audio, tts_command_provider
++    support.qualify(monkeypatch)
++    monkeypatch.setattr(transcription_audio, 'NATIVE_PREP_MAX_BYTES', 100)  # LOWERED-LIMIT
++    out = tmp_path / 'out.m4a'
++
++    def runner(argv, **kw):
++        out.write_bytes(b'\0' * written)
++        raise subprocess.CalledProcessError(1, argv)
++    monkeypatch.setattr(tts_command_provider, 'run_native_argv', runner)
++    policy = bounded_policy()
++    with native_send_policy.activate(policy):
++        if terminal:
++            with pytest.raises(native_send_policy.NativeSendRefused) as refused:
++                transcription_audio._run_native_prep(['/x/ffmpeg'], output=str(out))
++            assert refused.value.reason == 'too_long' and policy.refusal == 'too_long'
++        else:
++            with pytest.raises(subprocess.CalledProcessError):
++                transcription_audio._run_native_prep(['/x/ffmpeg'], output=str(out))
++            assert policy.refusal is None
++
++
++@pytest.mark.parametrize('written, terminal', [(1025, True), (10, False)])
++def test_gemini_helper_a_nonzero_exit_after_an_oversized_output_is_too_long_but_an_under_cap_failure_stays_a_conversion_failure(
++        monkeypatch, tmp_path, written, terminal):
++    from tools import native_send_policy, tts_command_provider, tts_tool_local
++    support.qualify(monkeypatch)
++    mp3 = tmp_path / 'chunk.mp3'
++
++    def runner(argv, **kw):
++        Path(argv[-1]).write_bytes(b'\0' * written)  # the chunk output named by the converter's last argument
++        raise subprocess.CalledProcessError(1, argv)
++    monkeypatch.setattr(tts_command_provider, 'run_native_argv', runner)
++    policy = bounded_policy()  # max_output_bytes = 1024
++    with native_send_policy.activate(policy):
++        if terminal:
++            with pytest.raises(native_send_policy.NativeSendRefused) as refused:
++                tts_tool_local.native_pcm_chunk_to_mp3(b'\x00\x00' * 480, str(mp3))
++            assert refused.value.reason == 'too_long' and policy.refusal == 'too_long'
++        else:
++            with pytest.raises(RuntimeError, match='native conversion failed'):
++                tts_tool_local.native_pcm_chunk_to_mp3(b'\x00\x00' * 480, str(mp3))
++            assert policy.refusal is None
++
++
++def oversize_then_fail(monkeypatch, selector, size):
++    """Wrap the lowest runner: a child chosen by ``selector(argv)`` leaves ``size`` bytes at its last argument and fails; the rest run for real."""
++    from tools import tts_command_provider
++    real = tts_command_provider.run_native_argv
++    chosen = []
++
++    def wrapper(argv, **kw):
++        if selector(argv):
++            chosen.append(os.path.basename(argv[0]))
++            Path(argv[-1]).write_bytes(b'\0' * size)
++            raise subprocess.CalledProcessError(1, argv)
++        return real(argv, **kw)
++    monkeypatch.setattr(tts_command_provider, 'run_native_argv', wrapper)
++    return chosen
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('size, terminal', [(8192, True), (10, False)])
++async def test_an_optional_trim_that_exits_nonzero_after_an_oversized_output_ends_the_call_instead_of_uploading_the_original(
++        monkeypatch, tmp_path, scratch, stock_runner, size, terminal):
++    from tools import transcription_audio
++    support.write_config(get_hermes_home(), config())
++    support.qualify(monkeypatch)
++    monkeypatch.setattr(transcription_audio, 'NATIVE_PREP_MAX_BYTES', 4096)  # LOWERED-LIMIT (production: 64 MiB)
++    chosen = oversize_then_fail(monkeypatch, lambda argv: os.path.basename(argv[0]) == 'ffmpeg' and '-af' in argv, size)
++    fallback = []
++    monkeypatch.setattr('tools.transcription_tools.transcribe_audio_local_fallback',
++                        lambda path, model=None: fallback.append(path) or {'success': True, 'transcript': 'never'})
++    cb, upload = support.Callbacks(), Upload()
++    wire = support.Wire([words()], tap=upload)
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(support.tone_and_silence_wav(tmp_path / 'long.wav'), cb)
++    assert chosen == ['ffmpeg']  # the one trim child, no retry
++    if terminal:  # terminal bound: failed, nothing uploaded, no callback, no cached-local fallback
++        assert (result.state, result.transcript, result.source, result.provider) == ('failed', None, None, 'not_started')
++        assert (wire.count, cb.before_send_calls, fallback) == (0, 0, [])
++    else:  # ordinary under-cap failure: the unchanged FULL recording is uploaded
++        assert (result.state, result.provider, wire.count) == ('transcribed', 'completed', 1) and upload.is_wav
++    assert os.listdir(scratch) == []
++
++
++@pytest.mark.asyncio
++async def test_a_caf_candidate_that_exits_nonzero_after_an_oversized_output_does_not_try_the_next_candidate(
++        monkeypatch, tmp_path, scratch, stock_runner):
++    from tools import transcription_audio
++    support.write_config(get_hermes_home(), config(cloud_trim_silence=False))
++    support.qualify(monkeypatch)
++    afconvert_stand_in(monkeypatch, tmp_path)
++    monkeypatch.setattr(transcription_audio, 'NATIVE_PREP_MAX_BYTES', 4096)  # LOWERED-LIMIT
++    chosen = oversize_then_fail(monkeypatch, lambda argv: os.path.basename(argv[0]) == 'ffmpeg' and argv[-1].endswith('.wav'), 8192)
++    fallback = []
++    monkeypatch.setattr('tools.transcription_tools.transcribe_audio_local_fallback',
++                        lambda path, model=None: fallback.append(path) or {'success': True, 'transcript': 'never'})
++    spawns = support.record_spawns(monkeypatch)
++    cb = support.Callbacks()
++    wire = support.Wire([words()])
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(caf(tmp_path / 'memo.caf'), cb)
++    assert chosen == ['ffmpeg'] and 'afconvert' not in names(spawns)  # no afconvert candidate after the bound violation
++    assert (result.state, result.transcript, result.source, result.provider) == ('failed', None, None, 'not_started')
++    assert (wire.count, cb.before_send_calls, fallback) == (0, 0, []) and os.listdir(scratch) == []
++
++
++# ---- fix1 M5: the existing native command-STT ``normalize`` caller of the shared transcode ---------------------------------------------
++# A named ``native: local-sandboxed`` command provider with ``normalize: true`` reaches ``_transcode_audio_for_stt`` through the real native
++# entry (transcription_tools -> _transcribe_command_stt -> _normalize_command_stt_input). The finite owned command fixture is
++# ``native_transcriber.py`` (guard-admitted shape). Prerequisite and cost: normalization now needs the qualified converter and counts as a
++# local launch (required work, probe=False).
++def command_stt(normalize=True):
++    import shlex
++    command = shlex.join([sys.executable, str(support.FIXTURES / 'native_transcriber.py')]) + ' {input_path} {output_path}'
++    entry = {'type': 'command', 'command': command, 'native': 'local-sandboxed', 'normalize': normalize}
++    return {'stt': {'provider': 'local-cli', 'providers': {'local-cli': entry}}}
++
++
++def command_work_dirs():
++    """The command-STT work directories in the runner temp root (the guard binds TMPDIR, so these tests cannot rebind it as ``scratch`` does)."""
++    import tempfile
++    return sorted(Path(tempfile.gettempdir()).glob('hermes-cmd-stt-*'))
++
++
++def wrapped_programs(spawns):
++    """Program name of every child behind the pass-through stand-in launcher, in spawn order (ffmpeg, then the command's /bin/sh)."""
++    return [os.path.basename(support.program_of(s)) for s in spawns
++            if isinstance(s['args'], list) and len(s['args']) > 5 and str(support.PASSTHROUGH) in s['args'][:2]]
++
++
++@pytest.mark.asyncio
++async def test_command_stt_normalize_runs_a_wrapped_encode_then_the_wrapped_command_and_succeeds(monkeypatch, tmp_path, stock_runner):
++    support.write_config(get_hermes_home(), command_stt())
++    support.qualify(monkeypatch)
++    before = command_work_dirs()
++    spawns = support.record_spawns(monkeypatch)
++    cb = support.Callbacks()
++    result = await hear(support.write_wav(tmp_path / 'clip.wav'), cb)
++    assert command_work_dirs() == before  # the command-STT work directory (normalized m4a, transcript) was removed
++    assert (result.state, result.transcript, result.source, result.provider) == ('transcribed', 'native local words', 'configured', 'not_started')
++    assert wrapped_programs(spawns) == ['ffmpeg', 'sh']  # the normalization first, then the command: both inside the launcher
++    encode = next(s['args'] for s in spawns if isinstance(s['args'], list) and 'ffmpeg' in ' '.join(s['args'][:8]))
++    assert ['-protocol_whitelist', 'file'] == encode[encode.index('-protocol_whitelist'):][:2] and cb.before_send_calls == 0
++
++
++@pytest.mark.asyncio
++async def test_command_stt_normalize_that_really_ran_then_an_unsent_command_refusal_is_failed_not_started(monkeypatch, tmp_path, stock_runner):
++    from tools import native_local_launcher
++    support.write_config(get_hermes_home(), command_stt())
++    support.qualify(monkeypatch)
++    real = native_local_launcher.qualified_prefix
++    asked = []
++
++    def flaky():  # readiness + the normalization spawn see the launcher; the command's own spawn-time check does not
++        asked.append(1)
++        return real() if len(asked) <= 2 else None
++    monkeypatch.setattr(native_local_launcher, 'qualified_prefix', flaky)
++    spawns = support.record_spawns(monkeypatch)
++    cb = support.Callbacks()
++    result = await hear(support.write_wav(tmp_path / 'clip.wav'), cb)
++    # normalization is REQUIRED work that really ran (a local launch): the later unsent refusal is failed, never "nothing was tried"
++    assert (result.state, result.transcript, result.source, result.provider) == ('failed', None, None, 'not_started')
++    assert wrapped_programs(spawns) == ['ffmpeg'] and cb.before_send_calls == 0  # the command itself never started
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('how', ['no-launcher', 'missing-ffmpeg'])
++async def test_command_stt_normalize_without_the_required_capability_runs_nothing_and_substitutes_no_provider(
++        monkeypatch, tmp_path, stock_runner, how):
++    """CHARACTERIZATION (unchanged BASE map, not a new decision): normalization is an error ENVELOPE of a local route, which the
++    existing STT map reports as failed/not_started; nothing is spawned, sent or substituted."""
++    from tools import transcription_audio
++    support.write_config(get_hermes_home(), command_stt())
++    if how == 'no-launcher':
++        support.joiner(monkeypatch, tmp_path, 'no-launcher')
++    else:
++        support.qualify(monkeypatch)
++        monkeypatch.setattr(transcription_audio, '_find_ffmpeg_binary', lambda: None)
++    fallback = []
++    monkeypatch.setattr('tools.transcription_tools.transcribe_audio_local_fallback',
++                        lambda path, model=None: fallback.append(path) or {'success': True, 'transcript': 'never'})
++    spawns = support.record_spawns(monkeypatch)
++    cb = support.Callbacks()
++    wire = support.Wire([words()])
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(support.write_wav(tmp_path / 'clip.wav'), cb)
++    assert (result.state, result.transcript, result.source, result.provider) == ('failed', None, None, 'not_started')
++    assert wrapped_programs(spawns) == [] and (wire.count, cb.before_send_calls, fallback) == (0, 0, [])
 diff --git a/tests/gateway/test_native_voice_rest_fences.py b/tests/gateway/test_native_voice_rest_fences.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..c4541eed7a02e9d0df13fb6930d408a2bed43a2a
@@ -14092,7 +14356,7 @@ index 0000000000000000000000000000000000000000..dc0a08db84aff8592ddf705f2430719d
 +if __name__ == '__main__':
 +    main()
 diff --git a/tools/transcription_audio.py b/tools/transcription_audio.py
-index 19e4956acc46941af48ff48569817de205575937..08e6a207c7df9d6397336bf3f4898630a6ebad3f 100644
+index 19e4956acc46941af48ff48569817de205575937..b45240168cc16d653c597f14983b1bcfd7a08ca5 100644
 --- a/tools/transcription_audio.py
 +++ b/tools/transcription_audio.py
 @@ -9,6 +9,7 @@ best-effort cloud pre-upload silence trim. Facade-owned state (``_HAS_PILK``,
@@ -14168,7 +14432,7 @@ index 19e4956acc46941af48ff48569817de205575937..08e6a207c7df9d6397336bf3f4898630
      if not _HAS_PILK:
          # pilk is a tiny silk-v3 codec binding — lazy-installed on first .silk voice note.
          _lazy_ensure_quietly("silk")
-@@ -140,15 +159,162 @@ def _prepare_audio_for_transcription(file_path: str) -> tuple[Optional[str], Opt
+@@ -140,15 +159,166 @@ def _prepare_audio_for_transcription(file_path: str) -> tuple[Optional[str], Opt
          return None, None, _error_result(f"Failed to convert .silk audio for transcription: {exc}")
  
  
@@ -14259,6 +14523,10 @@ index 19e4956acc46941af48ff48569817de205575937..08e6a207c7df9d6397336bf3f4898630
 +                                 max_stream_bytes=_ENGINE_STREAM_BYTES, probe=probe)
 +    except subprocess.TimeoutExpired:
 +        raise native_send_policy.refuse("timeout") from None  # its timeout IS the call's remaining deadline
++    except subprocess.CalledProcessError:
++        if watch() is not None:  # a non-zero exit that left an oversized file between two watch polls is a bound violation, not an ordinary failure
++            raise native_send_policy.refuse("too_long") from None
++        raise
 +    finally:
 +        if output is None:
 +            shutil.rmtree(cwd, ignore_errors=True)
@@ -14332,7 +14600,7 @@ index 19e4956acc46941af48ff48569817de205575937..08e6a207c7df9d6397336bf3f4898630
      try:
          _run_quiet([ffmpeg, "-y", "-i", file_path, converted_path], timeout=300)
          return converted_path, None
-@@ -165,6 +331,8 @@ def _convert_caf_to_wav(file_path: str, work_dir: str) -> Optional[str]:
+@@ -165,6 +335,8 @@ def _convert_caf_to_wav(file_path: str, work_dir: str) -> Optional[str]:
      """Convert CAF to WAV in a caller-owned directory using ffmpeg or afconvert."""
      audio_path = Path(file_path)
      wav_path = os.path.join(work_dir, f"{audio_path.stem}.wav")
@@ -14341,7 +14609,7 @@ index 19e4956acc46941af48ff48569817de205575937..08e6a207c7df9d6397336bf3f4898630
      ffmpeg = _find_ffmpeg_binary()
      afconvert = shutil.which("afconvert")
      candidates = (
-@@ -206,6 +374,8 @@ def _probe_audio_duration(file_path: str) -> Optional[float]:
+@@ -206,6 +378,8 @@ def _probe_audio_duration(file_path: str) -> Optional[float]:
      ``gateway/run.py._probe_audio_duration`` and the Telegram adapter carry local variants — keep
      the command shape in sync."""
      ffprobe = _find_ffprobe_binary()
@@ -14350,7 +14618,7 @@ index 19e4956acc46941af48ff48569817de205575937..08e6a207c7df9d6397336bf3f4898630
      if not ffprobe:
          return None
      try:
-@@ -233,7 +403,10 @@ def _trim_silence_for_cloud_stt(file_path: str, stt_config: dict[str, Any]) -> O
+@@ -233,7 +407,10 @@ def _trim_silence_for_cloud_stt(file_path: str, stt_config: dict[str, Any]) -> O
      if not enabled:
          return None
      ffmpeg = _find_ffmpeg_binary()
@@ -14362,7 +14630,7 @@ index 19e4956acc46941af48ff48569817de205575937..08e6a207c7df9d6397336bf3f4898630
          logger.debug("Cloud STT silence trim skipped: ffmpeg not found")
          return None
      original_duration = _probe_audio_duration(file_path)
-@@ -257,7 +430,7 @@ def _trim_silence_for_cloud_stt(file_path: str, stt_config: dict[str, Any]) -> O
+@@ -257,7 +434,7 @@ def _trim_silence_for_cloud_stt(file_path: str, stt_config: dict[str, Any]) -> O
      min_result_seconds = max(_CLOUD_TRIM_MIN_RESULT_SECONDS, 2 * keep_seconds)
      keep_result = False
      try:
@@ -14371,7 +14639,7 @@ index 19e4956acc46941af48ff48569817de205575937..08e6a207c7df9d6397336bf3f4898630
          trimmed_duration = _probe_audio_duration(trimmed_path)
          if not trimmed_duration or trimmed_duration < min_result_seconds:
              logger.debug("Cloud STT silence trim discarded for %s: trimmed result ~empty (%.2fs)",
-@@ -271,6 +444,8 @@ def _trim_silence_for_cloud_stt(file_path: str, stt_config: dict[str, Any]) -> O
+@@ -271,6 +448,8 @@ def _trim_silence_for_cloud_stt(file_path: str, stt_config: dict[str, Any]) -> O
                      original_duration, trimmed_duration, round((1 - trimmed_duration / original_duration) * 100))
          keep_result = True
          return trimmed_path
@@ -15250,7 +15518,7 @@ index 0334a60cb2c7d41c2acf6fbf89b6531ba2af4d51..aeccace6e5d842c054a61cc21520ce75
          with open(output_path, "wb") as f:
              f.write(wav_bytes)
 diff --git a/tools/tts_tool_local.py b/tools/tts_tool_local.py
-index 81c23cdbe52435023d2a76c6d7932379c338af2a..86545e8db0289a3be9a66ba26597acbd4eceb353 100644
+index 81c23cdbe52435023d2a76c6d7932379c338af2a..c9269aaddd2f58ad5d9ff341c26bfab5848a0bb2 100644
 --- a/tools/tts_tool_local.py
 +++ b/tools/tts_tool_local.py
 @@ -8,11 +8,13 @@ container. Piper and KittenTTS keep loaded models in small LRU caches registered
@@ -15268,7 +15536,7 @@ index 81c23cdbe52435023d2a76c6d7932379c338af2a..86545e8db0289a3be9a66ba26597acbd
  
  from tools.tts_tool_delivery import _finalize_wav_output, _origin, _section, _wav_sidecar_path
  
-@@ -193,3 +195,291 @@ def _generate_kittentts(text: str, output_path: str, tts_config: dict[str, Any])
+@@ -193,3 +195,295 @@ def _generate_kittentts(text: str, output_path: str, tts_config: dict[str, Any])
      wav_path = _wav_sidecar_path(output_path)
      sf.write(wav_path, audio, 24000)
      return _finalize_wav_output(wav_path, output_path)
@@ -15491,7 +15759,11 @@ index 81c23cdbe52435023d2a76c6d7932379c338af2a..86545e8db0289a3be9a66ba26597acbd
 +            _native_convert(ffmpeg, wav_path, mp3_path, policy, work, watch=watch)
 +        except subprocess.TimeoutExpired:
 +            raise native_send_policy.refuse("timeout") from None  # its timeout IS the call's remaining deadline
-+        except (subprocess.CalledProcessError, OSError):
++        except subprocess.CalledProcessError:
++            if watch() is not None:  # a non-zero exit that left an oversized file is a bound violation (terminal too_long), not an ordinary failure
++                raise native_send_policy.refuse("too_long") from None
++            raise RuntimeError("native conversion failed") from None
++        except OSError:
 +            raise RuntimeError("native conversion failed") from None
 +        if watch() is not None:  # finished between two watch polls with an oversized file
 +            raise native_send_policy.refuse("too_long")
