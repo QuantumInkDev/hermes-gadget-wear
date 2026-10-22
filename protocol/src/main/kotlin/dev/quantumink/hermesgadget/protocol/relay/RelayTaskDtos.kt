@@ -8,8 +8,14 @@ import kotlinx.serialization.json.JsonPrimitive
  * A live prompt projection. Whether it may ever be ANSWERED is decided by [actionable] (from an immutable [source])
  * only: the full form is a prompt the server said can be answered; every other form — the `too_large` notice, an
  * expired or settled one, an event, a list item, an O5 copy — is display-only data with no path to a response.
+ *
+ * The constructor is Kotlin-`internal`: code outside this module cannot build a [Prompt] or choose its [source], so
+ * provenance is assigned only by the reply decoders (`relay.task.get` / `relay.existing.prompt.get` -> fetched,
+ * `relay.tasks.list` -> list, `relay.events.read` -> event). This is a compile-time boundary for ordinary Kotlin
+ * consumers (proved by an outside-module compile in `tools/relay-external-probe`); `internal` members remain
+ * JVM-public, so it is not a barrier against reflection or a deliberately forged server reply.
  */
-class Prompt(
+class Prompt internal constructor(
     val promptId: PromptId,
     val taskId: TaskId,
     val kind: PromptKind,
