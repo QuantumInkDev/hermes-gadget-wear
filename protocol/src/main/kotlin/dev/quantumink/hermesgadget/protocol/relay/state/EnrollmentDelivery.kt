@@ -998,6 +998,24 @@ class EnrollmentDelivery private constructor(
     }
 
     /**
+     * `permission_denied`: forgets everything cached for this enrollment (identities, owed refreshes, the O5 baseline,
+     * unacknowledged ids, the session and anything staged). The server still holds the copies until they expire and
+     * they are NOT acknowledged by this; a later grant starts from an unknown baseline, i.e. with a refresh.
+     */
+    fun evictScopeContent(): DeliveryStep<Int> {
+        val forgotten = seen.size + pendingAcks.size + obligations.size
+        val next = copy(
+            seen = emptyMap(),
+            obligations = emptyList(),
+            gapBaseline = null,
+            pendingAcks = emptyList(),
+            live = null,
+            outbox = OutboxFlight(null, null, null)
+        )
+        return DeliveryStep(next, forgotten, listOf(DeliveryEffect.PersistDelivery))
+    }
+
+    /**
      * Explicitly forgets identities committed before [serverMs]. This RELAXES duplicate detection for them: only do it
      * for identities the server can no longer replay (an O5 copy expires after 24 hours; a live event is bound to a
      * binding that is gone).
