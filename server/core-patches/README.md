@@ -186,11 +186,39 @@ no converter, the model/language rules, cached-hash verification and the no-down
 client supplies an inert async client, so the SDK's own unused one is never created or finalized on a loop. Not claimed: any
 real engine, host sandbox, live Edge/provider, current-profile, global-telemetry or usable-parity result; the NeuTTS runtime
 conflict, legacy faster-whisper isolation, detached `setsid` descendants and the roughly 4 s refusal-reader join of the shared
-runner remain open. Unchanged native-conversion residuals (separate required serial follow-up, NOT waived): the native cloud STT silence trim runs
-the stock unwrapped ffmpeg/ffprobe, and its duration probe (`_probe_audio_duration`, ffprobe) runs BEFORE the 12 s gate, so
-short recordings reach the unwrapped probe too when trimming is enabled (the default) and ffmpeg exists; the oversize-splitting
-path (`transcription_chunking`) probes duration for duration-limited models even when trimming is disabled; CAF conversion and
-the splitter's ffmpeg children are unwrapped; and the Gemini PCM-to-MP3 conversion is the stock unwrapped call.
+runner remain open. *Auxiliary native audio (AUX-audio, source only).* The cloud STT preparation and the Gemini conversion that the earlier stages left on the
+stock unwrapped runner are now native-wrapped. **STT preparation** (duration probe, silence trim, CAF -> WAV, full-recording compaction)
+runs only as the same qualified-launcher, Stop-aware, exact-remainder, stdin-less, local-file-protocol (`-protocol_whitelist file`),
+64 KiB-stream, size-watched children as the managed normalizer above; the stock runner and the fixed 30/120/300 s timeouts are never
+reached natively. Authorization is asked before each spawn (never `before_send`). *Optional work* (the duration probe that gates the trim
+and the duration cap, the trim itself): when the tool is missing or this host has no qualified launcher it is skipped with NO recorded
+refusal and the unchanged full recording is uploaded exactly as stock does without those tools; an ordinary failure, junk or non-finite
+duration also keeps the full upload and later accounting stays truthful (a subsequent 5xx is still `failed`/`failed_after_send`); an
+unknown duration is left to the vendor in the one counted request. Stop, deadline, lost authority and output-bound violations are
+terminal and are never swallowed into "upload the original" or another child. Cost: unqualified or tool-less hosts lose the optional trim and
+the duration measurement, not the cloud provider. *Required work* (CAF conversion, compaction of an over-limit recording): the same two CAF
+candidates in the same order (ffmpeg, then `afconvert`) with the stock conversion arguments, each wrapped, bounded and checked for a real WAV (a
+partial output is removed before the next candidate); a missing capability is `unavailable`/`not_started`, work that ran and failed is
+`failed`/`not_started`, and the installed-and-cached local fallback stays as permitted as for any ordinary builtin failure (no new cloud,
+custom or command fallback). An over-limit recording is compacted as the FULL recording and sent once when that fits; when it still needs
+several requests the call is refused before any silence split, piece or send (no paid first part, no partial transcript, no truncation). That
+path is reachable from the standalone core seam (a real compressed recording under the 2 MiB cap can exceed a duration cap such as the default
+`whisper-1` 600 s) and not from the planned 60 s, 16 kHz mono private-WAV ingress. An output bound (64 MiB per preparation file, the existing
+normalized-WAV bound; an exceptionally long standalone CAF whose WAV expansion exceeds it is refused terminally, no resample is invented) ends the
+child while it runs, is `failed` with no fallback and is never reported as an oversized transcript. STT tool discovery is unchanged (Homebrew
+directories first, then `PATH`, as the accepted normalizer) while native TTS resolves `PATH` only; the wrapped tool's identity is not pinned by the launcher
+table, and `afconvert` has no file-protocol option, so its fixed local-file argv runs behind the same network denial. **Native format boundary:**
+the voice ingress packages WAV; a native call does not offer Silk. `.silk` is refused as an unsupported format before any lazy install, `pilk` import
+or in-process decode (unavailable/`not_started`); stock Silk (QQ/WeChat) is unchanged outside a native call. No source reading proves that an
+installation ever happened or that a decoder exists. **Gemini:** a native call, single chunk included, first proves a usable qualified WAV -> MP3
+converter (the capability preflight, no request, no `before_send`; a multi-chunk call also runs the independent concat/packet preflight and accepts one
+redundant tiny conversion). A paid PCM answer is written whole (small header, no extra copy, odd byte counts rejected) to a private 0600 file and
+converted by the same wrapped, size-watched converter; a vanished or failing converter, malformed PCM or non-MP3 output is `failed`/`failed_after_send`,
+an empty output keeps the existing `failed`/`completed` accounting, there is no retry, and the stock raw-WAV-under-`.mp3` fallback is never reached
+natively. Cost: native Gemini needs a qualified launcher and a working ffmpeg (as multi-chunk Edge and the local engines already do) and is
+otherwise `unavailable`/`not_started`; the single-chunk output is validated by its MP3 head only (no ffprobe prerequisite is added for single chunks).
+Not claimed: actual launcher, `afconvert`, codec, platform or sandbox qualification, real provider output, per-spawn latency under the real launcher,
+or any runtime result.
 
 **Disclosures that bind this stage (carried review findings).** (1) *Process-global telemetry (M1):* the pinned Mistral
 SDK's own key-carrying trace exporter is switched off for a native call, but a process-global OpenTelemetry tracer

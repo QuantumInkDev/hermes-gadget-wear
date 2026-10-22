@@ -1083,6 +1083,18 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   without ffmpeg must install that normal Hermes runtime prerequisite for full Edge speech; V1-P tests full-range
   Edge and the missing-joiner outcome, V3/user setup must expose the prerequisite, and the final rollout verifies it
   on each supported box. Unsupported hosts are not claimed to pass.
+* **Auxiliary native audio: format boundary and prerequisites (AUX-audio, source only).** The native STT ingress packages a private **WAV**
+  (§8.1); the standalone core seam accepts any path whose suffix the stock pipeline supports, but a native call does **not** offer Silk: `.silk`
+  is refused as an unsupported format (`unavailable`/`not_started`) before any lazy install, `pilk` import or in-process decode, while stock
+  Silk (QQ/WeChat) is unchanged. Cloud STT preparation (duration probe, silence trim, CAF conversion, full-recording compaction) runs only as
+  launcher-wrapped, bounded children; the optional probe and trim are skipped (no refusal, the full recording is uploaded) on a host without a
+  qualified launcher or the tool, and an unknown duration is left to the vendor in the one counted request. A recording whose full compaction
+  still needs several requests is refused before any piece or send (reachable from the standalone seam, not from the 60 s capture ingress); it is
+  `failed`/`not_started` after the compaction ran and `unavailable`/`not_started` when the capability is absent, and the installed cached-local
+  fallback stays available as for any ordinary failure. Native Gemini needs the qualified launcher and a working ffmpeg, proved by a converter
+  preflight before the first request (single chunk included), and never writes a WAV under an `.mp3` name. Costs: unqualified or tool-less hosts
+  lose the optional trim/measurement (STT) or Gemini speech (`unavailable`/`not_started`); a standalone CAF expanding beyond the 64 MiB
+  preparation bound is refused terminally. Not evidence of any installation, decoder, launcher, `afconvert` or runtime behaviour.
 * Voice output is listed only with the complete seam (TTS **and** display read): there is no reduced
   live-only mode that would narrow approved deliberate playback.
 * Hub: PROPOSED `DeviceSession.send_binary(data, *, authorize=None)` mirroring `send_json`; channel-5 routing in
