@@ -57,8 +57,8 @@ admission route; `NativeAdmissionOptions` stays TEXT-only; ordinary voice/STT/TT
   failure (never an install, never a model download, never a user command, never another cloud provider).
 * `synthesize_native_once(text, *, output_dir, authorize, before_send, deadline_s)` — the profile's
   configured voice, one request per core chunk, stop at the first failed chunk, audio only inside
-  the caller-owned directory and streamed under a byte cap; a multi-chunk call is refused unsent when the
-  join tool is missing. The 60 s request timeout is **new policy**, not a fact about the ElevenLabs client
+  the caller-owned directory and streamed under a byte cap; a multi-chunk call proves a real concat under the qualified launcher
+  before its first chunk and is refused unsent when that join is missing, broken or unqualified (Task4, below). The 60 s request timeout is **new policy**, not a fact about the ElevenLabs client
   (lock-pinned 1.59.0 measured: no retry, 60 s client timeout, without it).
 * `speakable_text(text)` — the reviewed spoken-text normalization of `text_to_speech_tool`, uncapped.
 * `SessionAuthority.locate_native_display`, `read_native_display`, `check_native_display` and the
@@ -79,7 +79,7 @@ STT failure of that kind runs no local fallback); only failures before the invoc
 `unavailable`/`not_started`. The consumer's `authorize`/`before_send` are fenced on the owning loop against close, cancellation and the deadline.
 
 **Edge bound.** A native Edge chunk is at most 600 code points (one gated handshake); a full or multi-chunk range
-needs the usable ffmpeg joiner and is `unavailable`/`not_started` before any send without it. **Token scope.** The
+needs the proved, launcher-wrapped ffmpeg joiner (Task4 below) and is `unavailable`/`not_started` before any handshake without it; a text of 600 code points or fewer is one chunk, needs no joiner and is never truncated. **Token scope.** The
 display token proves membership, physical row and content revision, not universal visibility: extending it with
 `display_kind` and the compressed-summary scalar is a mandatory prerequisite before any V3 consumer relies on it.
 
@@ -136,9 +136,39 @@ num2words 0.5.14; an installed resemble-perth must be 1.0.1): missing is `not_in
 `unsupported_version`. NeuTTS 1.4.1's own metadata pins transformers 5.1.0 against the supported 5.17.0, so a NeuTTS
 install that satisfies both is not established. Before any engine, a tiny synthetic WAV→MP3 conversion must succeed
 under the same launcher (a missing or broken ffmpeg refuses unsent); each chunk's conversion is the same wrapped,
-Stop-aware, WAV-forced, file-only child bounded by the exact remaining deadline. A multi-chunk join still uses the shared
-stock joiner (Task4). A NeuTTS language is passed only for a local GGUF. The pre-existing faster-whisper local path is
+Stop-aware, WAV-forced, file-only child bounded by the exact remaining deadline. A multi-chunk join was still the shared
+stock joiner at this stage (closed by Task4, below). A NeuTTS language is passed only for a local GGUF. The pre-existing faster-whisper local path is
 unchanged: cached-only by source (`local_files_only`), not launcher-wrapped and not network-denial proof.
+
+**Native response/audio pipeline (V1-P Task4, source only).** *Response bounds.* Every native STT answer, success or
+error, is read under the seam's 1 MiB cap BEFORE the SDK or a JSON layer buffers it: OpenAI/Groq/DeepInfra through a response
+hook on the injected httpx client (it runs before httpx's eager read), xAI/ElevenLabs through a streamed `requests` call
+read from the raw urllib3 body 64 KiB at a time, undecoded. An advertised `Content-Length` over the cap is refused with zero
+body reads; an absent or false length stops at the crossing; the response is closed on every exit. The same hook now guards the
+OpenAI/ElevenLabs TTS clients (the chunk audio cap), the plugin transport and Mistral, and the REST TTS post checks the encoding.
+The bound is chunk-granular (kept data is at most the cap plus the one underlying read that crosses it): it is **not** an
+allocation-hard heap limit, and a declared length is only an early-rejection aid. *Identity is enforced, not assumed.* Native
+requests ask for `Accept-Encoding: identity` but a peer may ignore that, so any nonidentity `Content-Encoding` is refused on the
+headers before a decoder or parser sees the body. Compatibility cost: a peer that ignores identity is unusable as a bounded
+native response; its send is already counted, so the call is `failed_after_send` (never retried, replaced or accepted; the
+existing single installed-only STT fallback applies to it as to any failed answer). Stock calls and the Edge WebSocket audio
+are unchanged. *Usable join.* A multi-chunk call, remote or local, first runs a real concat on tiny synthetic files (a 0.1 s WAV
+to MP3, then that MP3 concatenated with itself) under the qualified launcher; a missing, present-but-broken (or concat-incapable)
+tool, or an unqualified host, is `unavailable`/`not_started` with zero chunk requests, engine children, Edge handshakes or
+`before_send` calls and nothing left behind. The probe is not a send or an engine launch. The real join is the same wrapped,
+Stop-aware child bounded by the exact remaining float deadline, local-file protocols only, a staged output renamed only after it
+is checked to be an MP3. A multi-chunk native call therefore needs a qualified launcher (on this release: Darwin 27.0.0 arm64);
+elsewhere it is unavailable, which is the stated cost of not joining outside the launcher. *Managed whisper.cpp.* A non-WAV
+input is normalized by the real ffmpeg under the same launcher with Stop, the exact deadline, capped streams and a capped,
+checked WAV (missing converter: unavailable; a converter that ran and failed or left no WAV: `failed`); already-native formats need
+no converter, the model/language rules, cached-hash verification and the no-download/no-PATH-whisper rules are unchanged.
+*Failure map.* A Stop or deadline refusal that a probe, join or normalizer notices before the outer fence stays
+`timeout`/`cancelled` and never becomes `unavailable`; a failed spawn is not a launch (`unavailable`/`not_started`). The Mistral
+client supplies an inert async client, so the SDK's own unused one is never created or finalized on a loop. Not claimed: any
+real engine, host sandbox, live Edge/provider, current-profile, global-telemetry or usable-parity result; the NeuTTS runtime
+conflict, legacy faster-whisper isolation, detached `setsid` descendants and the roughly 4 s refusal-reader join of the shared
+runner remain open. The cloud pre-upload silence trim and the stock ffprobe duration probe of native cloud STT still run
+unwrapped ffmpeg/ffprobe (not part of this stage's scope; recorded for the controller).
 
 **Disclosures that bind this stage (carried review findings).** (1) *Process-global telemetry (M1):* the pinned Mistral
 SDK's own key-carrying trace exporter is switched off for a native call, but a process-global OpenTelemetry tracer
@@ -183,8 +213,9 @@ allocation-hard cap. The stock generators run unchanged: voice, model, language,
 request options are the profile's. A failure before the gate (no key, a bad region, a composed Gemini prompt over the
 provider limit) is `unavailable`/`not_started`; once the request passed the gate, a failure (HTTP 4xx/5xx, timeout, redirect,
 truncated, malformed, empty or oversize answer, a conversion error after a paid answer) is `failed_after_send` with exactly
-one send; the first failed chunk stops the call and every file is removed. The REST multi-chunk tests join the chunk files with a byte-wise stand-in: the real per-chunk Gemini PCM-to-mp3
-conversion is proved, the real ffmpeg join of REST chunks is not (it belongs to the Edge/joiner gate). "Zero hidden retries" at the
+one send; the first failed chunk stops the call and every file is removed. The routing/accounting REST multi-chunk tests join with a labelled byte-wise stand-in; the real per-chunk Gemini PCM-to-mp3
+conversion AND the real launcher-wrapped ffmpeg join of real REST chunks (valid MP3, summed length, tones in chunk order) are
+proved separately (Task4, below). "Zero hidden retries" at the
 HTTP-adapter level rests on the `requests` library default (`max_retries=0`), because the test transport replaces the adapter;
 redirects and second sends in one session are tested behaviourally. An answer that is empty audio keeps the existing
 `failed`/`completed` accounting. There is no hidden retry, no second request and no other provider.
