@@ -19,8 +19,7 @@ internal object RelayVectors {
         val request: JsonObject,
         val response: JsonObject,
         val wireBytes: Int,
-        val test: String,
-        val discrepancy: String?
+        val test: String
     ) {
         val method: String get() = request["method"]!!.jsonPrimitive.content
         val params: JsonObject get() = request["params"]!!.jsonObject
@@ -60,8 +59,7 @@ internal object RelayVectors {
             case["request"]!!.jsonObject,
             case["response"]!!.jsonObject,
             case["wire_bytes"]!!.jsonPrimitive.int,
-            case["source"]!!.jsonObject["test"]!!.jsonPrimitive.content,
-            case["contract_discrepancy"]?.jsonPrimitive?.content
+            case["source"]!!.jsonObject["test"]!!.jsonPrimitive.content
         )
     }
 

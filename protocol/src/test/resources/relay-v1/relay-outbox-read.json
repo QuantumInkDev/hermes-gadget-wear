@@ -369,7 +369,6 @@
   },
   {
    "class_population": 1,
-   "contract_discrepancy": "fixture-artifact: direct Outbox.put with non-UUID ids; strict contract client refuses",
    "id": "relay-outbox-read/ok-09",
    "kind": "captured",
    "outcome": "ok",

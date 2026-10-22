@@ -16,7 +16,7 @@ class RelaySchemaInvariantTest {
         method: RelayMethod,
         pick: (RelayVectors.Case) -> Boolean = { true }
     ): JsonObject = RelayVectors.forMethod(method).first {
-        it.isSuccess && it.discrepancy == null && pick(it)
+        it.isSuccess && pick(it)
     }.result
 
     private fun decodes(method: RelayMethod, result: JsonObject): Boolean = try {

@@ -26,9 +26,9 @@ Every case carries `source.test` (a test id in the accepted SDK, or in the gap t
 * Captured with the accepted wrapper, one worker, no retries, warnings as errors, in isolated clones with a synthetic
   home, no network and no provider. Command shape:
   `scripts/run_tests.sh -j 1 --file-retries 0 -W error -q -rA -p native_relay_recorder <test files>`.
-* `contract_discrepancy` marks a real fixture frame that a strict contract client refuses (a direct `Outbox.put` in an
-  accepted test uses the non-UUID ids `stock-chat` / `stock-final`; production capture derives UUIDs). The Kotlin tests
-  require those to decode as invalid, never as success.
+* O5 final-text frames keep `conversation_id` / `event_id` / `message_id` as exact opaque text: the accepted `Outbox.put` stores any
+  non-empty UTF-8 string (<= 128 / 256 / 36 bytes) and a compat test asserts the real adapter delivers `stock-chat` / `stock-final`.
+  Those recorded frames are ordinary successes and round-trip exactly. Task-change copies keep canonical UUIDs.
 * No real capture exists for `profile_changed`; the Kotlin tests classify it from the SDK source and label it constructed.
 * This proves the codec/DTO layer against recorded server behaviour only. No device, emulator, live host, provider or
   native acceptance is implied.

@@ -130,3 +130,52 @@ value class ProfileId private constructor(val value: String) {
     }
     override fun toString(): String = "ProfileId($value)"
 }
+
+/*
+ * O5 FINAL-TEXT identifiers are NOT canonical UUIDs by contract. The accepted `Outbox.put` stores any non-empty
+ * UTF-8 string of at most 256 bytes (event), 128 bytes (conversation) and 36 bytes (optional message id), and
+ * `Outbox.read` returns them untouched; an accepted test asserts the real adapter delivers `stock-chat` /
+ * `stock-final`. (Production capture happens to derive UUIDv5 values; that does not narrow the wire.) These
+ * types therefore carry the exact text: no trimming, case folding, normalization or parsing, equality by exact
+ * value, a distinct type per role, and no conversion to the canonical-UUID types that scope task-change copies,
+ * bindings and conversations.
+ */
+@JvmInline
+value class OpaqueConversationRef private constructor(val value: String) {
+    companion object {
+        const val MAX_BYTES = 128
+
+        fun of(value: String): OpaqueConversationRef? =
+            value.takeIf { validText(it, MAX_BYTES) }?.let(::OpaqueConversationRef)
+    }
+
+    override fun toString(): String = "OpaqueConversationRef(redacted)"
+}
+
+@JvmInline
+value class OpaqueEventRef private constructor(val value: String) {
+    companion object {
+        const val MAX_BYTES = 256
+
+        fun of(value: String): OpaqueEventRef? =
+            value.takeIf { validText(it, MAX_BYTES) }?.let(::OpaqueEventRef)
+    }
+
+    override fun toString(): String = "OpaqueEventRef(redacted)"
+}
+
+/** The optional `message_id` of a shared-conversation final: at most 36 bytes, otherwise opaque. */
+@JvmInline
+value class OpaqueMessageRef private constructor(val value: String) {
+    /** The same text as a canonical [MessageId] only when it already is one, exactly; never normalized. */
+    val asCanonicalOrNull: MessageId? get() = MessageId.of(value)
+
+    companion object {
+        const val MAX_BYTES = 36
+
+        fun of(value: String): OpaqueMessageRef? =
+            value.takeIf { validText(it, MAX_BYTES) }?.let(::OpaqueMessageRef)
+    }
+
+    override fun toString(): String = "OpaqueMessageRef(redacted)"
+}

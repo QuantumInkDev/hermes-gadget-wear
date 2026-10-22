@@ -19,7 +19,7 @@ import org.junit.Test
 class RelayActionFreeCopiesTest {
     private val recovered: List<OutboxItem> = RelayVectors.forMethod(RelayMethod.OUTBOX_READ)
         .filter {
-            it.isSuccess && it.discrepancy == null
+            it.isSuccess
         }.flatMap { OutboxPage.decode(it.result).items }
 
     private fun decodeItem(item: JsonObject): RelayOutcome<Any> {
@@ -52,8 +52,7 @@ class RelayActionFreeCopiesTest {
 
     private fun taskChangeItem(): JsonObject =
         RelayVectors.forMethod(RelayMethod.OUTBOX_READ).filter {
-            it.isSuccess &&
-                it.discrepancy == null
+            it.isSuccess
         }
             .flatMap { (it.result["items"] as JsonArray).map { item -> item as JsonObject } }
             .first {
@@ -162,8 +161,7 @@ class RelayActionFreeCopiesTest {
         val finals = recovered.map { it.payload }.filterIsInstance<OutboxPayload.FinalText>()
         assertTrue(finals.isNotEmpty())
         val item = RelayVectors.forMethod(RelayMethod.OUTBOX_READ).filter {
-            it.isSuccess &&
-                it.discrepancy == null
+            it.isSuccess
         }
             .flatMap { (it.result["items"] as JsonArray).map { entry -> entry as JsonObject } }
             .first {
@@ -291,8 +289,7 @@ class RelayActionFreeCopiesTest {
             }
         )
         val base = RelayVectors.forMethod(RelayMethod.OUTBOX_READ).filter {
-            it.isSuccess &&
-                it.discrepancy == null
+            it.isSuccess
         }
             .flatMap { (it.result["items"] as JsonArray).map { item -> item as JsonObject } }
             .first {
@@ -327,8 +324,7 @@ class RelayActionFreeCopiesTest {
 
     @Test fun aWantedInputCopyStillRefusesAPromptThatBelongsToItsOwnTask() {
         val item = RelayVectors.forMethod(RelayMethod.OUTBOX_READ).filter {
-            it.isSuccess &&
-                it.discrepancy == null
+            it.isSuccess
         }
             .flatMap { (it.result["items"] as JsonArray).map { entry -> entry as JsonObject } }
             .first { entry ->

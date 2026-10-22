@@ -112,7 +112,7 @@
    "cases": 17,
    "file": "relay-outbox-read.json",
    "method": "relay.outbox.read",
-   "sha256": "def43dea156f7aea0563b406439738037550b187960076d4d19241557b729a90"
+   "sha256": "5177ecfca5d9991d09aa52694c72e8ff8c91237e7e944ca55d68d7233ec4ca73"
   },
   {
    "cases": 14,

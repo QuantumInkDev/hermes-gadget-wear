@@ -28,6 +28,14 @@ class RelayDtoMutationTest {
         "execution_state", "mutation_outcome", "metadata_state"
     )
 
+    private fun isOpaqueFinalTextMember(node: JsonObject, key: String): Boolean {
+        val payload = node["payload"] as? JsonObject
+        val itemKind = (payload?.get("kind") as? JsonPrimitive)?.content
+        val ownKind = (node["kind"] as? JsonPrimitive)?.content
+        return (itemKind == "final_text" && key in setOf("conversation_id", "event_id")) ||
+            (ownKind == "final_text" && key == "message_id")
+    }
+
     private data class Mutation(
         val description: String,
         val result: JsonObject,
@@ -95,7 +103,11 @@ class RelayDtoMutationTest {
                         if (value is JsonPrimitive && value.isString && key.endsWith("_id") &&
                             "provenance" !in path
                         ) {
-                            out.add(Mutation("$here -id", swap(JsonPrimitive("NOT-A-UUID")), false))
+                            // Opaque by contract only inside a final-text copy: see RelayOpaqueFinalTextTest.
+                            val opaque = isOpaqueFinalTextMember(node, key)
+                            out.add(
+                                Mutation("$here -id", swap(JsonPrimitive("NOT-A-UUID")), opaque)
+                            )
                         }
                         walk(value, here) { replacement -> swap(replacement) }
                     }
@@ -116,7 +128,7 @@ class RelayDtoMutationTest {
         var executed = 0
         var stayedValid = 0
         val methodsSeen = mutableSetOf<RelayMethod>()
-        for (case in RelayVectors.all.filter { it.isSuccess && it.discrepancy == null }) {
+        for (case in RelayVectors.all.filter { it.isSuccess }) {
             val method = RelayMethod.fromWire(case.method) ?: continue
             methodsSeen += method
             assertTrue(

@@ -34,7 +34,7 @@ class RelayVectorGoldenTest {
 
     @Test fun everyCapturedSuccessDecodesToItsTypedDtoAndEncodesBackExactly() {
         var checked = 0
-        for (case in cases.filter { it.isSuccess && it.discrepancy == null }) {
+        for (case in cases.filter { it.isSuccess }) {
             val method = RelayMethod.fromWire(case.method) ?: continue
             val frame = RelayEnvelope.decodeFrame(case.wireText)
             assertTrue("${case.id}: $frame", frame is RelayFrame.Result)
@@ -51,24 +51,19 @@ class RelayVectorGoldenTest {
         assertTrue(checked >= 110)
     }
 
-    @Test fun fixtureArtifactsThatBreakTheIdContractAreRefusedNeverDecodedAsSuccess() {
-        val odd = cases.filter { it.discrepancy != null }
-        assertTrue(odd.isNotEmpty())
-        for (case in odd) {
-            val call =
-                RelayCall(
-                    RelayMethod.OUTBOX_READ,
-                    JsonObject(emptyMap()),
-                    RelayCalls.resultDecoder(RelayMethod.OUTBOX_READ)
-                )
-            val outcome = call.interpret(
-                CorrelationId.of(case.responseId!!)!!,
-                RelayEnvelope.decodeFrame(case.wireText)
-            )
-            assertTrue(
-                "${case.id}: $outcome",
-                outcome is RelayOutcome.Invalid && outcome.problem == RelayProblem.INVALID_RESULT
-            )
+    @Test fun theRecordedStockFinalTextWithOpaqueIdsIsASuccessAndRoundTripsExactly() {
+        val stock = cases.filter { it.method == RelayMethod.OUTBOX_READ.wire && it.isSuccess }
+            .filter { "stock-chat" in it.result.toString() }
+        assertTrue(stock.isNotEmpty())
+        for (case in stock) {
+            val page = OutboxPage.decode(case.result)
+            assertEquals(case.id, case.result, page.toWire())
+            val item = page.items.single {
+                it.payload is OutboxPayload.FinalText
+            } as OutboxItem.Final
+            assertEquals("stock-chat", item.conversationRef.value)
+            assertEquals("stock-final", item.eventRef.value)
+            assertEquals("stock-final", item.eventKey)
         }
     }
 
@@ -146,13 +141,12 @@ class RelayVectorGoldenTest {
 
     @Test fun capturedO5CopiesCoverBothPayloadKindsBothOriginsAndBothReferences() {
         val items = RelayVectors.forMethod(RelayMethod.OUTBOX_READ).filter {
-            it.isSuccess &&
-                it.discrepancy == null
+            it.isSuccess
         }
             .flatMap { OutboxPage.decode(it.result).items }
         val finals = items.map { it.payload }.filterIsInstance<OutboxPayload.FinalText>()
-        assertTrue(finals.any { it.messageId == null })
-        assertTrue(finals.any { it.messageId != null })
+        assertTrue(finals.any { it.messageRef == null })
+        assertTrue(finals.any { it.messageRef != null })
         val changes = items.map { it.payload }.filterIsInstance<OutboxPayload.TaskChange>()
         for (origin in TaskOrigin.entries) {
             for (reference in OutboxReference.entries) {
@@ -172,8 +166,7 @@ class RelayVectorGoldenTest {
             states.containsAll(setOf(TaskState.WORKING, TaskState.NEEDS_INPUT, TaskState.FINISHED))
         )
         val gaps = RelayVectors.forMethod(RelayMethod.OUTBOX_READ).filter {
-            it.isSuccess &&
-                it.discrepancy == null
+            it.isSuccess
         }
             .map { it.result["gap_generation"]!!.jsonPrimitive.int }
         assertTrue(gaps.any { it == 0 } && gaps.any { it > 0 } && gaps.any { it >= 2 })

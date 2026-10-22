@@ -17,8 +17,11 @@ sealed interface DisplayOnlyCopy {
 }
 
 sealed interface OutboxPayload : DisplayOnlyCopy {
-    /** Final assistant text (a stock final, or a shared-conversation final carrying its canonical [messageId]). */
-    data class FinalText(val text: String, val messageId: MessageId?) : OutboxPayload {
+    /**
+     * Final assistant text (a stock final, or a shared-conversation final carrying its [messageRef]). The message
+     * reference is opaque text of at most 36 bytes exactly as the server stored it.
+     */
+    data class FinalText(val text: String, val messageRef: OpaqueMessageRef?) : OutboxPayload {
         init {
             require(validText(text, RelayLimits.OUTBOX_TEXT_BYTES))
         }
@@ -32,7 +35,7 @@ sealed interface OutboxPayload : DisplayOnlyCopy {
                 "kind" to JsonPrimitive(kind.wire),
                 "text" to JsonPrimitive(text)
             )
-            messageId?.let { members["message_id"] = JsonPrimitive(it.value) }
+            messageRef?.let { members["message_id"] = JsonPrimitive(it.value) }
             return JsonObject(members)
         }
     }
@@ -71,19 +74,67 @@ private fun taskChangeWire(change: OutboxPayload.TaskChange, task: JsonObject): 
         "reference" to JsonPrimitive(change.reference.wire)
     )
 
-class OutboxItem(
-    val deliveryId: DeliveryId,
-    val conversationId: ConversationId,
-    val eventId: EventId,
-    val createdAtMs: Long,
-    val expiresAtMs: Long,
-    val payload: OutboxPayload
-) {
+/**
+ * One O5 delivery. The delivery id is always a server-issued canonical UUID. The conversation/event identifiers
+ * depend on the payload: a final-text copy keeps them as exact opaque text ([Final]); a task-change copy requires
+ * canonical UUIDs because the source validates and scopes them ([Change]).
+ */
+sealed class OutboxItem(val deliveryId: DeliveryId, val createdAtMs: Long, val expiresAtMs: Long) {
+    abstract val payload: OutboxPayload
+
+    /** The server's dedup key (`event_id`) as exact text: equal only when byte-for-byte equal. */
+    abstract val eventKey: String
+
     init {
         require(createdAtMs >= 0 && expiresAtMs >= 0)
-        val task = (payload as? OutboxPayload.TaskChange.Relay)?.task?.conversationId
-            ?: (payload as? OutboxPayload.TaskChange.Existing)?.task?.conversationId
-        require(task == null || task == conversationId)
+    }
+
+    abstract fun toWire(): JsonObject
+
+    class Final(
+        deliveryId: DeliveryId,
+        val conversationRef: OpaqueConversationRef,
+        val eventRef: OpaqueEventRef,
+        createdAtMs: Long,
+        expiresAtMs: Long,
+        override val payload: OutboxPayload.FinalText
+    ) : OutboxItem(deliveryId, createdAtMs, expiresAtMs) {
+        override val eventKey: String get() = eventRef.value
+
+        override fun toWire(): JsonObject = wireObject(
+            "delivery_id" to JsonPrimitive(deliveryId.value),
+            "conversation_id" to JsonPrimitive(conversationRef.value),
+            "event_id" to JsonPrimitive(eventRef.value),
+            "created_at_ms" to JsonPrimitive(createdAtMs),
+            "expires_at_ms" to JsonPrimitive(expiresAtMs),
+            "payload" to payload.toWire()
+        )
+    }
+
+    class Change(
+        deliveryId: DeliveryId,
+        val conversationId: ConversationId,
+        val eventId: EventId,
+        createdAtMs: Long,
+        expiresAtMs: Long,
+        override val payload: OutboxPayload.TaskChange
+    ) : OutboxItem(deliveryId, createdAtMs, expiresAtMs) {
+        init {
+            val task = (payload as? OutboxPayload.TaskChange.Relay)?.task?.conversationId
+                ?: (payload as? OutboxPayload.TaskChange.Existing)?.task?.conversationId
+            require(task == null || task == conversationId)
+        }
+
+        override val eventKey: String get() = eventId.value
+
+        override fun toWire(): JsonObject = wireObject(
+            "delivery_id" to JsonPrimitive(deliveryId.value),
+            "conversation_id" to JsonPrimitive(conversationId.value),
+            "event_id" to JsonPrimitive(eventId.value),
+            "created_at_ms" to JsonPrimitive(createdAtMs),
+            "expires_at_ms" to JsonPrimitive(expiresAtMs),
+            "payload" to payload.toWire()
+        )
     }
 
     override fun equals(other: Any?): Boolean = other is OutboxItem && toWire() == other.toWire()
@@ -92,15 +143,6 @@ class OutboxItem(
 
     override fun toString(): String =
         "OutboxItem(delivery=${deliveryId.value}, kind=${payload.kind.wire})"
-
-    fun toWire(): JsonObject = wireObject(
-        "delivery_id" to JsonPrimitive(deliveryId.value),
-        "conversation_id" to JsonPrimitive(conversationId.value),
-        "event_id" to JsonPrimitive(eventId.value),
-        "created_at_ms" to JsonPrimitive(createdAtMs),
-        "expires_at_ms" to JsonPrimitive(expiresAtMs),
-        "payload" to payload.toWire()
-    )
 
     internal companion object {
         val KEYS =
@@ -116,20 +158,36 @@ class OutboxItem(
         fun decode(reader: FieldReader): OutboxItem {
             val body = reader.rawObject("payload")
             val kind = (body["kind"] as? JsonPrimitive)?.takeIf { it.isString }?.content
-            val payload = when (kind) {
+            val delivery = reader.id("delivery_id", DeliveryId::of)
+            val created = reader.long("created_at_ms")
+            val expires = reader.long("expires_at_ms")
+            return when (kind) {
                 OutboxPayloadKind.FINAL_TEXT.wire -> {
                     val fields = reader.obj("payload", setOf("kind", "text"), setOf("message_id"))
-                    guarded(fields, "final_text") {
+                    val payload = guarded(fields, "final_text") {
                         OutboxPayload.FinalText(
                             fields.string("text", RelayLimits.OUTBOX_TEXT_BYTES),
-                            if (fields.has(
-                                    "message_id"
+                            if (fields.has("message_id")) {
+                                OpaqueMessageRef.of(
+                                    fields.string("message_id", OpaqueMessageRef.MAX_BYTES)
                                 )
-                            ) {
-                                fields.id("message_id", MessageId::of)
                             } else {
                                 null
                             }
+                        )
+                    }
+                    guarded(reader, "outbox.item") {
+                        Final(
+                            delivery,
+                            OpaqueConversationRef.of(
+                                reader.string("conversation_id", OpaqueConversationRef.MAX_BYTES)
+                            ) ?: reader.fail("conversation_id"),
+                            OpaqueEventRef.of(
+                                reader.string("event_id", OpaqueEventRef.MAX_BYTES)
+                            ) ?: reader.fail("event_id"),
+                            created,
+                            expires,
+                            payload
                         )
                     }
                 }
@@ -139,7 +197,7 @@ class OutboxItem(
                         "reference",
                         OutboxReference.entries.toTypedArray()
                     )
-                    when (fields.token("origin", TaskOrigin.entries.toTypedArray())) {
+                    val payload = when (fields.token("origin", TaskOrigin.entries.toTypedArray())) {
                         TaskOrigin.RELAY -> OutboxPayload.TaskChange.Relay(
                             Task.decode(fields.obj("task", Task.REQUIRED), null),
                             reference
@@ -149,18 +207,19 @@ class OutboxItem(
                             reference
                         )
                     }
+                    // Task-change copies are validated by the source as canonical UUIDs and scoped by them.
+                    guarded(reader, "outbox.item") {
+                        Change(
+                            delivery,
+                            reader.id("conversation_id", ConversationId::of),
+                            reader.id("event_id", EventId::of),
+                            created,
+                            expires,
+                            payload
+                        )
+                    }
                 }
                 else -> reader.fail("payload")
-            }
-            return guarded(reader, "outbox.item") {
-                OutboxItem(
-                    reader.id("delivery_id", DeliveryId::of),
-                    reader.id("conversation_id", ConversationId::of),
-                    reader.id("event_id", EventId::of),
-                    reader.long("created_at_ms"),
-                    reader.long("expires_at_ms"),
-                    payload
-                )
             }
         }
     }

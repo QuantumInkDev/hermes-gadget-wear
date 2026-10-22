@@ -51,7 +51,6 @@ class RelayOwnershipAndRedactionTest {
     private val outbox = OutboxPage.decode(
         RelayVectors.forMethod(RelayMethod.OUTBOX_READ).first {
             it.isSuccess &&
-                it.discrepancy == null &&
                 it.result["items"].toString().length > 10
         }.result
     )
