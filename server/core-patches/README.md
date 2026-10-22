@@ -140,24 +140,32 @@ Stop-aware, WAV-forced, file-only child bounded by the exact remaining deadline.
 stock joiner at this stage (closed by Task4, below). A NeuTTS language is passed only for a local GGUF. The pre-existing faster-whisper local path is
 unchanged: cached-only by source (`local_files_only`), not launcher-wrapped and not network-denial proof.
 
-**Native response/audio pipeline (V1-P Task4, source only).** *Response bounds.* Every native STT answer, success or
+**Native response/audio pipeline (V1-P Task4 + fix round 1, source only).** *Response bounds.* Every native STT answer, success or
 error, is read under the seam's 1 MiB cap BEFORE the SDK or a JSON layer buffers it: OpenAI/Groq/DeepInfra through a response
 hook on the injected httpx client (it runs before httpx's eager read), xAI/ElevenLabs through a streamed `requests` call
-read from the raw urllib3 body 64 KiB at a time, undecoded. An advertised `Content-Length` over the cap is refused with zero
+read from the raw urllib3 body 64 KiB at a time, undecoded, in a Requests RESPONSE HOOK: Requests dispatches it before its own
+redirect step, which would otherwise read and decode a 3xx-with-`Location` body whole even with `allow_redirects=False`. An advertised `Content-Length` over the cap is refused with zero
 body reads; an absent or false length stops at the crossing; the response is closed on every exit. The same hook now guards the
 OpenAI/ElevenLabs TTS clients (the chunk audio cap), the plugin transport and Mistral, and the REST TTS post checks the encoding.
 The bound is chunk-granular (kept data is at most the cap plus the one underlying read that crosses it): it is **not** an
-allocation-hard heap limit, and a declared length is only an early-rejection aid. *Identity is enforced, not assumed.* Native
+allocation-hard heap limit, and a declared length is only an early-rejection aid. Stop and the deadline are checked between
+reads (no callback, no send); a vendor read that is already blocked in the stream or socket is NOT preempted - it ends when the
+peer sends or at the client's IO timeout, after which the reader stops at the next chunk and produces nothing. No immediate
+socket teardown is claimed. *Identity is enforced, not assumed.* Native
 requests ask for `Accept-Encoding: identity` but a peer may ignore that, so any nonidentity `Content-Encoding` is refused on the
 headers before a decoder or parser sees the body. Compatibility cost: a peer that ignores identity is unusable as a bounded
-native response; its send is already counted, so the call is `failed_after_send` (never retried, replaced or accepted; the
-existing single installed-only STT fallback applies to it as to any failed answer). Stock calls and the Edge WebSocket audio
+native response; its send is already counted, so the call is `failed_after_send` with source `None` (never retried, replaced or
+accepted). For STT this and a response that crossed the bound are **terminal**: the installed-only local fallback is NOT run
+even when available, whereas an ordinary known gated failure (a 5xx after a counted send) keeps the single documented fallback. Stock calls and the Edge WebSocket audio
 are unchanged. *Usable join.* A multi-chunk call, remote or local, first runs a real concat on tiny synthetic files (a 0.1 s WAV
 to MP3, then that MP3 concatenated with itself) under the qualified launcher; a missing, present-but-broken (or concat-incapable)
 tool, or an unqualified host, is `unavailable`/`not_started` with zero chunk requests, engine children, Edge handshakes or
 `before_send` calls and nothing left behind. The probe is not a send or an engine launch. The real join is the same wrapped,
-Stop-aware child bounded by the exact remaining float deadline, local-file protocols only, a staged output renamed only after it
-is checked to be an MP3. A multi-chunk native call therefore needs a qualified launcher (on this release: Darwin 27.0.0 arm64);
+Stop-aware child bounded by the exact remaining float deadline (no artificial minimum: once nothing remains no child starts and
+the call is a `timeout`), local-file protocols only, a staged output under a size watch that ends the child, renamed only after it
+is checked to be a usable join (MP3 head and a size within a small per-extra-input tag allowance of the inputs' sum, so a join
+that kept only the first input is refused); the caller's output directory is checked for eligibility before any payment, and a
+join problem after payment is `failed`, never `unavailable`. A multi-chunk native call therefore needs a qualified launcher (on this release: Darwin 27.0.0 arm64);
 elsewhere it is unavailable, which is the stated cost of not joining outside the launcher. *Managed whisper.cpp.* A non-WAV
 input is normalized by the real ffmpeg under the same launcher with Stop, the exact deadline, capped streams and a capped,
 checked WAV (missing converter: unavailable; a converter that ran and failed or left no WAV: `failed`); already-native formats need
@@ -167,8 +175,11 @@ no converter, the model/language rules, cached-hash verification and the no-down
 client supplies an inert async client, so the SDK's own unused one is never created or finalized on a loop. Not claimed: any
 real engine, host sandbox, live Edge/provider, current-profile, global-telemetry or usable-parity result; the NeuTTS runtime
 conflict, legacy faster-whisper isolation, detached `setsid` descendants and the roughly 4 s refusal-reader join of the shared
-runner remain open. The cloud pre-upload silence trim and the stock ffprobe duration probe of native cloud STT still run
-unwrapped ffmpeg/ffprobe (not part of this stage's scope; recorded for the controller).
+runner remain open. Unchanged native-conversion residuals (separate required serial follow-up, NOT waived): the native cloud STT silence trim runs
+the stock unwrapped ffmpeg/ffprobe, and its duration probe (`_probe_audio_duration`, ffprobe) runs BEFORE the 12 s gate, so
+short recordings reach the unwrapped probe too when trimming is enabled (the default) and ffmpeg exists; the oversize-splitting
+path (`transcription_chunking`) probes duration for duration-limited models even when trimming is disabled; CAF conversion and
+the splitter's ffmpeg children are unwrapped; and the Gemini PCM-to-MP3 conversion is the stock unwrapped call.
 
 **Disclosures that bind this stage (carried review findings).** (1) *Process-global telemetry (M1):* the pinned Mistral
 SDK's own key-carrying trace exporter is switched off for a native call, but a process-global OpenTelemetry tracer
@@ -179,11 +190,12 @@ integration gate inspects the enabled plugins and the actual tracer-provider typ
 back whatever was assigned); the proof is the SDK's own `getattr` of the switch plus the behavioural exporter test, which
 must run on any SDK change. (3) *Stock `stt.prompt` (M9):* the pinned SDK's transcription endpoint has no `prompt`
 parameter, so the ordinary (non-native) Mistral STT path, which forwards a configured `stt.prompt`, fails with an error
-result; this stock defect is not changed here, and a native call refuses such a profile UNSENT. (4) *Bound scope (M9):* the
-1 MiB `MAX_STT_RESPONSE_BYTES` answer bound is enforced by the Mistral STT hook only; the OpenAI-SDK and REST STT answers are
-not bounded by it, which belongs to their own integration boundaries. (5) *Allocation (M5):* the Mistral wire bound is checked
-per decoded chunk, so it is not an allocation-hard cap (a compressed answer can transiently exceed it by one chunk's
-inflation); native Mistral and REST requests therefore ask for `Accept-Encoding: identity`. (6) *Logs (M3):* the native
+result; this stock defect is not changed here, and a native call refuses such a profile UNSENT. (4) *Bound scope (M9, superseded by Task4):*
+the 1 MiB `MAX_STT_RESPONSE_BYTES` answer bound now covers every native STT backend (OpenAI/Groq/DeepInfra and Mistral through an
+httpx response hook, xAI/ElevenLabs through a Requests response hook), see the Task4 paragraph. (5) *Allocation (M5, superseded
+by Task4):* the bounds are chunk-granular (the cap plus the one underlying read that crosses it), not an allocation-hard cap. A
+nonidentity `Content-Encoding` is no longer merely discouraged by a request header: it is refused on the headers before any
+decoder or parser, so there is no decoded inflation to bound. (6) *Logs (M3):* the native
 quiet filter now also names the credential-pool and Mistral SDK hook loggers, so their provider-controlled text (an OAuth
 refresh failure body, the deprecation date) is not logged during a native call. A dropped record is dropped for every
 handler: during a native call it is available in no local log either. Ordinary calls keep logging exactly as before.

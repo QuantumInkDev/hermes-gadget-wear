@@ -1,9 +1,9 @@
 diff --git a/agent/native_once.py b/agent/native_once.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..1473f216dcc5229fcb1f25864d2e86897e22d780
+index 0000000000000000000000000000000000000000..908f556bfc8d126e0d242946b07385d3b868a8dd
 --- /dev/null
 +++ b/agent/native_once.py
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,89 @@
 +"""Native-once v1: the opt-in contract between the native (Relay) voice seam and a plugin STT/TTS provider.
 +
 +A plugin opts in by overriding :meth:`agent.transcription_provider.TranscriptionProvider.transcribe_native_once_v1`
@@ -75,8 +75,10 @@ index 0000000000000000000000000000000000000000..1473f216dcc5229fcb1f25864d2e8689
 +@dataclass(frozen=True, slots=True)
 +class NativeTransport:
 +    """Constructed only by the seam (``tools.native_send_policy.native_transport``), which owns and closes ``client``:
-+    zero automatic retries, redirects disabled, the call's timeout, and the policy's request (send gate) and response
-+    (decoded-size bound) hooks."""
++    zero automatic retries, redirects disabled, the call's timeout, the policy's request (send gate) hook and its response hook:
++    the client asks for ``Accept-Encoding: identity`` and the hook refuses any nonidentity ``Content-Encoding`` before the body
++    is read or decoded, refuses an advertised oversize body unread, and bounds the rest per underlying chunk (chunk-granular,
++    not an allocation-hard cap). A peer that answers compressed cannot be served natively: the call fails after its counted send."""
 +    client: httpx.Client
 +
 +
@@ -775,10 +777,10 @@ index 0000000000000000000000000000000000000000..168d53e853fbe0b8aff939269e09ee44
 +    return PROVIDER_COMPLETED if answered else PROVIDER_FAILED
 diff --git a/gateway/session_native_voice_stt.py b/gateway/session_native_voice_stt.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..d26eb28b3ef008748e4f80dd3eadd21544ab85a0
+index 0000000000000000000000000000000000000000..07a74e2487eda4f44f27f5f07a9a59840e94f0ae
 --- /dev/null
 +++ b/gateway/session_native_voice_stt.py
-@@ -0,0 +1,205 @@
+@@ -0,0 +1,208 @@
 +"""Configured-once speech-to-text for the native voice seam (see ``session_native_voice``).
 +
 +The profile's own STT configuration is read at call time through the stock resolvers, the audio is
@@ -806,10 +808,13 @@ index 0000000000000000000000000000000000000000..d26eb28b3ef008748e4f80dd3eadd215
 +STT_PROVIDERS = frozenset({'local', 'openai', 'groq', 'deepinfra', 'xai', 'elevenlabs', 'mistral'})
 +LOCAL_PROVIDERS = frozenset({'local', 'local_command'})  # no remote request: never a fallback to themselves
 +SOURCE_LABEL = 'relay'
-+# A recorded refusal that ends the call: never followed by the local fallback or any re-selection. ``unsupported_hook``:
++# A recorded refusal that ends the call: never followed by the local fallback or any re-selection. The response-safety
++# refusals ``unsupported_encoding`` (a nonidentity answer) and ``too_long`` (the answer crossed the response bound) are terminal
++# too: the sealed contract is that such a response is never substituted. That is the difference from an ORDINARY known gated
++# failure (e.g. a 5xx after a counted send), which keeps the single documented installed-only fallback. ``unsupported_hook``:
 +# the served profile has an ordinary ``pre_transcription`` callback, which has no native-once contract; the whole call
 +# is refused unsent instead of running it or silently dropping it (and the local fallback would bypass it too).
-+TERMINAL_REFUSALS = frozenset({'closed', 'timeout', 'refused', 'cancelled', 'unsupported_hook'})
++TERMINAL_REFUSALS = frozenset({'closed', 'timeout', 'refused', 'cancelled', 'unsupported_hook', 'unsupported_encoding', 'too_long'})
 +
 +
 +@dataclass
@@ -986,10 +991,10 @@ index 0000000000000000000000000000000000000000..d26eb28b3ef008748e4f80dd3eadd215
 +    return _make(configured_state, None, None, provider)
 diff --git a/gateway/session_native_voice_tts.py b/gateway/session_native_voice_tts.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..caffdab84e2834a7a725b9323cc7fdc49ef93016
+index 0000000000000000000000000000000000000000..47b8671b86898afcc80ab364baaaec60fe5bdbec
 --- /dev/null
 +++ b/gateway/session_native_voice_tts.py
-@@ -0,0 +1,323 @@
+@@ -0,0 +1,325 @@
 +"""Configured one-request-per-chunk text-to-speech for the native voice seam (``session_native_voice``).
 +
 +The profile's own TTS configuration (provider, voice, model) is read at call time through the stock
@@ -1148,8 +1153,9 @@ index 0000000000000000000000000000000000000000..caffdab84e2834a7a725b9323cc7fdc4
 +    if len(run.chunks) == 1:
 +        os.replace(run.chunks[0], final)
 +        return final
++    from gateway.session_native_voice import MAX_SPEECH_AUDIO_BYTES
 +    from tools.native_audio_pipeline import native_concat
-+    return native_concat(list(run.chunks), final, run.paths.append)
++    return native_concat(list(run.chunks), final, run.paths.append, limit=MAX_SPEECH_AUDIO_BYTES)
 +
 +
 +def _route(provider, config):
@@ -1227,9 +1233,10 @@ index 0000000000000000000000000000000000000000..caffdab84e2834a7a725b9323cc7fdc4
 +    if unready := _local_preflight(engine, config):
 +        return _Synth(unready)
 +    if len(chunks) > 1:
-+        # Never pay for (or run) chunks that cannot be joined: prove the REAL join first, for every route including local.
++        # Never pay for (or run) chunks that cannot be joined: prove the REAL join first, for every route including local,
++        # and that the caller's output directory can ever be listed by the join (deterministic, so refused before payment).
 +        from tools.native_audio_pipeline import native_concat_preflight
-+        native_concat_preflight()
++        native_concat_preflight(run.output_dir)
 +    failure = _synthesize_chunks(run, engine, config, chunks)
 +    if failure:
 +        return _Synth(failure, code_points=code_points)
@@ -1274,7 +1281,7 @@ index 0000000000000000000000000000000000000000..caffdab84e2834a7a725b9323cc7fdc4
 +    if policy.refusal == 'closed':  # closed by the deadline fence, else by Stop/cancellation (N-2: a probe may notice first)
 +        return 'timeout' if policy.deadline is not None and time.monotonic() >= policy.deadline else 'cancelled'
 +    if policy.refusal == 'unsupported':
-+        return 'unavailable'
++        return 'unavailable' if not policy.sends else 'failed'  # after a paid chunk nothing is "unavailable": the join etc. failed
 +    if policy.local_launched:
 +        return 'failed'  # a local child really started: a failure after a local invocation, never "nothing was tried"
 +    return 'unavailable' if not policy.sends else 'failed'
@@ -1574,10 +1581,10 @@ index 0000000000000000000000000000000000000000..a9896b7f7fb9b7249a3a990be360e7ff
 +    print('NATIVE_VOICE_MEASURE ' + json.dumps({'label': label, **values}, sort_keys=True))
 diff --git a/tests/gateway/native_voice_support.py b/tests/gateway/native_voice_support.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..ae1c9563f5a2db1546596931296fd1b04546c257
+index 0000000000000000000000000000000000000000..8a3d52dd7eeb70630443c6e551b7319d9a688f76
 --- /dev/null
 +++ b/tests/gateway/native_voice_support.py
-@@ -0,0 +1,439 @@
+@@ -0,0 +1,557 @@
 +"""Synthetic provider transport for the native voice seam tests.
 +
 +Only the network bytes are replaced: the real OpenAI SDK, real httpx client (with whatever timeout,
@@ -1589,6 +1596,7 @@ index 0000000000000000000000000000000000000000..ae1c9563f5a2db1546596931296fd1b0
 +
 +from contextlib import contextmanager
 +from pathlib import Path
++import io
 +import struct
 +import threading
 +import wave
@@ -1949,7 +1957,8 @@ index 0000000000000000000000000000000000000000..ae1c9563f5a2db1546596931296fd1b0
 +    """Put the owned tools in the state ``how``; returns the stall/readiness state path."""
 +    state = tmp_path / 'launcher-state'
 +    real_which = shutil.which
-+    if how in ('fail-concat', 'silent-concat', 'junk-concat', 'fail-join', 'hold-join', 'hold-probe', 'hold-convert', 'hold-any'):
++    if how in ('fail-concat', 'silent-concat', 'junk-concat', 'fail-join', 'hold-join', 'hold-probe', 'hold-convert', 'hold-any',
++               'head-concat', 'head-join', 'grow-join', 'grow-convert', 'junk-convert'):
 +        faulty_launcher(monkeypatch, how, state)
 +        return state
 +    qualify(monkeypatch)
@@ -2017,6 +2026,122 @@ index 0000000000000000000000000000000000000000..ae1c9563f5a2db1546596931296fd1b0
 +
 +    def respond(self, request, value):
 +        return httpx.Response(self.status, headers=self.headers, stream=self.body, request=request)
++
++
++class CountingBytes(io.BytesIO):
++    """The raw body of a urllib3 response, counting what ``requests``/urllib3 actually pulled from it."""
++
++    def __init__(self, body):
++        super().__init__(body)
++        self.pulled = 0
++
++    def read(self, size=-1):
++        data = super().read(size)
++        self.pulled += len(data)
++        return data
++
++    def read1(self, size=-1):
++        data = super().read1(size)
++        self.pulled += len(data)
++        return data
++
++
++class RawWire:
++    """The ``requests`` adapter that would open the socket, replaced by one scripted raw answer over a REAL urllib3
++    response (so iter_content, decoding and content-length handling are the libraries' own)."""
++
++    def __init__(self, status, headers, body):
++        self.status, self.headers = status, headers
++        self.body = body if hasattr(body, 'read') else CountingBytes(body)  # bytes, or a ready-made (held) raw body
++        self.requests = []
++
++    @property
++    def count(self):
++        return len(self.requests)
++
++    def adapter(self):
++        import requests
++        from urllib3.response import HTTPResponse
++        wire = self
++
++        class Adapter(requests.adapters.HTTPAdapter):
++            def send(self, request, **kwargs):
++                wire.requests.append((request, kwargs))
++                raw = HTTPResponse(body=wire.body, headers=dict(wire.headers), status=wire.status, preload_content=False,
++                                   decode_content=True, request_url=request.url, enforce_content_length=False)
++                return self.build_response(request, raw)
++
++            def close(self):
++                pass
++        return Adapter()
++
++
++class HeldStream(httpx.SyncByteStream):
++    """LABELLED STAND-IN for a peer that sends the first chunk and then stalls: after chunk 1 it sets ``entered`` (the
++    readiness signal: the client is blocked INSIDE the body read) and waits (bounded 30 s) for ``release``; the rest follows."""
++
++    def __init__(self, chunks, release):
++        self.chunks, self.release = list(chunks), release
++        self.entered = threading.Event()
++        self.pulled = 0
++        self.started = False
++        self.closed = False
++
++    def __iter__(self):
++        self.started = True
++        for index, chunk in enumerate(self.chunks):
++            if index == 1:
++                self.entered.set()
++                assert self.release.wait(30), 'the test never released the stalled body'
++            self.pulled += len(chunk)
++            yield chunk
++
++    def close(self):
++        self.closed = True
++
++
++class HeldBodyWire(Wire):
++    """Every request is answered 200 with a ``HeldStream`` body."""
++
++    def __init__(self, headers, chunks, release):
++        super().__init__([('ok', {})] * 3)
++        self.body = HeldStream(chunks, release)
++        self.headers = headers
++
++    def respond(self, request, value):
++        return httpx.Response(200, headers=self.headers, stream=self.body, request=request)
++
++
++class HeldBytes(CountingBytes):
++    """The raw urllib3 body of a stalling peer: the first ``read`` returns ``first`` bytes, the next one sets ``entered`` and
++    waits (bounded 30 s) for ``release``. LABELLED STAND-IN."""
++
++    def __init__(self, body, release, first=CHUNK):
++        super().__init__(body)
++        self.release, self.first, self.entered, self.reads = release, first, threading.Event(), 0
++
++    def read(self, size=-1):
++        self.reads += 1
++        if self.reads == 2:
++            self.entered.set()
++            assert self.release.wait(30), 'the test never released the stalled body'
++        return super().read(min(size, self.first) if size and size > 0 else self.first)
++
++
++class ReadinessClock:
++    """CONTROLLED CLOCK for deadline controls (I3/M7): ``time.monotonic`` is real until the test calls ``advance`` AFTER it has
++    confirmed readiness (a hold, a first body chunk, a stall pid), so expiry cannot happen before the hold is reached and no
++    sleep or wide wait is involved. A call is made with a long deadline; ``advance`` then makes every pending deadline,
++    asyncio timer and runner check see it as expired."""
++
++    def __init__(self, monkeypatch):
++        import time
++        real = time.monotonic
++        self.offset = 0.0
++        monkeypatch.setattr(time, 'monotonic', lambda: real() + self.offset)
++
++    def advance(self, seconds=1000.0):
++        self.offset += seconds
 diff --git a/tests/gateway/rest_voice_support.py b/tests/gateway/rest_voice_support.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..1f184b31bd1cecf70673a66bcf008dbc92a788f7
@@ -4332,10 +4457,10 @@ index 0000000000000000000000000000000000000000..91148c3d22e7df07f2b010917064ff22
 +    assert transcribe_audio_local_fallback(clip)['transcript'] == 'by command' and ran == [1]
 diff --git a/tests/gateway/test_native_voice_local.py b/tests/gateway/test_native_voice_local.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..a00bd0a31c47655640e07706195c8e3177398b47
+index 0000000000000000000000000000000000000000..0837dc2d82eb198d66f1bbda5db77fad383f8a94
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_local.py
-@@ -0,0 +1,541 @@
+@@ -0,0 +1,567 @@
 +"""Native voice seam: local engines, launcher-wrapped command adapters and managed whisper.cpp ``local_command``.
 +
 +HARNESS, stated plainly: no engine package, model or host sandbox exists or runs here. The qualification table is
@@ -4806,7 +4931,7 @@ index 0000000000000000000000000000000000000000..a00bd0a31c47655640e07706195c8e31
 +
 +
 +@pytest.mark.asyncio
-+async def test_a_runaway_conversion_is_bounded_and_failed(monkeypatch, launcher, managed, spawns, scratch, mp3_clip):
++async def test_a_runaway_conversion_is_rejected_by_the_post_hoc_size_check(monkeypatch, launcher, managed, spawns, scratch, mp3_clip):
 +    support.ffmpeg_path()
 +    from tools import transcription_audio
 +    monkeypatch.setattr(transcription_audio, 'NORMALIZED_WAV_MAX_BYTES', 4096, raising=False)
@@ -4824,14 +4949,16 @@ index 0000000000000000000000000000000000000000..a00bd0a31c47655640e07706195c8e31
 +    state = tmp_path / 'state'
 +    support.faulty_launcher(monkeypatch, 'hold-convert', state)
 +    cb = support.Callbacks()
++    clock = support.ReadinessClock(monkeypatch)
 +    try:
-+        task = asyncio.create_task(hear(mp3_clip, cb, deadline_s=60 if how == 'stop' else 4))
-+        await async_wait_until(lambda: state.exists(), timeout=30, what='the held normalization to start')  # armed on readiness
++        task = asyncio.create_task(hear(mp3_clip, cb, deadline_s=60 if how == 'stop' else 300))
++        await async_wait_until(lambda: state.exists(), timeout=30, what='the held normalization to start')  # readiness
 +        if how == 'stop':
 +            task.cancel()
 +            with pytest.raises(asyncio.CancelledError):
 +                await task
 +        else:
++            clock.advance()  # expiry only AFTER the hold is confirmed (controlled clock)
 +            result = await task
 +            assert (result.state, result.transcript, result.provider) == ('timeout', None, 'not_started')
 +        await async_wait_until(lambda: support.pid_gone(state) and not os.listdir(scratch), timeout=15,
@@ -4869,14 +4996,38 @@ index 0000000000000000000000000000000000000000..a00bd0a31c47655640e07706195c8e31
 +    state = tmp_path / 'state'
 +    support.faulty_launcher(monkeypatch, 'hold-convert', state)
 +    support.unfenced_bounded(monkeypatch)
++    clock = support.ReadinessClock(monkeypatch)
 +    try:
-+        result = await speak('MODE:ok words', out, deadline_s=3)
-+        assert state.exists()  # the probe conversion really was the held child
++        task = asyncio.create_task(speak('MODE:ok words', out, deadline_s=300))
++        await async_wait_until(lambda: state.exists(), timeout=30, what='the held probe conversion to start')  # readiness
++        clock.advance()
++        result = await task
 +        assert (result.state, result.path, result.provider) == ('timeout', None, 'not_started')
 +        assert engine_spawns(spawns) == [] and os.listdir(out) == []
 +        await async_wait_until(lambda: support.pid_gone(state), timeout=15, what='the held probe child to be ended')
 +    finally:
 +        Path(str(state) + '.release').write_text('')
++
++
++@pytest.mark.asyncio
++async def test_a_runaway_conversion_is_ended_by_the_size_watch_not_merely_rejected_afterwards(
++        monkeypatch, launcher, managed, spawns, scratch, mp3_clip, tmp_path):
++    """m3: the stand-in converter streams 64 KiB blocks past the cap and then WAITS (its marker is written only after a
++    release). The call returns - the child gone and never finished - only because the watch ended the child."""
++    from tests.waiting import async_wait_until
++    support.ffmpeg_path()
++    from tools import transcription_audio
++    monkeypatch.setattr(transcription_audio, 'NORMALIZED_WAV_MAX_BYTES', 200 * 1024)
++    state = tmp_path / 'state'
++    support.faulty_launcher(monkeypatch, 'grow-convert', state)
++    try:
++        result = await hear(mp3_clip)
++        assert (result.state, result.transcript, result.provider) == ('failed', None, 'not_started')
++        assert state.exists() and not Path(str(state) + '.finished').exists()
++        await async_wait_until(lambda: support.pid_gone(state), timeout=15, what='the runaway converter to be ended')
++    finally:
++        Path(str(state) + '.release').write_text('')
++    assert whisper_spawns(spawns) == [] and os.listdir(scratch) == []
 diff --git a/tests/gateway/test_native_voice_mistral.py b/tests/gateway/test_native_voice_mistral.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..16419a90af663da5509f32acf9a9873889e400c2
@@ -5476,10 +5627,10 @@ index 0000000000000000000000000000000000000000..c41a54f6f07f880e0675f454cc98fcdd
 +    assert wire.count == 1 and cb.before_send_calls == 1 and len(built) == 3 and os.listdir(out) == []
 diff --git a/tests/gateway/test_native_voice_mistral_fences.py b/tests/gateway/test_native_voice_mistral_fences.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..2c9af113d6c01d98071133e323137e41d3c971f1
+index 0000000000000000000000000000000000000000..9594618f4e3c017fa6d10c5e1947f8e6f530316d
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_mistral_fences.py
-@@ -0,0 +1,204 @@
+@@ -0,0 +1,208 @@
 +"""Native voice seam, Mistral: Stop and deadline fences, no late callbacks or files, and no hidden SDK side channel.
 +
 +The REAL pinned ``mistralai`` SDK over a synthetic transport. Deterministic: the loop callback that runs the consumer's
@@ -5523,6 +5674,7 @@ index 0000000000000000000000000000000000000000..2c9af113d6c01d98071133e323137e41
 +    cb = support.Callbacks()
 +    wire = mistral.MistralWire([('ok', {})])
 +    held = HeldGate(monkeypatch)
++    clock = support.ReadinessClock(monkeypatch)
 +    with support.provider_wire(monkeypatch, wire):
 +        if how == 'cancel':
 +            task = asyncio.create_task(hear(clip, cb))
@@ -5531,10 +5683,11 @@ index 0000000000000000000000000000000000000000..2c9af113d6c01d98071133e323137e41
 +            with pytest.raises(asyncio.CancelledError):
 +                await task
 +        else:
-+            # M7: armed on READINESS. The call runs under a 2 s deadline; the test first waits (event, 10 s) for the worker
-+            # to be held at the gate, so the deadline can only fire while the gate is held, never before the worker got there.
-+            task = asyncio.create_task(hear(clip, cb, deadline_s=2.0))
++            # M7: armed on READINESS by a controlled clock. The call runs under a long (300 s) deadline; the clock advances
++            # only AFTER the worker is confirmed held at the gate, so expiry cannot precede the hold and nothing is timed.
++            task = asyncio.create_task(hear(clip, cb, deadline_s=300))
 +            await held.wait_enqueued()
++            clock.advance()
 +            result = await task
 +            assert (result.state, result.provider) == ('timeout', 'not_started')
 +        await held.release()
@@ -5551,6 +5704,7 @@ index 0000000000000000000000000000000000000000..2c9af113d6c01d98071133e323137e41
 +    cb = support.Callbacks()
 +    wire = mistral.MistralWire([('ok', {})])
 +    held = HeldGate(monkeypatch)
++    clock = support.ReadinessClock(monkeypatch)
 +    with support.provider_wire(monkeypatch, wire):
 +        if how == 'cancel':
 +            task = asyncio.create_task(speak(out, cb))
@@ -5559,8 +5713,9 @@ index 0000000000000000000000000000000000000000..2c9af113d6c01d98071133e323137e41
 +            with pytest.raises(asyncio.CancelledError):
 +                await task
 +        else:
-+            task = asyncio.create_task(speak(out, cb, deadline_s=2.0))  # M7: armed on readiness, as above
++            task = asyncio.create_task(speak(out, cb, deadline_s=300))  # M7: armed on readiness (controlled clock), as above
 +            await held.wait_enqueued()
++            clock.advance()
 +            result = await task
 +            assert (result.state, result.provider) == ('timeout', 'not_started')
 +        await held.release()
@@ -5686,10 +5841,10 @@ index 0000000000000000000000000000000000000000..2c9af113d6c01d98071133e323137e41
 +    assert wire.count == 2 and installs == []
 diff --git a/tests/gateway/test_native_voice_mistral_gate_and_logs.py b/tests/gateway/test_native_voice_mistral_gate_and_logs.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..aa4c9deb16d330ffcb9adae1612f7c7de302dbda
+index 0000000000000000000000000000000000000000..c26a92331c20544fe981acc58dafa5e48e498d67
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_mistral_gate_and_logs.py
-@@ -0,0 +1,189 @@
+@@ -0,0 +1,191 @@
 +"""Native voice seam, Mistral: carried review obligations M10 (consumer gate refusal) and M3 (provider log text).
 +
 +The REAL pinned ``mistralai`` SDK over a synthetic transport. M10: a real consumer ``authorize`` / ``before_send``
@@ -5877,14 +6032,16 @@ index 0000000000000000000000000000000000000000..aa4c9deb16d330ffcb9adae1612f7c7d
 +    wire = DeprecatedWire([('ok', {'audio': b'ID3native'})])
 +    with support.provider_wire(monkeypatch, wire):
 +        spoken = await speak(out, support.Callbacks())
-+    assert spoken.state in ('synthesized', 'failed')  # O1: the pinned SDK's TTS deprecation hook is the SDK's own business
++    # deterministic (m3): the pinned SDK's own deprecation hook fails the paid TTS answer (carried O1: ResponseNotRead), which
++    # is the truthful failed_after_send; the assertion that matters is the log text below
++    assert (spoken.state, spoken.path, spoken.provider) == ('failed', None, 'failed_after_send')
 +    assert 'PROVIDER-TEXT-2099' not in caplog.text and not [r for r in caplog.records if r.name.startswith('mistralai')]
 diff --git a/tests/gateway/test_native_voice_pipeline.py b/tests/gateway/test_native_voice_pipeline.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..6d78f019adadc6afbe655c3057a44e92cf10c82a
+index 0000000000000000000000000000000000000000..c7323f7f5877f32ecae35512a5ac4feaabbc37bb
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_pipeline.py
-@@ -0,0 +1,286 @@
+@@ -0,0 +1,413 @@
 +"""Native voice seam: the usable multi-chunk join (Task4 B) for remote and local routes.
 +
 +REAL: the pinned OpenAI SDK + httpx (synthetic bytes only), the real runner / process group / pipes, the real ``ffmpeg`` for
@@ -6014,7 +6171,7 @@ index 0000000000000000000000000000000000000000..6d78f019adadc6afbe655c3057a44e92
 +    assert spawns == [] and Path(result.path).read_bytes() == b'ID3one-chunk'
 +
 +
-+JOINERS = ['missing', 'broken', 'no-launcher', 'fail-concat', 'silent-concat', 'junk-concat']
++JOINERS = ['missing', 'broken', 'no-launcher', 'fail-concat', 'silent-concat', 'junk-concat', 'head-concat']
 +
 +
 +@pytest.mark.asyncio
@@ -6079,8 +6236,9 @@ index 0000000000000000000000000000000000000000..6d78f019adadc6afbe655c3057a44e92
 +        mp3, _ = real_chunks(tmp_path, chunk_total(LONG_TEXT, 60))
 +        cb = support.Callbacks()
 +        wire = support.Wire([('ok', {'audio': audio}) for audio in mp3])
++        clock = support.ReadinessClock(monkeypatch)
 +        with support.provider_wire(monkeypatch, wire):
-+            task = asyncio.create_task(speak(out, cb, deadline_s=4 if how == 'deadline' else 60))
++            task = asyncio.create_task(speak(out, cb, deadline_s=300 if how == 'deadline' else 60))
 +            await async_wait_until(lambda: state.exists(), timeout=30, what='the held join to start')
 +            calls = (cb.authorize_calls, cb.before_send_calls, wire.count)
 +            assert calls[1:] == (len(mp3), len(mp3))  # every chunk was paid for before the join began
@@ -6089,6 +6247,7 @@ index 0000000000000000000000000000000000000000..6d78f019adadc6afbe655c3057a44e92
 +                with pytest.raises(asyncio.CancelledError):
 +                    await task
 +            else:
++                clock.advance()  # expiry only AFTER the held join is confirmed (the stand-in wrote its pid)
 +                result = await task
 +                assert (result.state, result.path, result.provider) == ('timeout', None, 'unknown')
 +            await async_wait_until(lambda: support.pid_gone(state), timeout=15, what='the held join child to be ended')
@@ -6114,9 +6273,12 @@ index 0000000000000000000000000000000000000000..6d78f019adadc6afbe655c3057a44e92
 +    state = support.joiner(monkeypatch, tmp_path, 'hold-probe')
 +    cb = support.Callbacks()
 +    wire = support.Wire([('ok', {'audio': b'ID3x'})] * 5)
++    clock = support.ReadinessClock(monkeypatch)
 +    with support.provider_wire(monkeypatch, wire):
-+        result = await speak(out, cb, deadline_s=3)
-+    assert state.exists()  # the probe really was the held child
++        task = asyncio.create_task(speak(out, cb, deadline_s=300))
++        await async_wait_until(lambda: state.exists(), timeout=30, what='the held concat probe to start')  # readiness
++        clock.advance()
++        result = await task
 +    assert (result.state, result.path, result.provider) == ('timeout', None, 'not_started')
 +    assert wire.count == 0 and cb.before_send_calls == 0 and os.listdir(out) == []
 +    await async_wait_until(lambda: support.pid_gone(state), timeout=15, what='the held probe child to be ended')
@@ -6160,7 +6322,7 @@ index 0000000000000000000000000000000000000000..6d78f019adadc6afbe655c3057a44e92
 +
 +
 +@pytest.mark.asyncio
-+@pytest.mark.parametrize('how', ['broken', 'fail-concat', 'silent-concat', 'junk-concat'])
++@pytest.mark.parametrize('how', ['broken', 'fail-concat', 'silent-concat', 'junk-concat', 'head-concat'])
 +async def test_an_unusable_joiner_refuses_a_local_multi_chunk_call_before_any_engine_child(
 +        monkeypatch, tmp_path, out, scratch, engine, how):
 +    """CV-F's converter probe passes (the WAV->MP3 conversion works) yet the engine must not run: only an actual concat
@@ -6171,6 +6333,128 @@ index 0000000000000000000000000000000000000000..6d78f019adadc6afbe655c3057a44e92
 +    result = await speak(out, text=LOCAL_TEXT)
 +    assert (result.state, result.path, result.provider) == ('unavailable', None, 'not_started')
 +    assert engine_spawns(spawns) == [] and os.listdir(out) == [] and os.listdir(scratch) == []
++
++
++# ---- Task4 fix1 m1/m2/m6: output eligibility before payment, post-payment failures, join completeness and bound, exact deadline ----
++@pytest.mark.asyncio
++async def test_an_output_directory_the_join_can_never_list_is_refused_before_any_paid_chunk(monkeypatch, tmp_path, scratch, launcher):
++    """m1: a newline in the caller-owned output directory makes the concat list unwritable; that is deterministic, so it is
++    refused UNSENT before the first chunk request instead of after the chunks were paid."""
++    support.ffmpeg_path()
++    support.write_config(get_hermes_home(), openai_config())
++    out = tmp_path / 'caller\noutput'
++    out.mkdir()
++    cb = support.Callbacks()
++    wire = support.Wire([('ok', {'audio': b'ID3x'})] * 5)
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(str(out), cb)
++    assert (result.state, result.path, result.provider) == ('unavailable', None, 'not_started')
++    assert wire.count == 0 and cb.before_send_calls == 0 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_a_joiner_that_disappears_after_payment_is_failed_not_unavailable(monkeypatch, tmp_path, out, scratch, launcher):
++    """m1: the probe passed, every chunk was paid and answered, then the joiner vanished: the call is ``failed`` with the
++    answered requests accounted ``completed`` (``unavailable`` would claim nothing was tried). No retry, nothing left."""
++    support.ffmpeg_path()
++    support.write_config(get_hermes_home(), openai_config())
++    count = chunk_total(LONG_TEXT, 60)
++    mp3, _ = real_chunks(tmp_path, count)
++    real_which = shutil.which
++    seen = []
++
++    def vanish(request):
++        seen.append(request)
++        if len(seen) == count:
++            monkeypatch.setattr(shutil, 'which', lambda name, *a, **k: None if name == 'ffmpeg' else real_which(name, *a, **k))
++    cb = support.Callbacks()
++    wire = support.Wire([('ok', {'audio': audio}) for audio in mp3], tap=vanish)
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.path, result.provider) == ('failed', None, 'completed')
++    assert wire.count == count == cb.before_send_calls and os.listdir(out) == [] and os.listdir(scratch) == []
++
++
++@pytest.mark.asyncio
++async def test_a_join_that_keeps_only_the_first_input_is_failed_after_payment_and_leaves_nothing(
++        monkeypatch, tmp_path, out, scratch):
++    """m2: the stand-in's second concat child (the real join) exits 0 with a VALID MP3 that is only the first input. The head
++    bytes alone would admit it; the completeness check refuses it."""
++    support.ffmpeg_path()
++    support.write_config(get_hermes_home(), openai_config())
++    support.joiner(monkeypatch, tmp_path, 'head-join')
++    count = chunk_total(LONG_TEXT, 60)
++    mp3, _ = real_chunks(tmp_path, count)
++    wire = support.Wire([('ok', {'audio': audio}) for audio in mp3])
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out)
++    assert (result.state, result.path, result.provider) == ('failed', None, 'completed')
++    assert os.listdir(out) == [] and os.listdir(scratch) == []
++
++
++@pytest.mark.asyncio
++async def test_a_runaway_join_is_ended_by_the_size_watch_not_merely_rejected_afterwards(monkeypatch, tmp_path, out, scratch):
++    """m2: the stand-in's real-join child streams output past the total speech-audio cap and then WAITS (its marker is
++    written only after a release). The call returns - and the child is gone and never finished - only because the watch ended it."""
++    support.ffmpeg_path()
++    support.write_config(get_hermes_home(), openai_config())
++    state = support.joiner(monkeypatch, tmp_path, 'grow-join')
++    monkeypatch.setattr('gateway.session_native_voice.MAX_SPEECH_AUDIO_BYTES', 200 * 1024)
++    count = chunk_total(LONG_TEXT, 60)
++    mp3, _ = real_chunks(tmp_path, count)
++    wire = support.Wire([('ok', {'audio': audio}) for audio in mp3])
++    try:
++        with support.provider_wire(monkeypatch, wire):
++            result = await speak(out)
++        assert (result.state, result.path, result.provider) == ('too_long', None, 'completed')
++        assert state.exists() and not Path(str(state) + '.finished').exists()  # it was growing, and it never finished by itself
++        await async_wait_until(lambda: support.pid_gone(state), timeout=15, what='the runaway join child to be ended')
++    finally:
++        Path(str(state) + '.release').write_text('')
++    assert os.listdir(out) == [] and os.listdir(scratch) == []
++
++
++def test_the_native_remaining_deadline_has_no_artificial_floor(monkeypatch):
++    """m6: refuse ``timeout`` when nothing remains; otherwise pass the exact positive float (no 50 ms minimum lifetime)."""
++    import time
++    from types import SimpleNamespace
++    from tools import native_send_policy
++    from tools.tts_tool_local import _remaining
++    monkeypatch.setattr(time, 'monotonic', lambda: 1000.0)
++    assert _remaining(SimpleNamespace(deadline=1000.02)) == pytest.approx(0.02, abs=1e-9)  # below the old floor
++    for deadline in (1000.0, 999.0):
++        policy = native_send_policy.SendPolicy(timeout_s=5.0, providers=frozenset(), deadline=deadline)
++        with native_send_policy.activate(policy), pytest.raises(native_send_policy.NativeSendRefused) as refused:
++            _remaining(policy)
++        assert refused.value.reason == 'timeout' and policy.refusal == 'timeout'
++
++
++@pytest.mark.parametrize('remaining, expect', [(0.02, 0.02), (0.0, None), (-1.0, None)])
++def test_the_join_and_the_normalizer_pass_the_exact_remainder_and_start_no_child_once_expired(monkeypatch, tmp_path, remaining, expect):
++    import time
++    from tools import native_audio_pipeline, native_send_policy, transcription_audio, tts_command_provider
++    monkeypatch.setattr(time, 'monotonic', lambda: 1000.0)
++    policy = native_send_policy.SendPolicy(timeout_s=5.0, providers=frozenset(), deadline=1000.0 + remaining, max_output_bytes=1024)
++    seen = []
++
++    def recording(argv, **kw):
++        seen.append(kw['timeout'])
++        raise subprocess.CalledProcessError(1, argv)
++    monkeypatch.setattr(tts_command_provider, 'run_native_argv', recording)
++    for call in (lambda: native_audio_pipeline._run_join('/x/ffmpeg', str(tmp_path / 'l.txt'), str(tmp_path / 'o.mp3'), policy, str(tmp_path), True),
++                 lambda: transcription_audio._normalize_local_audio_native('/x/ffmpeg', str(tmp_path / 'i.mp3'), str(tmp_path / 'o.wav'))):
++        seen.clear()
++        with native_send_policy.activate(policy):
++            if expect is None:
++                with pytest.raises(native_send_policy.NativeSendRefused) as refused:
++                    call()
++                assert refused.value.reason == 'timeout' and seen == []  # no child, no artificial minimum lifetime
++            else:
++                try:
++                    call()
++                except subprocess.CalledProcessError:
++                    pass
++                assert seen == [pytest.approx(expect, abs=1e-9)]
 diff --git a/tests/gateway/test_native_voice_rest_fences.py b/tests/gateway/test_native_voice_rest_fences.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..2d32781e677e84eeddbd3a9da5acf2c6ba45bd27
@@ -6313,10 +6597,10 @@ index 0000000000000000000000000000000000000000..2d32781e677e84eeddbd3a9da5acf2c6
 +    assert os.listdir(out) == []
 diff --git a/tests/gateway/test_native_voice_rest_tts.py b/tests/gateway/test_native_voice_rest_tts.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..48d7ffbe783ebc30c5d611341022d129bc12b92a
+index 0000000000000000000000000000000000000000..a492df942b5e315d4f8a62a534a9cc48331a88ed
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_rest_tts.py
-@@ -0,0 +1,575 @@
+@@ -0,0 +1,650 @@
 +"""Native voice seam, REST TTS (xAI, MiniMax, Gemini): real request construction, one gated send per chunk, bounds.
 +
 +The stock generators (``tools.tts_tool_providers._generate_*``) run unchanged inside the seam; the REAL ``requests``
@@ -6407,8 +6691,8 @@ index 0000000000000000000000000000000000000000..48d7ffbe783ebc30c5d611341022d129
 +        from tools import native_audio_pipeline
 +    except ImportError:
 +        return
-+    monkeypatch.setattr(native_audio_pipeline, 'native_concat_preflight', lambda: None)
-+    monkeypatch.setattr(native_audio_pipeline, 'native_concat', lambda paths, output, track=None: concat(paths, output))
++    monkeypatch.setattr(native_audio_pipeline, 'native_concat_preflight', lambda output_dir=None: None)
++    monkeypatch.setattr(native_audio_pipeline, 'native_concat', lambda paths, output, track=None, limit=None: concat(paths, output))
 +
 +
 +async def speak(out, callbacks, text=TEXT, deadline_s=60):
@@ -6892,6 +7176,81 @@ index 0000000000000000000000000000000000000000..48d7ffbe783ebc30c5d611341022d129
 +    if name != 'gemini':
 +        assert [abs(f - 440 * (i + 1)) < 40 for i, f in enumerate(support.tone_sequence(result.path, spans))] == [True] * count
 +    assert os.listdir(out) == [os.path.basename(result.path)]
++
++
++# --- Task4 fix1 I1/I2: the REST TTS answer is bounded before Requests resolves a redirect; a held body read is ended ----------
++@pytest.mark.asyncio
++@pytest.mark.parametrize('name', PROVIDERS)
++@pytest.mark.parametrize('kind', ['declared-oversize', 'absent-length', 'gzip'])
++async def test_a_redirect_class_rest_tts_answer_is_refused_before_requests_reads_or_decodes_it(monkeypatch, out, name, kind):
++    """Requests' ``resolve_redirects`` evaluates ``response.content`` of a 3xx with ``Location`` (a whole, decoded read) even
++    with ``allow_redirects=False``. The native hook refuses first: zero body bytes pulled, no decoder entered, closed, exactly
++    one send, ``failed_after_send``."""
++    import urllib3.response
++    from tests.gateway.native_voice_support import RawWire
++    CASES[name]['profile']()
++    entered = []
++    real = urllib3.response.GzipDecoder.decompress
++    monkeypatch.setattr(urllib3.response.GzipDecoder, 'decompress', lambda self, *a, **k: entered.append(1) or real(self, *a, **k))
++    headers = {'Location': 'https://redirect.invalid/elsewhere', 'Content-Type': 'application/octet-stream'}
++    if kind == 'declared-oversize':
++        headers['Content-Length'] = str(16 * 1024 * 1024 + 1)
++        body = b'\0' * (16 * 1024 * 1024 + 1)
++    elif kind == 'absent-length':
++        body = b'\0' * (2 * 1024 * 1024)
++    else:
++        headers['Content-Encoding'] = 'gzip'
++        body = rest.gzipped(b'\0' * (2 * 1024 * 1024))
++    wire = RawWire(307, headers, body)
++    import requests
++    adapter = wire.adapter()
++    monkeypatch.setattr(requests.Session, 'get_adapter', lambda self, url: adapter)
++    cb = support.Callbacks()
++    result = await speak(out, cb)
++    expected = 'too_long' if kind == 'declared-oversize' else 'failed'  # the response bound maps to the existing too_long state
++    assert (outcome(result), wire.count, cb.before_send_calls) == ((expected, None, 'failed_after_send'), 1, 1)
++    assert wire.body.pulled == 0 and wire.body.closed and entered == [] and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('how', ['stop', 'deadline'])
++async def test_stop_or_the_deadline_while_a_rest_tts_body_read_is_held_leaves_no_late_result_send_or_file(
++        monkeypatch, out, how):
++    """LABELLED stand-in peer that stalls after the first body chunk (see the STT twin). The caller is released at once; the
++    blocked vendor read is not preempted; when it resumes the reader stops at the next chunk."""
++    import asyncio
++    import threading
++    import requests
++    from gateway import session_native_voice_tts as tts_module
++    from tests.gateway.mistral_voice_support import watch_worker
++    from tests.gateway.native_voice_support import CHUNK, HeldBytes, RawWire, ReadinessClock
++    xai_profile()
++    release = threading.Event()
++    finished = watch_worker(monkeypatch, tts_module, '_synthesize')
++    held = HeldBytes(b'ID3' + b'\0' * (4 * CHUNK), release)
++    wire = RawWire(200, {'Content-Type': 'audio/mpeg'}, held)
++    adapter = wire.adapter()
++    monkeypatch.setattr(requests.Session, 'get_adapter', lambda self, url: adapter)
++    clock = ReadinessClock(monkeypatch)
++    cb = support.Callbacks()
++    try:
++        task = asyncio.create_task(speak(out, cb, deadline_s=300 if how == 'deadline' else 60))
++        assert await asyncio.to_thread(held.entered.wait, 15)  # READINESS: inside the body read
++        if how == 'stop':
++            task.cancel()
++            with pytest.raises(asyncio.CancelledError):
++                await task
++        else:
++            clock.advance()
++            result = await task
++            assert (outcome(result), result.provider) == (('timeout', None, 'unknown'), 'unknown')
++        calls = (cb.authorize_calls, cb.before_send_calls, wire.count)
++        release.set()
++        assert await asyncio.to_thread(finished.wait, 15)
++    finally:
++        release.set()
++    assert (cb.authorize_calls, cb.before_send_calls, wire.count) == calls and calls[1:] == (1, 1)
++    assert held.pulled <= 2 * CHUNK and held.closed and os.listdir(out) == []
 diff --git a/tests/gateway/test_native_voice_sdk_boundaries.py b/tests/gateway/test_native_voice_sdk_boundaries.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..5c8e75790be6eb60286131fc39a5ad71e0cc2be0
@@ -7631,10 +7990,10 @@ index 0000000000000000000000000000000000000000..d1a2cba9c8b9a760dbfe43a88a08b163
 +    assert len(calls) == 1 and cb.before_send_calls == 0
 diff --git a/tests/gateway/test_native_voice_stt_bounds.py b/tests/gateway/test_native_voice_stt_bounds.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..db21ca8dbbd11dca637822d3c81acbf929a856c4
+index 0000000000000000000000000000000000000000..62c3a258b04346e1bdb88ca9e5fd89bcef57e52b
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_stt_bounds.py
-@@ -0,0 +1,295 @@
+@@ -0,0 +1,384 @@
 +"""Native voice seam: the STT answer is bounded BEFORE the SDK or the JSON layer buffers it (Task4 A).
 +
 +The REAL pinned OpenAI SDK over a real httpx client (OpenAI, Groq, DeepInfra) and the REAL ``requests`` session over a real
@@ -7647,67 +8006,19 @@ index 0000000000000000000000000000000000000000..db21ca8dbbd11dca637822d3c81acbf9
 +it (a peer that ignores the request is unusable as a bounded native response; its send is already counted, so it is
 +``failed_after_send``). The stock ``transcribe_audio`` path is unchanged and still decodes such an answer.
 +"""
++import asyncio
 +import gzip
-+import io
-+import json
++import threading
 +
-+import httpx
 +import pytest
 +
 +from gateway.session_native_voice import MAX_STT_RESPONSE_BYTES as CAP
 +from gateway.session_native_voice import transcribe_native_once
 +from hermes_constants import get_hermes_home
 +from tests.gateway import native_voice_support as support
-+from tests.gateway.native_voice_support import BodyWire, CHUNK, CountingStream
++from tests.gateway.native_voice_support import BodyWire, CHUNK, HeldBodyWire, HeldBytes, RawWire, ReadinessClock
 +
 +KEY = 'sk-synthetic-stt-bounds'
-+
-+
-+class CountingBytes(io.BytesIO):
-+    """The raw body of a urllib3 response, counting what ``requests``/urllib3 actually pulled from it."""
-+
-+    def __init__(self, body):
-+        super().__init__(body)
-+        self.pulled = 0
-+
-+    def read(self, size=-1):
-+        data = super().read(size)
-+        self.pulled += len(data)
-+        return data
-+
-+    def read1(self, size=-1):
-+        data = super().read1(size)
-+        self.pulled += len(data)
-+        return data
-+
-+
-+class RawWire:
-+    """The ``requests`` adapter that would open the socket, replaced by one scripted raw answer over a REAL urllib3
-+    response (so iter_content, decoding and content-length handling are the libraries' own)."""
-+
-+    def __init__(self, status, headers, body):
-+        self.status, self.headers, self.body = status, headers, CountingBytes(body)
-+        self.requests = []
-+
-+    @property
-+    def count(self):
-+        return len(self.requests)
-+
-+    def adapter(self):
-+        import requests
-+        from urllib3.response import HTTPResponse
-+        wire = self
-+
-+        class Adapter(requests.adapters.HTTPAdapter):
-+            def send(self, request, **kwargs):
-+                wire.requests.append((request, kwargs))
-+                raw = HTTPResponse(body=wire.body, headers=dict(wire.headers), status=wire.status, preload_content=False,
-+                                   decode_content=True, request_url=request.url, enforce_content_length=False)
-+                return self.build_response(request, raw)
-+
-+            def close(self):
-+                pass
-+        return Adapter()
 +
 +
 +def text_body(size):
@@ -7930,12 +8241,149 @@ index 0000000000000000000000000000000000000000..db21ca8dbbd11dca637822d3c81acbf9
 +    assert native.state == 'transcribed' and stock['success']
 +    assert seen[0].get('stream') is True and seen[0].get('allow_redirects') is False
 +    assert 'stream' not in seen[1] and 'allow_redirects' not in seen[1]
++
++
++# ---- Task4 fix1 I1: a REDIRECT-class answer is bounded before Requests' own redirect processing -----------------------------
++REDIRECT_CASES = [
++    # (id, headers, body size or the gzip marker)
++    ('declared-oversize', {'Content-Length': str(CAP + 1)}, CAP + 1),
++    ('absent-length', {}, 2 * CAP),
++    ('false-length', {'Content-Length': '10'}, 2 * CAP),
++    ('gzip', {'Content-Encoding': 'gzip'}, None),
++]
++REQUESTS_BACKENDS = [p for p in BACKENDS if p.values[0].family == 'requests']
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('backend', REQUESTS_BACKENDS)
++@pytest.mark.parametrize('case', REDIRECT_CASES, ids=[c[0] for c in REDIRECT_CASES])
++async def test_a_redirect_class_answer_is_bounded_and_refused_before_requests_resolves_the_redirect(
++        monkeypatch, clip, backend, case):
++    """Requests' ``Session.send`` runs ``resolve_redirects`` even with ``allow_redirects=False`` and that evaluates
++    ``response.content`` (a whole, DECODED read) for a 3xx with ``Location``. The bound and the identity rule therefore run in
++    the response hook, which Requests dispatches BEFORE that. One send, no second request, no decoder entered."""
++    import urllib3.response
++    _, headers, size = case
++    backend.profile()
++    entered = []
++    real = urllib3.response.GzipDecoder.decompress
++    monkeypatch.setattr(urllib3.response.GzipDecoder, 'decompress', lambda self, *a, **k: entered.append(1) or real(self, *a, **k))
++    declared = headers.get('Content-Length') == str(CAP + 1)
++    body = gzip.compress(backend.shape(CAP)) if size is None else backend.shape(size - len(backend.shape(0)) if declared else size)
++    wire = RawWire(307, {'Content-Type': backend.kind, 'Location': 'https://redirect.invalid/elsewhere', **headers}, body)
++    with backend.context(monkeypatch, wire):
++        result, cb = await hear(clip)
++    assert (result.state, result.transcript, result.provider) == ('failed', None, 'failed_after_send')
++    assert wire.count == 1 and cb.before_send_calls == 1  # exactly one send: the redirect is an answer, never followed
++    assert entered == [] and wire.body.closed
++    if size is None or declared:
++        assert wire.body.pulled == 0
++    else:
++        assert wire.body.pulled <= CAP + CHUNK < len(body)
++
++
++# ---- Task4 fix1 I4: a bounded-response safety refusal is TERMINAL for native STT (no installed local fallback) ---------------
++@pytest.fixture
++def fallback(monkeypatch):
++    """A cached installed local STT backend that WOULD answer if the seam ever fell back to it."""
++    calls = []
++    monkeypatch.setattr('tools.transcription_tools._HAS_FASTER_WHISPER', True)
++    monkeypatch.setattr('tools.transcription_tools._transcribe_local',
++                        lambda path, model, **kw: calls.append(path) or {'success': True, 'transcript': ' local words '})
++    return calls
++
++
++TERMINAL_CASES = [('unsupported-encoding', {'Content-Encoding': 'gzip'}, None), ('response-bound', {}, 2 * CAP)]
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('backend', BACKENDS)
++@pytest.mark.parametrize('case', TERMINAL_CASES, ids=[c[0] for c in TERMINAL_CASES])
++async def test_a_response_safety_refusal_never_reaches_the_installed_local_fallback(monkeypatch, clip, fallback, backend, case):
++    """The sealed 'never substituted': an answer refused for its encoding or for crossing the response bound is a failure
++    with source None and provider failed_after_send, and the available installed fallback is NOT invoked."""
++    _, headers, size = case
++    backend.profile()
++    body = gzip.compress(backend.small) if size is None else backend.shape(size)
++    wire = backend.answer(200, headers, body)
++    with backend.context(monkeypatch, wire):
++        result, cb = await hear(clip)
++    assert (result.state, result.transcript, result.source, result.provider) == ('failed', None, None, 'failed_after_send')
++    assert fallback == [] and wire.count == 1 and cb.before_send_calls == 1
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('name', ['openai-json', 'xai'])
++async def test_an_ordinary_known_gated_failure_still_gets_the_single_installed_local_fallback(monkeypatch, clip, fallback, name):
++    """POSITIVE control (green before and after): a plain 5xx after a counted send keeps the documented single fallback."""
++    backend = next(p.values[0] for p in BACKENDS if p.values[0].name == name)
++    backend.profile()
++    wire = backend.answer(500, {}, b'{"error":{"message":"synthetic outage"}}')
++    with backend.context(monkeypatch, wire):
++        result, _ = await hear(clip)
++    assert (result.state, result.transcript, result.source, result.provider) == (
++        'transcribed', 'local words', 'local_fallback', 'failed_after_send')
++    assert len(fallback) == 1 and wire.count == 1
++
++
++# ---- Task4 fix1 I2: Stop / the deadline while the response BODY read is held -------------------------------------------------
++HELD = [pytest.param(next(p.values[0] for p in BACKENDS if p.values[0].name == name), id=name)
++        for name in ('openai-text', 'xai')]
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('how', ['stop', 'deadline'])
++@pytest.mark.parametrize('backend', HELD)
++async def test_stop_or_the_deadline_while_the_body_read_is_held_leaves_no_late_result_callback_send_or_fallback(
++        monkeypatch, clip, fallback, backend, how):
++    """LABELLED stand-in: the peer sends one chunk and stalls the next. Readiness = the client is blocked INSIDE the body read.
++    Stop/expiry is armed from it (the controlled clock only advances after readiness). The caller is released at once; the
++    already-blocked vendor read is NOT preempted (it ends when the stand-in releases, or at its IO timeout); when it resumes
++    the reader sees the closed call and stops at the next chunk: nothing late is produced."""
++    from gateway import session_native_voice_stt as stt_module
++    from tests.gateway.mistral_voice_support import watch_worker
++    backend.profile()
++    release = threading.Event()
++    finished = watch_worker(monkeypatch, stt_module, '_configured')
++    chunks = [b'a' * CHUNK] * 4
++    if backend.family == 'sdk':
++        wire = HeldBodyWire({'Content-Type': backend.kind}, chunks, release)
++        held = wire.body
++    else:
++        held = HeldBytes(b''.join(chunks), release)
++        wire = RawWire(200, {'Content-Type': backend.kind}, held)
++    clock = ReadinessClock(monkeypatch)
++    cb = support.Callbacks()
++    try:
++        with backend.context(monkeypatch, wire):
++            task = asyncio.create_task(transcribe_native_once(clip, authorize=cb.authorize, before_send=cb.before_send,
++                                                              deadline_s=300 if how == 'deadline' else 30))
++            assert await asyncio.to_thread(held.entered.wait, 15)  # READINESS: inside the body read
++            if how == 'stop':
++                task.cancel()
++                with pytest.raises(asyncio.CancelledError):
++                    await task
++            else:
++                clock.advance()  # expiry only AFTER the hold is confirmed
++                result = await task
++                assert (result.state, result.transcript, result.source, result.provider) == ('timeout', None, None, 'unknown')
++            calls = (cb.authorize_calls, cb.before_send_calls, wire.count)
++            release.set()
++            assert await asyncio.to_thread(finished.wait, 15)  # the worker completed after the release
++    finally:
++        release.set()
++    assert (cb.authorize_calls, cb.before_send_calls, wire.count) == calls == (cb.authorize_calls, 1, 1)  # no late callback/send
++    assert fallback == []  # no fallback after Stop/expiry
++    pulled = held.pulled if hasattr(held, 'pulled') else wire.body.pulled
++    assert pulled <= 2 * CHUNK < 4 * CHUNK  # stopped at the first boundary after the release
++    if backend.family == 'sdk':
++        assert wire.body.closed
 diff --git a/tests/gateway/test_native_voice_tts.py b/tests/gateway/test_native_voice_tts.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..113eeba3b63847f60b8c62b01b71df6090073d8b
+index 0000000000000000000000000000000000000000..ffd5729a1bb11e16a95dcb7876d9f5491f9a1e49
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_tts.py
-@@ -0,0 +1,356 @@
+@@ -0,0 +1,391 @@
 +"""Native voice seam: configured text-to-speech, one request per chunk, stop at the first failed chunk.
 +
 +Real OpenAI SDK, real httpx client over a synthetic network transport; the profile's TTS
@@ -7997,8 +8445,8 @@ index 0000000000000000000000000000000000000000..113eeba3b63847f60b8c62b01b71df60
 +        from tools import native_audio_pipeline
 +    except ImportError:
 +        return
-+    monkeypatch.setattr(native_audio_pipeline, 'native_concat_preflight', lambda: None)
-+    monkeypatch.setattr(native_audio_pipeline, 'native_concat', lambda paths, output, track=None: concat(paths, output))
++    monkeypatch.setattr(native_audio_pipeline, 'native_concat_preflight', lambda output_dir=None: None)
++    monkeypatch.setattr(native_audio_pipeline, 'native_concat', lambda paths, output, track=None, limit=None: concat(paths, output))
 +
 +
 +async def seam(text, out, callbacks, deadline_s=60):
@@ -8292,6 +8740,41 @@ index 0000000000000000000000000000000000000000..113eeba3b63847f60b8c62b01b71df60
 +        result = await seam('Hello there, friend.', out, support.Callbacks())
 +    assert (result.state, result.path, result.provider) == ('too_long', None, 'failed_after_send')
 +    assert wire.body.pulled == 0 and wire.body.closed and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('how', ['stop', 'deadline'])
++async def test_stop_or_the_deadline_while_an_openai_tts_body_read_is_held_leaves_no_late_result_send_or_file(
++        monkeypatch, out, configured, how):
++    """I2 through the REAL OpenAI SDK + httpx: a LABELLED stand-in peer stalls after the first body chunk. Armed from readiness
++    (the controlled clock advances only after the client is blocked inside the body read)."""
++    import threading
++    from gateway import session_native_voice_tts as tts_module
++    from tests.gateway.mistral_voice_support import watch_worker
++    release = threading.Event()
++    finished = watch_worker(monkeypatch, tts_module, '_synthesize')
++    wire = support.HeldBodyWire({'Content-Type': 'audio/mpeg'}, [b'ID3' + b'\0' * support.CHUNK] + [b'\0' * support.CHUNK] * 3, release)
++    clock = support.ReadinessClock(monkeypatch)
++    cb = support.Callbacks()
++    try:
++        with support.provider_wire(monkeypatch, wire):
++            task = asyncio.create_task(seam('Hello there, friend.', out, cb, deadline_s=300 if how == 'deadline' else 60))
++            assert await asyncio.to_thread(wire.body.entered.wait, 15)
++            if how == 'stop':
++                task.cancel()
++                with pytest.raises(asyncio.CancelledError):
++                    await task
++            else:
++                clock.advance()
++                result = await task
++                assert (result.state, result.path, result.provider) == ('timeout', None, 'unknown')
++            calls = (cb.authorize_calls, cb.before_send_calls, wire.count)
++            release.set()
++            assert await asyncio.to_thread(finished.wait, 15)
++    finally:
++        release.set()
++    assert (cb.authorize_calls, cb.before_send_calls, wire.count) == calls and calls[1:] == (1, 1)
++    assert wire.body.pulled <= 2 * support.CHUNK + 3 and wire.body.closed and os.listdir(out) == []
 diff --git a/tests/gateway/test_native_voice_xai_credential_phase.py b/tests/gateway/test_native_voice_xai_credential_phase.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..9368bbfdf17797e0d6e5105a559e033096bbd819
@@ -9187,10 +9670,10 @@ index 0000000000000000000000000000000000000000..43fecdc53f953cdf5507671e96fa2429
 +stream.flush()
 diff --git a/tests/tools/native_command_fixtures/launcher_faulty.py b/tests/tools/native_command_fixtures/launcher_faulty.py
 new file mode 100755
-index 0000000000000000000000000000000000000000..22dde93956dc1df5b914e6e4982c7717b1bb4126
+index 0000000000000000000000000000000000000000..3bc2e456803d9e961b0e276d37edac46f76a27a1
 --- /dev/null
 +++ b/tests/tools/native_command_fixtures/launcher_faulty.py
-@@ -0,0 +1,50 @@
+@@ -0,0 +1,76 @@
 +"""HARNESS stand-in for the qualified network-deny launcher (NOT a sandbox, NOT launcher proof) that misbehaves on purpose
 +for audio-tool children only. Usage: ``launcher_faulty.py MODE STATE -p PROFILE PROGRAM [ARGS...]`` (the product's wrapping
 +argv ``-p <fixed profile> <program> <args...>`` behind two harness words). A concat child is an ffmpeg child with
@@ -9200,7 +9683,11 @@ index 0000000000000000000000000000000000000000..22dde93956dc1df5b914e6e4982c7717
 +``MODE``: ``hold-convert`` (first conversion), ``hold-probe`` (first concat child), ``hold-join`` (second concat child),
 +``hold-any`` (first ffmpeg child of any kind): write this process id to STATE (the readiness signal) and wait at most 20 s
 +for STATE + '.release' instead of running PROGRAM; a product that ends the child kills it here.
-+``fail-concat`` / ``silent-concat`` / ``junk-concat``: EVERY concat child exits 1 / exits 0 writing nothing / writes junk to
++``head-concat`` / ``head-join``: every / only the second concat child copies ONLY its first listed input to the output and
++exits 0 (a truncated join). ``grow-convert`` / ``grow-join``: the first conversion / the second concat child writes 64 KiB
++blocks to its output (the last argument) until it holds 8 MiB, writes its pid to STATE (readiness: the growth is under way),
++then waits at most 20 s for STATE + '.release' and ONLY THEN writes STATE + '.finished'; a product that ends it earlier
++(the size watch) never sees the marker. ``fail-concat`` / ``silent-concat`` / ``junk-concat``: EVERY concat child exits 1 / exits 0 writing nothing / writes junk to
 +its output (the last argument) and exits 0. ``fail-join``: only the second concat child exits 1. ``junk-convert``: every
 +conversion child writes junk to its output (the last argument) and exits 0. Every other child is
 +exec'd unchanged. Network-free; bounded; writes only STATE, STATE + '.concat' (a counter) and the concat output it was handed."""
@@ -9223,7 +9710,9 @@ index 0000000000000000000000000000000000000000..22dde93956dc1df5b914e6e4982c7717
 +        handle.write(str(nth))
 +hit = {'hold-convert': is_ffmpeg and not concat, 'hold-probe': concat and nth == 1, 'hold-join': concat and nth == 2,
 +       'hold-any': is_ffmpeg, 'fail-concat': concat, 'silent-concat': concat, 'junk-concat': concat,
-+       'fail-join': concat and nth == 2, 'junk-convert': is_ffmpeg and not concat}[mode]
++       'fail-join': concat and nth == 2, 'junk-convert': is_ffmpeg and not concat, 'head-concat': concat,
++       'head-join': concat and nth == 2, 'grow-convert': is_ffmpeg and not concat and not os.path.exists(state + '.grew'),
++       'grow-join': concat and nth == 2}[mode]
 +if hit and mode.startswith('hold'):
 +    with open(state, 'w') as handle:
 +        handle.write(str(os.getpid()))
@@ -9235,6 +9724,26 @@ index 0000000000000000000000000000000000000000..22dde93956dc1df5b914e6e4982c7717
 +    print('harness: concat refused', file=sys.stderr)
 +    raise SystemExit(1)
 +elif hit and mode == 'silent-concat':
++    raise SystemExit(0)
++elif hit and mode in ('head-concat', 'head-join'):
++    listed = open(args[args.index('-i') + 1]).read().splitlines()[0].split("'")[1]
++    with open(listed, 'rb') as source, open(args[-1], 'wb') as target:
++        target.write(source.read())
++    raise SystemExit(0)
++elif hit and mode in ('grow-convert', 'grow-join'):
++    open(state + '.grew', 'w').close()
++    with open(args[-1], 'wb') as target:
++        for block in range(128):  # bounded: 8 MiB
++            target.write(b'\0' * 65536)
++            target.flush()
++            if block == 1:
++                with open(state, 'w') as handle:
++                    handle.write(str(os.getpid()))
++    for _ in range(200):  # bounded: 20 s
++        if os.path.exists(state + '.release'):
++            break
++        time.sleep(0.1)  # health: allow HX013 -- the stall IS the behaviour under test
++    open(state + '.finished', 'w').close()
 +    raise SystemExit(0)
 +elif hit and mode in ('junk-concat', 'junk-convert'):
 +    with open(args[-1], 'wb') as handle:
@@ -10632,23 +11141,29 @@ index 0000000000000000000000000000000000000000..5ff5c62f947ca0aba0872f5934717bef
 +    measured('stock_tts_edge_403_then_ok', handshakes=boundary.handshakes)
 diff --git a/tools/native_audio_pipeline.py b/tools/native_audio_pipeline.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..83cb179039b6d62f86ca29374181a9e34430404e
+index 0000000000000000000000000000000000000000..feed37bf6dc42c328e4958a5347735d48e677fd2
 --- /dev/null
 +++ b/tools/native_audio_pipeline.py
-@@ -0,0 +1,133 @@
+@@ -0,0 +1,167 @@
 +"""Native audio pipeline: the usable multi-chunk JOIN of a native (Relay) speech call.
 +
 +A multi-chunk call pays for (or runs) every chunk before it can join them, so the join is proved BEFORE the first chunk
 +request, engine child or Edge handshake: :func:`native_concat_preflight` runs the real ffmpeg on a tiny synthetic file
-+(a 0.1 s WAV -> MP3, then a concat of that MP3 with itself) under the qualified network-deny launcher. Presence,
-+``-version`` or a WAV -> MP3 conversion alone is not concat capability. The probe is neither a provider send nor an engine
-+launch (``probe=True``: it never marks a local launch and needs no ``before_send``), so a refusal is a truthful ``unsent``.
++(a 0.1 s WAV -> MP3, then a concat of that MP3 with itself) under the qualified network-deny launcher, and also checks that the
++caller's output directory can be named in a concat list at all. Presence, ``-version`` or a WAV -> MP3 conversion alone is not
++concat capability. The probe is neither a provider send nor an engine launch (``probe=True``: it never marks a local launch and
++needs no ``before_send``), so a refusal is a truthful ``unsent``.
 +
-+:func:`native_concat` is the real join. It is a launcher-wrapped, Stop-aware, deadline-bounded ``run_native_argv`` child
-+(the exact remaining float deadline: no 300/120 s stock timeout, no ``int()`` rounding, no 1 s floor), reads only local
-+files (``-protocol_whitelist file``, ``-nostdin``, a private concat list, no URL, no shell), stages its output next to the
-+final file and renames it only after the output was checked to be a real MP3. Stock-off, the shared
-+``tools.tts_tool_delivery._concat_audio_files`` is unchanged. Neither function retries or falls back.
++:func:`native_concat` is the real join. It is a launcher-wrapped, Stop-aware, deadline-bounded ``run_native_argv`` child with
++the exact remaining float deadline (no 300/120 s stock timeout, no ``int()`` rounding, no artificial minimum: once nothing
++remains no child is started and the call is a ``timeout``). It reads only local files (``-protocol_whitelist file``, ``-nostdin``,
++a private concat list, no URL, no shell) and stages its output next to the final file under a size watch (the total
++speech-audio cap ends the child while it runs, not only a check afterwards). The staged file is renamed only after it passes
++:func:`_complete`: an ID3/frame-sync head AND a size within a small per-extra-input tag allowance of the inputs' sum (real small
++fixtures measured 236 bytes dropped per extra input; 512 is allowed), so a join that kept only the first input is refused. That
++is not a byte-equality rule and needs no ffprobe. Stock-off, the shared ``tools.tts_tool_delivery._concat_audio_files`` is
++unchanged. Neither function retries or falls back. A refusal AFTER the chunks were paid (a vanished joiner, an unusable launcher)
++is reported by the seam as ``failed``, never ``unavailable``.
 +
 +Not sandbox proof: the launcher is whatever ``tools.native_local_launcher`` qualified for this host.
 +"""
@@ -10663,6 +11178,8 @@ index 0000000000000000000000000000000000000000..83cb179039b6d62f86ca29374181a9e3
 +
 +from tools import native_send_policy
 +
++_TAG_ALLOWANCE = 512  # bytes per extra input that a copy-concat may drop (measured 236 on real small fixtures)
++_GROWTH_SLACK = 1024  # a muxer may add one small header frame
 +_JOIN_INPUT = ("-nostdin", "-hide_banner", "-loglevel", "error", "-protocol_whitelist", "file", "-f", "concat", "-safe", "0",
 +               "-i")
 +
@@ -10691,21 +11208,40 @@ index 0000000000000000000000000000000000000000..83cb179039b6d62f86ca29374181a9e3
 +    return head[:3] == b"ID3" or head[:1] == b"\xff"
 +
 +
-+def _run_join(ffmpeg: str, list_path: str, output: str, policy, cwd: str, probe: bool) -> None:
-+    """The one concat child: copy the (all MP3) inputs into ``output`` under the launcher, Stop and the exact deadline."""
++def _complete(inputs: list[str], output: str) -> bool:
++    """A usable join: an MP3 head AND an output that did not lose inputs (size within the tag allowance of their sum)."""
++    if not _is_mp3(output):
++        return False
++    try:
++        total = sum(os.path.getsize(path) for path in inputs)
++        size = os.path.getsize(output)
++    except OSError:
++        return False
++    return total - _TAG_ALLOWANCE * (len(inputs) - 1) <= size <= total + _GROWTH_SLACK
++
++
++def _run_join(ffmpeg: str, list_path: str, output: str, policy, cwd: str, probe: bool, limit: Optional[int] = None) -> None:
++    """The one concat child: copy the (all MP3) inputs into ``output`` under the launcher, Stop and the exact remaining
++    deadline, with ``limit`` (bytes) enforced WHILE it runs: the watch ends a child whose output outgrows it."""
 +    from tools.tts_command_provider import run_native_argv
 +    from tools.tts_tool_local import _ENGINE_STREAM_BYTES, _native_child_env, _remaining
++
++    def watch() -> Optional[str]:
++        try:
++            return "too_long" if limit is not None and os.path.getsize(output) > limit else None
++        except OSError:
++            return None
 +    run_native_argv([ffmpeg, *_JOIN_INPUT, list_path, "-vn", "-c:a", "copy", "-y", "-f", "mp3", output],
 +                    timeout=_remaining(policy), env=_native_child_env(), cwd=cwd, max_stream_bytes=_ENGINE_STREAM_BYTES,
-+                    probe=probe)
++                    watch=watch, probe=probe)
 +
 +
-+def _join_files(ffmpeg: str, paths: list[str], output: str, policy, work: str, probe: bool) -> None:
++def _join_files(ffmpeg: str, paths: list[str], output: str, policy, work: str, probe: bool, limit: Optional[int] = None) -> None:
 +    list_path = os.path.join(work, "inputs.txt")
 +    with open(list_path, "w", encoding="utf-8") as handle:
 +        handle.writelines(_list_line(path) for path in paths)
 +    try:
-+        _run_join(ffmpeg, list_path, output, policy, work, probe)
++        _run_join(ffmpeg, list_path, output, policy, work, probe, limit)
 +    except subprocess.TimeoutExpired:
 +        raise native_send_policy.refuse("timeout") from None  # its timeout IS the call's remaining deadline
 +
@@ -10718,15 +11254,19 @@ index 0000000000000000000000000000000000000000..83cb179039b6d62f86ca29374181a9e3
 +    return policy, ffmpeg
 +
 +
-+def native_concat_preflight() -> None:
++def native_concat_preflight(output_dir: Optional[str] = None) -> None:
 +    """Native call only, BEFORE any chunk request, engine child or Edge handshake of a multi-chunk call: prove with the real
-+    ffmpeg, under the qualified launcher, that a synthetic MP3 can be converted AND concatenated. Missing, broken or
-+    unqualified -> the policy's ``unsupported`` refusal (unsent); Stop/deadline refusals pass through unchanged."""
++    ffmpeg, under the qualified launcher, that a synthetic MP3 can be converted AND concatenated into a complete output, and
++    (``output_dir``) that the caller's directory can be named in the concat list at all. Missing, broken, truncating or
++    unqualified, or an ineligible directory -> the policy's ``unsupported`` refusal (unsent); Stop/deadline refusals pass
++    through unchanged."""
 +    from tools.native_local_launcher import qualified_prefix
 +    from tools.tts_tool_local import _native_convert, _write_probe_wav
 +    policy, ffmpeg = _tool()
 +    if qualified_prefix() is None:
 +        raise _unsupported()
++    if output_dir is not None:
++        _list_line(os.path.join(output_dir, ".native-speech-0.chunk001.mp3"))  # the paths the join will list
 +    work = tempfile.mkdtemp(prefix="hermes-native-concat-")
 +    try:
 +        wav, mp3, joined = (os.path.join(work, name) for name in ("probe.wav", "probe.mp3", "joined.mp3"))
@@ -10740,25 +11280,28 @@ index 0000000000000000000000000000000000000000..83cb179039b6d62f86ca29374181a9e3
 +            raise native_send_policy.refuse("timeout") from None
 +        except (subprocess.CalledProcessError, OSError):
 +            raise _unsupported() from None
-+        if not _is_mp3(joined):
++        if not _complete([mp3, mp3], joined):
 +            raise _unsupported()
 +    finally:
 +        shutil.rmtree(work, ignore_errors=True)
 +
 +
-+def native_concat(paths: list[str], output: str, track: Optional[Callable[[str], object]] = None) -> str:
++def native_concat(paths: list[str], output: str, track: Optional[Callable[[str], object]] = None,
++                  limit: Optional[int] = None) -> str:
 +    """Native call only: join the MP3 chunk files ``paths`` (in order) into ``output`` and return it. ``track`` receives the
-+    staging path BEFORE the child starts, so the caller can remove it on any failure, Stop or late completion. A failure
-+    after the chunks were produced raises ``RuntimeError`` (the caller reports ``failed``); it is never retried."""
++    staging path BEFORE the child starts, so the caller can remove it on any failure, Stop or late completion; ``limit`` is the
++    byte cap of the joined file, enforced while the child runs. A failure after the chunks were produced raises (the seam
++    reports ``failed``: ``RuntimeError`` here, or a policy refusal that is not ``unavailable`` once chunks were paid); it is
++    never retried."""
 +    policy, ffmpeg = _tool()
 +    staged = os.path.join(os.path.dirname(output), f".{os.path.basename(output)}.{uuid.uuid4().hex}.joining.mp3")
 +    if track is not None:
 +        track(staged)
 +    work = tempfile.mkdtemp(prefix="hermes-native-concat-")
 +    try:
-+        _join_files(ffmpeg, paths, staged, policy, work, probe=False)
-+        if not _is_mp3(staged):
-+            raise RuntimeError("native join produced no valid audio")
++        _join_files(ffmpeg, paths, staged, policy, work, probe=False, limit=limit)
++        if not _complete(paths, staged):
++            raise RuntimeError("native join produced no usable audio")
 +        os.replace(staged, output)
 +    except (subprocess.CalledProcessError, OSError):
 +        raise RuntimeError("native join failed") from None
@@ -10846,29 +11389,37 @@ index 0000000000000000000000000000000000000000..9121cefc3da1639d4df00bf8967b67ad
 +    return None
 diff --git a/tools/native_response_bounds.py b/tools/native_response_bounds.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..043d285f38c76e8dc109ee7f9bfdcbfc67c486c9
+index 0000000000000000000000000000000000000000..1497926000b4b87af56a0cbbc5fd5905fa998c4b
 --- /dev/null
 +++ b/tools/native_response_bounds.py
-@@ -0,0 +1,65 @@
+@@ -0,0 +1,86 @@
 +"""Response bounds of a native (Relay) voice call, applied BEFORE an SDK or a JSON layer buffers an answer.
 +
 +Native requests ask for ``Accept-Encoding: identity``, but a peer may ignore that, so the request header is never the
 +enforcement. The enforcement is here: a nonidentity ``Content-Encoding`` is refused on the headers, before any decoder
-+or parser can see the body, and a body is read in bounded steps that stop at the cap.
++or parser can see the body, and a body is read in bounded steps that stop at the cap or when Stop/the deadline closed the call.
 +
-+* ``refuse_nonidentity`` - the encoding rule, shared by the httpx response hooks and the Requests reader.
-+* ``read_requests_answer`` - the Requests (urllib3) seam used by the multipart STT backends (xAI, ElevenLabs): the body is
-+  read from ``response.raw`` UNDECODED, ``read(64 KiB)`` at a time, and reading stops at the crossing.
++* ``refuse_nonidentity`` - the encoding rule, shared by the httpx response hooks and the Requests hook.
++* ``requests_response_hook`` - the Requests (urllib3) seam. Requests dispatches its ``response`` hooks BEFORE
++  ``Session.send`` runs ``resolve_redirects``, and that evaluates ``response.content`` (a whole, DECODED read) for any 3xx
++  with ``Location`` even when ``allow_redirects=False``; so the bound and the identity rule must run in the hook, not after
++  ``requests.post`` returns. The multipart STT backends (xAI, ElevenLabs) BUFFER there: the body is read from
++  ``response.raw`` UNDECODED, ``read(64 KiB)`` at a time, stopping at the crossing, and handed back through the attributes
++  Requests itself fills, so the unchanged stock parser (and Requests' own redirect step) reads the bounded bytes and cannot
++  read the raw stream a second time. The REST TTS backends (xAI, MiniMax, Gemini) stream their body later, so their hook
++  checks the headers and refuses a redirect-class answer without reading it.
 +
-+Honest limits: the bound is chunk-granular. The data kept is at most the cap plus the one read (httpx: the underlying
-+stream chunk; Requests: 64 KiB) that crosses it. It is NOT an allocation-hard heap cap, and a ``Content-Length`` is only
-+an early-rejection aid, never trusted proof. A peer that ignores identity is unusable as a bounded native response: its
-+send is already counted, so the call is ``failed_after_send``; it is never retried, replaced or silently accepted. Outside
-+a native call nothing here runs and every stock path is unchanged.
++Honest limits: the bound is chunk-granular. The data kept is at most the cap plus the one read (httpx: the underlying stream
++chunk; Requests: 64 KiB) that crosses it. It is NOT an allocation-hard heap cap, and a ``Content-Length`` is only an
++early-rejection aid, never trusted proof. Stop/the deadline are checked BETWEEN reads: a vendor read that is already blocked in
++the socket or stream is not preempted (it ends when the peer sends, or at the client's own IO timeout), after which the reader
++stops at once and produces nothing. A peer that ignores identity is unusable as a bounded native response: its send is already
++counted, so the call is ``failed_after_send``; it is never retried, replaced or silently accepted, and for STT it is a TERMINAL
++refusal (no installed local fallback). Outside a native call nothing here runs and every stock path is unchanged.
 +"""
 +from __future__ import annotations
 +
-+from typing import Any, Optional
++from typing import Any, Callable, Optional
 +
 +from tools import native_send_policy
 +
@@ -10889,20 +11440,13 @@ index 0000000000000000000000000000000000000000..043d285f38c76e8dc109ee7f9bfdcbfc
 +    return int(declared) if declared.isdigit() else 0
 +
 +
-+def read_requests_answer(response: Any, limit: int) -> Any:
-+    """The bounded eager read of a streamed ``requests`` answer, returned with its content filled in so the caller's ordinary
-+    ``status_code`` / ``json()`` / ``text`` work on the bounded bytes.
-+
-+    The response MUST have been requested with ``stream=True`` (otherwise Requests has already read it whole). Order:
-+    refuse a nonidentity encoding, refuse an advertised oversize body with ZERO body reads, then read undecoded raw bytes
-+    until the end or the crossing. The response is closed on every exit."""
++def _buffer_answer(response: Any, limit: int) -> None:
++    """Read ``response.raw`` undecoded under ``limit`` (Stop/deadline checked between reads) and fill ``response``'s content."""
++    chunks: list[bytes] = []
++    total = 0
 +    try:
-+        refuse_nonidentity(response.headers.get("Content-Encoding"))
-+        if _declared_length(response.headers) > limit:
-+            raise native_send_policy.refuse("too_long")
-+        chunks: list[bytes] = []
-+        total = 0
 +        while True:
++            native_send_policy.check_alive()
 +            chunk = response.raw.read(READ_STEP_BYTES, decode_content=False)
 +            if not chunk:
 +                break
@@ -10914,13 +11458,33 @@ index 0000000000000000000000000000000000000000..043d285f38c76e8dc109ee7f9bfdcbfc
 +        response.close()
 +    response._content = b"".join(chunks)  # the attributes Requests itself fills after its own eager read
 +    response._content_consumed = True
-+    return response
++
++
++def requests_response_hook(limit: int, *, buffer: bool) -> Callable[..., Any]:
++    """The native ``requests`` response hook: liveness, nonidentity encoding, an advertised length over ``limit``; then either
++    buffer the bounded body (``buffer=True``, the STT upload) or refuse a redirect-class answer unread (``buffer=False``, REST
++    TTS, whose body is streamed by the caller). The response is closed on every refusal."""
++    def hook(response: Any, **_kwargs: Any) -> Any:
++        try:
++            native_send_policy.check_alive()
++            refuse_nonidentity(response.headers.get("Content-Encoding"))
++            if _declared_length(response.headers) > limit:
++                raise native_send_policy.refuse("too_long")
++            if buffer:
++                _buffer_answer(response, limit)
++            elif response.is_redirect:
++                raise RuntimeError("TTS provider answered with a redirect")  # counted send, unusable answer; never followed
++        except BaseException:
++            response.close()
++            raise
++        return response
++    return hook
 diff --git a/tools/native_send_policy.py b/tools/native_send_policy.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..af8a1745350d0d22a08ed79eb0d206c670f02468
+index 0000000000000000000000000000000000000000..3c6ed05132e454d4584858beda6216a8803b1f15
 --- /dev/null
 +++ b/tools/native_send_policy.py
-@@ -0,0 +1,645 @@
+@@ -0,0 +1,673 @@
 +"""One-send transport policy for a native (Relay) voice call.
 +
 +``gateway.session_native_voice`` activates a :class:`SendPolicy` around exactly one configured
@@ -10944,6 +11508,7 @@ index 0000000000000000000000000000000000000000..af8a1745350d0d22a08ed79eb0d206c6
 +import inspect
 +import logging
 +import threading
++import time
 +from typing import Any, Callable, Iterable, Iterator, Optional
 +
 +
@@ -11239,6 +11804,18 @@ index 0000000000000000000000000000000000000000..af8a1745350d0d22a08ed79eb0d206c6
 +        raise policy.refusal_for('closed')
 +
 +
++def check_alive() -> None:
++    """Inside a native call, between body reads: refuse once Stop/the deadline closed the call (``closed``) or the absolute
++    deadline passed (``timeout``). Cheap, no callback, no send. A read that is already blocked is not preempted by this."""
++    policy = _current.get()
++    if policy is None:
++        return
++    if policy.is_closed():
++        raise policy.refusal_for('closed')
++    if policy.deadline is not None and time.monotonic() >= policy.deadline:
++        raise policy.refusal_for('timeout')
++
++
 +def credential_client_kwargs() -> dict:
 +    """Extra ``httpx.Client(...)`` kwargs of an OAuth discovery/refresh client: the credential-phase probe on every request
 +    it sends. Outside a native call: nothing (the stock clients are built exactly as before)."""
@@ -11356,20 +11933,28 @@ index 0000000000000000000000000000000000000000..af8a1745350d0d22a08ed79eb0d206c6
 +
 +
 +def stt_requests_kwargs() -> dict:
-+    """Extra ``requests.post`` kwargs of a native STT upload: no redirect (:func:`requests_kwargs`) and ``stream=True``, so
-+    Requests returns after the headers instead of reading the whole answer (``Session.send`` evaluates ``response.content``
-+    unless streaming); the caller then reads it through :func:`bounded_requests_answer`."""
-+    return {} if _current.get() is None else {'allow_redirects': False, 'stream': True}
-+
-+
-+def bounded_requests_answer(response: Any) -> Any:
-+    """A native STT ``requests`` answer, read under the policy's cap with identity enforced (see
-+    :mod:`tools.native_response_bounds`). Outside a native call the response is returned untouched."""
++    """Extra ``requests.post`` kwargs of a native STT upload: no redirect (:func:`requests_kwargs`), ``stream=True`` (Requests
++    returns after the headers instead of reading the whole answer) and the response hook that buffers the answer under the
++    1 MiB cap with identity enforced. The hook is what runs BEFORE Requests' redirect step (see
++    :mod:`tools.native_response_bounds`); the caller's parser then reads the bounded bytes."""
 +    policy = _current.get()
 +    if policy is None:
-+        return response
-+    from tools.native_response_bounds import read_requests_answer
-+    return read_requests_answer(response, response_limit(1 << 20))
++        return {}
++    from tools.native_response_bounds import requests_response_hook
++    return {'allow_redirects': False, 'stream': True,
++            'hooks': {'response': [requests_response_hook(response_limit(1 << 20), buffer=True)]}}
++
++
++def tts_requests_kwargs(default_limit: int) -> dict:
++    """Extra ``requests.post`` kwargs of a native REST TTS send: the redirect-is-an-answer rule of :func:`requests_kwargs`
++    plus the response hook (liveness, identity, declared length, a redirect-class answer refused unread). The body itself is
++    streamed by the caller under :func:`response_limit`."""
++    policy = _current.get()
++    if policy is None:
++        return {}
++    from tools.native_response_bounds import requests_response_hook
++    return {'allow_redirects': False,
++            'hooks': {'response': [requests_response_hook(response_limit(default_limit), buffer=False)]}}
 +
 +
 +def rest_headers(headers: dict) -> dict:
@@ -11440,7 +12025,11 @@ index 0000000000000000000000000000000000000000..af8a1745350d0d22a08ed79eb0d206c6
 +def native_transport():
 +    """The :class:`agent.native_once.NativeTransport` handed to an opted-in plugin: a plain httpx client (httpx's
 +    default transport makes no automatic retry) with redirects disabled, the call's timeout, the send gate on every
-+    request and the decoded-size bound on every answer. Tracked, so the seam closes it whatever the plugin did."""
++    request and the answer bound on every response. The client asks for ``Accept-Encoding: identity`` and the response hook
++    REFUSES any nonidentity ``Content-Encoding`` before the body is read or decoded (a plugin that ignores identity-only
++    answers cannot be served by this transport), refuses an advertised oversize body unread and bounds the rest per
++    underlying chunk (chunk-granular, not an allocation-hard cap; Stop/the deadline are checked between chunks). Tracked, so
++    the seam closes it whatever the plugin did."""
 +    policy = _current.get()
 +    if policy is None or policy.max_output_bytes is None:
 +        raise refuse('unsupported')
@@ -11465,7 +12054,8 @@ index 0000000000000000000000000000000000000000..af8a1745350d0d22a08ed79eb0d206c6
 +    """httpx ``response`` event hook, run BEFORE the client's eager body read: a nonidentity ``Content-Encoding`` is refused on
 +    the headers (no decoder ever sees the body), an advertised ``Content-Length`` over ``limit`` is refused with zero body
 +    reads, and otherwise the body is refused once it exceeds ``limit`` bytes whether or not its length was declared (the SDK
-+    reads it whole, so nothing else bounds it). A declared length is an early-rejection aid, never proof.
++    reads it whole, so nothing else bounds it). A declared length is an early-rejection aid, never proof. Stop/the deadline are
++    checked between chunks (never a callback or a send); a read already blocked in the stream is not preempted.
 +
 +    With the encoding rule the stream is undecoded, so the check is per underlying stream chunk: the data kept is at most
 +    ``limit`` plus the one chunk that crosses it. That is NOT an allocation-hard heap cap. The clients built here also ask
@@ -11473,6 +12063,7 @@ index 0000000000000000000000000000000000000000..af8a1745350d0d22a08ed79eb0d206c6
 +    from tools.native_response_bounds import refuse_nonidentity
 +
 +    def hook(response) -> None:
++        check_alive()
 +        refuse_nonidentity(response.headers.get('content-encoding'))
 +        declared = response.headers.get('content-length', '')
 +        if declared.isdigit() and int(declared) > limit:
@@ -11482,6 +12073,7 @@ index 0000000000000000000000000000000000000000..af8a1745350d0d22a08ed79eb0d206c6
 +        def bounded(chunk_size=None):
 +            total = 0
 +            for chunk in iter_bytes(chunk_size):
++                check_alive()  # Stop/deadline between chunks; a read already blocked in the stream is not preempted
 +                total += len(chunk)
 +                if total > limit:
 +                    raise refuse('too_long')
@@ -11988,7 +12580,7 @@ index 0000000000000000000000000000000000000000..dc0a08db84aff8592ddf705f2430719d
 +if __name__ == '__main__':
 +    main()
 diff --git a/tools/transcription_audio.py b/tools/transcription_audio.py
-index 19e4956acc46941af48ff48569817de205575937..04935c7a20a34f157e71599acaff51b324ee5145 100644
+index 19e4956acc46941af48ff48569817de205575937..d6dc72e03779a843ccb7f06f0107008c39b05b7c 100644
 --- a/tools/transcription_audio.py
 +++ b/tools/transcription_audio.py
 @@ -18,6 +18,7 @@ from pathlib import Path
@@ -11999,7 +12591,7 @@ index 19e4956acc46941af48ff48569817de205575937..04935c7a20a34f157e71599acaff51b3
  from utils import is_truthy_value
  from tools.transcription_common import (
      COMMON_LOCAL_BIN_DIRS, LOCAL_NATIVE_AUDIO_FORMATS, MAX_FILE_SIZE, SUPPORTED_FORMATS,
-@@ -140,15 +141,62 @@ def _prepare_audio_for_transcription(file_path: str) -> tuple[Optional[str], Opt
+@@ -140,15 +141,61 @@ def _prepare_audio_for_transcription(file_path: str) -> tuple[Optional[str], Opt
          return None, None, _error_result(f"Failed to convert .silk audio for transcription: {exc}")
  
  
@@ -12014,9 +12606,8 @@ index 19e4956acc46941af48ff48569817de205575937..04935c7a20a34f157e71599acaff51b3
 +    Stop-aware child bounded by the call's exact remaining deadline, local-file protocols only, no stdin, capped output
 +    streams and a capped, checked WAV. A conversion that fails or leaves no real WAV is an error result (the child really
 +    ran); Stop/deadline refusals propagate. Cleanup is the caller's temporary directory."""
-+    import time
 +    from tools.tts_command_provider import run_native_argv
-+    from tools.tts_tool_local import _ENGINE_STREAM_BYTES, _native_child_env
++    from tools.tts_tool_local import _ENGINE_STREAM_BYTES, _native_child_env, _remaining
 +    policy = native_send_policy.current()
 +
 +    def watch() -> Optional[str]:
@@ -12026,7 +12617,7 @@ index 19e4956acc46941af48ff48569817de205575937..04935c7a20a34f157e71599acaff51b3
 +            return None
 +    try:
 +        run_native_argv([ffmpeg, *_NATIVE_NORMALIZE_INPUT, file_path, "-y", converted_path],
-+                        timeout=max(0.05, policy.deadline - time.monotonic()), env=_native_child_env(),
++                        timeout=_remaining(policy), env=_native_child_env(),
 +                        cwd=os.path.dirname(converted_path), watch=watch, max_stream_bytes=_ENGINE_STREAM_BYTES)
 +    except subprocess.TimeoutExpired:
 +        raise native_send_policy.refuse("timeout") from None  # its timeout IS the call's remaining deadline
@@ -12064,7 +12655,7 @@ index 19e4956acc46941af48ff48569817de205575937..04935c7a20a34f157e71599acaff51b3
          _run_quiet([ffmpeg, "-y", "-i", file_path, converted_path], timeout=300)
          return converted_path, None
 diff --git a/tools/transcription_cloud.py b/tools/transcription_cloud.py
-index b54514ae29fc3e63a2c46dc783411f7ddc586daa..df50cfc62ea7a79e25fcc8aad6b1349332ad9847 100644
+index b54514ae29fc3e63a2c46dc783411f7ddc586daa..53cd7c50cf330cc5d13a8dd6d0c1bba4daf2b029 100644
 --- a/tools/transcription_cloud.py
 +++ b/tools/transcription_cloud.py
 @@ -17,6 +17,7 @@ from typing import Any, Callable, Dict, Optional
@@ -12139,7 +12730,7 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..df50cfc62ea7a79e25fcc8aad6b13493
          transcript_text = _extract_transcript_text(result)
          logger.info("Transcribed %s via Mistral API (%s, %d chars)",
                      Path(file_path).name, model_name, len(transcript_text))
-@@ -220,8 +238,15 @@ def _transcribe_mistral(
+@@ -220,8 +238,14 @@ def _transcribe_mistral(
  def _post_audio_multipart(url: str, headers: dict[str, str], file_path: str, data: dict[str, str]):
      import requests
      with open(file_path, "rb") as audio_file:
@@ -12147,17 +12738,16 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..df50cfc62ea7a79e25fcc8aad6b13493
 -                             data=data, timeout=120)
 +        native_send_policy.begin_send()
 +        # Inside a native call: no redirect, ``stream=True`` (Requests returns after the headers instead of reading the whole
-+        # answer) and the identity request; the answer is then read under the 1 MiB cap with a nonidentity encoding refused
-+        # (``bounded_requests_answer``). Outside one, the call is byte-for-byte the stock one.
-+        response = requests.post(url, headers=native_send_policy.rest_headers(headers),
-+                                 files={"file": (Path(file_path).name, audio_file)}, data=data,
-+                                 timeout=native_send_policy.request_timeout(120),
-+                                 **native_send_policy.stt_requests_kwargs())
-+        return native_send_policy.bounded_requests_answer(response)
++        # answer), the identity request and a response HOOK that buffers the answer under the 1 MiB cap with a nonidentity
++        # encoding refused. It must be a hook: Requests dispatches it before its own redirect step, which would otherwise read
++        # (and decode) a 3xx body whole. Outside a native call the call is byte-for-byte the stock one.
++        return requests.post(url, headers=native_send_policy.rest_headers(headers),
++                             files={"file": (Path(file_path).name, audio_file)}, data=data,
++                             timeout=native_send_policy.request_timeout(120), **native_send_policy.stt_requests_kwargs())
  
  
  def _rest_provider(
-@@ -255,9 +280,10 @@ def _transcribe_xai(
+@@ -255,9 +279,10 @@ def _transcribe_xai(
      """Transcribe via xAI ``POST /v1/stt`` (multipart). Supports ITN, diarization, word timestamps."""
      from hermes_cli.config import get_env_value
      from tools.transcription_tools import _load_stt_config, _resolve_stt_language
@@ -12169,7 +12759,7 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..df50cfc62ea7a79e25fcc8aad6b13493
      # STT is API-billed: prefer the explicit XAI_API_KEY over the xAI OAuth/Grok-subscription
      # credential, which may be valid for Grok yet hit spending-limit errors on /v1/stt.
      direct_api_key = str(get_env_value("XAI_API_KEY") or "").strip()
-@@ -267,6 +293,7 @@ def _transcribe_xai(
+@@ -267,6 +292,7 @@ def _transcribe_xai(
      api_key = str(creds.get("api_key") or "").strip()
      if not api_key:
          return _error_result("No xAI credentials found. Configure xAI OAuth in `hermes model` or set XAI_API_KEY")
@@ -12177,7 +12767,7 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..df50cfc62ea7a79e25fcc8aad6b13493
      stt_config = _load_stt_config()
      xai_config = stt_config.get("xai") or {}
  
-@@ -299,7 +326,8 @@ def _transcribe_xai(
+@@ -299,7 +325,8 @@ def _transcribe_xai(
              return _post_audio_multipart(f"{endpoint_base_url}/stt", headers, file_path, data)
  
          response = _post_transcription(api_key, _resolve_base_url(creds))
@@ -12187,7 +12777,7 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..df50cfc62ea7a79e25fcc8aad6b13493
              logger.info("xAI STT got HTTP %d; refreshing OAuth credentials and retrying once", response.status_code)
              try:
                  refreshed_creds = resolve_xai_http_credentials(force_refresh=True, api_key_hint=api_key)
-@@ -372,6 +400,8 @@ def _transcribe_deepinfra(
+@@ -372,6 +399,8 @@ def _transcribe_deepinfra(
      from hermes_cli.models import deepinfra_base_url, deepinfra_model_ids
      # ``stt.deepinfra: null`` in YAML yields None, not {} — coalesce.
      base_url = deepinfra_base_url(_get_stt_section(_load_stt_config(), "deepinfra"))
@@ -12846,7 +13436,7 @@ index b60cdf372f35761b70ea6ed686579335f4d013b1..42622a269a8777b80840d342ca4571d7
  
  
 diff --git a/tools/tts_tool_local.py b/tools/tts_tool_local.py
-index 81c23cdbe52435023d2a76c6d7932379c338af2a..e4ff24f88297e4c76a9e32f6856b75e38fcd2159 100644
+index 81c23cdbe52435023d2a76c6d7932379c338af2a..e33d951d1624b0dcb15905c9d2637cbfb1cc093d 100644
 --- a/tools/tts_tool_local.py
 +++ b/tools/tts_tool_local.py
 @@ -8,11 +8,13 @@ container. Piper and KittenTTS keep loaded models in small LRU caches registered
@@ -12864,7 +13454,7 @@ index 81c23cdbe52435023d2a76c6d7932379c338af2a..e4ff24f88297e4c76a9e32f6856b75e3
  
  from tools.tts_tool_delivery import _finalize_wav_output, _origin, _section, _wav_sidecar_path
  
-@@ -193,3 +195,227 @@ def _generate_kittentts(text: str, output_path: str, tts_config: dict[str, Any])
+@@ -193,3 +195,233 @@ def _generate_kittentts(text: str, output_path: str, tts_config: dict[str, Any])
      wav_path = _wav_sidecar_path(output_path)
      sf.write(wav_path, audio, 24000)
      return _finalize_wav_output(wav_path, output_path)
@@ -12992,8 +13582,14 @@ index 81c23cdbe52435023d2a76c6d7932379c338af2a..e4ff24f88297e4c76a9e32f6856b75e3
 +
 +
 +def _remaining(policy: Any) -> float:
++    """The exact positive float left of the call's deadline. Once nothing remains no child is started: the call is a ``timeout``
++    (there is no artificial minimum lifetime)."""
 +    import time
-+    return max(0.05, policy.deadline - time.monotonic())
++    from tools import native_send_policy
++    remaining = policy.deadline - time.monotonic()
++    if remaining <= 0:
++        raise native_send_policy.refuse("timeout")
++    return remaining
 +
 +
 +def _native_convert(ffmpeg: str, wav_path: str, mp3_path: str, policy: Any, cwd: str, probe: bool = False) -> None:
@@ -13200,7 +13796,7 @@ index 8dee4a9d8ad03e80c5eba6310003d552c3eed0f7..93c39a19e8dd67c2824e1361eaa7bfa1
 +    if not (isinstance(answer, NativeTtsAnswer) and answer.status == 'ok'):
 +        raise RuntimeError("native plugin synthesis failed")
 diff --git a/tools/tts_tool_providers.py b/tools/tts_tool_providers.py
-index 15b0ad8ea39cbcad7166a86a235827eb78901d40..5be3ad3e411ac7b0295671e2a3c46854942b268c 100644
+index 15b0ad8ea39cbcad7166a86a235827eb78901d40..a3db27b4b87e102e3392ed81ef0074990fd01517 100644
 --- a/tools/tts_tool_providers.py
 +++ b/tools/tts_tool_providers.py
 @@ -11,6 +11,7 @@ from __future__ import annotations
@@ -13219,7 +13815,7 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..5be3ad3e411ac7b0295671e2a3c46854
  from tools.tts_tool_delivery import _origin, _section, _wrap_pcm_as_wav, _write_wav_bytes_as
  from tools.xai_http import hermes_xai_user_agent
  
-@@ -99,12 +101,20 @@ def _close_response(response: Any) -> None:
+@@ -99,18 +101,27 @@ def _close_response(response: Any) -> None:
              close()
  
  
@@ -13241,7 +13837,14 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..5be3ad3e411ac7b0295671e2a3c46854
          if _response_has_explicit_stream(response):
              iterator = response.iter_content(chunk_size=TTS_RESPONSE_BODY_CHUNK_BYTES)
          else:
-@@ -119,6 +129,8 @@ def _read_tts_response_bytes(response: Any, *, label: str, limit: Optional[int]
+             content = vars(response).get("content", getattr(type(response), "content", b""))
+             iterator = (content,) if isinstance(content, (str, bytes, bytearray)) else ()
+         for chunk in iterator:
++            native_send_policy.check_alive()  # native: Stop/deadline between reads (a no-op outside a native call)
+             if not chunk:
+                 continue
+             if isinstance(chunk, str):
+@@ -119,6 +130,8 @@ def _read_tts_response_bytes(response: Any, *, label: str, limit: Optional[int]
              total += len(chunk)
              if total > limit:
                  _close_response(response)
@@ -13250,7 +13853,7 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..5be3ad3e411ac7b0295671e2a3c46854
                  raise RuntimeError(f"{label} response exceeds {limit} bytes")
              chunks.append(chunk)
          return b"".join(chunks)
-@@ -150,9 +162,28 @@ def _write_bytes(output_path: str, audio_bytes: bytes) -> str:
+@@ -150,9 +163,23 @@ def _write_bytes(output_path: str, audio_bytes: bytes) -> str:
  
  
  def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str], **extra: Any):
@@ -13259,29 +13862,24 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..5be3ad3e411ac7b0295671e2a3c46854
 +
 +    Inside a native voice call this is the actual HTTP boundary of the xAI, MiniMax and Gemini generators: the send gate
 +    runs immediately before the wire, the timeout is bounded by the call, a redirect is an answer (never a second POST),
-+    the body is requested uncompressed and a nonidentity answer (a peer that ignored the request) is refused before any decode. Outside a native call nothing here differs from stock."""
++    the body is requested uncompressed and a response HOOK (dispatched by Requests before its own redirect step) refuses a
++    nonidentity answer (a peer that ignored the request) before any decode, an advertised oversize body unread and a
++    redirect-class answer unread. Outside a native call nothing here differs from stock."""
      import requests
 -    return requests.post(url, headers=headers, json=payload, timeout=60, stream=True, **extra)
 +    timeout = native_send_policy.request_timeout(60)
-+    native_options = native_send_policy.requests_kwargs()
++    native_options = native_send_policy.tts_requests_kwargs(TTS_RESPONSE_BODY_LIMIT_BYTES)
 +    headers = native_send_policy.rest_headers(headers)
 +    native_send_policy.begin_send()
 +    response = requests.post(url, headers=headers, json=payload, timeout=timeout, stream=True, **native_options, **extra)
 +    if native_send_policy.no_resend() and 300 <= response.status_code < 400:
 +        _close_response(response)
 +        raise RuntimeError("TTS provider answered with a redirect")  # counted send, unusable answer; never followed
-+    if native_send_policy.no_resend():
-+        from tools.native_response_bounds import refuse_nonidentity
-+        try:
-+            refuse_nonidentity(response.headers.get("Content-Encoding"))  # a peer that ignored identity: before any decode
-+        except native_send_policy.NativeSendRefused:
-+            _close_response(response)
-+            raise
 +    return response
  
  
  # --- Auxiliary-model speech-tag rewrites ---
-@@ -179,7 +210,12 @@ _TAG_REWRITE_TAIL = "- Do not explain or comment.\n- Return only the tagged TTS
+@@ -179,7 +206,12 @@ _TAG_REWRITE_TAIL = "- Do not explain or comment.\n- Return only the tagged TTS
  def _rewrite_with_auxiliary_model(
      system_prompt: str, user_prompt: str, fallback: str, *, label: str, fallback_label: str, level: int,
  ) -> str:
@@ -13295,7 +13893,7 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..5be3ad3e411ac7b0295671e2a3c46854
      try:
          from agent.auxiliary_client import call_llm
          response = call_llm(
-@@ -200,7 +236,9 @@ async def _generate_edge_tts(text: str, output_path: str, tts_config: dict[str,
+@@ -200,7 +232,9 @@ async def _generate_edge_tts(text: str, output_path: str, tts_config: dict[str,
      kwargs = {"voice": edge_config.get("voice", DEFAULT_EDGE_VOICE)}
      if speed != 1.0:
          kwargs["rate"] = f"{round((speed - 1.0) * 100):+d}%"
@@ -13306,7 +13904,7 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..5be3ad3e411ac7b0295671e2a3c46854
      return output_path
  
  
-@@ -216,16 +254,34 @@ def _elevenlabs_environment_kwargs(el_config: dict[str, Any]) -> dict[str, Any]:
+@@ -216,16 +250,34 @@ def _elevenlabs_environment_kwargs(el_config: dict[str, Any]) -> dict[str, Any]:
      return {"environment": ElevenLabsEnvironment(base=base_url, wss=wss_url)}
  
  
@@ -13344,7 +13942,7 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..5be3ad3e411ac7b0295671e2a3c46854
      return output_path
  
  
-@@ -285,8 +341,9 @@ def _clamped_number(raw: Any, cast, lo, hi):
+@@ -285,8 +337,9 @@ def _clamped_number(raw: Any, cast, lo, hi):
  
  
  def _generate_xai_tts(text: str, output_path: str, tts_config: dict[str, Any]) -> str:
@@ -13355,7 +13953,7 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..5be3ad3e411ac7b0295671e2a3c46854
      # TTS is API-billed: a subscription OAuth bearer can authorize chat while
      # returning 403 for /v1/tts, so prefer an explicit XAI_API_KEY over OAuth.
      # See #87045, #88040.
-@@ -294,6 +351,7 @@ def _generate_xai_tts(text: str, output_path: str, tts_config: dict[str, Any]) -
+@@ -294,6 +347,7 @@ def _generate_xai_tts(text: str, output_path: str, tts_config: dict[str, Any]) -
      api_key = str(creds.get("api_key") or "").strip()
      if not api_key:
          raise ValueError("No xAI credentials found. Configure xAI OAuth in `hermes model` or set XAI_API_KEY.")
@@ -13363,7 +13961,7 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..5be3ad3e411ac7b0295671e2a3c46854
      xai_config = tts_config.get("xai") or {}
      voice_id = str(xai_config.get("voice_id", DEFAULT_XAI_VOICE_ID)).strip() or DEFAULT_XAI_VOICE_ID
      language = str(xai_config.get("language", DEFAULT_XAI_LANGUAGE)).strip() or DEFAULT_XAI_LANGUAGE
-@@ -453,15 +511,20 @@ def _generate_mistral_tts(text: str, output_path: str, tts_config: dict[str, Any
+@@ -453,15 +507,20 @@ def _generate_mistral_tts(text: str, output_path: str, tts_config: dict[str, Any
      if mi_config.get("base_url"):
          client_kwargs["server_url"] = mi_config["base_url"]  # the Mistral SDK calls it server_url
      Mistral = _origin()._import_mistral_client()  # ImportError must escape the RuntimeError wrap
