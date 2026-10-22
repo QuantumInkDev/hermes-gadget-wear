@@ -463,10 +463,10 @@ index 0000000000000000000000000000000000000000..0ebcf76957838ebc56837a23b80f50d0
 +    return fragment
 diff --git a/gateway/session_native_voice_gate.py b/gateway/session_native_voice_gate.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..37c365aa2aabc6c399d954b5d3d72fc437d64329
+index 0000000000000000000000000000000000000000..f1eb90948e87aded5bbe5b89a1e924627768a06e
 --- /dev/null
 +++ b/gateway/session_native_voice_gate.py
-@@ -0,0 +1,119 @@
+@@ -0,0 +1,150 @@
 +"""Shared plumbing of the native voice seam: the send gate, bounded waiting and provider evidence.
 +
 +The consumer's ``authorize`` / ``before_send`` callables belong to the consumer's event loop (they
@@ -549,10 +549,41 @@ index 0000000000000000000000000000000000000000..37c365aa2aabc6c399d954b5d3d72fc4
 +    return gate
 +
 +
++def loop_probe(loop, policy, authorize, deadline):
++    """The credential-phase probe: ``authorize`` ONLY, on the consumer's loop, under the same close/abandon/deadline fence.
++
++    It is asked immediately before each actual OAuth discovery/refresh request. It is not a send: it never calls
++    ``before_send``, never ``policy.commit()``, and leaves every send counter alone. The worker never runs the callback itself;
++    a callback still queued after the call was closed, abandoned or returned does nothing."""
++    def probe():
++        verdict: concurrent.futures.Future = concurrent.futures.Future()
++        abandoned = threading.Event()
++
++        def run():
++            if abandoned.is_set() or policy.is_closed():
++                verdict.set_result('closed')
++                return
++            verdict.set_result(check(authorize))
++        try:
++            loop.call_soon_threadsafe(run)
++            refusal = verdict.result(timeout=max(0.0, deadline - time.monotonic()))
++        except concurrent.futures.TimeoutError:
++            abandoned.set()
++            raise native_send_policy.NativeSendRefused('timeout') from None
++        except RuntimeError:  # the loop is gone
++            abandoned.set()
++            raise native_send_policy.NativeSendRefused('closed') from None
++        if refusal is not None:
++            raise native_send_policy.NativeSendRefused(refusal)
++    return probe
++
++
 +def new_policy(loop, authorize, before_send, deadline, *, timeout_s, providers, max_output_bytes=None):
-+    """A send policy whose gate runs the consumer's callbacks on ``loop`` under the close fence."""
++    """A send policy whose gate runs the consumer's callbacks on ``loop`` under the close fence; its credential phase
++    asks the consumer's ``authorize`` alone, on the same loop, under the same fence."""
 +    policy = native_send_policy.SendPolicy(timeout_s=timeout_s, providers=providers, max_output_bytes=max_output_bytes)
 +    policy.set_gate(loop_gate(loop, policy, authorize, before_send, deadline))
++    policy.set_credential_probe(loop_probe(loop, policy, authorize, deadline))
 +    return policy
 +
 +
@@ -588,10 +619,10 @@ index 0000000000000000000000000000000000000000..37c365aa2aabc6c399d954b5d3d72fc4
 +    return PROVIDER_COMPLETED if answered else PROVIDER_FAILED
 diff --git a/gateway/session_native_voice_stt.py b/gateway/session_native_voice_stt.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..8f7611fb4e09fb1c83ba0ecd21c37d2e942e27a4
+index 0000000000000000000000000000000000000000..2e068ac5cd71de1d8d5915cc7f538a19c717779e
 --- /dev/null
 +++ b/gateway/session_native_voice_stt.py
-@@ -0,0 +1,169 @@
+@@ -0,0 +1,174 @@
 +"""Configured-once speech-to-text for the native voice seam (see ``session_native_voice``).
 +
 +The profile's own STT configuration is read at call time through the stock resolvers, the audio is
@@ -633,7 +664,12 @@ index 0000000000000000000000000000000000000000..8f7611fb4e09fb1c83ba0ecd21c37d2e
 +        with native_send_policy.activate(policy):
 +            config = stt._load_stt_config()
 +            enabled = stt.is_stt_enabled(config)
-+            provider = stt._get_provider(config) if enabled else 'none'
++            try:
++                provider = stt._get_provider(config) if enabled else 'none'
++            except native_send_policy.NativeSendRefused:
++                # Provider selection probes a remote provider's credentials (xAI may refresh OAuth): a refusal there
++                # is an unsent refusal, never an escape to the consumer. The policy recorded why.
++                return _Attempt(None, 'unresolved', True)
 +            if not enabled:
 +                return _Attempt(None, provider, False)
 +            try:
@@ -1016,6 +1052,39 @@ index 0000000000000000000000000000000000000000..771bd16be35283e47e24afbe927dcd64
 +        return _make(state, None, synth.code_points if state in ('failed', 'too_long') else 0,
 +                     'configured' if policy.sends or synth.unaccounted else None, provider)
 +    return _make('synthesized', synth.path, synth.code_points, 'configured', provider)
+diff --git a/hermes_cli/auth_xai.py b/hermes_cli/auth_xai.py
+index 2b92438a4dae721fd315628646d17f817e7450f3..5720fc5171ff325ef698108963d22ca3e1b276d0 100644
+--- a/hermes_cli/auth_xai.py
++++ b/hermes_cli/auth_xai.py
+@@ -267,8 +267,14 @@ def _xai_validate_inference_base_url(value: str, *, fallback: str) -> str:
+ 
+ 
+ def _xai_oauth_discovery(timeout_seconds: float = 15.0) -> dict[str, str]:
++    from tools import native_send_policy
++    native = native_send_policy.credential_client_kwargs()  # {} outside a native voice call
+     try:
+-        response = httpx.get(XAI_OAUTH_DISCOVERY_URL, headers={"Accept": "application/json"}, timeout=timeout_seconds)
++        if native:  # a native call: the authorization probe sits on the actual request, and the budget is the call's
++            with httpx.Client(timeout=native_send_policy.credential_timeout(timeout_seconds), **native) as client:
++                response = client.get(XAI_OAUTH_DISCOVERY_URL, headers={"Accept": "application/json"})
++        else:
++            response = httpx.get(XAI_OAUTH_DISCOVERY_URL, headers={"Accept": "application/json"}, timeout=timeout_seconds)
+     except Exception as exc:
+         raise _xai_err(f"xAI OIDC discovery failed: {exc}", "xai_discovery_failed") from exc
+     if response.status_code != 200:
+@@ -311,8 +317,10 @@ def refresh_xai_oauth_pure(
+     # Re-validate cached endpoints: an old/hand-edited auth.json may carry a non-xAI token_endpoint
+     # that would otherwise receive every future refresh_token.
+     _xai_validate_oauth_endpoint(endpoint, field="token_endpoint")
+-    timeout = httpx.Timeout(max(5.0, float(timeout_seconds)))
+-    with httpx.Client(timeout=timeout, headers={"Accept": "application/json"}) as client:
++    from tools import native_send_policy
++    timeout = httpx.Timeout(native_send_policy.credential_timeout(max(5.0, float(timeout_seconds))))
++    with httpx.Client(timeout=timeout, headers={"Accept": "application/json"},
++                      **native_send_policy.credential_client_kwargs()) as client:
+         response = client.post(
+             endpoint, headers={"Content-Type": "application/x-www-form-urlencoded"},
+             data={"grant_type": "refresh_token", "client_id": XAI_OAUTH_CLIENT_ID, "refresh_token": refresh_token},
 diff --git a/tests/gateway/mistral_voice_support.py b/tests/gateway/mistral_voice_support.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..d19830a52f92973329d654337576e93454d5b94d
@@ -1522,10 +1591,10 @@ index 0000000000000000000000000000000000000000..2e0952a763ad0ffaa3606508396023af
 +    return int(h) * 3600 + int(m) * 60 + float(sec)
 diff --git a/tests/gateway/rest_voice_support.py b/tests/gateway/rest_voice_support.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..495f4b9ea3ef79dc86fb542862641d71af0c8a33
+index 0000000000000000000000000000000000000000..540cfb0e712211a48dff6fc4b68358fc297d8a3a
 --- /dev/null
 +++ b/tests/gateway/rest_voice_support.py
-@@ -0,0 +1,235 @@
+@@ -0,0 +1,296 @@
 +"""Synthetic REST transports for the native REST TTS / xAI OAuth tests.
 +
 +Only network bytes are replaced, and only at the lowest layer that still lets the real library run:
@@ -1554,6 +1623,7 @@ index 0000000000000000000000000000000000000000..495f4b9ea3ef79dc86fb542862641d71
 +import httpx
 +
 +from hermes_constants import get_hermes_home
++from tests.gateway import native_voice_support as support
 +
 +
 +class RestWire:
@@ -1684,16 +1754,22 @@ index 0000000000000000000000000000000000000000..495f4b9ea3ef79dc86fb542862641d71
 +    """Synthetic xAI OAuth authority. ``token_script`` steps: ``('ok', {access_token, refresh_token})``,
 +    ``('status', n)``, ``('redirect', url)``, ``('badjson',)``, ``('raise', exc)``. ``hold`` stalls the token POST."""
 +
-+    def __init__(self, token_script=None, hold=None, events=None):
++    def __init__(self, token_script=None, hold=None, events=None, hold_discovery=None):
 +        self.token_script = list(token_script or [])
 +        self.requests = []
 +        self.hold = hold
++        self.hold_discovery = hold_discovery
 +        self.events = events
 +        self.entered = threading.Event()
++        self.discovery_entered = threading.Event()
 +
 +    @property
 +    def posts(self):
 +        return [r for r in self.requests if r.method == 'POST']
++
++    @property
++    def gets(self):
++        return [r for r in self.requests if r.method == 'GET']
 +
 +    def refresh_tokens_sent(self):
 +        return [parse_qs(r.content.decode())['refresh_token'][0] for r in self.posts]
@@ -1703,6 +1779,9 @@ index 0000000000000000000000000000000000000000..495f4b9ea3ef79dc86fb542862641d71
 +        if self.events is not None:
 +            self.events.append('oauth-discovery' if request.method == 'GET' else 'oauth-refresh')
 +        if request.method == 'GET':
++            self.discovery_entered.set()
++            if self.hold_discovery is not None:
++                assert self.hold_discovery.wait(30), 'the test never released the stalled OAuth discovery'
 +            return httpx.Response(200, request=request, json={'authorization_endpoint': 'https://auth.x.ai/oauth2/authorize',
 +                                                              'token_endpoint': 'https://auth.x.ai/oauth2/token'})
 +        self.entered.set()
@@ -1761,6 +1840,57 @@ index 0000000000000000000000000000000000000000..495f4b9ea3ef79dc86fb542862641d71
 +
 +    def fire(self):
 +        self.fired.set()
++
++
++class HeldProbe:
++    """Holds the loop callback the worker enqueues for the consumer's AUTHORIZATION-ONLY credential probe (the
++    ``loop_probe`` closure of the gate module) until the test releases it. Paid-gate callbacks are not held."""
++
++    def __init__(self, monkeypatch, which=1):
++        self.loop = asyncio.get_running_loop()
++        self.enqueued = threading.Event()
++        self.held = None
++        self.which = which
++        self.seen = 0
++        self.real = self.loop.call_soon_threadsafe
++
++        def intercept(callback, *args, **kwargs):
++            if 'loop_probe' in getattr(callback, '__qualname__', ''):
++                self.seen += 1
++                if self.seen == self.which:
++                    self.held = callback
++                    self.enqueued.set()
++                    return None
++            return self.real(callback, *args, **kwargs)
++        monkeypatch.setattr(self.loop, 'call_soon_threadsafe', intercept)
++
++    async def wait_enqueued(self):
++        assert await asyncio.to_thread(self.enqueued.wait, 10)
++
++    async def release(self):
++        done = asyncio.Event()
++
++        def run():
++            self.held()
++            done.set()
++        self.real(run)
++        await done.wait()
++
++
++class ThreadedCallbacks(support.Callbacks):
++    """The consumer's callbacks, recording the thread each ran on (they must run on the consumer's own loop thread)."""
++
++    def __init__(self, *args, **kwargs):
++        super().__init__(*args, **kwargs)
++        self.threads = []
++
++    def authorize(self):
++        self.threads.append(threading.get_ident())
++        super().authorize()
++
++    def before_send(self):
++        self.threads.append(threading.get_ident())
++        super().before_send()
 diff --git a/tests/gateway/test_native_voice_display.py b/tests/gateway/test_native_voice_display.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..885ebcba74591c415366feb8d6b2db5916538161
@@ -4074,10 +4204,10 @@ index 0000000000000000000000000000000000000000..072f2904434d182a18985a0588245c63
 +    assert os.listdir(out) == []
 diff --git a/tests/gateway/test_native_voice_rest_tts.py b/tests/gateway/test_native_voice_rest_tts.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..beb341159946bdddbc57bf9e6aa142c1b677de97
+index 0000000000000000000000000000000000000000..a24f531dd419dd0c7eb370b4202e64671de5c3a9
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_rest_tts.py
-@@ -0,0 +1,444 @@
+@@ -0,0 +1,493 @@
 +"""Native voice seam, REST TTS (xAI, MiniMax, Gemini): real request construction, one gated send per chunk, bounds.
 +
 +The stock generators (``tools.tts_tool_providers._generate_*``) run unchanged inside the seam; the REAL ``requests``
@@ -4380,14 +4510,63 @@ index 0000000000000000000000000000000000000000..beb341159946bdddbc57bf9e6aa142c1
 +    assert (outcome(result), wire.count) == (('failed', None, 'completed'), 1) and os.listdir(out) == []
 +
 +
++class Converter:
++    """FAULT INJECTION at the converter's process boundary (``tools.tts_tool_delivery._ffmpeg_run``) and nowhere else.
++
++    The provider request, the answer parser, the WAV wrapper, the chunk bookkeeping and the cleanup are the real code; only the
++    ffmpeg process result is scripted, so a conversion failure is deterministic. The real ffmpeg success path is proved by
++    ``test_each_provider_sends_once_through_the_gate_with_the_stock_request[gemini]`` and the multi-chunk join tests."""
++
++    def __init__(self, monkeypatch, returncode, writes_empty_output=False):
++        import subprocess
++        self.calls = []
++        self.wav_paths = []
++
++        def run(ffmpeg, args, **kwargs):
++            self.calls.append(args)
++            self.wav_paths.append(args[args.index('-i') + 1])
++            if writes_empty_output:
++                open(args[-1], 'wb').close()
++            return subprocess.CompletedProcess([ffmpeg, *args], returncode, stdout=b'', stderr=b'synthetic ffmpeg failure')
++        monkeypatch.setattr('tools.tts_tool_delivery._ffmpeg_run', run)
++
++
 +@pytest.mark.asyncio
-+async def test_gemini_conversion_error_after_a_paid_answer_is_failed_after_send(monkeypatch, out):
++async def test_a_conversion_failure_after_a_paid_gemini_answer_is_failed_after_send_with_one_send_and_cleanup(monkeypatch, out):
 +    gemini_profile()
-+    wire = rest.RestWire([rest.gemini_answer(b'\x01'), rest.gemini_answer(rest.pcm_bytes(0.2))])  # one byte: not audio
++    converter = Converter(monkeypatch, returncode=1)  # ffmpeg exits non-zero: the stock code raises "ffmpeg conversion failed"
++    cb = support.Callbacks()
++    wire = rest.RestWire([rest.gemini_answer(rest.pcm_bytes(0.2)), rest.gemini_answer(rest.pcm_bytes(0.2))])
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert outcome(result) == ('failed', None, 'failed_after_send')  # exact: a paid answer that could not be converted
++    assert (wire.count, cb.before_send_calls, len(converter.calls)) == (1, 1, 1)  # one request, one paid callback, one conversion
++    assert os.listdir(out) == []  # the chunk file never survived
++    assert not os.path.exists(converter.wav_paths[0])  # the temporary WAV was removed by the stock cleanup
++    assert 'synthetic ffmpeg failure' not in repr(result)
++
++
++@pytest.mark.asyncio
++async def test_a_converter_that_writes_an_empty_file_is_failed_completed_which_differs_from_a_conversion_failure(monkeypatch, out):
++    gemini_profile()
++    converter = Converter(monkeypatch, returncode=0, writes_empty_output=True)  # ffmpeg "succeeds" but leaves an empty file
++    cb = support.Callbacks()
++    wire = rest.RestWire([rest.gemini_answer(rest.pcm_bytes(0.2)), rest.gemini_answer(rest.pcm_bytes(0.2))])
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert outcome(result) == ('failed', None, 'completed')  # the existing empty-audio accounting, not a conversion exception
++    assert (wire.count, cb.before_send_calls, len(converter.calls)) == (1, 1, 1) and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_a_provider_answer_with_no_audio_data_is_a_parser_failure_not_a_conversion(monkeypatch, out):
++    gemini_profile()
++    converter = Converter(monkeypatch, returncode=0)
++    wire = rest.RestWire([rest.gemini_answer(b''), rest.gemini_answer(rest.pcm_bytes(0.2))])
 +    with rest.rest_wire(monkeypatch, wire):
 +        result = await speak(out, support.Callbacks())
-+    assert result.state == 'failed' and result.provider in ('failed_after_send', 'completed')
-+    assert wire.count == 1 and os.listdir(out) == []
++    assert outcome(result) == ('failed', None, 'failed_after_send') and wire.count == 1
++    assert converter.calls == [] and os.listdir(out) == []  # the converter was never reached
 +
 +
 +# --- request/response/output bounds ---------------------------------------------------------------------------------
@@ -5472,12 +5651,308 @@ index 0000000000000000000000000000000000000000..1341ba950d1fbef5529cfbeb09e68d1a
 +        result = await seam('Hello there, friend.', out, support.Callbacks())
 +    assert (result.state, result.provider, wire.count, catalog) == ('synthesized', 'completed', 1, [])
 +    assert wire.requests[0].url.host == 'api.deepinfra.com'
+diff --git a/tests/gateway/test_native_voice_xai_credential_phase.py b/tests/gateway/test_native_voice_xai_credential_phase.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..bdf84e6be5bb038eb62e3149317e9a36083f710a
+--- /dev/null
++++ b/tests/gateway/test_native_voice_xai_credential_phase.py
+@@ -0,0 +1,290 @@
++"""Native voice seam, xAI OAuth: the credential phase is authorization-gated at every actual OAuth request.
++
++Pre-review correction C2. An authorization checked at the start of the call is not enough for a LATER credential boundary:
++discovery and the refresh POST belong to the call's deadline / Stop / authority lifetime even though they are not a paid
++send. The REAL stock resolver, credential pool, auth module and token store run over a synthetic OAuth authority below the
++real ``httpx`` client (``OAuthWire``); audio goes through the real ``requests`` stack over ``RestWire``.
++
++Contract under test: before EACH actual OAuth HTTP request the consumer's ``authorize`` is asked, on the consumer's own loop
++(never by the worker), under the same close/abandon/deadline fence as the paid gate; that phase never calls ``before_send``,
++never commits and never counts as a send; a refusal, Stop or deadline stops the next OAuth request and every audio send,
++without benching the account or falling back; a POST that was already admitted may finish and persist its rotated token
++(this is NOT remote cancellation) but nothing is sent afterwards; stock calls are untouched.
++
++Authorize numbering of a refreshed call: 1 call check, 2 probe before discovery, 3 probe before the refresh POST, 4 paid
++gate, 5 post-call check.
++"""
++import asyncio
++import os
++import threading
++import time
++
++import pytest
++
++from gateway.session_native_voice import synthesize_native_once, transcribe_native_once
++from hermes_constants import get_hermes_home
++from tests.gateway import native_voice_support as support
++from tests.gateway import rest_voice_support as rest
++from tests.gateway.mistral_voice_support import watch_worker
++
++TEXT = 'Hello there, friend.'
++KINDS = ['tts', 'stt']
++
++
++@pytest.fixture
++def out(tmp_path):
++    path = tmp_path / 'caller-output'
++    path.mkdir()
++    return str(path)
++
++
++@pytest.fixture
++def clip(tmp_path):
++    return support.write_wav(tmp_path / 'clip.wav')
++
++
++@pytest.fixture
++def local_fallback(monkeypatch):
++    calls = []
++    monkeypatch.setattr('tools.transcription_tools._HAS_FASTER_WHISPER', True)
++    monkeypatch.setattr('tools.transcription_tools._transcribe_local',
++                        lambda path, model, **kw: calls.append(path) or {'success': True, 'transcript': 'local words'})
++    return calls
++
++
++class Call:
++    """One native xAI call of either kind over an EXPIRED OAuth bearer (so the credential phase must run)."""
++
++    def __init__(self, monkeypatch, kind, out, clip, **callbacks):
++        from hermes_cli.config import invalidate_env_cache
++        self.kind, self.out, self.clip = kind, out, clip
++        section = {'tts': {'provider': 'xai', 'xai': {}}} if kind == 'tts' else {'stt': {'provider': 'xai', 'cloud_trim_silence': False}}
++        support.write_config(get_hermes_home(), section)
++        (get_hermes_home() / '.env').write_text('')
++        invalidate_env_cache()
++        self.access = rest.jwt(time.time() - 60, 'expired')
++        rest.write_oauth_store(self.access, refresh='rt-singleton')
++        self.cb = rest.ThreadedCallbacks(**callbacks)
++        self.audio = rest.RestWire([('audio', b'ID3x')] if kind == 'tts' else [('json', {'text': 'hello world'})])
++        from gateway import session_native_voice_stt as stt_module
++        from gateway import session_native_voice_tts as tts_module
++        self.finished = (watch_worker(monkeypatch, tts_module, '_synthesize') if kind == 'tts'
++                         else watch_worker(monkeypatch, stt_module, '_configured'))
++
++    def start(self, deadline_s=60):
++        if self.kind == 'tts':
++            return synthesize_native_once(TEXT, output_dir=self.out, authorize=self.cb.authorize,
++                                          before_send=self.cb.before_send, deadline_s=deadline_s)
++        return transcribe_native_once(self.clip, authorize=self.cb.authorize, before_send=self.cb.before_send,
++                                      deadline_s=deadline_s)
++
++    def unsent(self, result):
++        """The truthful unsent vocabulary: never a provider send, a file or a fallback transcript."""
++        assert result.provider == 'not_started'
++        assert (result.path if self.kind == 'tts' else (result.transcript, result.source)) in (None, (None, None))
++        assert self.audio.count == 0 and self.cb.before_send_calls == 0
++        assert self.kind == 'stt' or os.listdir(self.out) == []
++
++
++# --- authority lost BEFORE discovery -----------------------------------------------------------------------------------
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('kind', KINDS)
++async def test_lost_authority_before_discovery_sends_no_oauth_request_audio_or_fallback(monkeypatch, out, clip, local_fallback, kind):
++    call = Call(monkeypatch, kind, out, clip, refuse_authorize_at=2)  # the probe before discovery
++    oauth = rest.OAuthWire()
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, call.audio):
++        result = await call.start()
++    assert result.state == 'refused'
++    call.unsent(result)
++    assert (len(oauth.gets), len(oauth.posts)) == (0, 0)  # OAuth GET 0 / POST 0 / audio 0 / paid callback 0
++    assert local_fallback == [] and call.cb.authorize_calls == 3  # call check, the refused probe, the post-call check
++    assert support.SECRET not in repr(result)
++    assert rest.read_oauth_store()['providers']['xai-oauth']['tokens']['access_token'] == call.access  # tokens untouched
++
++
++# --- authority / Stop / deadline AFTER a held discovery, BEFORE the refresh --------------------------------------------
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('kind', KINDS)
++async def test_lost_authority_after_a_held_discovery_sends_no_refresh_or_audio(monkeypatch, out, clip, local_fallback, kind):
++    call = Call(monkeypatch, kind, out, clip, refuse_authorize_at=3)  # the probe before the refresh POST
++    release = threading.Event()
++    oauth = rest.OAuthWire(hold_discovery=release)
++    try:
++        with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, call.audio):
++            task = asyncio.create_task(call.start())
++            assert await asyncio.to_thread(oauth.discovery_entered.wait, 10)  # discovery is in flight, held
++            release.set()
++            result = await task
++            assert await asyncio.to_thread(call.finished.wait, 10)
++    finally:
++        release.set()
++    assert result.state == 'refused'
++    call.unsent(result)
++    assert (len(oauth.gets), len(oauth.posts)) == (1, 0)  # the admitted discovery finished; no refresh POST followed
++    assert local_fallback == [] and call.cb.authorize_calls == 4  # call check, two probes (the 2nd refused), post-call check
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('how', ['cancel', 'deadline'])
++@pytest.mark.parametrize('kind', KINDS)
++async def test_stop_or_deadline_after_a_held_discovery_sends_no_refresh_audio_or_late_callback(monkeypatch, out, clip, kind, how):
++    call = Call(monkeypatch, kind, out, clip)
++    release = threading.Event()
++    oauth = rest.OAuthWire(hold_discovery=release)
++    deadline = rest.EventDeadline(monkeypatch)
++    try:
++        with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, call.audio):
++            task = asyncio.create_task(call.start(deadline_s=30))
++            assert await asyncio.to_thread(oauth.discovery_entered.wait, 10)
++            if how == 'cancel':
++                task.cancel()
++                with pytest.raises(asyncio.CancelledError):
++                    await task
++            else:
++                deadline.fire()
++                result = await task
++                assert (result.state, result.provider) == ('timeout', 'not_started')
++            seen = (call.cb.authorize_calls, call.cb.before_send_calls)
++            release.set()  # the late discovery answer arrives
++            assert await asyncio.to_thread(call.finished.wait, 10)
++    finally:
++        release.set()
++    assert (len(oauth.gets), len(oauth.posts)) == (1, 0)
++    assert call.audio.count == 0 and (call.cb.authorize_calls, call.cb.before_send_calls) == seen  # no late callback
++    assert call.cb.before_send_calls == 0 and (kind == 'stt' or os.listdir(out) == [])
++
++
++# --- the probe itself: loop, fence, accounting ---------------------------------------------------------------------------
++
++@pytest.mark.asyncio
++async def test_every_oauth_request_is_probed_on_the_consumers_loop_and_is_never_a_paid_attempt(monkeypatch, out, clip):
++    call = Call(monkeypatch, 'tts', out, clip)
++    events = []
++    call.cb.events = events
++    oauth = rest.OAuthWire(events=events)
++    call.audio.tap = lambda request: events.append('request')
++    loop_thread = threading.get_ident()
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, call.audio):
++        result = await call.start()
++    assert (result.state, result.provider, call.audio.count) == ('synthesized', 'completed', 1)
++    assert events == ['authorize', 'authorize', 'oauth-discovery', 'authorize', 'oauth-refresh', 'authorize', 'before_send',
++                      'request', 'authorize']  # a probe sits immediately before EACH OAuth request
++    assert set(call.cb.threads) == {loop_thread}  # the consumer's callbacks only ever ran on its own loop thread
++    assert call.cb.before_send_calls == 1  # the probes never reached before_send: it ran once, for the audio
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('which', [1, 2])
++async def test_a_policy_closed_while_a_probe_is_queued_runs_nothing_and_sends_nothing(monkeypatch, out, clip, which):
++    call = Call(monkeypatch, 'tts', out, clip)
++    release = threading.Event()
++    oauth = rest.OAuthWire(hold_discovery=release)
++    held = rest.HeldProbe(monkeypatch, which=which)
++    try:
++        with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, call.audio):
++            task = asyncio.create_task(call.start())
++            if which == 2:
++                assert await asyncio.to_thread(oauth.discovery_entered.wait, 10)
++                release.set()
++            await held.wait_enqueued()  # the worker is parked on the loop callback of the probe
++            task.cancel()
++            with pytest.raises(asyncio.CancelledError):
++                await task
++            seen = call.cb.authorize_calls
++            await held.release()  # the callback finally runs, after Stop closed the policy
++            assert await asyncio.to_thread(call.finished.wait, 10)
++    finally:
++        release.set()
++    assert call.cb.authorize_calls == seen  # the queued callback did NOTHING: no consumer callback after Stop
++    assert call.audio.count == 0 and call.cb.before_send_calls == 0
++    assert len(oauth.posts) == 0 and len(oauth.gets) == (0 if which == 1 else 1)
++
++
++# --- an admitted POST may finish; nothing is sent afterwards -----------------------------------------------------------
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('how', ['cancel', 'authority'])
++async def test_an_admitted_refresh_post_persists_its_rotated_token_and_no_audio_follows(monkeypatch, out, clip, how):
++    call = Call(monkeypatch, 'tts', out, clip, **(dict(refuse_authorize_at=4) if how == 'authority' else {}))  # 4 = the paid gate
++    release = threading.Event()
++    oauth = rest.OAuthWire(hold=release)
++    try:
++        with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, call.audio):
++            task = asyncio.create_task(call.start())
++            assert await asyncio.to_thread(oauth.entered.wait, 10)  # the POST passed its probe and is in flight
++            if how == 'cancel':
++                task.cancel()
++                with pytest.raises(asyncio.CancelledError):
++                    await task
++            seen = call.cb.authorize_calls
++            release.set()
++            if how == 'authority':
++                result = await task
++                assert (result.state, result.provider) == ('refused', 'not_started')
++            assert await asyncio.to_thread(call.finished.wait, 10)
++    finally:
++        release.set()
++    tokens = rest.read_oauth_store()['providers']['xai-oauth']['tokens']
++    assert tokens['refresh_token'] == 'rt-rotated' and tokens['access_token'] != call.access  # rotation persisted, not discarded
++    assert len(oauth.posts) == 1 and call.audio.count == 0 and call.cb.before_send_calls == 0
++    if how == 'cancel':
++        assert call.cb.authorize_calls == seen
++
++
++@pytest.mark.asyncio
++async def test_a_refused_credential_phase_does_not_bench_the_account_or_change_its_tokens(monkeypatch, out, clip):
++    from tools.xai_http import resolve_xai_http_credentials
++    call = Call(monkeypatch, 'tts', out, clip, refuse_authorize_at=3)
++    oauth = rest.OAuthWire()
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, call.audio):
++        result = await call.start()
++    assert result.state == 'refused' and (len(oauth.gets), len(oauth.posts)) == (1, 0)
++    assert rest.read_oauth_store()['providers']['xai-oauth']['tokens']['access_token'] == call.access
++    # An ordinary (non-native) resolution right afterwards refreshes normally: the refusal left no cooldown behind.
++    after = rest.OAuthWire()
++    with rest.oauth_wire(monkeypatch, after):
++        credentials = resolve_xai_http_credentials(prefer_api_key=True)
++    assert credentials['provider'] == 'xai-oauth' and credentials['api_key'] != call.access and len(after.posts) == 1
++
++
++# --- bounded phase budget, API-key preference, stock-off ----------------------------------------------------------------
++
++@pytest.mark.asyncio
++async def test_oauth_requests_are_bounded_by_the_native_phase_budget(monkeypatch, out, clip):
++    call = Call(monkeypatch, 'tts', out, clip)
++    oauth = rest.OAuthWire()
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, call.audio):
++        result = await call.start(deadline_s=7)
++    assert result.state == 'synthesized' and len(oauth.requests) == 2
++    assert {request.extensions['timeout']['read'] for request in oauth.requests} == {7.0}  # min(stock 20 s, the call's bound)
++
++
++def test_the_stock_oauth_budget_and_requests_are_untouched_outside_a_native_call(monkeypatch):
++    from tools.xai_http import resolve_xai_http_credentials
++    rest.write_oauth_store(rest.jwt(time.time() - 60, 'expired'), refresh='rt-singleton')
++    stock = rest.OAuthWire()
++    with rest.oauth_wire(monkeypatch, stock):
++        credentials = resolve_xai_http_credentials(prefer_api_key=True)
++    assert credentials['provider'] == 'xai-oauth' and [r.method for r in stock.requests] == ['GET', 'POST']
++    assert {request.extensions['timeout']['read'] for request in stock.requests} == {20.0}  # the stock budget
++
++
++def test_outside_a_native_call_the_credential_seam_is_inert():
++    from tools import native_send_policy
++    assert native_send_policy.credential_client_kwargs() == {}
++    assert native_send_policy.credential_timeout(20.0) == 20.0
++
++
++@pytest.mark.asyncio
++async def test_the_explicit_api_key_never_enters_the_credential_phase(monkeypatch, out, clip):
++    from hermes_cli.config import invalidate_env_cache
++    call = Call(monkeypatch, 'tts', out, clip)
++    (get_hermes_home() / '.env').write_text('XAI_API_KEY=xai-explicit-key\n')
++    invalidate_env_cache()
++    oauth = rest.OAuthWire()
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, call.audio):
++        result = await call.start()
++    assert result.state == 'synthesized' and oauth.requests == []
++    assert call.cb.authorize_calls == 3  # call check, paid gate, post-call check: not one credential probe
 diff --git a/tests/gateway/test_native_voice_xai_freshness.py b/tests/gateway/test_native_voice_xai_freshness.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..7741558b850fcea2844576371b63ffac0680b76b
+index 0000000000000000000000000000000000000000..23bfddfcccc0567668087e6ab8fcee389868f2eb
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_xai_freshness.py
-@@ -0,0 +1,380 @@
+@@ -0,0 +1,382 @@
 +"""Native voice seam, xAI OAuth pre-send freshness (M2) against the REAL resolver, pool and token store.
 +
 +Nothing credential-related is stubbed: ``resolve_xai_http_credentials`` / ``CredentialPool.select`` read a synthetic
@@ -5583,7 +6058,8 @@ index 0000000000000000000000000000000000000000..7741558b850fcea2844576371b63ffac
 +    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
 +        result = await speak(out, cb)
 +    assert (result.state, result.provider, wire.count) == ('synthesized', 'completed', 1)
-+    assert events == ['authorize', 'oauth-discovery', 'oauth-refresh', 'authorize', 'before_send', 'request', 'authorize']
++    assert events == ['authorize', 'authorize', 'oauth-discovery', 'authorize', 'oauth-refresh', 'authorize', 'before_send',
++                      'request', 'authorize']  # a credential probe precedes each OAuth request (test_native_voice_xai_credential_phase)
 +    assert oauth.refresh_tokens_sent() == ['rt-singleton'] and bearer(wire) != f'Bearer {stale}'
 +    assert cb.before_send_calls == 1  # the credential exchange is not a paid attempt: one before_send, for the audio
 +    assert all(r.extensions['timeout']['read'] >= 5 for r in oauth.posts)  # the stock refresh timeout is finite
@@ -5748,7 +6224,7 @@ index 0000000000000000000000000000000000000000..7741558b850fcea2844576371b63ffac
 +async def test_stop_deadline_or_lost_authority_while_refreshing_can_never_become_a_late_send(monkeypatch, out, how):
 +    from gateway import session_native_voice_tts as tts_module
 +    finished = watch_worker(monkeypatch, tts_module, '_synthesize')
-+    cb = support.Callbacks(refuse_authorize_at=2) if how == 'authority' else support.Callbacks()
++    cb = support.Callbacks(refuse_authorize_at=4) if how == 'authority' else support.Callbacks()  # 4 = the paid gate
 +    oauth, wire, release = start_held_refresh()
 +    try:
 +        with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
@@ -5803,7 +6279,8 @@ index 0000000000000000000000000000000000000000..7741558b850fcea2844576371b63ffac
 +    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
 +        result = await hear(clip, cb)
 +    assert (result.state, result.transcript, result.provider, wire.count) == ('transcribed', 'hello world', 'completed', 1)
-+    assert events == ['authorize', 'oauth-discovery', 'oauth-refresh', 'authorize', 'before_send', 'request', 'authorize']
++    assert events == ['authorize', 'authorize', 'oauth-discovery', 'authorize', 'oauth-refresh', 'authorize', 'before_send',
++                      'request', 'authorize']  # a credential probe precedes each OAuth request (test_native_voice_xai_credential_phase)
 +    assert cb.before_send_calls == 1 and wire.requests[0][0].url == 'https://api.x.ai/v1/stt'
 +
 +
@@ -6235,10 +6712,10 @@ index 0000000000000000000000000000000000000000..5ff5c62f947ca0aba0872f5934717bef
 +    measured('stock_tts_edge_403_then_ok', handshakes=boundary.handshakes)
 diff --git a/tools/native_send_policy.py b/tools/native_send_policy.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..833145e108e9416f5452369a4a473f276f9beeb2
+index 0000000000000000000000000000000000000000..be9d562774f339ccafc410a29132750ee68c5bb0
 --- /dev/null
 +++ b/tools/native_send_policy.py
-@@ -0,0 +1,408 @@
+@@ -0,0 +1,464 @@
 +"""One-send transport policy for a native (Relay) voice call.
 +
 +``gateway.session_native_voice`` activates a :class:`SendPolicy` around exactly one configured
@@ -6272,6 +6749,20 @@ index 0000000000000000000000000000000000000000..833145e108e9416f5452369a4a473f27
 +        self.reason = reason
 +
 +
++class CredentialPhaseStopped(BaseException):
++    """An actual OAuth discovery/refresh request of the credential phase was refused (``reason`` is a stable token).
++
++    A ``BaseException`` ON PURPOSE, like ``asyncio.CancelledError``: the stock credential pool treats any ``Exception`` from a
++    refresh as a failed account (it benches the account for a cooldown or clears its stored tokens) and the stock resolver
++    swallows ``Exception`` and falls through to another credential. A Stop, deadline or lost authority is not an account
++    fault and must not fall through, so this passes both untouched; ``tools.xai_http`` converts it to
++    :class:`NativeSendRefused` at the resolver boundary."""
++
++    def __init__(self, reason: str):
++        super().__init__(reason)
++        self.reason = reason
++
++
 +class SendPolicy:
 +    """Counts and gates transport sends for one native call.
 +
@@ -6286,6 +6777,7 @@ index 0000000000000000000000000000000000000000..833145e108e9416f5452369a4a473f27
 +        self.providers = providers
 +        self.max_output_bytes = max_output_bytes
 +        self._gate = gate
++        self._credential_probe: Optional[Callable[[], None]] = None
 +        self._lock = threading.Lock()
 +        self._scope_sends = 0
 +        self._entered = False
@@ -6297,6 +6789,10 @@ index 0000000000000000000000000000000000000000..833145e108e9416f5452369a4a473f27
 +
 +    def set_gate(self, gate: Callable[[], None]) -> None:
 +        self._gate = gate
++
++    def set_credential_probe(self, probe: Callable[[], None]) -> None:
++        """The authorization-only check of the credential phase (runs the consumer's ``authorize`` on its own loop)."""
++        self._credential_probe = probe
 +
 +    @property
 +    def scope_sends(self) -> int:
@@ -6368,6 +6864,30 @@ index 0000000000000000000000000000000000000000..833145e108e9416f5452369a4a473f27
 +    def on_request(self, _request) -> None:
 +        """httpx ``request`` event hook: the actual transport boundary of SDK and httpx clients."""
 +        self.begin()
++
++    def probe_credentials(self) -> None:
++        """Called immediately before an OAuth discovery/refresh HTTP request: refuse a closed policy, else ask the
++        consumer whether the call is still authorized. This is NOT a send: it never runs ``before_send``, never commits,
++        never counts a send nor opens a scope, and a policy with no probe fails closed."""
++        with self._lock:
++            if self.closed:
++                raise self._refusal_locked('closed')
++        try:
++            if self._credential_probe is None:
++                raise NativeSendRefused('refused')
++            self._credential_probe()
++        except NativeSendRefused as exc:
++            raise self.refusal_for(exc.reason) from None
++        with self._lock:
++            if self.closed:
++                raise self._refusal_locked('closed')
++
++    def on_credential_request(self, _request) -> None:
++        """httpx ``request`` event hook of the OAuth clients: the actual lowest OAuth boundary under the credential phase."""
++        try:
++            self.probe_credentials()
++        except NativeSendRefused as exc:
++            raise CredentialPhaseStopped(exc.reason) from None
 +
 +    def require_provider(self, provider: str) -> None:
 +        if provider not in self.providers:
@@ -6457,6 +6977,19 @@ index 0000000000000000000000000000000000000000..833145e108e9416f5452369a4a473f27
 +    policy = _current.get()
 +    if policy is not None and policy.is_closed():
 +        raise policy.refusal_for('closed')
++
++
++def credential_client_kwargs() -> dict:
++    """Extra ``httpx.Client(...)`` kwargs of an OAuth discovery/refresh client: the credential-phase probe on every request
++    it sends. Outside a native call: nothing (the stock clients are built exactly as before)."""
++    policy = _current.get()
++    return {} if policy is None else {'event_hooks': {'request': [policy.on_credential_request]}}
++
++
++def credential_timeout(seconds: float) -> float:
++    """An OAuth request timeout bounded by the native call's budget (``min(stock, the call's bound)``); stock outside one."""
++    policy = _current.get()
++    return seconds if policy is None else min(seconds, policy.timeout_s)
 +
 +
 +def no_resend() -> bool:
@@ -7098,7 +7631,7 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..876d7bd9da881b2d789638b4876a11b6
          logger.error("Mistral TTS failed: %s", e, exc_info=True)
          raise RuntimeError(f"Mistral TTS failed: {type(e).__name__}") from e
 diff --git a/tools/xai_http.py b/tools/xai_http.py
-index 7ad9df97ab55966325dd9fa681987e2a4d35c489..1caa18842b09068519aab2716f0e36ccaaa14cff 100644
+index 7ad9df97ab55966325dd9fa681987e2a4d35c489..c2316e69edfd5e3fc3edb0eeb1d18b4c4ccd10c1 100644
 --- a/tools/xai_http.py
 +++ b/tools/xai_http.py
 @@ -5,9 +5,12 @@ from __future__ import annotations
@@ -7114,7 +7647,18 @@ index 7ad9df97ab55966325dd9fa681987e2a4d35c489..1caa18842b09068519aab2716f0e36cc
  
  DEFAULT_XAI_BASE_URL = "https://api.x.ai/v1"
  MAX_XAI_STORAGE_EXPIRES_AFTER_SECONDS = 30 * 24 * 60 * 60
-@@ -227,3 +230,20 @@ def resolve_xai_http_credentials(
+@@ -220,6 +223,10 @@ def resolve_xai_http_credentials(
+         base_url = auth_mod._xai_validate_inference_base_url(_xai_base_url_override(), fallback=fallback_base_url)
+         if str(access_token).strip():
+             return {"provider": "xai-oauth", "api_key": str(access_token).strip(), "base_url": base_url}
++    except native_send_policy.CredentialPhaseStopped as stopped:
++        # A Stop, deadline or lost authority at an OAuth request is not "no OAuth credentials": never fall through
++        # to another credential. The policy already recorded the reason.
++        raise native_send_policy.NativeSendRefused(stopped.reason) from None
+     except Exception:
+         pass
+ 
+@@ -227,3 +234,20 @@ def resolve_xai_http_credentials(
      api_key = _resolve_explicit_xai_api_key()
      base_url = str(get_env_value("XAI_BASE_URL") or DEFAULT_XAI_BASE_URL).strip().rstrip("/")
      return {"provider": "xai", "api_key": api_key, "base_url": base_url}

@@ -1066,8 +1066,10 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   profile with `auto_speech_tags`/`audio_tags` does NOT speak the same script as an ordinary call. **xAI OAuth freshness:**
   the stock resolver/pool refreshes an expiring token before returning it; a native call additionally refuses UNSENT an
   OAuth bearer without a future JWT `exp` (opaque bearers are refused), never refreshes or resends after a 401/403, and
-  the OAuth exchange is never a paid attempt (no `before_send`, no accounting; a Stop/deadline in flight can never become
-  a late send). Carried Mistral review findings that bind this stage: the process-global OpenTelemetry provider residual
+  the OAuth exchange is never a paid attempt (no `before_send`, no accounting) and carries its own authorization-only
+  credential phase — the consumer's `authorize` is asked on its loop, under the paid gate's fence, immediately before each
+  actual OAuth discovery/refresh request; a Stop/deadline/lost authority stops the next request and every send (no account
+  bench, no fallback), while an already-admitted POST may finish and persist its rotated token (not remote cancellation). Carried Mistral review findings that bind this stage: the process-global OpenTelemetry provider residual
   (M1, open until the current-profile gate inspects plugins and the tracer provider), the telemetry read-back is not proof
   (M2; the behavioural exporter test is), the stock Mistral STT path forwards `stt.prompt` that the pinned SDK rejects (M9),
   the 1 MiB STT answer bound is enforced by the Mistral hook only (M9), the Mistral wire bound is chunk-granular (M5), and

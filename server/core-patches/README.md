@@ -150,10 +150,18 @@ covers that by refreshing after a 401 and resending, which a native call must ne
 UNSENT (`unavailable`/`not_started`; STT may still use only the cached local fallback) unless an OAuth bearer carries an
 `exp` later than the request window, so an **opaque OAuth bearer is refused** in a native call (conservative; an explicit
 `XAI_API_KEY` has no expiry and is unaffected, and ordinary calls are unchanged). The OAuth exchange is not a paid attempt: it
-never reaches the consumer's `before_send` or the provider accounting; a Stop or deadline that arrives while it is in flight
-ends the caller's wait, and the late worker's gate is then refused, so a late result can never send audio (a refresh that
-completes still persists its rotated refresh token, as the stock code requires). Nothing is refreshed or resent after a
-401/403, no other account is retried and no other provider is used.
+never reaches the consumer's `before_send` or the provider accounting. It has its own **authorization-only credential
+phase**: immediately before EACH actual OAuth discovery and refresh HTTP request (an `httpx` request hook on the clients the
+stock auth module builds in a native call, so no request can follow an unchecked one) the worker asks the consumer's
+`authorize` on the consumer's own event loop, under the same close/abandon/deadline fence as the paid gate; the worker never
+runs the callback itself and a callback still queued after the call returned or was stopped does nothing. The phase never calls
+`before_send`, never commits and never counts a send. A refusal, Stop or deadline stops the next OAuth request and every audio
+send, is reported as the existing unsent vocabulary (`refused`/`cancelled`/`timeout`/`unavailable`, `not_started`) and never
+triggers the STT fallback; it does not bench the account (the stop is a `BaseException` that the stock pool and resolver do
+not swallow, converted to an unsent refusal at the resolver boundary). OAuth request timeouts are bounded by the call. A POST
+that was **already admitted** may finish after Stop or a lost authority and persist its rotated refresh token (the stock
+code requires that and the token is not discarded); this is not remote cancellation, and no further request or audio send
+starts afterwards. Nothing is refreshed or resent after a 401/403, no other account is retried and no other provider is used.
 
 Outcomes are stable tokens only: results carry no provider message, exception text, credential or
 path except the audio file a successful synthesis wrote, and the stock provider helpers' log lines are suppressed
