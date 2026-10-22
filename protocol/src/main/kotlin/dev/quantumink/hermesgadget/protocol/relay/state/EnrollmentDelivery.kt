@@ -7,6 +7,8 @@ import dev.quantumink.hermesgadget.protocol.relay.DeliveryId
 import dev.quantumink.hermesgadget.protocol.relay.EventId
 import dev.quantumink.hermesgadget.protocol.relay.EventPayload
 import dev.quantumink.hermesgadget.protocol.relay.EventsPage
+import dev.quantumink.hermesgadget.protocol.relay.OpaqueConversationRef
+import dev.quantumink.hermesgadget.protocol.relay.OpaqueEventRef
 import dev.quantumink.hermesgadget.protocol.relay.OutboxItem
 import dev.quantumink.hermesgadget.protocol.relay.OutboxPage
 import dev.quantumink.hermesgadget.protocol.relay.OutboxPayload
@@ -1031,6 +1033,34 @@ class EnrollmentDelivery private constructor(
         return out
     }
 
+    // -- snapshot ------------------------------------------------------------------------------------------
+
+    /**
+     * The durable part: the identities committed so far, the refreshes still owed, the O5 baseline (null if none was
+     * ever committed) and the stored-but-unacknowledged delivery ids. The live session, its cursor and anything staged
+     * are transient and are not saved.
+     */
+    fun snapshot(): DeliverySnapshot = DeliverySnapshot(
+        enrollment.toSnapshot(),
+        gapBaseline,
+        seen.map { (key, at) ->
+            when (key) {
+                is DedupKey.Canonical ->
+                    SeenKeySnapshot("canonical", key.conversationId.value, key.eventId.value, at)
+                is DedupKey.Opaque -> SeenKeySnapshot(
+                    "opaque",
+                    key.conversationRef,
+                    key.eventRef,
+                    at
+                )
+            }
+        },
+        obligations.map {
+            ObligationSnapshot(it.conversation?.conversationId?.value, it.kind.name, it.cause.name)
+        },
+        pendingAcks.map { it.value }
+    )
+
     override fun toString(): String =
         "EnrollmentDelivery(seen=${seen.size}, owed=${obligations.size}, acks=${pendingAcks.size})"
 
@@ -1082,6 +1112,106 @@ class EnrollmentDelivery private constructor(
 
     companion object {
         private const val MAX_OBLIGATIONS = 128
+
+        /**
+         * Restores the delivery state of one enrollment. Without a session, a cursor or a staged batch; the saved O5
+         * baseline is restored as it was (never invented: null stays null, and an unknown baseline is a refresh).
+         */
+        internal fun restore(saved: DeliverySnapshot): RestoreResult<EnrollmentDelivery> {
+            fun refused(reason: RestoreRefusal, path: String) = RestoreResult.Refused(reason, path)
+            val enrollment =
+                saved.scope.toScope() ?: return refused(RestoreRefusal.INVALID_SCOPE, "scope")
+            if (saved.seen.size >
+                StateLimits.MAX_SEEN_KEYS
+            ) {
+                return refused(RestoreRefusal.TOO_MANY, "seen")
+            }
+            if (saved.obligations.size >
+                MAX_OBLIGATIONS
+            ) {
+                return refused(RestoreRefusal.TOO_MANY, "obligations")
+            }
+            if (saved.pendingAcks.size >
+                StateLimits.MAX_PENDING_ACKS
+            ) {
+                return refused(RestoreRefusal.TOO_MANY, "pendingAcks")
+            }
+            if ((saved.gapBaseline ?: 0) <
+                0
+            ) {
+                return refused(RestoreRefusal.INVALID_FIELD, "gapBaseline")
+            }
+            val seen = LinkedHashMap<DedupKey, Long>()
+            for ((index, item) in saved.seen.withIndex()) {
+                val path = "seen[$index]"
+                if (item.committedAtMs <
+                    0
+                ) {
+                    return refused(RestoreRefusal.INVALID_FIELD, "$path.committedAtMs")
+                }
+                val key: DedupKey = when (item.kind) {
+                    "canonical" -> {
+                        val conversation = ConversationId.of(item.conversation)
+                            ?: return refused(RestoreRefusal.INVALID_ID, "$path.conversation")
+                        val event =
+                            EventId.of(item.event)
+                                ?: return refused(RestoreRefusal.INVALID_ID, "$path.event")
+                        DedupKey.Canonical(conversation, event)
+                    }
+                    "opaque" -> {
+                        val conversation = OpaqueConversationRef.of(item.conversation)
+                            ?: return refused(RestoreRefusal.INVALID_ID, "$path.conversation")
+                        val event = OpaqueEventRef.of(item.event)
+                            ?: return refused(RestoreRefusal.INVALID_ID, "$path.event")
+                        DedupKey.Opaque(conversation.value, event.value)
+                    }
+                    else -> return refused(RestoreRefusal.INVALID_FIELD, "$path.kind")
+                }
+                if (seen.put(key, item.committedAtMs) !=
+                    null
+                ) {
+                    return refused(RestoreRefusal.DUPLICATE, path)
+                }
+            }
+            val obligations = ArrayList<RefreshObligation>()
+            for ((index, item) in saved.obligations.withIndex()) {
+                val path = "obligations[$index]"
+                val kind = RefreshKind.entries.firstOrNull { it.name == item.kind }
+                    ?: return refused(RestoreRefusal.INVALID_FIELD, "$path.kind")
+                val cause = RefreshCause.entries.firstOrNull { it.name == item.cause }
+                    ?: return refused(RestoreRefusal.INVALID_FIELD, "$path.cause")
+                val conversation = item.conversationId?.let { text ->
+                    ConversationScope(
+                        enrollment,
+                        ConversationId.of(text)
+                            ?: return refused(RestoreRefusal.INVALID_ID, "$path.conversationId")
+                    )
+                }
+                if (obligations.any { it.conversation == conversation && it.kind == kind }) {
+                    return refused(RestoreRefusal.DUPLICATE, path)
+                }
+                obligations.add(RefreshObligation(conversation, kind, cause))
+            }
+            val acks = ArrayList<DeliveryId>()
+            for ((index, text) in saved.pendingAcks.withIndex()) {
+                val id =
+                    DeliveryId.of(text)
+                        ?: return refused(RestoreRefusal.INVALID_ID, "pendingAcks[$index]")
+                if (id in acks) return refused(RestoreRefusal.DUPLICATE, "pendingAcks[$index]")
+                acks.add(id)
+            }
+            val delivery = EnrollmentDelivery(
+                enrollment,
+                seen,
+                obligations,
+                saved.gapBaseline,
+                acks,
+                null,
+                OutboxFlight(null, null, null),
+                1
+            )
+            return RestoreResult.Restored(delivery, emptyList())
+        }
 
         fun begin(enrollment: EnrollmentScope): EnrollmentDelivery = EnrollmentDelivery(
             enrollment,

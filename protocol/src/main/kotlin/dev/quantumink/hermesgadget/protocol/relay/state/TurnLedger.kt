@@ -1,5 +1,7 @@
 package dev.quantumink.hermesgadget.protocol.relay.state
 
+import dev.quantumink.hermesgadget.protocol.relay.AdmissionId
+import dev.quantumink.hermesgadget.protocol.relay.ConversationId
 import dev.quantumink.hermesgadget.protocol.relay.CorrelationId
 import dev.quantumink.hermesgadget.protocol.relay.Receipt
 import dev.quantumink.hermesgadget.protocol.relay.ReceiptStatus
@@ -8,7 +10,9 @@ import dev.quantumink.hermesgadget.protocol.relay.RelayError
 import dev.quantumink.hermesgadget.protocol.relay.RelayErrorAction
 import dev.quantumink.hermesgadget.protocol.relay.RelayErrorCode
 import dev.quantumink.hermesgadget.protocol.relay.RelayJson
+import dev.quantumink.hermesgadget.protocol.relay.RelayLimits
 import dev.quantumink.hermesgadget.protocol.relay.RelayOutcome
+import dev.quantumink.hermesgadget.protocol.relay.RequestId
 import java.util.Collections
 
 /** A deliberate new user turn. Only this kind of input can make [TurnLedger.prepare] mint a request id. */
@@ -808,6 +812,48 @@ class TurnLedger private constructor(
         textBytes: Long = this.textBytes
     ): TurnLedger = TurnLedger(turns, scopes, nextCall, correlations, lastNanos, textBytes)
 
+    // -- snapshot ------------------------------------------------------------------------------------------
+
+    /**
+     * The durable part of the ledger as plain values: every prepared turn exactly (identity, immutable text/deadline,
+     * server evidence, closure, hold) and the scope decisions. Nothing transient is saved: no call, correlation,
+     * binding, lookup time or freshness mark. Persisting it, and in what order, is the consumer's job.
+     */
+    fun snapshot(): TurnLedgerSnapshot = TurnLedgerSnapshot(
+        turns.values.map { it.toSnapshot() },
+        scopes.map { (scope, record) ->
+            ScopeStateSnapshot(scope.toSnapshot(), record.status.name, record.contentEvictionOwed)
+        }
+    )
+
+    private fun TurnEntry.toSnapshot() = TurnSnapshot(
+        key.conversation.enrollment.toSnapshot(),
+        key.conversation.conversationId.value,
+        key.requestId.value,
+        expiresAtMs,
+        preparedAtMs,
+        fingerprint.hex,
+        text,
+        sent,
+        facts?.let {
+            AdmissionFactsSnapshot(
+                it.admissionId.value,
+                it.authorityEpoch,
+                it.status.wire,
+                it.executionGeneration,
+                it.outcome
+            )
+        },
+        when (val shut = closure) {
+            null -> null
+            is TurnClosure.NotAdmitted -> "not_admitted:" + shut.proof.name.lowercase()
+            is TurnClosure.Refused -> "refused:" + shut.code.wire
+        },
+        hold != null,
+        lastErrorCode?.wire,
+        anomalies
+    )
+
     override fun toString(): String = "TurnLedger(turns=${turns.size}, scopes=${scopes.size})"
 
     internal sealed interface Merge {
@@ -823,6 +869,179 @@ class TurnLedger private constructor(
 
         fun empty(): TurnLedger = TurnLedger(emptyMap(), emptyMap(), 1, emptyList(), 0, 0)
 
+        /**
+         * Restores a ledger. Needs a fresh [ServerInstant] and a fresh (empty) [RelayAuthority]. Every turn that may
+         * have reached the server comes back UNCERTAIN (process loss): it needs an attach made after this restore,
+         * then a receipt lookup, before any resubmit. No identity, deadline, evidence or scope decision is invented:
+         * each is re-validated, and a request id must carry exactly the server-time stamp it was prepared with.
+         */
+        internal fun restore(
+            saved: TurnLedgerSnapshot,
+            now: ServerInstant,
+            authority: RelayAuthority
+        ): RestoreResult<TurnLedger> {
+            fun refused(reason: RestoreRefusal, path: String) = RestoreResult.Refused(reason, path)
+            if (saved.turns.size >
+                StateLimits.MAX_RETAINED_TURNS
+            ) {
+                return refused(RestoreRefusal.TOO_MANY, "turns")
+            }
+            val turns = LinkedHashMap<TurnKey, TurnEntry>()
+            var textBytes = 0L
+            var pastDeadline = false
+            var clockBehind = false
+            for ((index, item) in saved.turns.withIndex()) {
+                val path = "turns[$index]"
+                val scope =
+                    item.scope.toScope()
+                        ?: return refused(RestoreRefusal.INVALID_SCOPE, "$path.scope")
+                val conversation = ConversationId.of(item.conversationId)
+                    ?: return refused(RestoreRefusal.INVALID_ID, "$path.conversationId")
+                val requestId = RequestId.of(item.requestId)
+                    ?: return refused(RestoreRefusal.INVALID_ID, "$path.requestId")
+                val key = TurnKey(ConversationScope(scope, conversation), requestId)
+                if (key in turns) return refused(RestoreRefusal.DUPLICATE, path)
+                val stamped = item.preparedAtMs in 0..StateLimits.SERVER_TIME_MAX_MS &&
+                    RequestIds.timestampMs(requestId) == item.preparedAtMs
+                if (!stamped) return refused(RestoreRefusal.INCONSISTENT, "$path.preparedAtMs")
+                val window = item.expiresAtMs > item.preparedAtMs &&
+                    item.expiresAtMs <= item.preparedAtMs + StateLimits.TURN_EXPIRY_MAX_AHEAD_MS
+                if (!window) return refused(RestoreRefusal.INCONSISTENT, "$path.expiresAtMs")
+                val fingerprint = TurnFingerprint.parse(item.fingerprint)
+                    ?: return refused(RestoreRefusal.INVALID_FIELD, "$path.fingerprint")
+                val text = item.text
+                if (text != null) {
+                    if (!RelayCalls.validSubmitText(
+                            text
+                        )
+                    ) {
+                        return refused(RestoreRefusal.INVALID_FIELD, "$path.text")
+                    }
+                    textBytes += RelayJson.utf8Length(text)
+                    if (textBytes > StateLimits.MAX_RETAINED_TURN_TEXT_BYTES) {
+                        return refused(RestoreRefusal.BUDGET, "$path.text")
+                    }
+                    val recomputed = TurnFingerprint.of(
+                        conversation,
+                        requestId,
+                        item.expiresAtMs,
+                        text
+                    )
+                    if (recomputed !=
+                        fingerprint
+                    ) {
+                        return refused(RestoreRefusal.INCONSISTENT, "$path.fingerprint")
+                    }
+                }
+                val facts = item.facts?.let {
+                    parseFacts(it) ?: return refused(RestoreRefusal.INVALID_FIELD, "$path.facts")
+                }
+                val closure = item.closure?.let {
+                    parseClosure(it)
+                        ?: return refused(RestoreRefusal.INVALID_FIELD, "$path.closure")
+                }
+                val lastError = item.lastErrorCode?.let { wire ->
+                    RelayErrorCode.entries.firstOrNull { it.wire == wire }
+                        ?: return refused(RestoreRefusal.INVALID_FIELD, "$path.lastErrorCode")
+                }
+                if (item.anomalies !in
+                    0..MAX_ANOMALIES
+                ) {
+                    return refused(RestoreRefusal.INVALID_FIELD, "$path.anomalies")
+                }
+                val open = facts == null && closure == null
+                val shape = when {
+                    !item.sent -> open && !item.held && lastError == null
+                    facts != null -> closure == null && !item.held
+                    closure != null -> !item.held
+                    else -> true
+                }
+                if (!shape) return refused(RestoreRefusal.INCONSISTENT, path)
+                val unresolved = item.sent && open
+                if (unresolved && now.serverMs >= item.expiresAtMs) pastDeadline = true
+                if (item.preparedAtMs > now.serverMs + StateLimits.ID_FUTURE_MS) clockBehind = true
+                turns[key] = TurnEntry(
+                    key,
+                    item.expiresAtMs,
+                    item.preparedAtMs,
+                    fingerprint,
+                    text,
+                    item.sent,
+                    facts,
+                    closure,
+                    absentSoFar = false,
+                    uncertainty = if (unresolved) UncertainReason.PROCESS_LOSS else null,
+                    hold = if (item.held) TurnHold.UNEXPECTED_ERROR else null,
+                    lastErrorCode = lastError,
+                    anomalies = item.anomalies,
+                    freshAfterSerial = authority.lastSerial,
+                    outstanding = null,
+                    lookupSentAtMs = null
+                )
+            }
+            val scopes = LinkedHashMap<EnrollmentScope, ScopeRecord>()
+            for ((index, item) in saved.scopes.withIndex()) {
+                val path = "scopes[$index]"
+                val scope =
+                    item.scope.toScope()
+                        ?: return refused(RestoreRefusal.INVALID_SCOPE, "$path.scope")
+                val status = ScopeStatus.entries.firstOrNull { it.name == item.status }
+                    ?: return refused(RestoreRefusal.INVALID_FIELD, "$path.status")
+                if (status == ScopeStatus.ACTIVE && !item.contentEvictionOwed) {
+                    return refused(RestoreRefusal.INCONSISTENT, path)
+                }
+                if (scopes.put(scope, ScopeRecord(status, item.contentEvictionOwed)) != null) {
+                    return refused(RestoreRefusal.DUPLICATE, path)
+                }
+            }
+            val notices = ArrayList<RestoreNotice>()
+            if (pastDeadline) notices.add(RestoreNotice.UNRESOLVED_TURNS_PAST_DEADLINE)
+            if (clockBehind) notices.add(RestoreNotice.SERVER_CLOCK_BEHIND_SNAPSHOT)
+            val ledger = TurnLedger(turns, scopes, 1, emptyList(), now.monotonicNanos, textBytes)
+            return RestoreResult.Restored(ledger, notices)
+        }
+
+        private fun parseFacts(saved: AdmissionFactsSnapshot): AdmissionFacts? {
+            val admission = AdmissionId.of(saved.admissionId) ?: return null
+            val status =
+                ReceiptStatus.entries.firstOrNull { it.wire == saved.status } ?: return null
+            val generation = saved.executionGeneration
+            val outcome = saved.outcome
+            val validOutcome = outcome == null ||
+                (
+                    outcome.length in 1..RelayLimits.ID_CHARS &&
+                        outcome.all { it in 'a'..'z' || it == '_' }
+                    )
+            val valid = saved.authorityEpoch >= 0 && (generation ?: 0) >= 0 && validOutcome &&
+                consistent(status, outcome, generation)
+            return if (valid) {
+                AdmissionFacts(
+                    admission,
+                    saved.authorityEpoch,
+                    status,
+                    generation,
+                    outcome
+                )
+            } else {
+                null
+            }
+        }
+
+        private fun parseClosure(saved: String): TurnClosure? {
+            val kind = saved.substringBefore(':')
+            val detail = saved.substringAfter(':', "")
+            return when (kind) {
+                "not_admitted" -> NotAdmittedProof.entries.firstOrNull {
+                    it.name.lowercase() ==
+                        detail
+                }
+                    ?.let { TurnClosure.NotAdmitted(it) }
+                "refused" -> RelayErrorCode.entries.firstOrNull { it.wire == detail }
+                    ?.let { TurnClosure.Refused(it) }
+                else -> null
+            }
+        }
+
         private fun rank(status: ReceiptStatus): Int = when (status) {
             ReceiptStatus.UNKNOWN -> 0
             ReceiptStatus.QUEUED -> 1
@@ -831,10 +1050,16 @@ class TurnLedger private constructor(
         }
 
         /** Status, outcome and generation must go together, following the actual DTOs (queued: generation null). */
-        internal fun consistent(receipt: Receipt): Boolean = when (receipt.status) {
-            ReceiptStatus.QUEUED -> receipt.outcome == null && receipt.executionGeneration == null
-            ReceiptStatus.STARTED ->
-                receipt.outcome == null && (receipt.executionGeneration ?: 0) >= 1
+        internal fun consistent(receipt: Receipt): Boolean =
+            consistent(receipt.status, receipt.outcome, receipt.executionGeneration)
+
+        internal fun consistent(
+            status: ReceiptStatus,
+            outcome: String?,
+            generation: Long?
+        ): Boolean = when (status) {
+            ReceiptStatus.QUEUED -> outcome == null && generation == null
+            ReceiptStatus.STARTED -> outcome == null && (generation ?: 0) >= 1
             ReceiptStatus.TERMINAL, ReceiptStatus.UNKNOWN -> true
         }
 

@@ -1,5 +1,6 @@
 package dev.quantumink.hermesgadget.protocol.relay.state
 
+import dev.quantumink.hermesgadget.protocol.relay.ConversationId
 import dev.quantumink.hermesgadget.protocol.relay.HistoryMessage
 import dev.quantumink.hermesgadget.protocol.relay.HistoryPage
 import dev.quantumink.hermesgadget.protocol.relay.HistoryRole
@@ -10,6 +11,7 @@ import dev.quantumink.hermesgadget.protocol.relay.RelayError
 import dev.quantumink.hermesgadget.protocol.relay.RelayErrorAction
 import dev.quantumink.hermesgadget.protocol.relay.RelayErrorCode
 import dev.quantumink.hermesgadget.protocol.relay.RelayJson
+import dev.quantumink.hermesgadget.protocol.relay.validCursor
 import java.util.Collections
 
 /** Which history a listing reads: the Relay conversation's own, or an existing (read-only) session. */
@@ -80,7 +82,10 @@ enum class HistoryInvalidation {
     GAP_EVENT,
 
     /** The consumer abandoned the listing. */
-    CONSUMER
+    CONSUMER,
+
+    /** A restored listing had committed content but no cursor to continue from: rebuild explicitly. */
+    RESTORED_WITHOUT_CURSOR
 }
 
 /** Why a message was refused locally. A refused message is neither complete nor truncated: it is absent. */
@@ -581,6 +586,34 @@ class HistoryAssembly private constructor(
         )
     }
 
+    // -- snapshot ------------------------------------------------------------------------------------------
+
+    /**
+     * The COMMITTED progress of this listing: its provenance, the resume point, the identities (no text) of committed
+     * messages and the locally refused ones. Staged messages, a partly assembled message, an outstanding request and
+     * the cursor memory are not saved: whatever was not committed is fetched again.
+     */
+    fun snapshot(): HistorySnapshot = HistorySnapshot(
+        scope.conversation.enrollment.toSnapshot(),
+        scope.conversation.conversationId.value,
+        scope.source.name,
+        provenance.generation,
+        provenance.start.name,
+        provenance.after?.name,
+        provenance.status.name,
+        provenance.invalidation?.name,
+        committedOrdinal,
+        resume != null,
+        resume?.cursor,
+        resume?.atEnd ?: false,
+        known.filterValues { it.isCommitted }.map { (id, entry) ->
+            KnownMessageSnapshot(id.value, entry.role.wire, entry.createdAtMs, entry.count)
+        },
+        refused.map {
+            RefusedMessageSnapshot(it.messageId.value, it.reason.name, it.declaredSegments)
+        }
+    )
+
     override fun toString(): String =
         "HistoryAssembly($scope, $provenance, staged=${staged.size}, known=${known.size})"
 
@@ -808,6 +841,181 @@ class HistoryAssembly private constructor(
     )
 
     companion object {
+        /**
+         * Restores a listing from its committed progress. A saved cursor is only a CANDIDATE: the server decides whether
+         * it still holds (a `snapshot_required` then invalidates). Without a usable cursor the chain is NOT silently
+         * re-read from its top while committed identities are trusted: the listing comes back invalidated and an
+         * explicit [restart] claims the new beginning. A listing that never committed anything just starts again.
+         */
+        internal fun restore(saved: HistorySnapshot): RestoreResult<HistoryAssembly> {
+            fun refused(reason: RestoreRefusal, path: String) = RestoreResult.Refused(reason, path)
+            val enrollment =
+                saved.scope.toScope() ?: return refused(RestoreRefusal.INVALID_SCOPE, "scope")
+            val conversation = ConversationId.of(saved.conversationId)
+                ?: return refused(RestoreRefusal.INVALID_ID, "conversationId")
+            val source = HistorySource.entries.firstOrNull { it.name == saved.source }
+                ?: return refused(RestoreRefusal.INVALID_FIELD, "source")
+            val start = ListingStart.entries.firstOrNull { it.name == saved.start }
+                ?: return refused(RestoreRefusal.INVALID_FIELD, "start")
+            val after = saved.after?.let { name ->
+                HistoryInvalidation.entries.firstOrNull { it.name == name }
+                    ?: return refused(RestoreRefusal.INVALID_FIELD, "after")
+            }
+            val status = ListingStatus.entries.firstOrNull { it.name == saved.status }
+                ?: return refused(RestoreRefusal.INVALID_FIELD, "status")
+            val invalidation = saved.invalidation?.let { name ->
+                HistoryInvalidation.entries.firstOrNull { it.name == name }
+                    ?: return refused(RestoreRefusal.INVALID_FIELD, "invalidation")
+            }
+            if (saved.generation < 1) return refused(RestoreRefusal.INVALID_FIELD, "generation")
+            if ((status == ListingStatus.INVALIDATED) != (invalidation != null)) {
+                return refused(RestoreRefusal.INCONSISTENT, "invalidation")
+            }
+            if (saved.committedOrdinal <
+                0
+            ) {
+                return refused(RestoreRefusal.INVALID_FIELD, "committedOrdinal")
+            }
+            val resume = when {
+                !saved.hasResume -> if (saved.resumeCursor == null && !saved.resumeAtEnd) {
+                    null
+                } else {
+                    return refused(RestoreRefusal.INCONSISTENT, "resume")
+                }
+                saved.resumeAtEnd ->
+                    if (saved.resumeCursor == null) {
+                        Resume(null, true)
+                    } else {
+                        return refused(RestoreRefusal.INCONSISTENT, "resume")
+                    }
+                else -> {
+                    val cursor = saved.resumeCursor
+                    if (cursor == null ||
+                        !validCursor(cursor)
+                    ) {
+                        return refused(RestoreRefusal.INVALID_FIELD, "resume")
+                    }
+                    Resume(cursor, false)
+                }
+            }
+            if (saved.known.size >
+                StateLimits.MAX_KNOWN_MESSAGES
+            ) {
+                return refused(RestoreRefusal.TOO_MANY, "known")
+            }
+            if (saved.known.size >
+                saved.committedOrdinal
+            ) {
+                return refused(RestoreRefusal.INCONSISTENT, "known")
+            }
+            val known = LinkedHashMap<MessageId, Known>()
+            for ((index, item) in saved.known.withIndex()) {
+                val path = "known[$index]"
+                val id =
+                    MessageId.of(item.messageId)
+                        ?: return refused(RestoreRefusal.INVALID_ID, "$path.messageId")
+                val role = HistoryRole.entries.firstOrNull { it.wire == item.role }
+                    ?: return refused(RestoreRefusal.INVALID_FIELD, "$path.role")
+                val shape =
+                    item.createdAtMs >= 0 &&
+                        item.segmentCount in 1..StateLimits.MAX_MESSAGE_SEGMENTS
+                if (!shape) return refused(RestoreRefusal.INVALID_FIELD, path)
+                if (known.put(id, Known(role, item.createdAtMs, item.segmentCount, null)) != null) {
+                    return refused(RestoreRefusal.DUPLICATE, path)
+                }
+            }
+            if (saved.refused.size >
+                StateLimits.MAX_REFUSED_MESSAGES
+            ) {
+                return refused(RestoreRefusal.TOO_MANY, "refused")
+            }
+            val refusedList = ArrayList<RefusedMessage>()
+            for ((index, item) in saved.refused.withIndex()) {
+                val path = "refused[$index]"
+                val id =
+                    MessageId.of(item.messageId)
+                        ?: return refused(RestoreRefusal.INVALID_ID, "$path.messageId")
+                val reason = RefusalReason.entries.firstOrNull { it.name == item.reason }
+                    ?: return refused(RestoreRefusal.INVALID_FIELD, "$path.reason")
+                if (item.declaredSegments <
+                    1
+                ) {
+                    return refused(RestoreRefusal.INVALID_FIELD, "$path.declaredSegments")
+                }
+                if (refusedList.any {
+                        it.messageId == id
+                    }
+                ) {
+                    return refused(RestoreRefusal.DUPLICATE, path)
+                }
+                refusedList.add(RefusedMessage(id, reason, item.declaredSegments))
+            }
+            val notices = ArrayList<RestoreNotice>()
+            val untouched = saved.committedOrdinal == 0L && known.isEmpty()
+            val restoredStatus: ListingStatus
+            val restoredStart: ListingStart
+            val restoredInvalidation: HistoryInvalidation?
+            val cursor: String?
+            when {
+                status == ListingStatus.INVALIDATED -> {
+                    restoredStatus = ListingStatus.INVALIDATED
+                    restoredStart = start
+                    restoredInvalidation = invalidation
+                    cursor = null
+                }
+                resume != null && resume.atEnd -> {
+                    restoredStatus = ListingStatus.COMPLETE
+                    restoredStart = start
+                    restoredInvalidation = null
+                    cursor = null
+                }
+                resume != null -> {
+                    restoredStatus = ListingStatus.ACTIVE
+                    restoredStart = ListingStart.RESUMED_FROM_SAVED_CURSOR
+                    restoredInvalidation = null
+                    cursor = resume.cursor
+                }
+                untouched -> {
+                    restoredStatus = ListingStatus.ACTIVE
+                    restoredStart = start
+                    restoredInvalidation = null
+                    cursor = null
+                }
+                else -> {
+                    restoredStatus = ListingStatus.INVALIDATED
+                    restoredStart = start
+                    restoredInvalidation = HistoryInvalidation.RESTORED_WITHOUT_CURSOR
+                    cursor = null
+                    notices.add(RestoreNotice.HISTORY_NEEDS_REBUILD)
+                }
+            }
+            val assembly = HistoryAssembly(
+                HistoryScope(ConversationScope(enrollment, conversation), source),
+                ListingProvenance(
+                    saved.generation,
+                    restoredStart,
+                    after,
+                    restoredStatus,
+                    restoredInvalidation
+                ),
+                cursor,
+                null,
+                1,
+                null,
+                known,
+                emptyList(),
+                0,
+                emptyList(),
+                resume,
+                saved.committedOrdinal,
+                saved.committedOrdinal,
+                refusedList,
+                0,
+                emptyList()
+            )
+            return RestoreResult.Restored(assembly, notices)
+        }
+
         /** The first listing of [scope]: from the canonical beginning, generation 1. */
         fun begin(scope: HistoryScope): HistoryAssembly = create(
             scope,
