@@ -1069,7 +1069,7 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   the OAuth exchange is never a paid attempt (no `before_send`, no accounting) and carries its own authorization-only
   credential phase — the consumer's `authorize` is asked on its loop, under the paid gate's fence, immediately before each
   actual OAuth discovery/refresh request; a Stop/deadline/lost authority stops the next request and every send (no account
-  bench, no fallback), while an already-admitted POST may finish and persist its rotated token (not remote cancellation). Carried Mistral review findings that bind this stage: the process-global OpenTelemetry provider residual
+  bench, no fallback), while an already-admitted POST may finish and persist its rotated token (not remote cancellation). The refusal is terminal for the call (the policy is closed, first reason kept), so it also holds under the STT auto-detect, whose quiet availability probe swallows exceptions: no other cloud provider, fallback or further consumer callback follows. Carried Mistral review findings that bind this stage: the process-global OpenTelemetry provider residual
   (M1, open until the current-profile gate inspects plugins and the tracer provider), the telemetry read-back is not proof
   (M2; the behavioural exporter test is), the stock Mistral STT path forwards `stt.prompt` that the pinned SDK rejects (M9),
   the 1 MiB STT answer bound is enforced by the Mistral hook only (M9), the Mistral wire bound is chunk-granular (M5), and

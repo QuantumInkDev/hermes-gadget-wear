@@ -133,7 +133,10 @@ allocation-hard cap. The stock generators run unchanged: voice, model, language,
 request options are the profile's. A failure before the gate (no key, a bad region, a composed Gemini prompt over the
 provider limit) is `unavailable`/`not_started`; once the request passed the gate, a failure (HTTP 4xx/5xx, timeout, redirect,
 truncated, malformed, empty or oversize answer, a conversion error after a paid answer) is `failed_after_send` with exactly
-one send; the first failed chunk stops the call and every file is removed. An answer that is empty audio keeps the existing
+one send; the first failed chunk stops the call and every file is removed. The REST multi-chunk tests join the chunk files with a byte-wise stand-in: the real per-chunk Gemini PCM-to-mp3
+conversion is proved, the real ffmpeg join of REST chunks is not (it belongs to the Edge/joiner gate). "Zero hidden retries" at the
+HTTP-adapter level rests on the `requests` library default (`max_retries=0`), because the test transport replaces the adapter;
+redirects and second sends in one session are tested behaviourally. An answer that is empty audio keeps the existing
 `failed`/`completed` accounting. There is no hidden retry, no second request and no other provider.
 
 **Auxiliary speech tags are omitted in a native call (accepted cost).** The optional xAI `auto_speech_tags` and Gemini
@@ -158,7 +161,13 @@ runs the callback itself and a callback still queued after the call returned or 
 `before_send`, never commits and never counts a send. A refusal, Stop or deadline stops the next OAuth request and every audio
 send, is reported as the existing unsent vocabulary (`refused`/`cancelled`/`timeout`/`unavailable`, `not_started`) and never
 triggers the STT fallback; it does not bench the account (the stop is a `BaseException` that the stock pool and resolver do
-not swallow, converted to an unsent refusal at the resolver boundary). OAuth request timeouts are bounded by the call. A POST
+not swallow, converted to an unsent refusal at the resolver boundary). The refusal is **terminal for the call**: it closes the
+send policy (keeping the first truthful reason), so it holds even where a stock caller swallows the converted exception — the
+STT auto-detect (no explicit `stt.provider`) probes xAI through a quiet availability function that absorbs exceptions, and
+before this rule it could fall through to another cloud provider; now a refusal recorded during provider selection ends the
+attempt unsent, nothing else is probed, transcribed or sent, and the consumer is not asked again even if it would authorize
+(regressions run the real stock selection, resolver, pool and token store with a usable second-provider key; a mid-call
+Stop was already safe). The same rule means no STT fallback follows a credential refusal. OAuth request timeouts are bounded by the call. A POST
 that was **already admitted** may finish after Stop or a lost authority and persist its rotated refresh token (the stock
 code requires that and the token is not discarded); this is not remote cancellation, and no further request or audio send
 starts afterwards. Nothing is refreshed or resent after a 401/403, no other account is retried and no other provider is used.

@@ -619,10 +619,10 @@ index 0000000000000000000000000000000000000000..f1eb90948e87aded5bbe5b89a1e92462
 +    return PROVIDER_COMPLETED if answered else PROVIDER_FAILED
 diff --git a/gateway/session_native_voice_stt.py b/gateway/session_native_voice_stt.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..2e068ac5cd71de1d8d5915cc7f538a19c717779e
+index 0000000000000000000000000000000000000000..e936b8a98b045a810c3d5492a03cd7cd00f0e53b
 --- /dev/null
 +++ b/gateway/session_native_voice_stt.py
-@@ -0,0 +1,174 @@
+@@ -0,0 +1,179 @@
 +"""Configured-once speech-to-text for the native voice seam (see ``session_native_voice``).
 +
 +The profile's own STT configuration is read at call time through the stock resolvers, the audio is
@@ -669,6 +669,11 @@ index 0000000000000000000000000000000000000000..2e068ac5cd71de1d8d5915cc7f538a19
 +            except native_send_policy.NativeSendRefused:
 +                # Provider selection probes a remote provider's credentials (xAI may refresh OAuth): a refusal there
 +                # is an unsent refusal, never an escape to the consumer. The policy recorded why.
++                return _Attempt(None, 'unresolved', True)
++            if policy.refusal is not None:
++                # Auto-detect probes remote providers through a QUIET availability function that swallows exceptions, so a
++                # credential-phase refusal can be absorbed there and selection can fall through to another cloud provider.
++                # A recorded refusal is terminal (it also closed the policy): no substitute provider, no transcription.
 +                return _Attempt(None, 'unresolved', True)
 +            if not enabled:
 +                return _Attempt(None, provider, False)
@@ -1591,10 +1596,10 @@ index 0000000000000000000000000000000000000000..2e0952a763ad0ffaa3606508396023af
 +    return int(h) * 3600 + int(m) * 60 + float(sec)
 diff --git a/tests/gateway/rest_voice_support.py b/tests/gateway/rest_voice_support.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..540cfb0e712211a48dff6fc4b68358fc297d8a3a
+index 0000000000000000000000000000000000000000..1f184b31bd1cecf70673a66bcf008dbc92a788f7
 --- /dev/null
 +++ b/tests/gateway/rest_voice_support.py
-@@ -0,0 +1,296 @@
+@@ -0,0 +1,300 @@
 +"""Synthetic REST transports for the native REST TTS / xAI OAuth tests.
 +
 +Only network bytes are replaced, and only at the lowest layer that still lets the real library run:
@@ -1607,6 +1612,10 @@ index 0000000000000000000000000000000000000000..540cfb0e712211a48dff6fc4b68358fc
 +  pool, token store and JWT handling run above it.
 +
 +A count recorded here is the number of requests that would have left the process.
++
++Scope of the REST proof (review m6): ``RestWire`` replaces ``HTTPAdapter.send``, so the adapter's own urllib3 ``Retry`` configuration
++never runs here. That ``requests`` adds no retry of its own to a bare ``post`` rests on the library default (``max_retries=0``), not on
++these transports; redirects, a second POST in the same session and the gate's refusal of a second send are tested behaviourally.
 +"""
 +from __future__ import annotations
 +
@@ -4204,10 +4213,10 @@ index 0000000000000000000000000000000000000000..072f2904434d182a18985a0588245c63
 +    assert os.listdir(out) == []
 diff --git a/tests/gateway/test_native_voice_rest_tts.py b/tests/gateway/test_native_voice_rest_tts.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..a24f531dd419dd0c7eb370b4202e64671de5c3a9
+index 0000000000000000000000000000000000000000..7e5a8f5c8f950677eadc6fd050291bf714a15d84
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_rest_tts.py
-@@ -0,0 +1,493 @@
+@@ -0,0 +1,494 @@
 +"""Native voice seam, REST TTS (xAI, MiniMax, Gemini): real request construction, one gated send per chunk, bounds.
 +
 +The stock generators (``tools.tts_tool_providers._generate_*``) run unchanged inside the seam; the REAL ``requests``
@@ -4514,8 +4523,9 @@ index 0000000000000000000000000000000000000000..a24f531dd419dd0c7eb370b4202e6467
 +    """FAULT INJECTION at the converter's process boundary (``tools.tts_tool_delivery._ffmpeg_run``) and nowhere else.
 +
 +    The provider request, the answer parser, the WAV wrapper, the chunk bookkeeping and the cleanup are the real code; only the
-+    ffmpeg process result is scripted, so a conversion failure is deterministic. The real ffmpeg success path is proved by
-+    ``test_each_provider_sends_once_through_the_gate_with_the_stock_request[gemini]`` and the multi-chunk join tests."""
++    ffmpeg process result is scripted, so a conversion failure is deterministic. The real ffmpeg PER-CHUNK Gemini PCM -> mp3
++    conversion is proved by ``test_each_provider_sends_once_through_the_gate_with_the_stock_request[gemini]``. The multi-chunk REST
++    tests use the ``joined`` fixture (a byte-wise join stub), so the real ffmpeg JOIN of REST chunks is NOT proved here (Task 4 / Edge)."""
 +
 +    def __init__(self, monkeypatch, returncode, writes_empty_output=False):
 +        import subprocess
@@ -5653,10 +5663,10 @@ index 0000000000000000000000000000000000000000..1341ba950d1fbef5529cfbeb09e68d1a
 +    assert wire.requests[0].url.host == 'api.deepinfra.com'
 diff --git a/tests/gateway/test_native_voice_xai_credential_phase.py b/tests/gateway/test_native_voice_xai_credential_phase.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..bdf84e6be5bb038eb62e3149317e9a36083f710a
+index 0000000000000000000000000000000000000000..9368bbfdf17797e0d6e5105a559e033096bbd819
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_xai_credential_phase.py
-@@ -0,0 +1,290 @@
+@@ -0,0 +1,391 @@
 +"""Native voice seam, xAI OAuth: the credential phase is authorization-gated at every actual OAuth request.
 +
 +Pre-review correction C2. An authorization checked at the start of the call is not enough for a LATER credential boundary:
@@ -5672,6 +5682,11 @@ index 0000000000000000000000000000000000000000..bdf84e6be5bb038eb62e3149317e9a36
 +
 +Authorize numbering of a refreshed call: 1 call check, 2 probe before discovery, 3 probe before the refresh POST, 4 paid
 +gate, 5 post-call check.
++
++Review I1: the refusal must also be terminal when xAI is only PROBED by the stock STT auto-detect (no explicit ``stt.provider``),
++whose quiet availability function swallows exceptions. The auto-detect tests use the real ``_get_provider``, resolver, pool and
++token store over the synthetic OAuth authority, a usable synthetic ElevenLabs key and a counting stand-in only for the cached local
++fallback entry, so a substituted provider or a fallback would show as a count.
 +"""
 +import asyncio
 +import os
@@ -5947,12 +5962,108 @@ index 0000000000000000000000000000000000000000..bdf84e6be5bb038eb62e3149317e9a36
 +        result = await call.start()
 +    assert result.state == 'synthesized' and oauth.requests == []
 +    assert call.cb.authorize_calls == 3  # call check, paid gate, post-call check: not one credential probe
++
++
++# --- review I1: a credential refusal is terminal when xAI is probed by the stock STT auto-detect -----------------------------
++
++class AutoDetectCall:
++    """Native STT with NO ``stt.provider`` in config.yaml: the stock auto-detect probes xAI (expired OAuth) before the usable
++    ElevenLabs key. The consumer refuses ONE callback and would authorize every other one."""
++
++    def __init__(self, monkeypatch, clip, **callbacks):
++        from hermes_cli.config import invalidate_env_cache
++        from tools import transcription_tools as stt
++        support.write_config(get_hermes_home(), {'stt': {'cloud_trim_silence': False}})
++        (get_hermes_home() / '.env').write_text('ELEVENLABS_API_KEY=el-synthetic-key\n')
++        invalidate_env_cache()
++        assert stt._detect_local_backend() is None  # fixture precondition: no local backend is detected
++        self.clip = clip
++        self.access = rest.jwt(time.time() - 60, 'expired')
++        rest.write_oauth_store(self.access, refresh='rt-singleton')
++        self.cb = rest.ThreadedCallbacks(**callbacks)
++        self.cloud = rest.RestWire([('json', {'text': 'paid cloud words'})] * 3)  # xAI and ElevenLabs both answer here
++        self.local = []
++        monkeypatch.setattr('tools.transcription_tools.transcribe_audio_local_fallback',
++                            lambda path, *a, **k: self.local.append(path) or {'success': True, 'transcript': 'local words'})
++        from gateway import session_native_voice_stt as stt_module
++        self.finished = watch_worker(monkeypatch, stt_module, '_configured')
++
++    def start(self):
++        return transcribe_native_once(self.clip, authorize=self.cb.authorize, before_send=self.cb.before_send, deadline_s=60)
++
++    def assert_terminal(self, result, oauth, expected_oauth, authorize_calls):
++        assert (result.state, result.transcript, result.source, result.provider) == ('refused', None, None, 'not_started')
++        assert (len(oauth.gets), len(oauth.posts)) == expected_oauth
++        assert self.cloud.count == 0 and self.cb.before_send_calls == 0 and self.local == []  # no provider substituted, no fallback
++        assert self.cb.authorize_calls == authorize_calls  # exact: nothing asked the consumer again
++        assert rest.read_oauth_store()['providers']['xai-oauth']['tokens']['access_token'] == self.access
++        assert support.SECRET not in repr(result)
++
++
++@pytest.mark.asyncio
++async def test_auto_detect_refusal_before_discovery_is_terminal_and_substitutes_no_provider(monkeypatch, clip):
++    call = AutoDetectCall(monkeypatch, clip, refuse_authorize_at=2)  # the probe before discovery
++    oauth = rest.OAuthWire()
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, call.cloud):
++        result = await call.start()
++        assert await asyncio.to_thread(call.finished.wait, 10)
++    call.assert_terminal(result, oauth, (0, 0), authorize_calls=3)  # call check, the refused probe, the post-call check
++
++
++@pytest.mark.asyncio
++async def test_auto_detect_refusal_after_a_held_discovery_is_terminal_and_substitutes_no_provider(monkeypatch, clip):
++    call = AutoDetectCall(monkeypatch, clip, refuse_authorize_at=3)  # the probe before the refresh POST
++    release = threading.Event()
++    oauth = rest.OAuthWire(hold_discovery=release)
++    try:
++        with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, call.cloud):
++            task = asyncio.create_task(call.start())
++            assert await asyncio.to_thread(oauth.discovery_entered.wait, 10)
++            release.set()
++            result = await task
++            assert await asyncio.to_thread(call.finished.wait, 10)
++    finally:
++        release.set()
++    call.assert_terminal(result, oauth, (1, 0), authorize_calls=4)  # + the second (refused) probe
++
++
++@pytest.mark.asyncio
++async def test_a_stop_during_auto_detect_after_a_held_discovery_is_terminal_too(monkeypatch, clip):
++    call = AutoDetectCall(monkeypatch, clip)
++    release = threading.Event()
++    oauth = rest.OAuthWire(hold_discovery=release)
++    try:
++        with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, call.cloud):
++            task = asyncio.create_task(call.start())
++            assert await asyncio.to_thread(oauth.discovery_entered.wait, 10)
++            task.cancel()
++            with pytest.raises(asyncio.CancelledError):
++                await task
++            seen = call.cb.authorize_calls
++            release.set()
++            assert await asyncio.to_thread(call.finished.wait, 10)
++    finally:
++        release.set()
++    assert (len(oauth.gets), len(oauth.posts)) == (1, 0) and call.cloud.count == 0 and call.local == []
++    assert call.cb.authorize_calls == seen and call.cb.before_send_calls == 0
++
++
++@pytest.mark.asyncio
++async def test_auto_detect_without_a_refusal_still_prefers_xai_and_refreshes_once(monkeypatch, clip):
++    """Control: the stock selection order and the once-refresh are intact when the consumer authorizes everything."""
++    call = AutoDetectCall(monkeypatch, clip)
++    oauth = rest.OAuthWire()
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, call.cloud):
++        result = await call.start()
++    assert (result.state, result.transcript, result.provider) == ('transcribed', 'paid cloud words', 'completed')
++    assert (len(oauth.gets), len(oauth.posts), call.cloud.count, call.cb.before_send_calls) == (1, 1, 1, 1)
++    assert call.cloud.requests[0][0].url == 'https://api.x.ai/v1/stt' and call.local == []
 diff --git a/tests/gateway/test_native_voice_xai_freshness.py b/tests/gateway/test_native_voice_xai_freshness.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..23bfddfcccc0567668087e6ab8fcee389868f2eb
+index 0000000000000000000000000000000000000000..9cd4424a272052020bcc6782b9b0baac037d8cdb
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_xai_freshness.py
-@@ -0,0 +1,382 @@
+@@ -0,0 +1,385 @@
 +"""Native voice seam, xAI OAuth pre-send freshness (M2) against the REAL resolver, pool and token store.
 +
 +Nothing credential-related is stubbed: ``resolve_xai_http_credentials`` / ``CredentialPool.select`` read a synthetic
@@ -6290,7 +6401,9 @@ index 0000000000000000000000000000000000000000..23bfddfcccc0567668087e6ab8fcee38
 +    monkeypatch.setattr('tools.transcription_tools._HAS_FASTER_WHISPER', True)
 +    monkeypatch.setattr('tools.transcription_tools._transcribe_local',
 +                        lambda path, model, **kw: fallback.append(path) or {'success': True, 'transcript': ' local words '})
-+    for store, steps in ((rest.jwt(time.time() - 60, 'expired'), [('status', 500)] * 3), ('opaque-bearer', [])):
++    # xAI credentials resolve up to three times per native STT call (provider selection, the stock re-selection in
++    # transcribe_audio, the xAI transcriber). A failed refresh must still cost exactly ONE discovery GET and ONE refresh POST.
++    for store, steps, expected in ((rest.jwt(time.time() - 60, 'expired'), [('status', 500)] * 3, (1, 1)), ('opaque-bearer', [], (0, 0))):
 +        stt_profile()
 +        rest.write_oauth_store(store)
 +        oauth = rest.OAuthWire(steps)
@@ -6301,6 +6414,7 @@ index 0000000000000000000000000000000000000000..23bfddfcccc0567668087e6ab8fcee38
 +        assert (result.state, result.transcript, result.source, result.provider) == (
 +            'transcribed', 'local words', 'local_fallback', 'not_started')
 +        assert wire.count == 0 and cb.before_send_calls == 0
++        assert (len(oauth.gets), len(oauth.posts)) == expected  # no hidden refresh across the repeated resolutions
 +    assert len(fallback) == 2
 +
 +
@@ -6712,10 +6826,10 @@ index 0000000000000000000000000000000000000000..5ff5c62f947ca0aba0872f5934717bef
 +    measured('stock_tts_edge_403_then_ok', handshakes=boundary.handshakes)
 diff --git a/tools/native_send_policy.py b/tools/native_send_policy.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..be9d562774f339ccafc410a29132750ee68c5bb0
+index 0000000000000000000000000000000000000000..728f1fc1ad33bf9cab78569e85e61f6104b8c1b1
 --- /dev/null
 +++ b/tools/native_send_policy.py
-@@ -0,0 +1,464 @@
+@@ -0,0 +1,470 @@
 +"""One-send transport policy for a native (Relay) voice call.
 +
 +``gateway.session_native_voice`` activates a :class:`SendPolicy` around exactly one configured
@@ -6868,7 +6982,10 @@ index 0000000000000000000000000000000000000000..be9d562774f339ccafc410a29132750e
 +    def probe_credentials(self) -> None:
 +        """Called immediately before an OAuth discovery/refresh HTTP request: refuse a closed policy, else ask the
 +        consumer whether the call is still authorized. This is NOT a send: it never runs ``before_send``, never commits,
-+        never counts a send nor opens a scope, and a policy with no probe fails closed."""
++        never counts a send nor opens a scope, and a policy with no probe fails closed.
++
++        A refusal CLOSES the policy: it is terminal for the call, so no later probe, OAuth request or paid ``begin`` can be
++        admitted even if a stock caller swallowed the exception or the consumer would authorize again."""
 +        with self._lock:
 +            if self.closed:
 +                raise self._refusal_locked('closed')
@@ -6877,7 +6994,9 @@ index 0000000000000000000000000000000000000000..be9d562774f339ccafc410a29132750e
 +                raise NativeSendRefused('refused')
 +            self._credential_probe()
 +        except NativeSendRefused as exc:
-+            raise self.refusal_for(exc.reason) from None
++            refusal = self.refusal_for(exc.reason)  # keeps the FIRST truthful reason
++            self.close()  # terminal: a stock quiet availability probe may swallow this, and authority may return later
++            raise refusal from None
 +        with self._lock:
 +            if self.closed:
 +                raise self._refusal_locked('closed')
@@ -6927,10 +7046,11 @@ index 0000000000000000000000000000000000000000..be9d562774f339ccafc410a29132750e
 +        return _current.get() is None
 +
 +
-+# Python applies a logger's filters only to records created on THAT logger, so each logger that can print
-+# provider-controlled text is named exactly: the stock STT/TTS helpers, the credential pool (an OAuth refresh
-+# failure logs the authority's response body) and the pinned Mistral SDK's hook loggers (the deprecation
-+# WARNING carries a provider-supplied date).
++# Python applies a logger's filters only to records created on THAT logger, so the loggers below are named exactly and
++# these are the ones covered by tests: the stock STT/TTS helpers, the credential pool (an OAuth refresh failure logs the
++# authority's response body) and three Mistral SDK hook loggers (the deprecation WARNING carries a provider-supplied date).
++# NOT covered: the pinned SDK's other loggers, e.g. ``mistralai.extra.observability.otel``/``.telemetry`` (WARNINGs with
++# tracebacks when SDK tracing and a global tracer are active); that belongs to the global-OpenTelemetry condition (M1/CV2).
 +_QUIET_LOGGERS = (
 +    'tools.transcription_tools', 'tools.tts_tool', 'agent.credential_pool', 'mistralai.client',
 +    'mistralai.client._hooks.deprecation_warning', 'mistralai.client._hooks.tracing',
