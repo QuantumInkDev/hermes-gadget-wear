@@ -34,7 +34,7 @@ agreement or live deployment is claimed.
 Runtime baseline: the maintainer's Hermes runtime core `7c17e6d72a3b9ec2974b3566f02dab1ed4b94eae`
 (tree `680abe7642528e1b5d85a9bf1ba9f3d1d6f5c5a9`), **not** upstream `e6f57427…`. The
 [patch](0002-feat-add-native-conversation-voice-seams.patch) is the complete `7c17e6d..HEAD`
-delta of the series' core commits (the V1 seams, two corrections, the Mistral enablement and its option assertions, the REST TTS / xAI freshness enablement, and the Task3 Phase1A native-once plugin route, bounded command runner and terminal STT refusals, all below); it depends on everything already in that runtime baseline (the Relay
+delta of the series' core commits (the V1 seams, two corrections, the Mistral enablement and its option assertions, the REST TTS / xAI freshness enablement, the Task3 Phase1A native-once plugin route, bounded command runner and terminal STT refusals, and the Task3 Phase1B launcher-qualified local engines, command adapters and managed whisper.cpp, all below); it depends on everything already in that runtime baseline (the Relay
 native session seams and their prior core changes), none of which this stage exports. Patch 0001
 plus patch 0002 alone do **not** apply to a clean upstream `e6f57427`; the full clean-series
 export and a clean-core compatibility check are a later stage. Apply only to a fresh isolated
@@ -86,8 +86,9 @@ display token proves membership, physical row and content revision, not universa
 **Stage coverage (explicit amendment).** This stage covers a prerequisite provider set: STT `openai`, `groq`,
 `deepinfra` (pinned model), `xai`, `elevenlabs`, `mistral` and the cached local fallback; TTS `edge`, `elevenlabs`,
 `openai`, `deepinfra` (pinned model), `mistral`, `minimax`, `xai`, `gemini`. Every other configured provider — STT user
-command (including the `local_command` template) and plugin providers that did not opt in; TTS NeuTTS/Kitten/Piper,
-command providers and plugin providers that did not opt in — is refused UNSENT (`unavailable`). They are the remaining
+command providers not configured `native: local-sandboxed`, the env/PATH `local_command` templates and plugin providers
+that did not opt in; TTS command providers not so configured and plugins that did not opt in — is refused UNSENT
+(`unavailable`). Local execution (below) is refused unsent on every host that is not qualified. They are the remaining
 mandatory V1-P provider-parity gates of the plan, which must all pass before V2; no category's source is
 configured-provider acceptance by itself.
 
@@ -106,6 +107,22 @@ native combination until a bounded hook contract exists. A recorded `closed`/`ti
 bounded by the call's absolute deadline, Stop and per-stream/transcript-file caps, killing the same-session process
 group (a `setsid` descendant is not reached); command providers themselves stay refused until an OS network-deny
 launcher is admitted. The runner also now closes the child's pipes after every run (a stock file-object leak).
+
+**Launcher-qualified local execution (V1-P Task3 Phase1B, source only).** Every native local child — the Piper,
+KittenTTS and NeuTTS engines, a command provider configured `native: local-sandboxed`, and the managed whisper.cpp
+`local_command` — runs only inside the OS network-deny launcher qualified for this exact host
+(`tools/native_local_launcher.py`: Darwin 27.0.0 arm64, `/usr/bin/sandbox-exec` by sha256, profile
+`(version 1) (allow default) (deny network*)`, from a controller host probe of a direct child and a `setsid` descendant).
+The prefix is built from that table and the binary is re-hashed per use; every other host, architecture, release or
+binary refuses unsent. This is not a hostile-code sandbox and the process-group kill does not reach detached
+descendants. Engines run one new-session helper child per chunk (`tools/native_tts_engine_helper.py`): text on stdin
+only, output descriptors pointed at null before any vendor import, one bounded JSON reply, `RLIMIT_FSIZE` and a live
+WAV watch, and a complete-cache preflight before inference (Piper espeak/text/hebrew incl. Arabic Tashkeel; KittenTTS
+through `try_to_load_from_cache` and the lower `KittenTTS_1_Onnx`, never the downloading wrapper; NeuTTS a local GGUF,
+the stock Torch neucodec with its nested w2v-bert encoder files and the Perth resources, refused before any import on
+Python 3.14). ffmpeg must be usable before any engine and converts WAV to MP3. Managed whisper.cpp runs only with both
+pinned models verified by `_existing_dest_ok` (never the downloader). Local routes make no gated send (`not_started`); a
+failure after a local invocation is `failed`. No real engine, model, cache, sandbox or audio acceptance is claimed.
 
 **Disclosures that bind this stage (carried review findings).** (1) *Process-global telemetry (M1):* the pinned Mistral
 SDK's own key-carrying trace exporter is switched off for a native call, but a process-global OpenTelemetry tracer
