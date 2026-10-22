@@ -13,7 +13,9 @@ local client choice, not a server rule.
 ## Time and ids
 
 * `ServerClock.fix(info, monotonicNanos)` anchors on the full `relay.info.server_time_ms`; the O5-only `Info` has none and
-  is refused (`NO_SERVER_TIME`). There is no wall-clock fallback. `read(nanos)` gives a `ServerInstant`; negative input,
+  is refused (`NO_SERVER_TIME`). There is no wall-clock fallback. `read(nanos)` gives an ESTIMATE: the sampled server
+  time plus the local monotonic time elapsed since the sample. It is NOT guaranteed never to lead (or lag) the server: the
+  server's wall clock can step back or drift after the sample while local elapsed time keeps advancing. Negative input,
   a reading before the fix, a server time above `Long.MAX - 691200000` and arithmetic overflow are refused. A stateful
   component also refuses an instant older than one it already recorded (`CLOCK_ROLLBACK`).
 * An offset is process-local. Nothing about the clock, a binding or an authority epoch is ever saved.
@@ -41,11 +43,17 @@ local client choice, not a server rule.
    claimed after a crash.
 3. Receipt first: a turn that may have reached the server (timeout, stale authority, transport loss, transient error,
    process loss, any unexpected answer) is `UNCERTAIN`. `planSubmit` refuses it (`LOOKUP_REQUIRED_FIRST`); `planLookup`
-   needs a binding made AFTER the uncertainty (`FRESH_ATTACH_REQUIRED`). Only an `ABSENT_SO_FAR` turn (a lookup said not
-   found before the deadline) may be submitted again, with the same id, text and expiry.
-4. Local expiry is not evidence. `NOT_ADMITTED` needs the server's `expired` or a lookup SENT at or after the deadline that
-   found nothing. A found receipt settles only its exact turn and only forward; unknown stays unknown; a conflicting,
-   regressing or inconsistent receipt keeps what is known and surfaces an anomaly.
+   needs a binding made AFTER the uncertainty (`FRESH_ATTACH_REQUIRED`). Only an `ABSENT_SO_FAR` turn (a lookup said `not_found`)
+   may be submitted again, with the same id, text and expiry, and only while the local estimate is before the deadline.
+4. Local expiry is not evidence. `NOT_ADMITTED` needs the server's own `expired` answer, which compares the intent's expiry
+   with the server's clock. A `not_found` receipt (also the answer for a journaled intent the server has not yet expired)
+   is only an observation: the turn becomes `ABSENT_SO_FAR` and stays unresolved, at any local time, with its original
+   id, text, fingerprint and deadline, and a later receipt or `expired` still resolves it (also after a restore). The
+   local estimate may only refuse a resubmit (`DEADLINE_PASSED`) or propose a request; it never renews the deadline,
+   never mints an id and never proves what the server holds. No lookup or resubmit is automatic: the consumer paces
+   explicit lookups with backoff. A found receipt settles only its exact turn and only forward; unknown stays unknown; a
+   conflicting, regressing or inconsistent receipt keeps what is known and surfaces an anomaly. A known admission never
+   regresses to absence.
 5. `permission_denied` stops the scope and owes content eviction; `profile_changed` needs user review; both invalidate
    runtime authority. `busy` / `rate_limited` / `temporarily_unavailable` never stop a scope. Server answers that settle
    nothing hold the turn for a person.

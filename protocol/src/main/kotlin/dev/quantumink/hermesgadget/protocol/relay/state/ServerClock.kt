@@ -42,7 +42,9 @@ sealed interface InstantRead {
 
 /** One estimate of the server's clock at one local monotonic reading. Only a [ServerClock] makes one. */
 class ServerInstant internal constructor(
-    /** The estimated server time in milliseconds. It lags the real server clock by about one network delay. */
+    /**
+     * The estimated server time in milliseconds: the sampled `server_time_ms` plus local monotonic elapsed time. It
+     * is an ESTIMATE only; it may lead or lag the server (see [ServerClock]). */
     val serverMs: Long,
     val monotonicNanos: Long
 ) {
@@ -63,7 +65,12 @@ class ServerInstant internal constructor(
  *
  * The monotonic reading is a NON-NEGATIVE count of nanoseconds from one fixed origin that keeps counting while the
  * device sleeps (on Android `SystemClock.elapsedRealtimeNanos()`); `System.nanoTime()` may be negative and is refused.
- * Estimates lag the real server clock by roughly the one-way delay of the `relay.info` answer, never lead it.
+ * Guarantee: a reading is the sampled `server_time_ms` plus the local monotonic time elapsed since the sample. Nothing
+ * else. There is no device wall-clock fallback. There is NO guarantee that an estimate never leads (or never lags) the
+ * server: the server's own clock can step back or drift after the sample (its wall clock can fall behind while its
+ * retained high-water mark stays put), while local elapsed time keeps advancing. An estimate is therefore usable to
+ * propose a request or to refuse one conservatively, and never as proof of what the server has admitted or can still
+ * admit.
  */
 class ServerClock private constructor(
     private val anchorServerMs: Long,

@@ -113,8 +113,12 @@ class TurnLedgerRecoveryTest {
         assertEquals(TurnPhase.STARTED, h.phase(key))
     }
 
-    @Test fun anAbsentAnswerToALookupSentAfterTheDeadlineProvesNonAdmissionAtTheExactBoundary() {
-        for ((afterMs, closed) in listOf(59_999L to false, 60_000L to true, 60_001L to true)) {
+    @Test fun anAbsentAnswerNeverClosesTheTurnAndOnlyTheEstimateRefusesAResendAtTheExactBoundary() {
+        for ((afterMs, resendAllowed) in listOf(
+            59_999L to true,
+            60_000L to false,
+            60_001L to false
+        )) {
             val h = h()
             val key = h.prepare(ttlMs = 60_000)
             val (_, submit) = h.token1(key)
@@ -122,17 +126,13 @@ class TurnLedgerRecoveryTest {
             h.advance(afterMs)
             val token = h.attach()
             h.fail(h.planned(h.lookup(key, token)), "not_found")
-            val phase = h.phase(key)
-            if (closed) {
-                assertEquals("at +$afterMs", TurnPhase.NOT_ADMITTED, phase)
-                assertEquals(
-                    TurnClosure.NotAdmitted(NotAdmittedProof.ABSENT_AFTER_DEADLINE),
-                    h.entry(key).closure
-                )
-                assertEquals(PlanRefusal.ALREADY_CLOSED, h.refusal(h.submit(key, token)))
+            assertEquals("at +$afterMs", TurnPhase.ABSENT_SO_FAR, h.phase(key))
+            assertNull(h.entry(key).closure)
+            val resend = h.submit(key, token)
+            if (resendAllowed) {
+                assertTrue("at +$afterMs", resend is PlanOutcome.Planned)
             } else {
-                assertEquals("at +$afterMs", TurnPhase.ABSENT_SO_FAR, phase)
-                assertNull(h.entry(key).closure)
+                assertEquals("at +$afterMs", PlanRefusal.DEADLINE_PASSED, h.refusal(resend))
             }
         }
     }
@@ -147,10 +147,12 @@ class TurnLedgerRecoveryTest {
         h.advance(70_000) // the answer arrives late
         h.fail(early, "not_found")
         assertEquals(TurnPhase.ABSENT_SO_FAR, h.phase(key))
-        // A resend would be refused as expired.
+        // A resend would be refused by the estimate.
         assertEquals(PlanRefusal.DEADLINE_PASSED, h.refusal(h.submit(key, token)))
-        h.fail(h.planned(h.lookup(key, token)), "not_found") // this one WAS sent after the deadline
-        assertEquals(TurnPhase.NOT_ADMITTED, h.phase(key))
+        // A lookup planned after the estimated deadline that finds nothing is again only an observation.
+        h.fail(h.planned(h.lookup(key, token)), "not_found")
+        assertEquals(TurnPhase.ABSENT_SO_FAR, h.phase(key))
+        assertNull(h.entry(key).closure)
     }
 
     @Test fun theServersOwnExpiredAnswerIsProofWhateverTheLocalClockSays() {

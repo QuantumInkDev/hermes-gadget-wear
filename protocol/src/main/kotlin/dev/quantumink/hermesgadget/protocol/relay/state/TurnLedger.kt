@@ -145,8 +145,11 @@ enum class Reactivation { USER_REAUTHORIZED, USER_REVIEWED }
  *  - Timeout, stale authority, disconnect, process loss and any other uncertainty require a FRESH attach and then a
  *    receipt lookup BEFORE any resubmit of the same id; admission is never repeated, and only the exact turn whose
  *    receipt it was can be settled by it.
- *  - Local expiry is not evidence: a turn that may have reached the server stays unknown until a lookup (or the
- *    server's own `expired`) proves otherwise.
+ *  - Local expiry is not evidence: a turn that may have reached the server stays unknown until a receipt or the
+ *    server's own `expired` resolves it. A `not_found` observation, before or after the locally estimated deadline,
+ *    never closes a turn (the estimate can lead the server clock); it is conservative to refuse a resubmit then, but
+ *    it is not proof that the server holds nothing or can admit nothing. The ledger never repeats a lookup by itself:
+ *    the consumer must pace explicit lookups (backoff) and may stop at any point; the turn stays reconcilable.
  *
  * Resource limits ([StateLimits]) are LOCAL policy; reaching one is typed backpressure, never truncation.
  */
@@ -235,8 +238,7 @@ class TurnLedger private constructor(
             lastErrorCode = null,
             anomalies = 0,
             freshAfterSerial = 0,
-            outstanding = null,
-            lookupSentAtMs = null
+            outstanding = null
         )
         val next = derive(
             turns = turns + (key to entry),
@@ -297,8 +299,7 @@ class TurnLedger private constructor(
             sent = true,
             absentSoFar = false,
             uncertainty = null,
-            outstanding = ref,
-            lookupSentAtMs = null
+            outstanding = ref
         )
         return LedgerStep(
             planned(changed, ref, now),
@@ -310,7 +311,8 @@ class TurnLedger private constructor(
     /**
      * Plans the receipt lookup (the read-only recovery call) for a turn that may have reached the server, or to
      * refresh an admitted turn that is not yet settled. After uncertainty it needs a binding NEWER than the
-     * uncertainty (a fresh attach). A retained receipt is looked up whatever the age of the id or the deadline.
+     * uncertainty (a fresh attach). A retained receipt is looked up whatever the age of the id or the deadline, and a turn that earlier
+     * observed `not_found` may be looked up again (the later answer may be a legitimate receipt).
      */
     fun planLookup(
         key: TurnKey,
@@ -333,7 +335,7 @@ class TurnLedger private constructor(
                 key.conversation.enrollment
             )
         val call = RelayCalls.receipt(key.conversation.conversationId, key.requestId)
-        val changed = turn.update(outstanding = ref, lookupSentAtMs = now.serverMs)
+        val changed = turn.update(outstanding = ref)
         return LedgerStep(
             planned(changed, ref, now),
             PlanOutcome.Planned(TurnDispatch(key, ref, call)),
@@ -459,12 +461,11 @@ class TurnLedger private constructor(
         val changed = when (ref.kind) {
             CallKind.SUBMIT -> entry.update(
                 outstanding = null,
-                lookupSentAtMs = null,
                 uncertainty = reason,
                 absentSoFar = false,
                 freshAfterSerial = maxOf(entry.freshAfterSerial, ref.bindingSerial)
             )
-            CallKind.LOOKUP -> entry.update(outstanding = null, lookupSentAtMs = null)
+            CallKind.LOOKUP -> entry.update(outstanding = null)
         }
         return commit(entry, changed, emptyList())
     }
@@ -503,7 +504,6 @@ class TurnLedger private constructor(
             is Merge.Conflict -> {
                 val kept = entry.update(
                     outstanding = null,
-                    lookupSentAtMs = null,
                     anomalies = bump(entry.anomalies)
                 )
                 commit(
@@ -515,7 +515,7 @@ class TurnLedger private constructor(
             }
             is Merge.Unchanged -> commit(
                 entry,
-                entry.update(outstanding = null, lookupSentAtMs = null),
+                entry.update(outstanding = null),
                 emptyList()
             )
             is Merge.Changed -> commit(
@@ -523,7 +523,6 @@ class TurnLedger private constructor(
                 entry.update(
                     facts = merged.facts,
                     outstanding = null,
-                    lookupSentAtMs = null,
                     uncertainty = null,
                     absentSoFar = false,
                     hold = null
@@ -541,7 +540,7 @@ class TurnLedger private constructor(
         val scope = entry.key.conversation.enrollment
         val code = error.code
         val submit = ref.kind == CallKind.SUBMIT
-        val cleared = entry.update(outstanding = null, lookupSentAtMs = null)
+        val cleared = entry.update(outstanding = null)
         return when {
             error.action == RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW -> {
                 val record = ScopeRecord(
@@ -637,15 +636,18 @@ class TurnLedger private constructor(
     private fun CallRef.asSubmit(): CallRef =
         CallRef(serial, correlation, CallKind.SUBMIT, bindingSerial, scope)
 
+    /**
+     * `not_found` is an OBSERVATION, never a closure: it is also what the server answers for a journaled intent whose
+     * expiry its own clock has not reached, and the local estimate of the deadline can lead the server's clock (a
+     * sampled `server_time_ms` plus local elapsed time has no bound after a server clock step back or drift). The
+     * turn stays unresolved with its immutable id, text and deadline and can still be settled by a later receipt or
+     * by the server's own `expired`. Whether a resubmit is still allowed is decided separately, conservatively, by
+     * the estimate (`DEADLINE_PASSED`); nothing is retried or looked up automatically.
+     */
     private fun lookupFoundNothing(entry: TurnEntry, cleared: TurnEntry): LedgerStep<ReplyOutcome> {
         val admitted = entry.facts != null
         if (admitted) return anomalous(entry, cleared, AnomalyKind.ABSENT_AFTER_ADMISSION)
-        val sentAt = entry.lookupSentAtMs
-        return if (sentAt != null && sentAt >= entry.expiresAtMs) {
-            close(entry, cleared, TurnClosure.NotAdmitted(NotAdmittedProof.ABSENT_AFTER_DEADLINE))
-        } else {
-            commit(entry, cleared.update(absentSoFar = true, uncertainty = null), emptyList())
-        }
+        return commit(entry, cleared.update(absentSoFar = true, uncertainty = null), emptyList())
     }
 
     private fun close(
@@ -975,8 +977,7 @@ class TurnLedger private constructor(
                     lastErrorCode = lastError,
                     anomalies = item.anomalies,
                     freshAfterSerial = authority.lastSerial,
-                    outstanding = null,
-                    lookupSentAtMs = null
+                    outstanding = null
                 )
             }
             val scopes = LinkedHashMap<EnrollmentScope, ScopeRecord>()

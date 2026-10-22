@@ -82,13 +82,15 @@ enum class UncertainReason {
     UNEXPECTED_ERROR
 }
 
-/** Server evidence that no admission exists and none can be made any more. Distinct proofs, never merged. */
+/**
+ * Server evidence that no admission exists and none can be made any more. The only such evidence is the SERVER's own
+ * `expired` answer: it compares the intent's expiry with the server's clock, which never moves backwards. A `not_found`
+ * receipt is NOT such evidence (it is also the answer for a journaled intent whose expiry the server has not reached),
+ * and neither is a local estimate of the deadline: the estimate can lead the server clock (see [ServerClock]).
+ */
 enum class NotAdmittedProof {
     /** The server answered `expired`: no journal record and the deadline is past (receipt or submit). */
-    SERVER_EXPIRED,
-
-    /** A receipt lookup sent AFTER the deadline found nothing (`not_found`): a late submit is refused as expired. */
-    ABSENT_AFTER_DEADLINE
+    SERVER_EXPIRED
 }
 
 sealed interface TurnClosure {
@@ -176,7 +178,11 @@ enum class TurnPhase {
     /** A receipt lookup is outstanding. */
     LOOKING_UP,
 
-    /** A lookup found no admission and the deadline has not passed: the same id may be submitted again. */
+    /**
+     * A lookup observed `not_found`. That is an observation, not a closure, at any time: the turn stays unresolved. While
+     * the local estimate is before the deadline the same id may be submitted again; afterwards the estimate refuses a
+     * resubmit, but only the server's `expired` or a receipt resolves the turn.
+     */
     ABSENT_SO_FAR,
     QUEUED,
     STARTED,
@@ -258,8 +264,7 @@ class TurnEntry internal constructor(
     val lastErrorCode: RelayErrorCode?,
     val anomalies: Int,
     internal val freshAfterSerial: Long,
-    internal val outstanding: CallRef?,
-    internal val lookupSentAtMs: Long?
+    internal val outstanding: CallRef?
 ) {
     val phase: TurnPhase
         get() = when {
@@ -299,7 +304,10 @@ class TurnEntry internal constructor(
             TurnPhase.REFUSED -> TurnStatus.REFUSED
         }
 
-    /** True when the local deadline has passed. Not evidence of non-admission or of completion. */
+    /**
+     * True when the LOCAL estimate of server time has reached the deadline. It refuses a resubmit; it is not evidence
+     * of non-admission or of completion, and not of what the server holds or can still admit (the estimate can lead).
+     */
     fun deadlinePassed(now: ServerInstant): Boolean = now.serverMs >= expiresAtMs
 
     /** Whether the server may still be holding or executing this turn: local expiry never changes the answer. */
@@ -316,8 +324,7 @@ class TurnEntry internal constructor(
         lastErrorCode: RelayErrorCode? = this.lastErrorCode,
         anomalies: Int = this.anomalies,
         freshAfterSerial: Long = this.freshAfterSerial,
-        outstanding: CallRef? = this.outstanding,
-        lookupSentAtMs: Long? = this.lookupSentAtMs
+        outstanding: CallRef? = this.outstanding
     ): TurnEntry = TurnEntry(
         key,
         expiresAtMs,
@@ -333,8 +340,7 @@ class TurnEntry internal constructor(
         lastErrorCode,
         anomalies,
         freshAfterSerial,
-        outstanding,
-        lookupSentAtMs
+        outstanding
     )
 
     override fun toString(): String =
