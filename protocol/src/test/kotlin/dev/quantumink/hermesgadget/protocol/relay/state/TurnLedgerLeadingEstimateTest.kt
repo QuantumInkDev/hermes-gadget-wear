@@ -4,7 +4,6 @@ import dev.quantumink.hermesgadget.protocol.relay.ReceiptStatus
 import dev.quantumink.hermesgadget.protocol.relay.RelayOutcome
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -43,8 +42,6 @@ class TurnLedgerLeadingEstimateTest {
             val after = h.entry(key)
             val label = "estimate at +$afterMs"
             assertNull(label, after.closure)
-            assertNotEquals(label, TurnPhase.NOT_ADMITTED, after.phase)
-            assertNotEquals(label, TurnStatus.NOT_ADMITTED, after.status)
             assertEquals(label, TurnStatus.UNCERTAIN, after.status)
             assertTrue(label, after.mayHaveReachedServer)
             // The local estimate only refuses a resend; it proves nothing about the server.
@@ -85,7 +82,7 @@ class TurnLedgerLeadingEstimateTest {
     @Test fun anAbsentObservationSurvivesARestoreAndAFreshAttachStillReconcilesTheReceipt() {
         val (h, key) = uncertain(61_000)
         absent(h, key)
-        val saved = RelayStateSnapshot.of(h.ledger, emptyList(), emptyList())
+        val saved = StateTestSupport.builtSnapshot(h.ledger, emptyList(), emptyList())
         val state = (
             RelayStateRestore.restore(
                 saved,
@@ -115,14 +112,16 @@ class TurnLedgerLeadingEstimateTest {
         )
     }
 
-    @Test fun aLaterAuthoritativeExpiredStillClosesAfterEarlierAbsence() {
+    @Test fun aLaterExpiredAnswerAfterEarlierAbsenceIsAlsoOnlyAnObservation() {
         val (h, key) = uncertain(61_000)
         absent(h, key)
         absent(h, key)
         assertNull(h.entry(key).closure)
         h.fail(h.planned(h.lookup(key, h.attach())), "expired")
-        assertEquals(TurnClosure.NotAdmitted(NotAdmittedProof.SERVER_EXPIRED), h.entry(key).closure)
-        assertEquals(TurnStatus.NOT_ADMITTED, h.entry(key).status)
+        // Review C2 supersedes the earlier assumption that `expired` closes: the turn stays unresolved
+        assertNull(h.entry(key).closure)
+        assertEquals(TurnPhase.UNCERTAIN, h.phase(key))
+        assertEquals(TurnStatus.UNCERTAIN, h.entry(key).status)
     }
 
     @Test fun anAbsentObservationBeforeTheDeadlineKeepsTheExistingSameIdPreExpiryRetry() {

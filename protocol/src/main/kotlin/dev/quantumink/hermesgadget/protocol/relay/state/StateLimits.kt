@@ -96,6 +96,13 @@ object StateLimits {
     /** Enrollments with delivery state tracked at once. */
     const val MAX_ENROLLMENTS = 16
 
+    /**
+     * Scope decisions (stopped, under review, content eviction owed) one ledger snapshot may hold: up to four review
+     * epochs per enrollment. A decision is a server-authoritative fact and is never dropped to fit: the live ledger
+     * keeps every one, its aggregate snapshot is refused (typed) when more exist, and restore refuses the excess.
+     */
+    const val MAX_SCOPE_DECISIONS = MAX_ENROLLMENTS * 4
+
     // -- snapshots ---------------------------------------------------------------------------------------
 
     const val SNAPSHOT_VERSION = 1

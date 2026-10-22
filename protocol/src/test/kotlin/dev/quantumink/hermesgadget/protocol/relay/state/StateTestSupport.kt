@@ -79,4 +79,12 @@ internal object StateTestSupport {
             bytes.fill(destination)
         }
     }
+
+    /** The aggregate snapshot of the given state; fails the test if a component is over its limit. */
+    fun builtSnapshot(
+        ledger: TurnLedger,
+        histories: List<HistoryAssembly>,
+        deliveries: List<EnrollmentDelivery>
+    ): RelayStateSnapshot =
+        (RelayStateSnapshot.of(ledger, histories, deliveries) as SnapshotBuild.Built).snapshot
 }

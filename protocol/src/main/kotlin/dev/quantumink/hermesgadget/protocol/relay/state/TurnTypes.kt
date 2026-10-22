@@ -79,25 +79,24 @@ enum class UncertainReason {
     PROCESS_LOSS,
 
     /** An error whose meaning does not settle the turn (see [TurnHold]). */
-    UNEXPECTED_ERROR
+    UNEXPECTED_ERROR,
+
+    /**
+     * The server answered `expired`. That shared code also answers a NEW intent whose UUID timestamp or deadline lies
+     * too far in the FUTURE of the server clock, and the receipt path reads a different clock sample than a new
+     * admission does, so it never proves that THIS immutable request can not be admitted. It is an observation: the
+     * turn stays unresolved and reconcilable (fresh attach, then receipt), never closed.
+     */
+    EXPIRED_REPORTED
 }
 
 /**
- * Server evidence that no admission exists and none can be made any more. The only such evidence is the SERVER's own
- * `expired` answer: it compares the intent's expiry with the server's clock, which never moves backwards. A `not_found`
- * receipt is NOT such evidence (it is also the answer for a journaled intent whose expiry the server has not reached),
- * and neither is a local estimate of the deadline: the estimate can lead the server clock (see [ServerClock]).
+ * How a turn can end without a receipt. There is deliberately NO "not admitted" ending: neither a local deadline
+ * estimate, nor `not_found`, nor the server's `expired` code proves that a possibly sent intent can never be admitted
+ * (see [UncertainReason.EXPIRED_REPORTED]); such a turn stays unresolved and reconcilable until a receipt settles it
+ * or the user explicitly stops tracking it.
  */
-enum class NotAdmittedProof {
-    /** The server answered `expired`: no journal record and the deadline is past (receipt or submit). */
-    SERVER_EXPIRED
-}
-
 sealed interface TurnClosure {
-    data class NotAdmitted(val proof: NotAdmittedProof) : TurnClosure {
-        override fun toString(): String = "NotAdmitted($proof)"
-    }
-
     /** The server refused the call before any effect (`invalid_request` / `unsupported`). Needs the user. */
     data class Refused(val code: RelayErrorCode) : TurnClosure {
         override fun toString(): String = "Refused(${code.wire})"
@@ -106,7 +105,7 @@ sealed interface TurnClosure {
 
 /** Why automatic progress of a turn stopped and waits for a deliberate user decision. */
 enum class TurnHold {
-    /** An error that neither proves admission nor non-admission (conflict, not_found, unknown code, ...). */
+    /** An error that neither proves admission nor non-admission (conflict, unknown code, ...). */
     UNEXPECTED_ERROR
 }
 
@@ -140,14 +139,23 @@ class AdmissionFacts internal constructor(
     val status: ReceiptStatus,
     /** Null for a queued turn (and a queued turn cancelled before it ran); at least 1 once started. */
     val executionGeneration: Long?,
-    val outcome: String?
+    val outcome: String?,
+    /**
+     * Only for a terminal `cancelled` receipt WITHOUT a generation that replaced a STARTED observation: the generation
+     * that start was shown with. The core projects a queued admission handed to a running claim as STARTED(that claim's
+     * generation), hides the transfer, and can requeue (generation NULL) and then cancel it; the earlier start was a
+     * projection of the claim it was transferred to, kept here so that evidence is not erased or mistaken for a run of
+     * this admission. Null in every other case.
+     */
+    val priorStartedGeneration: Long? = null
 ) {
     val knownOutcome: TaskOutcome? get() = TaskOutcome.entries.firstOrNull { it.wire == outcome }
 
     override fun equals(other: Any?): Boolean =
         other is AdmissionFacts && other.admissionId == admissionId &&
             other.authorityEpoch == authorityEpoch && other.status == status &&
-            other.executionGeneration == executionGeneration && other.outcome == outcome
+            other.executionGeneration == executionGeneration && other.outcome == outcome &&
+            other.priorStartedGeneration == priorStartedGeneration
 
     override fun hashCode(): Int = admissionId.hashCode() * 31 + status.hashCode()
 
@@ -181,7 +189,8 @@ enum class TurnPhase {
     /**
      * A lookup observed `not_found`. That is an observation, not a closure, at any time: the turn stays unresolved. While
      * the local estimate is before the deadline the same id may be submitted again; afterwards the estimate refuses a
-     * resubmit, but only the server's `expired` or a receipt resolves the turn.
+     * resubmit, but only a receipt resolves the turn (the server's `expired` is an observation too, see
+     * [UncertainReason.EXPIRED_REPORTED]).
      */
     ABSENT_SO_FAR,
     QUEUED,
@@ -190,7 +199,6 @@ enum class TurnPhase {
     /** The server cannot tell: stays unknown, never success. */
     ADMITTED_UNKNOWN,
     TERMINAL,
-    NOT_ADMITTED,
     REFUSED
 }
 
@@ -213,7 +221,6 @@ enum class TurnStatus {
 
     /** Terminal with an outcome this build does not know: it stays unknown. */
     TERMINAL_UNKNOWN_OUTCOME,
-    NOT_ADMITTED,
     REFUSED
 }
 
@@ -268,7 +275,6 @@ class TurnEntry internal constructor(
 ) {
     val phase: TurnPhase
         get() = when {
-            closure is TurnClosure.NotAdmitted -> TurnPhase.NOT_ADMITTED
             closure is TurnClosure.Refused -> TurnPhase.REFUSED
             outstanding?.kind == CallKind.SUBMIT -> TurnPhase.SUBMITTING
             outstanding?.kind == CallKind.LOOKUP -> TurnPhase.LOOKING_UP
@@ -300,7 +306,6 @@ class TurnEntry internal constructor(
                 TaskOutcome.FAILED, TaskOutcome.REJECTED -> TurnStatus.FAILED
                 null -> TurnStatus.TERMINAL_UNKNOWN_OUTCOME
             }
-            TurnPhase.NOT_ADMITTED -> TurnStatus.NOT_ADMITTED
             TurnPhase.REFUSED -> TurnStatus.REFUSED
         }
 
@@ -385,7 +390,7 @@ enum class AnomalyKind {
     /** A receipt whose status, outcome and generation cannot go together. */
     INCONSISTENT_RECEIPT,
 
-    /** A lookup found nothing for a turn that is already known to be admitted. */
+    /** A lookup found nothing (`not_found`) or answered `expired` for a turn that is already known to be admitted. */
     ABSENT_AFTER_ADMISSION
 }
 

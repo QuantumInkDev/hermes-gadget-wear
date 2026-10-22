@@ -1,6 +1,7 @@
 package dev.quantumink.hermesgadget.protocol.relay.state
 
 import dev.quantumink.hermesgadget.protocol.relay.HistoryMessage
+import dev.quantumink.hermesgadget.protocol.relay.RelayLimits
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -40,23 +41,24 @@ class HistoryAssemblyQuotaTest {
         assertFalse("nothing is allocated for a refused message", h.assembly.hasOpenMessage)
         assertEquals(listOf(max + 1), h.assembly.refusedMessages.map { it.declaredSegments })
         assertEquals(RefusalReason.TOO_MANY_SEGMENTS, h.assembly.refusedMessages.single().reason)
-        // Its later fragments are skipped, then the listing carries on with the next message.
+        // Its later fragments arrive in order and are consumed without allocation, then the listing carries on.
         val rest = h.accepted(
             h.feed(
                 f.page(
                     null,
-                    f.fragment(2, 1, max + 1, "x"),
-                    f.fragment(2, 2, max + 1, "y"),
-                    f.single(3, "after")
+                    *((1..max).map { f.fragment(2, it, max + 1, "x") } + f.single(3, "after"))
+                        .toTypedArray()
                 )
             )
         )
         assertEquals(listOf("after"), rest.emitted.map { it.text })
-        assertEquals(2, rest.duplicateFragments)
+        assertEquals(max, rest.newFragments - 1)
+        assertEquals(0, rest.duplicateFragments)
         assertTrue(rest.listingComplete)
         assertEquals(ListingCompleteness.COMPLETE_WITH_LOCAL_REFUSALS, rest.completeness)
         val huge = HistoryHarness()
-        huge.accepted(huge.feed(f.page(null, f.fragment(9, 0, Int.MAX_VALUE, "x"))))
+        // Only the first fragment is needed to refuse it; the listing then continues with the rest of that message
+        huge.accepted(huge.feed(f.page(f.cursor(1), f.fragment(9, 0, Int.MAX_VALUE, "x"))))
         assertEquals(Int.MAX_VALUE, huge.assembly.refusedMessages.single().declaredSegments)
     }
 
@@ -118,18 +120,31 @@ class HistoryAssemblyQuotaTest {
     @Test fun refusalsAreBoundedAndTheNextOneInvalidatesTheListing() {
         val max = StateLimits.MAX_REFUSED_MESSAGES
         val ok = HistoryHarness()
-        val refusedAll = (1..max).map {
-            f.fragment(it, 0, StateLimits.MAX_MESSAGE_SEGMENTS + 1, "x")
+
+        // Each refused message is read to its end before the next one begins
+        fun refusedMessages(count: Int) = (1..count).flatMap { n ->
+            (0..StateLimits.MAX_MESSAGE_SEGMENTS).map {
+                f.fragment(n, it, StateLimits.MAX_MESSAGE_SEGMENTS + 1, "x")
+            }
         }
-        ok.accepted(ok.feed(f.page(null, *refusedAll.toTypedArray())))
+
+        // in pages within the 400-row structural bound of a history page
+        fun feedAll(h: HistoryHarness, count: Int): PageOutcome? {
+            var last: PageOutcome? = null
+            for ((page, items) in refusedMessages(
+                count
+            ).chunked(RelayLimits.HISTORY_PAGE_ROWS).withIndex()) {
+                last = h.feed(f.page(f.cursor(page + 1), *items.toTypedArray()))
+                if (last is PageOutcome.Invalidated) return last
+            }
+            return last
+        }
+        assertTrue(feedAll(ok, max) is PageOutcome.Accepted)
         assertEquals(max, ok.assembly.refusedMessages.size)
         val past = HistoryHarness()
-        val tooMany = (1..max + 1).map {
-            f.fragment(it, 0, StateLimits.MAX_MESSAGE_SEGMENTS + 1, "x")
-        }
         assertEquals(
             HistoryInvalidation.TOO_MANY_REFUSED,
-            past.invalidated(past.feed(f.page(null, *tooMany.toTypedArray())))
+            past.invalidated(feedAll(past, max + 1)!!)
         )
     }
 

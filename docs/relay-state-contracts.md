@@ -45,15 +45,36 @@ local client choice, not a server rule.
    process loss, any unexpected answer) is `UNCERTAIN`. `planSubmit` refuses it (`LOOKUP_REQUIRED_FIRST`); `planLookup`
    needs a binding made AFTER the uncertainty (`FRESH_ATTACH_REQUIRED`). Only an `ABSENT_SO_FAR` turn (a lookup said `not_found`)
    may be submitted again, with the same id, text and expiry, and only while the local estimate is before the deadline.
-4. Local expiry is not evidence. `NOT_ADMITTED` needs the server's own `expired` answer, which compares the intent's expiry
-   with the server's clock. A `not_found` receipt (also the answer for a journaled intent the server has not yet expired)
-   is only an observation: the turn becomes `ABSENT_SO_FAR` and stays unresolved, at any local time, with its original
-   id, text, fingerprint and deadline, and a later receipt or `expired` still resolves it (also after a restore). The
-   local estimate may only refuse a resubmit (`DEADLINE_PASSED`) or propose a request; it never renews the deadline,
-   never mints an id and never proves what the server holds. No lookup or resubmit is automatic: the consumer paces
-   explicit lookups with backoff. A found receipt settles only its exact turn and only forward; unknown stays unknown; a
-   conflicting, regressing or inconsistent receipt keeps what is known and surfaces an anomaly. A known admission never
-   regresses to absence.
+4. Local expiry is not evidence, and neither is the server's `expired`. **This supersedes the earlier assumption (and the
+   earlier `NOT_ADMITTED` / `SERVER_EXPIRED` proof) that an `expired` answer permanently proves non-admission.** The
+   shared `expired` code also answers a NEW intent whose UUIDv7 timestamp or deadline lies too far in the FUTURE of the
+   server clock (`relay_store.py` `_intent` / `reserve_turn`), and the registered SDK/core fixture shows that the EXACT
+   SAME params are admitted after the server clock advances by one millisecond (controller proof
+   `.local/expansion/native-relay-protocol/receipt-expiry-proof-r1/report.md`, read-only). The receipt path also reads a
+   different clock sample than a new admission does. So `expired` (to a submit or to a lookup) is an observation: the
+   turn stays `UNCERTAIN` (`EXPIRED_REPORTED`, `lastErrorCode` = `expired`) with its original id, text, fingerprint and
+   deadline; receipt-first order holds (no resubmit; a lookup needs a fresh attach); a later receipt settles it, also
+   after a restore. There is **no** "not admitted" ending any more: `TurnClosure.NotAdmitted`, `NotAdmittedProof`,
+   `TurnPhase.NOT_ADMITTED` and `TurnStatus.NOT_ADMITTED` were removed, and a snapshot that still carries a
+   `not_admitted:*` closure is refused (`INVALID_FIELD`, `ledger.turns[n].closure`), never revived. A turn ends only by
+   a receipt, by a server refusal before any effect (`invalid_request` / `unsupported`), or by the user's explicit
+   `ABANDON_TRACKING` (the truthful recovery for a turn that never appears; a new turn then needs a new explicit prepare).
+   A `not_found` receipt (also the answer for a journaled intent the server has not yet expired) is likewise only an
+   observation: `ABSENT_SO_FAR`, at any local time. The local estimate may only refuse a resubmit (`DEADLINE_PASSED`) or
+   propose a request; it never renews the deadline, never mints an id and never proves what the server holds. No lookup
+   or resubmit is automatic: the consumer paces explicit lookups with backoff (later controller/UI work, not proven
+   here). A found receipt settles only its exact turn and only forward; unknown stays unknown; a conflicting,
+   regressing or inconsistent receipt keeps what is known and surfaces an anomaly. A known admission never regresses to
+   absence or to `expired` (`ABSENT_AFTER_ADMISSION`).
+   One source-valid exception to "a generation never vanishes": the core projects a queued admission handed to a running
+   claim as `STARTED(that claim's generation)` (the transfer is hidden), requeues it (`queued`, generation NULL) when the
+   text never reached the claim's agent, and can then cancel it: terminal `cancelled`, generation NULL, same admission
+   and authority epoch. Exactly that shape (STARTED, then TERMINAL `cancelled` with no generation, same admission and
+   epoch, for the call that is outstanding) settles the turn and remembers the start in
+   `AdmissionFacts.priorStartedGeneration`; every other lost or lower generation, any other outcome without a
+   generation, another admission or epoch, or a receipt for another request stays a conflict that keeps what is known.
+   A `queued` observation between the start and the cancel is a `STATUS_REGRESSION` anomaly that keeps the start (the
+   later cancel still settles).
 5. `permission_denied` stops the scope and owes content eviction; `profile_changed` needs user review; both invalidate
    runtime authority. `busy` / `rate_limited` / `temporarily_unavailable` never stop a scope. Server answers that settle
    nothing hold the turn for a person.
@@ -74,6 +95,16 @@ local client choice, not a server rule.
   and recorded, so the listing may then be complete only "with local refusals"), 256 / 4 MiB uncommitted, 2,048 known
   identities, 64 refused messages, 64 consecutive empty pages, a 16-cursor memory. A full quota is `Backpressure`: the page
   is not consumed and its request stays outstanding.
+* A refused message is read THROUGH, not skipped: its remaining fragments must arrive in order with the metadata of the
+  first one (bounded state: id, role, timestamp, count and the next expected index; no text is kept), and each advancing
+  index is cursor progress, so a refused message spanning more than 64 legal `limit` 1 pages no longer stalls the
+  listing. A skipped or out-of-order index (`MISSING_SEGMENT`), changed metadata (`MISMATCHED_METADATA`), another message
+  beginning first (`INTERLEAVED`) or the listing ending inside it (`INCOMPLETE_AT_END`) still invalidates; a repeated
+  already-seen index is an idempotent duplicate; pages of only duplicates still stall. A page ending inside a refused
+  message is never a resume point. After an abort or a restore the message is read again from its first fragment.
+  **Quota-driven invalidations are permanent for that stream until the policy changes:** more than 64 refused messages
+  invalidates the listing as `TOO_MANY_REFUSED`, and an explicit rebuild reads the same stream and reaches the same
+  place; a message over the local segment or byte quota is never delivered (it stays absent, never truncated).
 * Staged vs committed: `accept` stages messages; only `commit(through)` (after the consumer stored them) moves the resume
   point to the latest clean page boundary at or before `through`. `abortUncommitted` rewinds. After an invalidation only
   an explicit `restart` claims a new beginning and records why (`ListingProvenance.after`).
@@ -103,3 +134,14 @@ and a field path (never a value): a request id must carry exactly the server-tim
 match its fingerprint, evidence must be consistent, limits hold. A restored turn that may have reached the server is
 `UNCERTAIN(PROCESS_LOSS)`. A history listing with committed content but no cursor is invalidated, not re-read from its top.
 Never saved: bindings, clocks/offsets, calls/correlations, staged content, fetched prompts/controls, send/playback flags.
+
+Bounds are enforced twice and never by shortening. `RelayStateSnapshot.of(ledger, histories, deliveries)` returns a
+`SnapshotBuild`: `Built(snapshot)` or `TooMany(path, limit)` for more than 16 histories (`histories`), 16 deliveries
+(`deliveries`) or 64 ledger scope decisions (`ledger.scopes`), reading the caller's collections element by element and at
+most one past the limit before anything is mapped or copied. The live ledger never drops a scope decision (a `STOPPED`
+scope that owes content eviction stays so); when it holds more than 64 the consumer must reactivate or evict some before a
+snapshot can be built. The public snapshot constructors keep at most limit + 1 entries (an explicit invalid-oversize
+value) and `RelayStateRestore.restore` refuses `size > limit` with `TOO_MANY` and the same paths, so no restorable prefix
+of a longer input exists. `AdmissionFactsSnapshot.priorStartedGeneration` (default null) was added; the snapshot version
+stays 1 (plain values, no serialisation format exists yet), and a non-null value is accepted only for a terminal
+`cancelled` fact without a generation.

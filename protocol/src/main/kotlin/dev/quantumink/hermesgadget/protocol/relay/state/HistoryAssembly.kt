@@ -268,7 +268,10 @@ class HistoryStep<out R>(
  *
  * LOCAL POLICY ([StateLimits]): how many segments/bytes of one message, how many completed-but-uncommitted
  * messages/bytes and how many identities are kept. A limit is a typed refusal or backpressure result, never a silent
- * truncation, and a refused message is absent, not "complete".
+ * truncation, and a refused message is absent, not "complete". The remaining fragments of a refused message are read in
+ * order (bounded: id, metadata, next index; no text) and each advancing index is progress; an out-of-order, missing or
+ * mismatched one invalidates the listing. Quota-driven invalidations ([HistoryInvalidation.TOO_MANY_REFUSED]) are
+ * permanent for that stream until the policy changes: a rebuild reads the same stream and reaches the same place.
  *
  * Contract with the consumer (not proven here): [AssembledMessage]s are STAGED. The consumer writes them durably, then
  * calls [commit]; only then does the resume point advance. Canonical order is the authenticated page order — nothing
@@ -290,7 +293,11 @@ class HistoryAssembly private constructor(
     private val nextOrdinal: Long,
     private val refused: List<RefusedMessage>,
     private val emptyStreak: Int,
-    private val recentCursors: List<String>
+    private val recentCursors: List<String>,
+    /** The locally refused message whose later fragments are still due, with the next index expected. */
+    private val openRefused: OpenRefused?,
+    /** Refused messages whose fragments were all consumed in THIS cursor chain (reset by abort, restore, rebuild). */
+    private val readRefused: Set<MessageId>
 ) {
     val status: ListingStatus get() = provenance.status
 
@@ -304,6 +311,12 @@ class HistoryAssembly private constructor(
 
     /** Whether a message is partly assembled (its remaining segments are still due). */
     val hasOpenMessage: Boolean get() = pending != null
+
+    /**
+     * Whether a locally refused message is still being read: its remaining fragments are due in order and are
+     * consumed without allocating anything for them. Never a resume point while true.
+     */
+    val hasOpenRefusedMessage: Boolean get() = openRefused != null
 
     val hasOutstandingRequest: Boolean get() = outstanding != null
 
@@ -409,7 +422,7 @@ class HistoryAssembly private constructor(
         }
         val streak = if (next != null && work.newFragments == 0) emptyStreak + 1 else 0
         if (streak > STALL_LIMIT) return invalidated(HistoryInvalidation.STALLED)
-        val endedMidMessage = next == null && work.pending != null
+        val endedMidMessage = next == null && (work.pending != null || work.openRefused != null)
         if (endedMidMessage) return invalidated(HistoryInvalidation.INCOMPLETE_AT_END)
         val complete = next == null
         val ring = ArrayList<String>(StateLimits.CURSOR_RING)
@@ -417,7 +430,7 @@ class HistoryAssembly private constructor(
         for (index in keepFrom until recentCursors.size) ring.add(recentCursors[index])
         fingerprint?.let { ring.add(it) }
         val newBoundaries = when {
-            work.pending != null -> boundaries
+            work.pending != null || work.openRefused != null -> boundaries
             boundaries.lastOrNull()?.ordinal == work.nextOrdinal ->
                 boundaries.dropLast(1) + Boundary(work.nextOrdinal, next)
             else -> boundaries + Boundary(work.nextOrdinal, next)
@@ -440,7 +453,9 @@ class HistoryAssembly private constructor(
             nextOrdinal = work.nextOrdinal,
             refused = Collections.unmodifiableList(work.refused),
             emptyStreak = streak,
-            recentCursors = Collections.unmodifiableList(ring)
+            recentCursors = Collections.unmodifiableList(ring),
+            openRefused = work.openRefused,
+            readRefused = Collections.unmodifiableSet(work.readRefused)
         )
         val outcome = PageOutcome.Accepted(
             Collections.unmodifiableList(work.emitted),
@@ -507,7 +522,9 @@ class HistoryAssembly private constructor(
             boundaries = emptyList(),
             nextOrdinal = committedOrdinal,
             emptyStreak = 0,
-            recentCursors = emptyList()
+            recentCursors = emptyList(),
+            openRefused = null,
+            readRefused = emptySet()
         )
         return HistoryStep(next, dropped)
     }
@@ -569,7 +586,9 @@ class HistoryAssembly private constructor(
             pending = null,
             staged = emptyList(),
             stagedBytes = 0,
-            boundaries = emptyList()
+            boundaries = emptyList(),
+            openRefused = null,
+            readRefused = emptySet()
         )
         return HistoryStep(
             next,
@@ -628,6 +647,19 @@ class HistoryAssembly private constructor(
 
     internal class Boundary(val ordinal: Long, val cursor: String?)
 
+    /**
+     * A message refused locally (over the segment or byte quota) whose remaining fragments are still due. Only its
+     * identity, metadata and the next expected index are kept: bounded, and nothing of its text. Its fragments must
+     * arrive in order (an advancing index is cursor progress) and with the metadata of the first one.
+     */
+    internal class OpenRefused(
+        val id: MessageId,
+        val role: HistoryRole,
+        val createdAtMs: Long,
+        val count: Int,
+        val next: Int
+    )
+
     internal class OpenMessage(
         val id: MessageId,
         val role: HistoryRole,
@@ -668,6 +700,8 @@ class HistoryAssembly private constructor(
         var stagedBytes = source.stagedBytes
         var nextOrdinal = source.nextOrdinal
         val refused = ArrayList(source.refused)
+        var openRefused: OpenRefused? = source.openRefused
+        val readRefused = HashSet(source.readRefused)
         val emitted = ArrayList<AssembledMessage>()
         var newFragments = 0
         var duplicateFragments = 0
@@ -675,10 +709,10 @@ class HistoryAssembly private constructor(
         fun consume(fragment: HistoryMessage): Verdict {
             val current = pending
             if (current != null) return continueOpen(current, fragment)
-            if (refused.any { it.messageId == fragment.messageId }) {
-                duplicateFragments++
-                return Verdict.Continue
-            }
+            val refusing = openRefused
+            if (refusing != null) return continueRefused(refusing, fragment)
+            val earlier = refused.firstOrNull { it.messageId == fragment.messageId }
+            if (earlier != null) return seenRefused(earlier, fragment)
             val seen = known[fragment.messageId]
             if (seen != null) return duplicateOfKnown(seen, fragment)
             val beginsMessage = fragment.segmentIndex == 0
@@ -728,6 +762,66 @@ class HistoryAssembly private constructor(
             return finishIfComplete(current)
         }
 
+        /** Another fragment of the refused message being read: only the next index advances, in order. */
+        private fun continueRefused(open: OpenRefused, fragment: HistoryMessage): Verdict {
+            if (fragment.messageId !=
+                open.id
+            ) {
+                return Verdict.Invalid(HistoryInvalidation.INTERLEAVED)
+            }
+            val sameMetadata = fragment.role == open.role &&
+                fragment.createdAtMs == open.createdAtMs &&
+                fragment.segmentCount == open.count
+            if (!sameMetadata) return Verdict.Invalid(HistoryInvalidation.MISMATCHED_METADATA)
+            val index = fragment.segmentIndex
+            if (index < open.next) {
+                duplicateFragments++
+                return Verdict.Continue
+            }
+            if (index != open.next) return Verdict.Invalid(HistoryInvalidation.MISSING_SEGMENT)
+            newFragments++
+            advanceRefused(OpenRefused(open.id, open.role, open.createdAtMs, open.count, index + 1))
+            return Verdict.Continue
+        }
+
+        /**
+         * A fragment of a message this listing already refused. Read through in this cursor chain it is an idempotent
+         * duplicate; otherwise (a rebuild after an abort or restore re-reads it) it must begin at its first fragment and
+         * is tracked in order again, as progress.
+         */
+        private fun seenRefused(earlier: RefusedMessage, fragment: HistoryMessage): Verdict {
+            if (fragment.segmentCount != earlier.declaredSegments) {
+                return Verdict.Invalid(HistoryInvalidation.MISMATCHED_METADATA)
+            }
+            if (earlier.messageId in readRefused) {
+                duplicateFragments++
+                return Verdict.Continue
+            }
+            if (fragment.segmentIndex != 0) {
+                return Verdict.Invalid(HistoryInvalidation.UNEXPECTED_FRAGMENT)
+            }
+            newFragments++
+            advanceRefused(
+                OpenRefused(
+                    fragment.messageId,
+                    fragment.role,
+                    fragment.createdAtMs,
+                    fragment.segmentCount,
+                    1
+                )
+            )
+            return Verdict.Continue
+        }
+
+        private fun advanceRefused(open: OpenRefused) {
+            if (open.next >= open.count) {
+                openRefused = null
+                readRefused.add(open.id)
+            } else {
+                openRefused = open
+            }
+        }
+
         private fun duplicateOfKnown(seen: Known, fragment: HistoryMessage): Verdict {
             val sameMetadata = fragment.role == seen.role &&
                 fragment.createdAtMs == seen.createdAtMs &&
@@ -750,6 +844,16 @@ class HistoryAssembly private constructor(
             }
             pending = null
             refused.add(RefusedMessage(fragment.messageId, reason, fragment.segmentCount))
+            newFragments++
+            advanceRefused(
+                OpenRefused(
+                    fragment.messageId,
+                    fragment.role,
+                    fragment.createdAtMs,
+                    fragment.segmentCount,
+                    fragment.segmentIndex + 1
+                )
+            )
             return Verdict.Continue
         }
 
@@ -812,7 +916,9 @@ class HistoryAssembly private constructor(
         nextOrdinal: Long = this.nextOrdinal,
         refused: List<RefusedMessage> = this.refused,
         emptyStreak: Int = this.emptyStreak,
-        recentCursors: List<String> = this.recentCursors
+        recentCursors: List<String> = this.recentCursors,
+        openRefused: OpenRefused? = this.openRefused,
+        readRefused: Set<MessageId> = this.readRefused
     ) = HistoryAssembly(
         scope,
         provenance,
@@ -829,7 +935,9 @@ class HistoryAssembly private constructor(
         nextOrdinal,
         refused,
         emptyStreak,
-        recentCursors
+        recentCursors,
+        openRefused,
+        readRefused
     )
 
     companion object {
@@ -1003,7 +1111,9 @@ class HistoryAssembly private constructor(
                 saved.committedOrdinal,
                 refusedList,
                 0,
-                emptyList()
+                emptyList(),
+                null,
+                emptySet()
             )
             return RestoreResult.Restored(assembly, notices)
         }
@@ -1032,7 +1142,9 @@ class HistoryAssembly private constructor(
                 0,
                 emptyList(),
                 0,
-                emptyList()
+                emptyList(),
+                null,
+                emptySet()
             )
     }
 }

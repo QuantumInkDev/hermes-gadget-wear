@@ -155,7 +155,7 @@ class TurnLedgerRecoveryTest {
         assertNull(h.entry(key).closure)
     }
 
-    @Test fun theServersOwnExpiredAnswerIsProofWhateverTheLocalClockSays() {
+    @Test fun theServersExpiredAnswerIsOnlyAnObservationWhateverTheLocalClockSays() {
         val h = h()
         val key = h.prepare(ttlMs = 60_000)
         val (_, submit) = h.token1(key)
@@ -163,17 +163,16 @@ class TurnLedgerRecoveryTest {
         val token = h.attach()
         // Before the local deadline: the server clock is ahead of the estimate.
         h.fail(h.planned(h.lookup(key, token)), "expired")
-        assertEquals(
-            TurnClosure.NotAdmitted(NotAdmittedProof.SERVER_EXPIRED),
-            h.entry(key).closure
-        )
-        assertEquals(TurnStatus.NOT_ADMITTED, h.entry(key).status)
-        // A submit answered `expired` is the same proof.
+        assertNull(h.entry(key).closure)
+        assertEquals(TurnStatus.UNCERTAIN, h.entry(key).status)
+        assertEquals(UncertainReason.EXPIRED_REPORTED, h.entry(key).uncertainty)
+        // A submit answered `expired` is the same observation (review C2).
         val h2 = h()
         val k2 = h2.prepare()
         val s2 = h2.planned(h2.submit(k2, h2.attach()))
         h2.fail(s2, "expired")
-        assertEquals(TurnClosure.NotAdmitted(NotAdmittedProof.SERVER_EXPIRED), h2.entry(k2).closure)
+        assertNull(h2.entry(k2).closure)
+        assertEquals(UncertainReason.EXPIRED_REPORTED, h2.entry(k2).uncertainty)
     }
 
     @Test fun staleAuthorityKeepsTheTurnUncertainRequestsAFreshViewAndMintsNothing() {
@@ -385,7 +384,6 @@ class TurnLedgerRecoveryTest {
         h2.apply(h2.ledger.onReply(s2.ref, uncorrelated))
         assertEquals(UncertainReason.LINK_FAILURE, h2.entry(k2).uncertainty)
         assertEquals(TurnPhase.UNCERTAIN, h2.phase(k2))
-        assertNotEquals(TurnPhase.NOT_ADMITTED, h2.phase(k2))
     }
 
     @Test fun aLateReplyToAnOlderCallIsIgnoredBeforeAnyStateChange() {

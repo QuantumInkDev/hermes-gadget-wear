@@ -61,7 +61,7 @@ class NoSpontaneousActionTest {
         assertTrue(history.effects.all { it is HistoryEffect.RebuildRequired })
 
         // A restore likewise only re-creates the uncertainty; the same id, no call, no new turn.
-        val snapshot = RelayStateSnapshot.of(
+        val snapshot = StateTestSupport.builtSnapshot(
             turns.ledger,
             listOf(history.assembly),
             listOf(delivery.delivery)

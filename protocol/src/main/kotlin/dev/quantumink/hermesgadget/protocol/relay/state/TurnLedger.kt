@@ -113,7 +113,7 @@ sealed interface ReplyOutcome {
 enum class IntentMatch { SAME, CHANGED, UNKNOWN_TURN }
 
 enum class DiscardMode {
-    /** Only a turn the server cannot still be holding: never sent, settled, refused or provably not admitted. */
+    /** Only a turn the server cannot still be holding: never sent, settled or refused before any effect. */
     ONLY_IF_SETTLED,
 
     /** The user explicitly stops tracking a turn the server may still execute. */
@@ -145,11 +145,14 @@ enum class Reactivation { USER_REAUTHORIZED, USER_REVIEWED }
  *  - Timeout, stale authority, disconnect, process loss and any other uncertainty require a FRESH attach and then a
  *    receipt lookup BEFORE any resubmit of the same id; admission is never repeated, and only the exact turn whose
  *    receipt it was can be settled by it.
- *  - Local expiry is not evidence: a turn that may have reached the server stays unknown until a receipt or the
- *    server's own `expired` resolves it. A `not_found` observation, before or after the locally estimated deadline,
- *    never closes a turn (the estimate can lead the server clock); it is conservative to refuse a resubmit then, but
- *    it is not proof that the server holds nothing or can admit nothing. The ledger never repeats a lookup by itself:
- *    the consumer must pace explicit lookups (backoff) and may stop at any point; the turn stays reconcilable.
+ *  - Local expiry is not evidence: a turn that may have reached the server stays unknown until a receipt resolves it.
+ *    Neither a `not_found` observation nor the server's `expired` code ever closes a turn: the local estimate can lead
+ *    the server clock, and `expired` also answers a NEW intent whose UUID timestamp or deadline lies too far in the
+ *    FUTURE of the server clock (it may become admissible later) and is read by the receipt path from another clock
+ *    sample than a new admission uses. It is conservative to refuse a resubmit when the estimate has passed the deadline,
+ *    but that is not proof that the server holds nothing or can admit nothing. A turn ends only by a receipt, by a
+ *    server refusal before any effect, or by the user's explicit [DiscardMode.ABANDON_TRACKING]. The ledger never
+ *    repeats a lookup by itself: the consumer must pace explicit lookups (backoff) and may stop at any point.
  *
  * Resource limits ([StateLimits]) are LOCAL policy; reaching one is typed backpressure, never truncation.
  */
@@ -182,6 +185,13 @@ class TurnLedger private constructor(
     /** Scopes with recorded non-default state (stopped, under review, or owing content eviction). */
     val recordedScopes: Map<EnrollmentScope, ScopeRecord>
         get() = Collections.unmodifiableMap(LinkedHashMap(scopes))
+
+    /**
+     * How many scope decisions the live ledger holds. None is ever dropped to fit a limit; when it exceeds
+     * [StateLimits.MAX_SCOPE_DECISIONS] the aggregate snapshot is refused ([SnapshotBuild.TooMany]) and a restore
+     * refuses the excess, until the consumer has reactivated or evicted scopes.
+     */
+    val scopeDecisionCount: Int get() = scopes.size
 
     // -- preparing ---------------------------------------------------------------------------------------
 
@@ -572,10 +582,11 @@ class TurnLedger private constructor(
             }
             code == RelayErrorCode.EXPIRED && entry.facts != null ->
                 anomalous(entry, cleared, AnomalyKind.ABSENT_AFTER_ADMISSION)
-            code == RelayErrorCode.EXPIRED -> close(
+            code == RelayErrorCode.EXPIRED -> commit(
                 entry,
-                cleared,
-                TurnClosure.NotAdmitted(NotAdmittedProof.SERVER_EXPIRED)
+                uncertainAfter(cleared, ref, UncertainReason.EXPIRED_REPORTED)
+                    .update(lastErrorCode = code),
+                emptyList()
             )
             submit &&
                 (code == RelayErrorCode.INVALID_REQUEST || code == RelayErrorCode.UNSUPPORTED) ->
@@ -617,7 +628,13 @@ class TurnLedger private constructor(
         reason: UncertainReason
     ): TurnEntry = when {
         ref.kind == CallKind.SUBMIT ||
-            (cleared.facts == null && reason == UncertainReason.STALE_AUTHORITY) ->
+            (
+                cleared.facts == null &&
+                    (
+                        reason == UncertainReason.STALE_AUTHORITY ||
+                            reason == UncertainReason.EXPIRED_REPORTED
+                        )
+                ) ->
             cleared.update(
                 uncertainty = reason,
                 absentSoFar = false,
@@ -786,7 +803,6 @@ class TurnLedger private constructor(
         val settled = when (entry.phase) {
             TurnPhase.PREPARED,
             TurnPhase.TERMINAL,
-            TurnPhase.NOT_ADMITTED,
             TurnPhase.REFUSED -> true
             else -> false
         }
@@ -823,9 +839,12 @@ class TurnLedger private constructor(
      */
     fun snapshot(): TurnLedgerSnapshot = TurnLedgerSnapshot(
         turns.values.map { it.toSnapshot() },
-        scopes.map { (scope, record) ->
+        // At most one past the limit is mapped: such a snapshot is explicitly oversize and is refused, never shortened
+        scopes.entries.asSequence().take(
+            StateLimits.MAX_SCOPE_DECISIONS + 1
+        ).map { (scope, record) ->
             ScopeStateSnapshot(scope.toSnapshot(), record.status.name, record.contentEvictionOwed)
-        }
+        }.toList()
     )
 
     private fun TurnEntry.toSnapshot() = TurnSnapshot(
@@ -843,12 +862,12 @@ class TurnLedger private constructor(
                 it.authorityEpoch,
                 it.status.wire,
                 it.executionGeneration,
-                it.outcome
+                it.outcome,
+                it.priorStartedGeneration
             )
         },
         when (val shut = closure) {
             null -> null
-            is TurnClosure.NotAdmitted -> "not_admitted:" + shut.proof.name.lowercase()
             is TurnClosure.Refused -> "refused:" + shut.code.wire
         },
         hold != null,
@@ -868,6 +887,7 @@ class TurnLedger private constructor(
 
     companion object {
         private const val MAX_ANOMALIES = 1_000
+        private const val CANCELLED = "cancelled"
 
         fun empty(): TurnLedger = TurnLedger(emptyMap(), emptyMap(), 1, emptyList(), 0, 0)
 
@@ -887,6 +907,9 @@ class TurnLedger private constructor(
                 StateLimits.MAX_RETAINED_TURNS
             ) {
                 return refused(RestoreRefusal.TOO_MANY, "turns")
+            }
+            if (saved.scopes.size > StateLimits.MAX_SCOPE_DECISIONS) {
+                return refused(RestoreRefusal.TOO_MANY, "scopes")
             }
             val turns = LinkedHashMap<TurnKey, TurnEntry>()
             var textBytes = 0L
@@ -1013,15 +1036,23 @@ class TurnLedger private constructor(
                     outcome.length in 1..RelayLimits.ID_CHARS &&
                         outcome.all { it in 'a'..'z' || it == '_' }
                     )
+            val prior = saved.priorStartedGeneration
+            // Only the requeued-and-cancelled shape may remember an earlier start
+            val validPrior = prior == null ||
+                (
+                    prior >= 1 && status == ReceiptStatus.TERMINAL && generation == null &&
+                        outcome == CANCELLED
+                    )
             val valid = saved.authorityEpoch >= 0 && (generation ?: 0) >= 0 && validOutcome &&
-                consistent(status, outcome, generation)
+                validPrior && consistent(status, outcome, generation)
             return if (valid) {
                 AdmissionFacts(
                     admission,
                     saved.authorityEpoch,
                     status,
                     generation,
-                    outcome
+                    outcome,
+                    prior
                 )
             } else {
                 null
@@ -1032,11 +1063,7 @@ class TurnLedger private constructor(
             val kind = saved.substringBefore(':')
             val detail = saved.substringAfter(':', "")
             return when (kind) {
-                "not_admitted" -> NotAdmittedProof.entries.firstOrNull {
-                    it.name.lowercase() ==
-                        detail
-                }
-                    ?.let { TurnClosure.NotAdmitted(it) }
+                // There is no "not_admitted" ending any more (an obsolete saved one is refused, not revived)
                 "refused" -> RelayErrorCode.entries.firstOrNull { it.wire == detail }
                     ?.let { TurnClosure.Refused(it) }
                 else -> null
@@ -1049,6 +1076,29 @@ class TurnLedger private constructor(
             ReceiptStatus.STARTED -> 2
             ReceiptStatus.TERMINAL -> 3
         }
+
+        /**
+         * The one source-valid way a generation vanishes: the core projects a queued admission handed to a running claim
+         * as STARTED(that claim's generation), requeues it (queued, generation NULL) when the text never reached the
+         * claim's agent, and then cancels the queued admission: terminal `cancelled`, generation NULL, SAME admission
+         * and authority epoch (the caller has already matched both). Anything else that loses or lowers a generation
+         * stays a conflict.
+         */
+        private fun requeuedThenCancelled(
+            current: AdmissionFacts,
+            incoming: AdmissionFacts
+        ): Boolean =
+            current.status == ReceiptStatus.STARTED && incoming.status == ReceiptStatus.TERMINAL &&
+                incoming.outcome == CANCELLED && incoming.executionGeneration == null
+
+        private fun AdmissionFacts.rememberingStart(generation: Long) = AdmissionFacts(
+            admissionId,
+            authorityEpoch,
+            status,
+            executionGeneration,
+            outcome,
+            generation
+        )
 
         /** Status, outcome and generation must go together, following the actual DTOs (queued: generation null). */
         internal fun consistent(receipt: Receipt): Boolean =
@@ -1082,7 +1132,10 @@ class TurnLedger private constructor(
             val before = current.executionGeneration
             val after = incoming.executionGeneration
             if (before != null && (after == null || after < before)) {
-                return Merge.Conflict(AnomalyKind.GENERATION_REGRESSION)
+                if (!requeuedThenCancelled(current, incoming)) {
+                    return Merge.Conflict(AnomalyKind.GENERATION_REGRESSION)
+                }
+                return Merge.Changed(incoming.rememberingStart(before))
             }
             if (incoming.status == current.status) {
                 if (incoming.status == ReceiptStatus.TERMINAL) {

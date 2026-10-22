@@ -65,7 +65,9 @@ data class AdmissionFactsSnapshot(
     val authorityEpoch: Long,
     val status: String,
     val executionGeneration: Long?,
-    val outcome: String?
+    val outcome: String?,
+    /** See [AdmissionFacts.priorStartedGeneration]; null except for a requeued-then-cancelled admission. */
+    val priorStartedGeneration: Long? = null
 ) {
     override fun toString(): String = "AdmissionFactsSnapshot(redacted)"
 }
@@ -81,7 +83,7 @@ data class TurnSnapshot(
     val text: String?,
     val sent: Boolean,
     val facts: AdmissionFactsSnapshot?,
-    /** `not_admitted:<proof>` / `refused:<code>`, or null while the turn is open. */
+    /** `refused:<code>`, or null while the turn is open. */
     val closure: String?,
     val held: Boolean,
     val lastErrorCode: String?,
@@ -105,7 +107,7 @@ class TurnLedgerSnapshot(turns: List<TurnSnapshot>, scopes: List<ScopeStateSnaps
     )
     val scopes: List<ScopeStateSnapshot> = ownedBoundedForSnapshot(
         scopes,
-        StateLimits.MAX_ENROLLMENTS * 4 + 1
+        StateLimits.MAX_SCOPE_DECISIONS + 1
     )
 
     override fun toString(): String =
@@ -221,16 +223,55 @@ class RelayStateSnapshot(
     companion object {
         const val VERSION = StateLimits.SNAPSHOT_VERSION
 
+        /**
+         * Builds the aggregate snapshot, or refuses with [SnapshotBuild.TooMany] when a component exceeds its policy
+         * limit: a snapshot that restore would refuse (or, worse, shorten) is never handed out as a durable value. The
+         * caller's collections are read element by element and only up to one past their limit, before anything is
+         * mapped or copied, so an arbitrarily large collection costs a bounded amount of work.
+         */
         fun of(
             ledger: TurnLedger,
             histories: List<HistoryAssembly>,
             deliveries: List<EnrollmentDelivery>
-        ): RelayStateSnapshot = RelayStateSnapshot(
-            VERSION,
-            ledger.snapshot(),
-            histories.map { it.snapshot() },
-            deliveries.map { it.snapshot() }
-        )
+        ): SnapshotBuild {
+            val ownedHistories = ownedBoundedForSnapshot(
+                histories,
+                StateLimits.MAX_HISTORY_SCOPES + 1
+            )
+            if (ownedHistories.size > StateLimits.MAX_HISTORY_SCOPES) {
+                return SnapshotBuild.TooMany("histories", StateLimits.MAX_HISTORY_SCOPES)
+            }
+            val ownedDeliveries = ownedBoundedForSnapshot(
+                deliveries,
+                StateLimits.MAX_ENROLLMENTS + 1
+            )
+            if (ownedDeliveries.size > StateLimits.MAX_ENROLLMENTS) {
+                return SnapshotBuild.TooMany("deliveries", StateLimits.MAX_ENROLLMENTS)
+            }
+            if (ledger.scopeDecisionCount > StateLimits.MAX_SCOPE_DECISIONS) {
+                return SnapshotBuild.TooMany("ledger.scopes", StateLimits.MAX_SCOPE_DECISIONS)
+            }
+            return SnapshotBuild.Built(
+                RelayStateSnapshot(
+                    VERSION,
+                    ledger.snapshot(),
+                    ownedHistories.map { it.snapshot() },
+                    ownedDeliveries.map { it.snapshot() }
+                )
+            )
+        }
+    }
+}
+
+/** The result of building an aggregate snapshot: the value, or a typed refusal naming the component and its limit. */
+sealed interface SnapshotBuild {
+    class Built(val snapshot: RelayStateSnapshot) : SnapshotBuild {
+        override fun toString(): String = "Built($snapshot)"
+    }
+
+    /** More than [limit] entries of [path] exist. Nothing was dropped, truncated or built. */
+    class TooMany(val path: String, val limit: Int) : SnapshotBuild {
+        override fun toString(): String = "TooMany($path, limit=$limit)"
     }
 }
 
@@ -265,6 +306,12 @@ object RelayStateRestore {
                 RestoreRefusal.AUTHORITY_NOT_FRESH,
                 "authority"
             )
+        }
+        if (snapshot.histories.size > StateLimits.MAX_HISTORY_SCOPES) {
+            return RestoreResult.Refused(RestoreRefusal.TOO_MANY, "histories")
+        }
+        if (snapshot.deliveries.size > StateLimits.MAX_ENROLLMENTS) {
+            return RestoreResult.Refused(RestoreRefusal.TOO_MANY, "deliveries")
         }
         val notices = LinkedHashSet<RestoreNotice>()
         val ledger = when (val result = TurnLedger.restore(snapshot.ledger, now, authority)) {
@@ -321,11 +368,9 @@ object RelayStateRestore {
 
 internal fun <T : Any> ownedBoundedForSnapshot(values: List<T>, maximum: Int): List<T> {
     val owned = ArrayList<T>(minOf(maximum, 16))
-    for (value in values) {
-        // One past the policy limit is kept so that restore can refuse it
-        if (owned.size >= maximum) break
-        owned.add(value)
-    }
+    val source = values.iterator()
+    // One past the policy limit is kept so that restore can refuse it; the element after that is never even read
+    while (owned.size < maximum && source.hasNext()) owned.add(source.next())
     return Collections.unmodifiableList(owned)
 }
 

@@ -65,7 +65,7 @@ class RelayStateSnapshotTest {
         result as RestoreResult.Refused
 
     private fun snapshotOf(ledger: TurnLedger) =
-        RelayStateSnapshot.of(ledger, emptyList(), emptyList())
+        StateTestSupport.builtSnapshot(ledger, emptyList(), emptyList())
 
     @Test fun aRestoredLedgerKeepsEveryTurnExactlyAndMarksPossiblySentOnesUncertain() {
         val l = Ledger()
@@ -95,7 +95,8 @@ class RelayStateSnapshotTest {
         assertEquals(TurnPhase.UNCERTAIN, phases[l.timedOut])
         assertEquals(TurnPhase.STARTED, phases[l.started])
         assertEquals(TurnPhase.TERMINAL, phases[l.finished])
-        assertEquals(TurnPhase.NOT_ADMITTED, phases[l.expired])
+        // `expired` is an observation (review C2): the turn stays unresolved and reconcilable, never closed
+        assertEquals(TurnPhase.UNCERTAIN, phases[l.expired])
         assertEquals(TurnPhase.REFUSED, phases[l.refused])
         assertEquals(TurnPhase.UNCERTAIN, phases[l.held])
         assertEquals(TurnHold.UNEXPECTED_ERROR, after.entry(l.held)!!.hold)
@@ -564,8 +565,11 @@ class RelayStateSnapshotTest {
             h.feed(
                 f.page(
                     f.cursor(1),
-                    f.fragment(1, 0, StateLimits.MAX_MESSAGE_SEGMENTS + 1, "x"),
-                    f.single(2)
+                    *(
+                        (0..StateLimits.MAX_MESSAGE_SEGMENTS).map {
+                            f.fragment(1, it, StateLimits.MAX_MESSAGE_SEGMENTS + 1, "x")
+                        } + f.single(2)
+                        ).toTypedArray()
                 )
             )
         )
@@ -788,7 +792,7 @@ class RelayStateSnapshotTest {
         val l = Ledger()
         val history = committedHistory()
         val delivery = deliveryWithState()
-        val snapshot = RelayStateSnapshot.of(
+        val snapshot = StateTestSupport.builtSnapshot(
             l.h.ledger,
             listOf(history.assembly),
             listOf(delivery.delivery)
@@ -798,13 +802,13 @@ class RelayStateSnapshotTest {
         assertEquals(1, state.histories.size)
         assertEquals(1, state.deliveries.size)
         assertEquals(history.scope, state.histories.single().scope)
-        val dupHistory = RelayStateSnapshot.of(
+        val dupHistory = StateTestSupport.builtSnapshot(
             l.h.ledger,
             listOf(history.assembly, history.assembly),
             emptyList()
         )
         assertEquals(RestoreRefusal.DUPLICATE, refusal(restore(dupHistory)).reason)
-        val dupDelivery = RelayStateSnapshot.of(
+        val dupDelivery = StateTestSupport.builtSnapshot(
             l.h.ledger,
             emptyList(),
             listOf(delivery.delivery, delivery.delivery)
@@ -886,7 +890,7 @@ class RelayStateSnapshotTest {
         val l = Ledger()
         val history = committedHistory()
         val delivery = deliveryWithState()
-        val snapshot = RelayStateSnapshot.of(
+        val snapshot = StateTestSupport.builtSnapshot(
             l.h.ledger,
             listOf(history.assembly),
             listOf(delivery.delivery)

@@ -263,15 +263,27 @@ class TurnLedgerEvidenceTest {
         )
         val cancelled = facts(ReceiptStatus.TERMINAL, null, "cancelled")
         assertEquals(TurnLedger.Merge.Unchanged, TurnLedger.merge(cancelled, cancelled))
+        // Review C1: a STARTED projection of a hidden steering transfer, requeued and then cancelled (terminal
+        // `cancelled`, generation NULL, same admission and epoch), settles and remembers the start it replaced.
+        val started = facts(ReceiptStatus.STARTED, 2)
+        val settled = (TurnLedger.merge(started, cancelled) as TurnLedger.Merge.Changed).facts
+        assertEquals(ReceiptStatus.TERMINAL, settled.status)
+        assertEquals(null, settled.executionGeneration)
+        assertEquals(2L, settled.priorStartedGeneration)
+        // Anything else that loses or lowers a generation stays a conflict, also after a settlement.
+        for (shape in listOf("completed", "failed", "interrupted", "steered", "rejected")) {
+            assertEquals(
+                shape,
+                AnomalyKind.GENERATION_REGRESSION,
+                conflict(started, facts(ReceiptStatus.TERMINAL, null, shape))
+            )
+        }
         assertEquals(
             AnomalyKind.GENERATION_REGRESSION,
-            conflict(
-                cancelled.let {
-                    facts(ReceiptStatus.STARTED, 2)
-                },
-                cancelled
-            )
+            conflict(facts(ReceiptStatus.TERMINAL, 2, "completed"), cancelled)
         )
+        assertEquals(TurnLedger.Merge.Unchanged, TurnLedger.merge(settled, cancelled))
+        assertEquals(AnomalyKind.STATUS_REGRESSION, conflict(settled, started))
     }
 
     @Test fun aRestartedRunUnderAHigherGenerationAdvancesAndIdenticalEvidenceIsQuiet() {
