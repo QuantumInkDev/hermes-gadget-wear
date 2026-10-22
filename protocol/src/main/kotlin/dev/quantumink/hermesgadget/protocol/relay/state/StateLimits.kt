@@ -84,17 +84,17 @@ object StateLimits {
 
     // -- POLICY: events and O5 ---------------------------------------------------------------------------
 
-    /** Event identities remembered per conversation. */
-    const val MAX_SEEN_EVENT_IDS = 1_024
-
-    /** Conversations / enrollments with event or O5 state tracked at once. */
-    const val MAX_EVENT_SCOPES = 64
-
-    /** O5 event keys remembered per enrollment (final-text refs are opaque text of up to 256 bytes). */
-    const val MAX_SEEN_OUTBOX_KEYS = 1_024
+    /**
+     * Event identities remembered per enrollment: live events, O5 task copies and O5 final-text copies share one
+     * table (a final-text key is opaque text of up to 128 + 256 bytes).
+     */
+    const val MAX_SEEN_KEYS = 4_096
 
     /** O5 deliveries stored but not yet acknowledged per enrollment. */
     const val MAX_PENDING_ACKS = 256
+
+    /** Enrollments with delivery state tracked at once. */
+    const val MAX_ENROLLMENTS = 16
 
     // -- snapshots ---------------------------------------------------------------------------------------
 
