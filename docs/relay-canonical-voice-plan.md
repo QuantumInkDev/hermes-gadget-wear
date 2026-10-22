@@ -121,6 +121,7 @@ category below on the registered fixtures, then ONE source review and a current-
 | TTS NeuTTS / Kitten / Piper | installed AND cached assets only, no downloads, bounded local execution, truthful `not_started` remote accounting, no paid-provider fallback |
 | TTS command and plugin | the same native-once capability contract as STT; an arbitrary program cannot be certified single-attempt by a provider-name allowlist |
 | Pre-send credential freshness (xAI OAuth, M2) | refresh BEFORE the paid send with synthetic transport proof; never refresh-and-resend after a send |
+| Edge full range and the joiner (round-2 N2) | test a full-range (> 600 code points) Edge call with the real ffmpeg joiner and the missing-joiner outcome (`unavailable`/`not_started` before any send, no paid fallback, no silent truncation); concise ≤ 600 code points independent |
 
 Until V1-P passes, V1 alone is not configured-provider acceptance and V2 cannot start. The full fifteen-feature scope is
 unchanged.
@@ -161,6 +162,13 @@ socket and the V1 provider boundary are synthetic):
 Exit: exported patch, fresh pinned-source reapplication, focused report with call counts; ONE review.
 
 ### V3 — SDK voice output
+
+**Mandatory core prerequisite BEFORE any V3 consumer relies on `NativeDisplayToken` (round-2 N1):** extend the token
+with the `display_kind` (≤ 128 bytes) and compressed-summary scalars (or equally strong sibling-fingerprint semantics)
+and prove it with a visible-assistant → hidden-after-read test (token mismatch or `not_found`). V3 does not activate
+before this gate; it is a staged prerequisite, not a waiver (design §9.2.3). V3 and user setup also expose the ffmpeg
+joiner prerequisite for full-range Edge speech (design §12.1, round-2 N2); the final rollout verifies it on each
+supported box.
 
 Scope (PROPOSED): `relay.voice.speak`/`speak.stop`; live selection (journal + core lookup + `message_id`
 mapping, author-only, window, one live row including client mode); deliberate `replay`/`more` selection by
@@ -315,6 +323,10 @@ acceptance item of design §15 has its own evidence.
 | M1 billing evidence (`preparing`, `before_send`) | V1, V2, V3 |
 | M2 content-free logs, confined content responses | V2, V3 log capture; N8 |
 | M3 provider timeout/retry provenance and measured RED | V1 (covered providers), V1-P (the rest) |
+| M2 pre-send credential freshness (no refresh-and-resend) | V1-P |
+| M10 exhaustive `(state, provider)` → wire table with a parametrized test (no new wire value) | V2 (STT), V3 (TTS) |
+| Round-2 N1 token visibility scalars (`display_kind`, compressed-summary) | core prerequisite before V3 activation |
+| Round-2 N2 Edge 600-code-point bound and ffmpeg joiner | V1-P tests, V3/user setup, final rollout |
 | M4 output fence cost gate | V3 |
 | M5 registry gaps (removed; canonical read) | V1, V3 |
 | M6 BYOK live row, chunk limits, watch delegation boundary | V3, V5, V6 |

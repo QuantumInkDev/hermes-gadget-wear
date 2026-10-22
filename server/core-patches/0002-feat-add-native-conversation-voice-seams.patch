@@ -45,10 +45,10 @@ index 14703329aef89b5516dc67f6379d3f284627d99c..7741eb05aacf82bdf9b232d4e2c9b06e
          return await read_native_admissions(self, actor, ref, adapter=adapter, source=source,
 diff --git a/gateway/session_native_voice.py b/gateway/session_native_voice.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..39f3a961716ec60d7f10856b95118dc0b99bb36b
+index 0000000000000000000000000000000000000000..7bfe706dfa03a5d57c580f535622f4f4feb2e579
 --- /dev/null
 +++ b/gateway/session_native_voice.py
-@@ -0,0 +1,110 @@
+@@ -0,0 +1,111 @@
 +"""Generic native voice seam: one configured STT request, one TTS request per chunk, canonical display reads.
 +
 +An in-process extension seam for a consumer that owns its own registry, grants and accounting (the
@@ -67,7 +67,8 @@ index 0000000000000000000000000000000000000000..39f3a961716ec60d7f10856b95118dc0
 +Local backends send nothing remote and therefore always report ``not_started``. A deadline bounds the
 +caller's waiting; it never claims the provider stopped, and a worker that outlives it is fenced so it
 +cannot start a send, run a consumer callback nor leave an audio file behind. Audio or a transcript that
-+comes back without exactly one gated send is ``failed`` with ``provider='unknown'``, never ``not_started``.
++comes back without exactly one gated send is ``failed`` with ``provider='unknown'``, never ``not_started``;
++so is an invocation that, once entered, raises or answers a failure with zero gated sends (no STT fallback).
 +
 +V1 covers a prerequisite provider set (see ``session_native_voice_stt`` / ``_tts``); any other configured
 +provider is refused UNSENT until its V1-P gate passes.
@@ -586,10 +587,10 @@ index 0000000000000000000000000000000000000000..37c365aa2aabc6c399d954b5d3d72fc4
 +    return PROVIDER_COMPLETED if answered else PROVIDER_FAILED
 diff --git a/gateway/session_native_voice_stt.py b/gateway/session_native_voice_stt.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..c7be1a89c44138d71bca531b2d447db7b7242a54
+index 0000000000000000000000000000000000000000..f90d9935baed144a63c938402f986e71ee9a6b13
 --- /dev/null
 +++ b/gateway/session_native_voice_stt.py
-@@ -0,0 +1,164 @@
+@@ -0,0 +1,166 @@
 +"""Configured-once speech-to-text for the native voice seam (see ``session_native_voice``).
 +
 +The profile's own STT configuration is read at call time through the stock resolvers, the audio is
@@ -684,6 +685,8 @@ index 0000000000000000000000000000000000000000..c7be1a89c44138d71bca531b2d447db7
 +        return state, text, True
 +    if result is not None and result.get('no_speech') and policy.sends:
 +        return 'empty', None, True  # HTTP 200 with no words: silence is an answer
++    if attempt.provider not in LOCAL_PROVIDERS and policy.silent_after_entry():
++        return 'unaccounted', None, False  # failed after entry with no gated send: it may have sent unseen
 +    return _failure_state(attempt, policy), None, False
 +
 +
@@ -756,10 +759,10 @@ index 0000000000000000000000000000000000000000..c7be1a89c44138d71bca531b2d447db7
 +    return _make(configured_state, None, None, provider)
 diff --git a/gateway/session_native_voice_tts.py b/gateway/session_native_voice_tts.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..8348c4134c828c19e6cb3b742994057e176e26d2
+index 0000000000000000000000000000000000000000..fa9821faed9cb7cd4c0eaf3f4f2767bcd13224d3
 --- /dev/null
 +++ b/gateway/session_native_voice_tts.py
-@@ -0,0 +1,243 @@
+@@ -0,0 +1,249 @@
 +"""Configured one-request-per-chunk text-to-speech for the native voice seam (``session_native_voice``).
 +
 +The profile's own TTS configuration (provider, voice, model) is read at call time through the stock
@@ -844,6 +847,12 @@ index 0000000000000000000000000000000000000000..8348c4134c828c19e6cb3b742994057e
 +    run.policy.arm()
 +    try:
 +        tts._synthesize_builtin(engine, chunk, path, config, None)
++    except native_send_policy.NativeSendRefused:
++        raise  # a gate or policy refusal: the policy knows exactly what was and was not sent
++    except Exception:
++        if run.policy.silent_after_entry():
++            run.unaccounted = True  # the engine failed after entry with no gated send: it may have sent unseen
++        raise
 +    finally:
 +        run.policy.close_clients()
 +    if run.policy.scope_sends != 1:
@@ -1830,6 +1839,182 @@ index 0000000000000000000000000000000000000000..885ebcba74591c415366feb8d6b2db59
 +    assert settled_start == settled_end and settled == 'v' * 20000
 +    db.set_user_message_content(ref.session_id, row_id, 'w' * 20000)  # after the read, before P2
 +    assert fence(rig, ref, identity) != settled_end
+diff --git a/tests/gateway/test_native_voice_exception_accounting.py b/tests/gateway/test_native_voice_exception_accounting.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..62c2d0a07f4d900f3db24f5c9abdbfafcbf21edb
+--- /dev/null
++++ b/tests/gateway/test_native_voice_exception_accounting.py
+@@ -0,0 +1,170 @@
++"""Native voice seam: an engine that RAISES after entering the provider invocation without a gated send.
++
++A hooked SDK that passes the injected-client identity proof and then sends through a path the gate never saw
++may also fail (a 500, a parse error). The consumer then has no durable in-flight record, so the result must be
++``failed`` with ``provider='unknown'`` (never ``unavailable``/``not_started``) and a configured-STT failure of
++that kind must not run the local fallback. Failures BEFORE the invocation is entered (missing key, an SDK that
++cannot be told "no retry", a refusal) stay truthful ``unavailable``/``not_started``.
++
++The diverging SDKs below are labelled stand-ins that misbehave on purpose; the first chunk of the later-chunk
++control and every pre-entry/known-failure control use the REAL pinned SDK or the real OpenAI client. Only the
++network bytes are synthetic.
++"""
++import os
++import types
++
++import httpx
++import pytest
++
++from gateway.session_native_voice import synthesize_native_once, transcribe_native_once
++from hermes_constants import get_hermes_home
++from tests.gateway import native_voice_support as support
++
++KEY = 'sk-synthetic-exception-accounting'
++
++
++@pytest.fixture
++def out(tmp_path):
++    path = tmp_path / 'caller-output'
++    path.mkdir()
++    return str(path)
++
++
++async def speak(out, callbacks, text='Hello there, friend.', deadline_s=60):
++    return await synthesize_native_once(text, output_dir=out, authorize=callbacks.authorize,
++                                        before_send=callbacks.before_send, deadline_s=deadline_s)
++
++
++def elevenlabs_profile(**section):
++    support.write_config(get_hermes_home(), {'tts': {'provider': 'elevenlabs', 'elevenlabs': section}})
++    (get_hermes_home() / '.env').write_text('ELEVENLABS_API_KEY=el-synthetic-key\n')
++
++
++class DivergesThenRaises:
++    """Labelled stand-in: reports the injected client as its sender (the identity proof PASSES), then sends once
++    through ITS OWN client over the synthetic transport, receives the provider's answer and raises."""
++
++    def __init__(self, api_key=None, timeout=None, httpx_client=None, environment=None):
++        self.own = httpx.Client()
++        self.text_to_speech = self
++        self._client_wrapper = type('W', (), {'httpx_client': type('H', (), {'httpx_client': httpx_client})()})()
++
++    def convert(self, voice_id, *, text, model_id=None, output_format=None, request_options=None):
++        response = self.own.post('https://api.elevenlabs.io/v1/diverged', json={'text': text})
++        response.raise_for_status()
++        yield response.content
++
++
++class NoRequestOptions(DivergesThenRaises):
++    """Labelled stand-in: passes the identity proof but cannot be told "no retry" (no ``request_options``)."""
++
++    def convert(self, voice_id, *, text, model_id=None, output_format=None):
++        yield b'ID3never'
++
++
++@pytest.mark.asyncio
++async def test_a_diverging_tts_sdk_that_raises_after_its_own_send_is_failed_unknown(monkeypatch, out):
++    elevenlabs_profile()
++    monkeypatch.setattr('tools.tts_tool._import_elevenlabs', lambda: DivergesThenRaises)
++    cb = support.Callbacks()
++    wire = support.Wire([('status', 500)] * 3)
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.path, result.provider) == ('failed', None, 'unknown')
++    assert wire.count == 1 and cb.before_send_calls == 0 and os.listdir(out) == []
++    assert support.SECRET not in repr(result)
++
++
++@pytest.mark.asyncio
++async def test_a_later_chunk_that_diverges_and_raises_leaves_the_aggregate_unknown_and_cleans_up(monkeypatch, out):
++    pytest.importorskip('elevenlabs')
++    from elevenlabs.client import ElevenLabs
++    elevenlabs_profile(max_text_length=60)
++    built = []
++
++    def importer():
++        built.append(1)
++        # call 1 is the engine-availability probe, call 2 builds chunk 1 (real, gated), call 3 builds chunk 2 (diverges)
++        return ElevenLabs if len(built) <= 2 else DivergesThenRaises
++    monkeypatch.setattr('tools.tts_tool._import_elevenlabs', importer)
++    text = ('The first sentence is deliberately rather long. The second sentence is also fairly long here. '
++            'The third sentence closes out the whole text.')
++    cb = support.Callbacks()
++    wire = support.Wire([('ok', {'audio': b'ID3first'}), ('status', 500), ('ok', {'audio': b'ID3never'})])
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb, text=text)
++    assert (result.state, result.path, result.provider) == ('failed', None, 'unknown')
++    assert len(built) == 3, 'no third chunk is attempted after the unaccounted one'
++    assert wire.count == 2 and cb.before_send_calls == 1 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_a_diverging_stt_client_that_raises_is_failed_unknown_and_never_falls_back(monkeypatch, tmp_path):
++    import openai
++
++    class Diverging(openai.OpenAI):
++        """Labelled stand-in: ``_client`` IS the injected client (identity proof passes); the request goes elsewhere."""
++
++        def __init__(self, *args, http_client=None, **kwargs):
++            super().__init__(*args, http_client=http_client, **kwargs)
++            own = httpx.Client()
++
++            class Transcriptions:
++                def create(self, **kw):
++                    response = own.post('https://api.openai.com/v1/audio/transcriptions', content=b'x')
++                    response.raise_for_status()
++                    return response.text
++            self.audio = types.SimpleNamespace(transcriptions=Transcriptions())
++    support.write_config(get_hermes_home(), {'stt': {'provider': 'openai', 'cloud_trim_silence': False,
++                                                     'openai': {'api_key': KEY, 'model': 'whisper-1'}}})
++    monkeypatch.setattr(openai, 'OpenAI', Diverging)
++    fallback = []
++    monkeypatch.setattr('tools.transcription_tools._HAS_FASTER_WHISPER', True)
++    monkeypatch.setattr('tools.transcription_tools._transcribe_local',
++                        lambda path, model, **kw: fallback.append(path) or {'success': True, 'transcript': 'local words'})
++    clip = support.write_wav(tmp_path / 'clip.wav')
++    cb = support.Callbacks()
++    wire = support.Wire([('status', 500)] * 3)
++    with support.provider_wire(monkeypatch, wire):
++        result = await transcribe_native_once(clip, authorize=cb.authorize, before_send=cb.before_send, deadline_s=30)
++    assert (result.state, result.transcript, result.source, result.provider) == ('failed', None, None, 'unknown')
++    assert wire.count == 1 and cb.before_send_calls == 0 and fallback == []
++
++
++@pytest.mark.asyncio
++async def test_pre_entry_failures_stay_unsent(monkeypatch, out, tmp_path):
++    cb = support.Callbacks()
++    wire = support.Wire([('ok', {'audio': b'ID3x'})])
++    with support.provider_wire(monkeypatch, wire):
++        # no API key: raised before any client exists
++        support.write_config(get_hermes_home(), {'tts': {'provider': 'elevenlabs'}})
++        missing = await speak(out, cb)
++        # an SDK that passes the identity proof but cannot be told "no retry": refused before the invocation
++        elevenlabs_profile()
++        monkeypatch.setattr('tools.tts_tool._import_elevenlabs', lambda: NoRequestOptions)
++        options = await speak(out, cb)
++        # STT without a key
++        support.write_config(get_hermes_home(), {'stt': {'provider': 'openai', 'cloud_trim_silence': False}})
++        clip = support.write_wav(tmp_path / 'clip.wav')
++        heard = await transcribe_native_once(clip, authorize=cb.authorize, before_send=cb.before_send, deadline_s=30)
++    assert [(r.state, r.provider) for r in (missing, options)] == [('unavailable', 'not_started')] * 2
++    assert (heard.state, heard.provider) == ('unavailable', 'not_started')
++    assert wire.count == 0 and cb.before_send_calls == 0 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_known_gated_failures_keep_their_truthful_accounting_and_the_fallback(monkeypatch, tmp_path):
++    support.write_config(get_hermes_home(), {'stt': {'provider': 'openai', 'cloud_trim_silence': False,
++                                                     'openai': {'api_key': KEY, 'model': 'whisper-1'}}})
++    fallback = []
++    monkeypatch.setattr('tools.transcription_tools._HAS_FASTER_WHISPER', True)
++    monkeypatch.setattr('tools.transcription_tools._transcribe_local',
++                        lambda path, model, **kw: fallback.append(path) or {'success': True, 'transcript': ' local words '})
++    clip = support.write_wav(tmp_path / 'clip.wav')
++    cb = support.Callbacks()
++    wire = support.Wire([('status', 500)] * 3)
++    with support.provider_wire(monkeypatch, wire):
++        result = await transcribe_native_once(clip, authorize=cb.authorize, before_send=cb.before_send, deadline_s=30)
++    assert (result.state, result.transcript, result.source, result.provider) == (
++        'transcribed', 'local words', 'local_fallback', 'failed_after_send')
++    assert wire.count == 1 and cb.before_send_calls == 1 and len(fallback) == 1
 diff --git a/tests/gateway/test_native_voice_existing_display.py b/tests/gateway/test_native_voice_existing_display.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..5c40d2d3d8bd567bb2cc85ec15628e5aaa9da4b3
@@ -3462,10 +3647,10 @@ index 0000000000000000000000000000000000000000..5ff5c62f947ca0aba0872f5934717bef
 +    measured('stock_tts_edge_403_then_ok', handshakes=boundary.handshakes)
 diff --git a/tools/native_send_policy.py b/tools/native_send_policy.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..7bf9e3cb160c606986e7d7170e62a396c9441e48
+index 0000000000000000000000000000000000000000..81f6ffae2bec9d8fe375a1d8d85966eb41e484de
 --- /dev/null
 +++ b/tools/native_send_policy.py
-@@ -0,0 +1,270 @@
+@@ -0,0 +1,297 @@
 +"""One-send transport policy for a native (Relay) voice call.
 +
 +``gateway.session_native_voice`` activates a :class:`SendPolicy` around exactly one configured
@@ -3514,6 +3699,7 @@ index 0000000000000000000000000000000000000000..7bf9e3cb160c606986e7d7170e62a396
 +        self._gate = gate
 +        self._lock = threading.Lock()
 +        self._scope_sends = 0
++        self._entered = False
 +        self._committed = False
 +        self._clients: list[Any] = []
 +        self.sends = 0
@@ -3528,6 +3714,23 @@ index 0000000000000000000000000000000000000000..7bf9e3cb160c606986e7d7170e62a396
 +        """Gated sends admitted since the last :meth:`arm`."""
 +        return self._scope_sends
 +
++    @property
++    def entered(self) -> bool:
++        """The provider invocation of the current scope was entered (the injected client was proven, or the
++        Edge connector built, and the SDK is about to be called)."""
++        return self._entered
++
++    def mark_entered(self) -> None:
++        with self._lock:
++            self._entered = True
++
++    def silent_after_entry(self) -> bool:
++        """True when an invocation was entered, no send passed the gate in this scope and no policy refusal
++        explains it: whatever happened next (an exception, a failure answer) may have left through a path the
++        gate never saw, so the accounting is ambiguous (``unknown``), never ``not_started``."""
++        with self._lock:
++            return self._entered and not self._scope_sends and self.refusal is None
++
 +    def refusal_for(self, reason: str) -> NativeSendRefused:
 +        """The exception to raise for ``reason``, remembering the first reason for the caller's report."""
 +        with self._lock:
@@ -3541,6 +3744,7 @@ index 0000000000000000000000000000000000000000..7bf9e3cb160c606986e7d7170e62a396
 +        """Open a fresh one-send scope (one TTS chunk); cumulative ``sends`` keeps counting."""
 +        with self._lock:
 +            self._scope_sends = 0
++            self._entered = False
 +
 +    def is_closed(self) -> bool:
 +        with self._lock:
@@ -3652,6 +3856,14 @@ index 0000000000000000000000000000000000000000..7bf9e3cb160c606986e7d7170e62a396
 +    return policy.refusal_for(reason) if policy is not None else NativeSendRefused(reason)
 +
 +
++def mark_entered() -> None:
++    """Immediately before an SDK/engine invocation whose gate is proven: from here a zero-send exception or
++    failure is ambiguous, not "nothing was sent"."""
++    policy = _current.get()
++    if policy is not None:
++        policy.mark_entered()
++
++
 +def begin_send() -> None:
 +    """Transport-boundary hook for providers that do not go through an httpx client."""
 +    policy = _current.get()
@@ -3737,7 +3949,7 @@ index 0000000000000000000000000000000000000000..7bf9e3cb160c606986e7d7170e62a396
 +    return {'connector': GatedConnector(), 'connect_timeout': max(1, int(min(10, policy.timeout_s))),
 +            'receive_timeout': max(1, int(policy.timeout_s))}
 diff --git a/tools/transcription_cloud.py b/tools/transcription_cloud.py
-index b54514ae29fc3e63a2c46dc783411f7ddc586daa..a12607a876bc38c08a87eaa53354f0eddab2edc1 100644
+index b54514ae29fc3e63a2c46dc783411f7ddc586daa..f60ca13302ba62ad2c153dd17ab1e6386e99ed6e 100644
 --- a/tools/transcription_cloud.py
 +++ b/tools/transcription_cloud.py
 @@ -17,6 +17,7 @@ from typing import Any, Callable, Dict, Optional
@@ -3748,7 +3960,7 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..a12607a876bc38c08a87eaa53354f0ed
  from tools.transcription_audio import _transcode_audio_for_stt
  from tools.transcription_common import (
      DEFAULT_GROQ_STT_MODEL, DEFAULT_STT_MODEL, ELEVENLABS_STT_BASE_URL,
-@@ -50,13 +51,18 @@ def _with_openai_client(api_key: str, base_url: Optional[str], file_path: str, l
+@@ -50,13 +51,19 @@ def _with_openai_client(api_key: str, base_url: Optional[str], file_path: str, l
          from tools.transcription_common import DEFAULT_STT_TIMEOUT, _config_number
          from tools.transcription_tools import _load_stt_config
          openai_config = _get_stt_section(_load_stt_config(), "openai")
@@ -3770,10 +3982,11 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..a12607a876bc38c08a87eaa53354f0ed
 +        client = OpenAI(**client_kwargs)
          try:
 +            native_send_policy.prove_injected(getattr(client, "_client", None), client_kwargs.get("http_client"))
++            native_send_policy.mark_entered()
              return body(client)
          finally:
              close = getattr(client, "close", None)
-@@ -169,6 +175,8 @@ def _transcribe_openai(
+@@ -169,6 +176,8 @@ def _transcribe_openai(
              try:
                  transcription = _create_transcription(file_path)
              except APIStatusError as exc:
@@ -3782,7 +3995,7 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..a12607a876bc38c08a87eaa53354f0ed
                  # 400 + container hint is the documented rejection; some OpenAI-compatible endpoints
                  # reject a container with a bare 5xx instead (#81644). A 5xx is ambiguous, so it earns
                  # the same single transcode retry and, when no transcode is possible, its own error.
-@@ -220,8 +228,10 @@ def _transcribe_mistral(
+@@ -220,8 +229,10 @@ def _transcribe_mistral(
  def _post_audio_multipart(url: str, headers: dict[str, str], file_path: str, data: dict[str, str]):
      import requests
      with open(file_path, "rb") as audio_file:
@@ -3794,7 +4007,7 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..a12607a876bc38c08a87eaa53354f0ed
  
  
  def _rest_provider(
-@@ -299,7 +309,8 @@ def _transcribe_xai(
+@@ -299,7 +310,8 @@ def _transcribe_xai(
              return _post_audio_multipart(f"{endpoint_base_url}/stt", headers, file_path, data)
  
          response = _post_transcription(api_key, _resolve_base_url(creds))
@@ -3804,7 +4017,7 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..a12607a876bc38c08a87eaa53354f0ed
              logger.info("xAI STT got HTTP %d; refreshing OAuth credentials and retrying once", response.status_code)
              try:
                  refreshed_creds = resolve_xai_http_credentials(force_refresh=True, api_key_hint=api_key)
-@@ -372,6 +383,8 @@ def _transcribe_deepinfra(
+@@ -372,6 +384,8 @@ def _transcribe_deepinfra(
      from hermes_cli.models import deepinfra_base_url, deepinfra_model_ids
      # ``stt.deepinfra: null`` in YAML yields None, not {} — coalesce.
      base_url = deepinfra_base_url(_get_stt_section(_load_stt_config(), "deepinfra"))
@@ -3901,7 +4114,7 @@ index b60cdf372f35761b70ea6ed686579335f4d013b1..42622a269a8777b80840d342ca4571d7
  
  
 diff --git a/tools/tts_tool_openai.py b/tools/tts_tool_openai.py
-index aa10ff3607bcf460f3585c9e5e0e11d7bc55348f..426ae5d820ef22bf9b1ee866c84ecfda66928bbe 100644
+index aa10ff3607bcf460f3585c9e5e0e11d7bc55348f..407445daecc1dd237bd360b57ba7953f74970323 100644
 --- a/tools/tts_tool_openai.py
 +++ b/tools/tts_tool_openai.py
 @@ -13,6 +13,7 @@ import uuid
@@ -3929,7 +4142,7 @@ index aa10ff3607bcf460f3585c9e5e0e11d7bc55348f..426ae5d820ef22bf9b1ee866c84ecfda
  def _generate_openai_tts(
      text: str, output_path: str, tts_config: dict[str, Any], *, api_key: Optional[str] = None,
      base_url: Optional[str] = None, model: Optional[str] = None, voice: Optional[str] = None,
-@@ -136,9 +147,11 @@ def _generate_openai_tts(
+@@ -136,9 +147,12 @@ def _generate_openai_tts(
          create_kwargs["instructions"] = instructions
      if extra_body := _openai_extra_body(oai_config):
          create_kwargs["extra_body"] = extra_body
@@ -3939,11 +4152,12 @@ index aa10ff3607bcf460f3585c9e5e0e11d7bc55348f..426ae5d820ef22bf9b1ee866c84ecfda
      try:
 -        client.audio.speech.create(**create_kwargs).stream_to_file(output_path)
 +        native_send_policy.prove_injected(getattr(client, "_client", None), sdk_kwargs.get("http_client"))
++        native_send_policy.mark_entered()
 +        _write_speech(client, create_kwargs, output_path)
          return output_path
      finally:
          close = getattr(client, "close", None)
-@@ -156,6 +169,8 @@ def _generate_deepinfra_tts(text: str, output_path: str, tts_config: dict[str, A
+@@ -156,6 +170,8 @@ def _generate_deepinfra_tts(text: str, output_path: str, tts_config: dict[str, A
      from hermes_cli.models import deepinfra_base_url, deepinfra_model_ids
      model = di_config.get("model")
      if not isinstance(model, str) or not model.strip():
@@ -3953,7 +4167,7 @@ index aa10ff3607bcf460f3585c9e5e0e11d7bc55348f..426ae5d820ef22bf9b1ee866c84ecfda
          if not candidates:
              raise ValueError(
 diff --git a/tools/tts_tool_providers.py b/tools/tts_tool_providers.py
-index 15b0ad8ea39cbcad7166a86a235827eb78901d40..0f921b40eb5db940ac79f08bdf507eccfa2878e1 100644
+index 15b0ad8ea39cbcad7166a86a235827eb78901d40..db3d0b908a5b953a41be03adaa53dd167ae3ee6e 100644
 --- a/tools/tts_tool_providers.py
 +++ b/tools/tts_tool_providers.py
 @@ -11,6 +11,7 @@ from __future__ import annotations
@@ -3972,16 +4186,18 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..0f921b40eb5db940ac79f08bdf507ecc
  from tools.tts_tool_delivery import _origin, _section, _wrap_pcm_as_wav, _write_wav_bytes_as
  from tools.xai_http import hermes_xai_user_agent
  
-@@ -200,7 +202,7 @@ async def _generate_edge_tts(text: str, output_path: str, tts_config: dict[str,
+@@ -200,7 +202,9 @@ async def _generate_edge_tts(text: str, output_path: str, tts_config: dict[str,
      kwargs = {"voice": edge_config.get("voice", DEFAULT_EDGE_VOICE)}
      if speed != 1.0:
          kwargs["rate"] = f"{round((speed - 1.0) * 100):+d}%"
 -    await edge_tts.Communicate(text, **kwargs).save(output_path)
-+    await edge_tts.Communicate(text, **kwargs, **native_send_policy.edge_communicate_kwargs()).save(output_path)
++    communicate = edge_tts.Communicate(text, **kwargs, **native_send_policy.edge_communicate_kwargs())
++    native_send_policy.mark_entered()
++    await communicate.save(output_path)
      return output_path
  
  
-@@ -216,16 +218,33 @@ def _elevenlabs_environment_kwargs(el_config: dict[str, Any]) -> dict[str, Any]:
+@@ -216,16 +220,34 @@ def _elevenlabs_environment_kwargs(el_config: dict[str, Any]) -> dict[str, Any]:
      return {"environment": ElevenLabsEnvironment(base=base_url, wss=wss_url)}
  
  
@@ -4006,12 +4222,13 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..0f921b40eb5db940ac79f08bdf507ecc
 +    client = _origin()._import_elevenlabs()(api_key=api_key, **_elevenlabs_environment_kwargs(el_config), **sdk_kwargs)
 +    sender = getattr(getattr(getattr(client.text_to_speech, "_client_wrapper", None), "httpx_client", None), "httpx_client", None)
 +    native_send_policy.prove_injected(sender, sdk_kwargs.get("httpx_client"))
++    options = _elevenlabs_native_request_options(client)  # may refuse: still before the invocation is entered
++    native_send_policy.mark_entered()
      audio_generator = client.text_to_speech.convert(
          text=text, voice_id=el_config.get("voice_id", DEFAULT_ELEVENLABS_VOICE_ID),
          model_id=el_config.get("model_id", DEFAULT_ELEVENLABS_MODEL_ID),
 -        output_format="opus_48000_64" if output_path.endswith(".ogg") else "mp3_44100_128")
-+        output_format="opus_48000_64" if output_path.endswith(".ogg") else "mp3_44100_128",
-+        **_elevenlabs_native_request_options(client))
++        output_format="opus_48000_64" if output_path.endswith(".ogg") else "mp3_44100_128", **options)
      with open(output_path, "wb") as f:
 -        f.writelines(audio_generator)
 +        f.writelines(native_send_policy.bounded_stream(audio_generator))

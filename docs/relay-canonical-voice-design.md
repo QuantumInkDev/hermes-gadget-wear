@@ -83,7 +83,9 @@ Key witnesses (path:lines, SHA-256 prefix):
   `requests.post` helper used by other providers, **not** ElevenLabs; `_generate_elevenlabs` builds the SDK
   client with no timeout or retry arguments and the profile `voice_id`/`model_id` 219–229, so its effective
   timeout and retry behaviour are the installed SDK's own. Measured at V1 correction round 1 on the lock-pinned
-  wheels, no network: `elevenlabs==1.59.0` sends once on a 5xx or read timeout without `request_options` (60 s client
+  wheels, no network, on the STOCK path outside a native call: `elevenlabs==1.59.0` sends once on a 5xx (also on the
+  never-patched `7c17e6d` run) or a read timeout, and a stalled transport blocks the stock call (the latter two and
+  the Edge case were run at the corrected head, where every stock edit is a no-op without a native policy; 60 s client
   timeout, SDK `max_retries` default 0); `edge-tts==7.2.7` re-handshakes after a 403 (two handshakes).
 * SDK `plugin/relay_history_store.py` (ab10412f…): durable message aliases map a display id (and, for history
   rows, a physical id) to the public `message_id`, ≤ 4,096 rows with oldest-first eviction ("deterministically
@@ -760,9 +762,19 @@ The design therefore adds the minimal reviewed core display seam (PROPOSED, §12
    the read (a torn read, `conflict`); `A != C` means it changed after (`conflict`); equal tokens mean the digested text
    is the text now. An edit before token A is not an inconsistency: the read sees the revised text, which is the
    current canonical text. A compaction that republishes the row changes `physical_id` and is refused the same way
-   (deliberate Replay repeats it). A carrier the canonical normalizer hides is a projection row the scalar fence
-   cannot judge: only a READ refuses it (`not_found`), and the bridge always reads before it fences. Existing sources
-   use `check_existing_display(actor, target, *, adapter, source, authorize, row_id)` with the same token.
+   (deliberate Replay repeats it). Existing sources use `check_existing_display(actor, target, *, adapter, source,
+   authorize, row_id)` with the same token.
+
+   **Mandatory V3 CORE PREREQUISITE (visibility, round-2 N1).** The V1 token proves projection membership,
+   physical row and content revision only. It is NOT universal visibility proof: a row the canonical normalizer
+   hides (`display_kind` `hidden`/`compression_summary`/`context_summary`, a compressed-summary carrier) stays in the
+   projection, and an in-place writer (`set_latest_matching_message_display_kind`) can stamp a row hidden after the
+   read without a content change, leaving the token equal. Before ANY V3 consumer relies on the token, a core change
+   must add the `display_kind` (≤ 128 bytes) and compressed-summary scalars the sibling `_fingerprint` already selects
+   (or equally strong actual sibling fingerprint semantics) to the token, covered by a test that reads a visible
+   assistant row, stamps it hidden, and sees a token mismatch or `not_found`. Until that gate passes V3 must not
+   activate: the bridge's "read before fence" only covers rows that were already hidden at read time. This is a
+   staged prerequisite, not a waiver.
 4. **Actor and fences**: every core call uses `core.actor(ctx.device_id, row, ...)` (the reading device's own
    principal with `session:read`) and the request's `output_check` as `authorize`; nothing is cached across
    requests except the verified alias.
@@ -1011,7 +1023,11 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   unavailable, failed, timeout, refused, cancelled`; TTS adds `synthesized` in place of `transcribed`. `provider` ∈
   `not_started` (no request left, and the consumer's `before_send` did not commit), `completed` (every sent request was
   answered), `failed_after_send`, `unknown` (a request may have left, or audio/transcript came back through a path the
-  gate never saw: reported as `failed`/`unknown`, never `synthesized`/`not_started`). `refused` with `completed` means
+  gate never saw: reported as `failed`/`unknown`, never `synthesized`/`not_started`; this includes an engine that,
+  after the injected client was proven and the SDK invoked, RAISES or answers a failure with zero gated sends in that
+  scope — the exception path is as ambiguous as the success path, so it is `failed`/`unknown`, a configured-STT
+  failure of that kind runs NO local fallback, and only failures before the invocation is entered, or recorded policy
+  refusals, stay `unavailable`/`not_started`). `refused` with `completed` means
   authority was lost after the provider answered: the result is withheld, the attempt stays billed. `source` is
   `configured` once the configured provider was used, `local_fallback`, or `null`. `cancelled` is returned only when a
   callback raises `asyncio.CancelledError`; a real cancellation of the awaiting task propagates `CancelledError` and
@@ -1024,7 +1040,25 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   `openai`, `groq`, `deepinfra` (pinned model), `xai`, `elevenlabs`, cached local `faster-whisper` fallback; TTS
   `edge`, `elevenlabs`, `openai`, `deepinfra` (pinned model). Everything else is refused **unsent**
   (`unavailable`) — never replaced by another provider — until its V1-P gate passes. This is not the final
-  provider scope and is not configured-provider acceptance.
+  provider scope and is not configured-provider acceptance. The mandatory V1-P provider-parity gates (plan V1-P,
+  mirrored here) are: STT Mistral — real installed SDK transport, one gated send, zero hidden retries; STT command
+  and plugin (including `local_command`) — native-once capability adapter, no implicit install/download, explicit
+  cancellation and output bounds, incapable custom implementations refuse UNSENT; TTS MiniMax/xAI/Gemini —
+  instrument each actual HTTP boundary including auxiliary transformations, no hidden second paid request, fail
+  closed before a disallowed send; TTS Mistral — real installed SDK boundary and zero-retry proof; TTS
+  NeuTTS/Kitten/Piper — installed AND cached assets only, no downloads, bounded local execution, truthful
+  `not_started` remote accounting, no paid-provider fallback; TTS command and plugin — the same native-once
+  capability contract (an arbitrary program cannot be certified single-attempt by a provider-name allowlist);
+  pre-send credential freshness (xAI OAuth, M2) with synthetic transport proof; full-range Edge and the
+  missing-joiner behaviour below.
+* **Edge speech bound and its join dependency (round-2 N2).** The Edge library sends one websocket message set per
+  4,096 escaped bytes, so a native Edge chunk is capped at 600 code points: one chunk = one gated handshake. Concise
+  ranges (≤ 600 code points) are independent of any joiner. A full or multi-chunk Edge range is permitted only with
+  the usable existing ffmpeg joiner (the same `ffmpeg` the stock concat uses); a missing joiner is
+  `unavailable`/`not_started` BEFORE any send, never a paid fallback and never a silently truncated text. Hosts
+  without ffmpeg must install that normal Hermes runtime prerequisite for full Edge speech; V1-P tests full-range
+  Edge and the missing-joiner outcome, V3/user setup must expose the prerequisite, and the final rollout verifies it
+  on each supported box. Unsupported hosts are not claimed to pass.
 * Voice output is listed only with the complete seam (TTS **and** display read): there is no reduced
   live-only mode that would narrow approved deliberate playback.
 * Hub: PROPOSED `DeviceSession.send_binary(data, *, authorize=None)` mirroring `send_json`; channel-5 routing in

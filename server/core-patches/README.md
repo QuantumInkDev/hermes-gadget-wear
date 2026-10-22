@@ -73,8 +73,15 @@ admission route; `NativeAdmissionOptions` stays TEXT-only; ordinary voice/STT/TT
   response-bound regression for existing-source history is not addressed here.
 
 Send accounting is fail-closed: a hooked SDK is proven to send through the client that carries the gate before it
-is called and must produce exactly one gated send, else the result is `failed` with `provider='unknown'`; the
-consumer's `authorize`/`before_send` are fenced on the owning loop against close, cancellation and the deadline.
+is called and must produce exactly one gated send, else the result is `failed` with `provider='unknown'` — on the
+success path AND when the invocation, once entered, raises or answers a failure with zero gated sends (a configured
+STT failure of that kind runs no local fallback); only failures before the invocation is entered stay
+`unavailable`/`not_started`. The consumer's `authorize`/`before_send` are fenced on the owning loop against close, cancellation and the deadline.
+
+**Edge bound.** A native Edge chunk is at most 600 code points (one gated handshake); a full or multi-chunk range
+needs the usable ffmpeg joiner and is `unavailable`/`not_started` before any send without it. **Token scope.** The
+display token proves membership, physical row and content revision, not universal visibility: extending it with
+`display_kind` and the compressed-summary scalar is a mandatory prerequisite before any V3 consumer relies on it.
 
 **Stage coverage (explicit amendment).** This stage covers a prerequisite provider set: STT `openai`, `groq`,
 `deepinfra` (pinned model), `xai`, `elevenlabs` and the cached local fallback; TTS `edge`, `elevenlabs`, `openai`,
