@@ -1,0 +1,153 @@
+{
+ "cases": [
+  {
+   "class_population": 1,
+   "id": "relay-existing-prompt-get/error-unsupported-01",
+   "kind": "captured",
+   "outcome": "error:unsupported",
+   "request": {
+    "id": "r8",
+    "method": "relay.existing.prompt.get",
+    "params": {
+     "binding_id": "f574b86e-6206-4286-9364-5d61412f7ca9"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "unsupported"
+    },
+    "id": "r8",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "gap-7",
+    "test": "tests/test_native_relay_gap_vectors.py::test_adapter_level_wire_only_errors"
+   },
+   "wire_bytes": 72
+  },
+  {
+   "class_population": 1,
+   "id": "relay-existing-prompt-get/ok-02",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r3",
+    "method": "relay.existing.prompt.get",
+    "params": {
+     "binding_id": "31ec7e25-523a-41db-912e-fe5fc4bddbba"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r3",
+    "result": {
+     "prompt": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_existing_scope.py::test_delegated_clarification_and_approval_answers_reach_the_actual_native_waiters"
+   },
+   "wire_bytes": 66
+  },
+  {
+   "class_population": 1,
+   "id": "relay-existing-prompt-get/ok-03",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r9",
+    "method": "relay.existing.prompt.get",
+    "params": {
+     "binding_id": "31ec7e25-523a-41db-912e-fe5fc4bddbba"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r9",
+    "result": {
+     "prompt": {
+      "actionable": true,
+      "choices": [
+       "once",
+       "deny",
+       "session",
+       "always"
+      ],
+      "deadline": "bounded",
+      "expires_at_ms": 1792638575577,
+      "free_text": false,
+      "generation": 1,
+      "kind": "approval",
+      "prompt_id": "70713e90-4295-5692-9d1b-9dd0a2f29690",
+      "reason": null,
+      "task_id": "d6f06fd9-26e9-55fc-8917-460d5f4c28dc",
+      "text": "clean the build tree\nrm -rf build-target-5c1e"
+     }
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_existing_scope.py::test_delegated_clarification_and_approval_answers_reach_the_actual_native_waiters"
+   },
+   "wire_bytes": 398
+  },
+  {
+   "class_population": 3,
+   "id": "relay-existing-prompt-get/ok-04",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r4",
+    "method": "relay.existing.prompt.get",
+    "params": {
+     "binding_id": "31ec7e25-523a-41db-912e-fe5fc4bddbba"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r4",
+    "result": {
+     "prompt": {
+      "actionable": true,
+      "choices": [
+       "Left-7f3a",
+       "Right-9b2c"
+      ],
+      "deadline": "bounded",
+      "expires_at_ms": 1792638335549,
+      "free_text": false,
+      "generation": 1,
+      "kind": "clarify",
+      "prompt_id": "cf0f50b5-9610-56bd-81ff-bf472a5d7cbe",
+      "reason": null,
+      "task_id": "d6f06fd9-26e9-55fc-8917-460d5f4c28dc",
+      "text": "Which way to go?"
+     }
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_existing_scope.py::test_delegated_clarification_and_approval_answers_reach_the_actual_native_waiters"
+   },
+   "wire_bytes": 359
+  }
+ ],
+ "method": "relay.existing.prompt.get"
+}

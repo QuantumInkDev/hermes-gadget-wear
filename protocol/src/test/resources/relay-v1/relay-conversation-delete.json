@@ -1,0 +1,327 @@
+{
+ "cases": [
+  {
+   "class_population": 3,
+   "id": "relay-conversation-delete/error-busy-01",
+   "kind": "captured",
+   "outcome": "error:busy",
+   "request": {
+    "id": "r4",
+    "method": "relay.conversation.delete",
+    "params": {
+     "conversation_id": "9bcfe732-13a7-4150-872d-295529a9a511",
+     "expected_revision": 2,
+     "request_id": "01a14d6d-bd80-7000-893b-d9cce6507a23",
+     "scope": "canonical"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "busy"
+    },
+    "id": "r4",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_canonical_delete.py::test_core_lineage_idleness_fences_an_admission_relay_did_not_journal"
+   },
+   "wire_bytes": 65
+  },
+  {
+   "class_population": 6,
+   "id": "relay-conversation-delete/error-conflict-02",
+   "kind": "captured",
+   "outcome": "error:conflict",
+   "request": {
+    "id": "r6",
+    "method": "relay.conversation.delete",
+    "params": {
+     "conversation_id": "7b1f7864-fd08-49ee-a0b3-2b965753321e",
+     "expected_revision": 7,
+     "request_id": "01a14d67-a300-7000-b777-26d6f0833bb8",
+     "scope": "canonical"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "conflict"
+    },
+    "id": "r6",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_canonical_delete.py::test_exact_delete_retry_and_restart_never_resurrect_route_or_execution"
+   },
+   "wire_bytes": 69
+  },
+  {
+   "class_population": 4,
+   "id": "relay-conversation-delete/error-conflict-snapshot-required-03",
+   "kind": "captured",
+   "outcome": "error:conflict+snapshot_required",
+   "request": {
+    "id": "r3",
+    "method": "relay.conversation.delete",
+    "params": {
+     "conversation_id": "d1d6dbd2-9bd5-4e3b-aefc-f2f566c26f7c",
+     "expected_revision": 1,
+     "request_id": "01a14d67-a300-7000-a2b7-22106d39f133",
+     "scope": "canonical"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "conflict",
+     "snapshot_required": true
+    },
+    "id": "r3",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_canonical_delete.py::test_delete_refuses_a_stale_native_version_without_deleting"
+   },
+   "wire_bytes": 94
+  },
+  {
+   "class_population": 1,
+   "id": "relay-conversation-delete/error-expired-snapshot-required-04",
+   "kind": "captured",
+   "outcome": "error:expired+snapshot_required",
+   "request": {
+    "id": "r1",
+    "method": "relay.conversation.delete",
+    "params": {
+     "conversation_id": "0aad67df-7097-4e63-990a-a2af808c69fd",
+     "expected_revision": 1,
+     "request_id": "01a14d67-a300-7000-ac1f-01ee93200424",
+     "scope": "canonical"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "expired",
+     "snapshot_required": true
+    },
+    "id": "r1",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_canonical_delete.py::test_relay_reserved_core_not_called_is_abandoned_without_deleting"
+   },
+   "wire_bytes": 93
+  },
+  {
+   "class_population": 6,
+   "id": "relay-conversation-delete/error-invalid-request-05",
+   "kind": "captured",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "r1",
+    "method": "relay.conversation.delete",
+    "params": {
+     "conversation_id": "a09ff0b4-c645-4024-b437-62990d41ab80",
+     "expected_revision": 1,
+     "request_id": "01a14d67-a300-7000-bfe4-86bda9d3879f",
+     "scope": "archive"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "r1",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_canonical_delete.py::test_delete_validation_scope_permission_and_stale_view"
+   },
+   "wire_bytes": 76
+  },
+  {
+   "class_population": 12,
+   "id": "relay-conversation-delete/error-not-found-06",
+   "kind": "captured",
+   "outcome": "error:not_found",
+   "request": {
+    "id": "r2",
+    "method": "relay.conversation.delete",
+    "params": {
+     "conversation_id": "792f34f8-9b9c-4e3a-a21b-36f307172848",
+     "expected_revision": 3,
+     "request_id": "01a14d67-a300-7000-9569-d1b1e72e2cb7",
+     "scope": "canonical"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "not_found"
+    },
+    "id": "r2",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "watch",
+    "run": "full-1",
+    "test": "tests/test_relay_canonical_delete.py::test_delete_retires_the_lineage_tombstones_and_purges_projections"
+   },
+   "wire_bytes": 70
+  },
+  {
+   "class_population": 5,
+   "id": "relay-conversation-delete/error-permission-denied-07",
+   "kind": "captured",
+   "outcome": "error:permission_denied",
+   "request": {
+    "id": "r1",
+    "method": "relay.conversation.delete",
+    "params": {
+     "conversation_id": "9c8db664-76b2-4d46-b093-2a99afb65949",
+     "expected_revision": 1,
+     "request_id": "01a14d67-a300-7000-bee4-b8aee08ec860",
+     "scope": "canonical"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "permission_denied"
+    },
+    "id": "r1",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_canonical_delete.py::test_delete_grant_revoked_while_waiting_has_no_effect[gate]"
+   },
+   "wire_bytes": 78
+  },
+  {
+   "class_population": 1,
+   "id": "relay-conversation-delete/error-temporarily-unavailable-08",
+   "kind": "captured",
+   "outcome": "error:temporarily_unavailable",
+   "request": {
+    "id": "r1",
+    "method": "relay.conversation.delete",
+    "params": {
+     "conversation_id": "84d8ca0e-eee4-4897-84e9-d58bef9ea603",
+     "expected_revision": 1,
+     "request_id": "01a14d67-a300-7000-a823-c7298e7bce80",
+     "scope": "canonical"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "temporarily_unavailable"
+    },
+    "id": "r1",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_canonical_delete.py::test_unknown_execution_after_core_restart_refuses_deletion"
+   },
+   "wire_bytes": 84
+  },
+  {
+   "class_population": 11,
+   "id": "relay-conversation-delete/error-unsupported-09",
+   "kind": "captured",
+   "outcome": "error:unsupported",
+   "request": {
+    "id": "r3",
+    "method": "relay.conversation.delete",
+    "params": {
+     "conversation_id": "732961cd-7346-4ec9-9708-86baa2e02878",
+     "expected_revision": 1,
+     "request_id": "01a14d67-a300-7000-b579-c7b8196ad580",
+     "scope": "canonical"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "unsupported"
+    },
+    "id": "r3",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_metadata_isolation.py::test_broken_seam_dependency_keeps_relay_info_and_unadvertises_the_mutations"
+   },
+   "wire_bytes": 72
+  },
+  {
+   "class_population": 19,
+   "id": "relay-conversation-delete/ok-10",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r1",
+    "method": "relay.conversation.delete",
+    "params": {
+     "conversation_id": "37828284-25cb-4412-b5bc-dacb0182ed57",
+     "expected_revision": 1,
+     "request_id": "01a14d67-a300-7000-904a-dc19cc174647",
+     "scope": "canonical"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r1",
+    "result": {
+     "deleted": true
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_canonical_delete.py::test_cancelled_delete_requester_reconciles_exactly_one_deletion"
+   },
+   "wire_bytes": 67
+  }
+ ],
+ "method": "relay.conversation.delete"
+}

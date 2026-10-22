@@ -1,0 +1,203 @@
+{
+ "cases": [
+  {
+   "class_population": 1,
+   "id": "relay-info/error-invalid-request-01",
+   "kind": "captured",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "r21",
+    "method": "relay.info",
+    "params": {
+     "extra": 1
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "r21",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "gap-7",
+    "test": "tests/test_native_relay_gap_vectors.py::test_adapter_level_wire_only_errors"
+   },
+   "wire_bytes": 77
+  },
+  {
+   "class_population": 10,
+   "id": "relay-info/error-rate-limited-02",
+   "kind": "captured",
+   "outcome": "error:rate_limited",
+   "request": {
+    "id": "burst20",
+    "method": "relay.info",
+    "params": {},
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "rate_limited"
+    },
+    "id": "burst20",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "watch",
+    "run": "gap-7",
+    "test": "tests/test_native_relay_gap_vectors.py::test_rate_limit_burst_without_resetting_the_bucket"
+   },
+   "wire_bytes": 78
+  },
+  {
+   "class_population": 8,
+   "id": "relay-info/ok-03",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r2",
+    "method": "relay.info",
+    "params": {},
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r2",
+    "result": {
+     "expires_at_ms": 1794892000000,
+     "grant_generation": 2,
+     "limits": {
+      "dto_bytes": 8192,
+      "dto_depth": 6,
+      "history_page_bytes": 65536,
+      "history_text_bytes": 32768,
+      "outbox_cursor": false,
+      "outbox_payloads": [
+       "final_text",
+       "task_change"
+      ],
+      "page_items": 50,
+      "text_bytes": 16384
+     },
+     "methods": [
+      "relay.info",
+      "relay.conversation.create",
+      "relay.conversation.attach",
+      "relay.conversation.detach",
+      "relay.turn.submit",
+      "relay.turn.receipt",
+      "relay.history.page",
+      "relay.events.read",
+      "relay.conversations.list",
+      "relay.existing.tasks.list",
+      "relay.outbox.read",
+      "relay.outbox.ack"
+     ],
+     "profile_id": "9e8af651-47eb-411f-b28c-ed292bbfd305",
+     "server_time_ms": 1792300000000
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "watch",
+    "run": "full-1",
+    "test": "tests/test_relay_task_outbox_existing.py::test_a_change_after_the_first_observation_reaches_only_task_authorized_devices"
+   },
+   "wire_bytes": 671
+  },
+  {
+   "class_population": 110,
+   "id": "relay-info/ok-04",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r1",
+    "method": "relay.info",
+    "params": {},
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r1",
+    "result": {
+     "expires_at_ms": 1794892000000,
+     "grant_generation": 2,
+     "limits": {
+      "dto_bytes": 8192,
+      "dto_depth": 6,
+      "history_page_bytes": 65536,
+      "history_text_bytes": 32768,
+      "outbox_cursor": false,
+      "page_items": 50,
+      "text_bytes": 16384
+     },
+     "methods": [
+      "relay.info",
+      "relay.conversation.create",
+      "relay.turn.submit",
+      "relay.outbox.read",
+      "relay.outbox.ack"
+     ],
+     "profile_id": "9e8af651-47eb-411f-b28c-ed292bbfd305",
+     "server_time_ms": 1792300000000
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_search.py::test_list_is_advertised_only_with_read_grant_flag_and_compatible_core"
+   },
+   "wire_bytes": 451
+  },
+  {
+   "class_population": 10,
+   "id": "relay-info/ok-05",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r2",
+    "method": "relay.info",
+    "params": {},
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r2",
+    "result": {
+     "expires_at_ms": 1794892000000,
+     "grant_generation": 1,
+     "limits": {
+      "outbox_cursor": false,
+      "page_items": 50,
+      "text_bytes": 16384
+     },
+     "methods": [
+      "relay.info",
+      "relay.outbox.read",
+      "relay.outbox.ack"
+     ],
+     "profile_id": "9e8af651-47eb-411f-b28c-ed292bbfd305"
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_shared_delivery.py::test_fix1_disabled_restart_reserves_only_owned_names"
+   },
+   "wire_bytes": 287
+  }
+ ],
+ "method": "relay.info"
+}

@@ -1,0 +1,243 @@
+{
+ "cases": [
+  {
+   "class_population": 4,
+   "id": "relay-existing-tasks-list/error-not-found-01",
+   "kind": "captured",
+   "outcome": "error:not_found",
+   "request": {
+    "id": "r6",
+    "method": "relay.existing.tasks.list",
+    "params": {
+     "conversation_id": "330bebc1-1165-5228-b971-6f7b3c402b02"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "not_found"
+    },
+    "id": "r6",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_existing_tasks.py::test_task_only_local_access_is_its_own_effective_grant_and_gains_no_history"
+   },
+   "wire_bytes": 70
+  },
+  {
+   "class_population": 7,
+   "id": "relay-existing-tasks-list/error-permission-denied-02",
+   "kind": "captured",
+   "outcome": "error:permission_denied",
+   "request": {
+    "id": "r6",
+    "method": "relay.existing.tasks.list",
+    "params": {
+     "conversation_id": "dbe19108-8528-51d6-8170-adaf57f4681b"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "permission_denied"
+    },
+    "id": "r6",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_existing_scope.py::test_default_relay_only_and_independent_effective_opt_ins"
+   },
+   "wire_bytes": 78
+  },
+  {
+   "class_population": 1,
+   "id": "relay-existing-tasks-list/error-snapshot-required-03",
+   "kind": "captured",
+   "outcome": "error:snapshot_required",
+   "request": {
+    "id": "r0",
+    "method": "relay.existing.tasks.list",
+    "params": {
+     "conversation_id": "13a64e0b-675a-54ee-bd0a-5f2215495cdb",
+     "cursor": "ZTKQPR_L2Av6ML0dld-goy3JDXABxTU6M8MSJAZniyRbMTc5MjMwMDkwMDAwMCwyXQ",
+     "limit": 2
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "snapshot_required"
+    },
+    "id": "r0",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "watch",
+    "run": "full-1",
+    "test": "tests/test_relay_existing_tasks.py::test_existing_tasks_are_their_own_opt_in_with_genuine_execution_identifiers"
+   },
+   "wire_bytes": 78
+  },
+  {
+   "class_population": 7,
+   "id": "relay-existing-tasks-list/ok-04",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r7",
+    "method": "relay.existing.tasks.list",
+    "params": {
+     "conversation_id": "13a64e0b-675a-54ee-bd0a-5f2215495cdb",
+     "cursor": "ZTKQPR_L2Av6ML0dld-goy3JDXABxTU6M8MSJAZniyRbMTc5MjMwMDkwMDAwMCwyXQ",
+     "limit": 2
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r7",
+    "result": {
+     "items": [
+      {
+       "admission_id": "b27ca22b-202c-4b4c-8d0a-09d72ea213d2",
+       "conversation_id": "13a64e0b-675a-54ee-bd0a-5f2215495cdb",
+       "execution_generation": 3,
+       "origin": "existing",
+       "outcome": "completed",
+       "provenance": null,
+       "run_id": "42d244f8-57df-54cb-96d2-6040c8788767",
+       "source": "local",
+       "state": "finished",
+       "task_id": "d455746e-fc05-5245-8366-7600811f669e"
+      }
+     ],
+     "next_cursor": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_existing_tasks.py::test_existing_tasks_are_their_own_opt_in_with_genuine_execution_identifiers"
+   },
+   "wire_bytes": 412
+  },
+  {
+   "class_population": 1,
+   "id": "relay-existing-tasks-list/ok-05",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r6",
+    "method": "relay.existing.tasks.list",
+    "params": {
+     "conversation_id": "13a64e0b-675a-54ee-bd0a-5f2215495cdb",
+     "limit": 2
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r6",
+    "result": {
+     "items": [
+      {
+       "admission_id": "2acb574b-ec3d-4e4e-ab43-d86707b5c3a3",
+       "conversation_id": "13a64e0b-675a-54ee-bd0a-5f2215495cdb",
+       "execution_generation": 1,
+       "origin": "existing",
+       "outcome": "completed",
+       "provenance": null,
+       "run_id": "ca45c5e9-f8b7-59ae-b69b-a904b6d89e3a",
+       "source": "local",
+       "state": "finished",
+       "task_id": "f0f62851-4106-55ac-adbf-0c502fa97afc"
+      },
+      {
+       "admission_id": "b2279f0a-ad67-4965-a2cd-e673d89f1097",
+       "conversation_id": "13a64e0b-675a-54ee-bd0a-5f2215495cdb",
+       "execution_generation": 2,
+       "origin": "existing",
+       "outcome": "completed",
+       "provenance": null,
+       "run_id": "1cd1d07e-ce6c-5991-bdc7-7a8f10ed2bec",
+       "source": "local",
+       "state": "finished",
+       "task_id": "34407c63-d3f5-5e9c-8e28-6cd60c401c36"
+      }
+     ],
+     "next_cursor": "ZTKQPR_L2Av6ML0dld-goy3JDXABxTU6M8MSJAZniyRbMTc5MjMwMDkwMDAwMCwyXQ"
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_existing_tasks.py::test_existing_tasks_are_their_own_opt_in_with_genuine_execution_identifiers"
+   },
+   "wire_bytes": 807
+  },
+  {
+   "class_population": 1,
+   "id": "relay-existing-tasks-list/ok-06",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r0",
+    "method": "relay.existing.tasks.list",
+    "params": {
+     "conversation_id": "ea56f6c9-b57c-543d-bb93-f105a61c244a"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r0",
+    "result": {
+     "items": [
+      {
+       "admission_id": "566cbc59-b0c1-48f6-b0fb-566f3e90d0da",
+       "conversation_id": "ea56f6c9-b57c-543d-bb93-f105a61c244a",
+       "execution_generation": 1,
+       "origin": "existing",
+       "outcome": null,
+       "provenance": {
+        "board": "owned",
+        "kind": "kanban",
+        "run_id": 1,
+        "task_id": "t_1f9c120a"
+       },
+       "run_id": "132f572e-bbc4-5023-9366-0b4909837c95",
+       "source": "local",
+       "state": "unknown",
+       "task_id": "875e4598-4138-508c-96e5-75c06130405e"
+      }
+     ],
+     "next_cursor": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_existing_tasks.py::test_a_kanban_execution_keeps_its_dispatcher_and_projects_its_board_task_and_run"
+   },
+   "wire_bytes": 467
+  }
+ ],
+ "method": "relay.existing.tasks.list"
+}

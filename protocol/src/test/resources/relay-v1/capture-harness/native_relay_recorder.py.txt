@@ -1,0 +1,61 @@
+"""Pytest plugin (loaded with ``-p native_relay_recorder``): passive recorder of the REAL relay.request ->
+relay.response exchanges that the accepted SDK tests already drive through the registered adapter/core/authority.
+
+It wraps two methods and changes no behaviour: ``GadgetAdapter.on_relay_request`` (remembers the request) and
+``DeviceSession.send_json`` (after the real send returned, i.e. only bytes that really left, records the exact
+reply object and its encoded size). Output: one JSON line per exchange under ``<capture>/vectors-raw/``.
+Nothing is hand-built; nothing here opens a socket, spawns a process or touches the accepted source.
+"""
+import copy
+import json
+import os
+from pathlib import Path
+
+import pytest
+
+OUT = Path(__file__).resolve().parent.parent / 'vectors-raw'
+_pending = {}
+_patched = False
+
+
+def _install():
+    global _patched
+    if _patched:
+        return
+    from hermes_gadget_plugin import hub
+    from hermes_gadget_plugin.adapter import GadgetAdapter
+    original_request = GadgetAdapter.on_relay_request
+    original_send = hub.DeviceSession.send_json
+
+    async def on_relay_request(self, session, msg):
+        try:
+            _pending[(id(session), msg.get('id') if isinstance(msg, dict) else None)] = copy.deepcopy(msg)
+        except Exception:
+            pass
+        return await original_request(self, session, msg)
+
+    async def send_json(self, obj, *, authorize=None):
+        await original_send(self, obj, authorize=authorize)
+        if isinstance(obj, dict) and obj.get('type') == 'relay.response':
+            try:
+                payload = json.dumps({k: v for k, v in obj.items() if v is not None}, separators=(',', ':'))
+                request = _pending.pop((id(self), obj.get('id')), None)
+                record = dict(nodeid=os.environ.get('PYTEST_CURRENT_TEST', '?').rsplit(' ', 1)[0],
+                              device=getattr(self, 'device_id', None), request=request,
+                              response=json.loads(payload), wire_bytes=len(payload.encode('utf-8')))
+                OUT.mkdir(parents=True, exist_ok=True)
+                name = record['nodeid'].split('::')[0].replace('/', '_')
+                with (OUT / (name + '.jsonl')).open('a') as stream:
+                    stream.write(json.dumps(record, sort_keys=True) + '\n')
+            except Exception:
+                pass
+
+    GadgetAdapter.on_relay_request = on_relay_request
+    hub.DeviceSession.send_json = send_json
+    _patched = True
+
+
+@pytest.fixture(autouse=True)
+def _native_relay_recorder():
+    _install()
+    yield

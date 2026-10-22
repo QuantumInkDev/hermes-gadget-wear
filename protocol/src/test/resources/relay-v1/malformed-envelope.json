@@ -1,0 +1,30 @@
+{
+ "cases": [
+  {
+   "class_population": 4,
+   "id": "malformed-envelope/error-invalid-request-01",
+   "kind": "captured",
+   "outcome": "error:invalid_request",
+   "request": {
+    "method": "relay.info",
+    "params": {},
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "gap-7",
+    "test": "tests/test_native_relay_gap_vectors.py::test_adapter_level_wire_only_errors"
+   },
+   "wire_bytes": 66
+  }
+ ],
+ "method": "(malformed envelope)"
+}

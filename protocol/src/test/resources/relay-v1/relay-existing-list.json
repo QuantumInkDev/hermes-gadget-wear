@@ -1,0 +1,193 @@
+{
+ "cases": [
+  {
+   "class_population": 9,
+   "id": "relay-existing-list/error-permission-denied-01",
+   "kind": "captured",
+   "outcome": "error:permission_denied",
+   "request": {
+    "id": "r1",
+    "method": "relay.existing.list",
+    "params": {},
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "permission_denied"
+    },
+    "id": "r1",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_existing_scope.py::test_default_relay_only_and_independent_effective_opt_ins"
+   },
+   "wire_bytes": 78
+  },
+  {
+   "class_population": 2,
+   "id": "relay-existing-list/error-snapshot-required-02",
+   "kind": "captured",
+   "outcome": "error:snapshot_required",
+   "request": {
+    "id": "r0",
+    "method": "relay.existing.list",
+    "params": {
+     "cursor": "YN5LnLJEnj_Uk6vHrx1oiHlGk4QhNcTPlT4Zv9_KroJbMTc5MjMwMDkwMDAwMCwxXQ",
+     "limit": 1
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "snapshot_required"
+    },
+    "id": "r0",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "watch",
+    "run": "full-1",
+    "test": "tests/test_relay_existing_scope.py::test_scope_group_and_source_bound_discovery_without_count_or_cursor_leakage"
+   },
+   "wire_bytes": 78
+  },
+  {
+   "class_population": 2,
+   "id": "relay-existing-list/error-unsupported-03",
+   "kind": "captured",
+   "outcome": "error:unsupported",
+   "request": {
+    "id": "r9",
+    "method": "relay.existing.list",
+    "params": {},
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "unsupported"
+    },
+    "id": "r9",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "gap-7",
+    "test": "tests/test_native_relay_gap_vectors.py::test_adapter_level_wire_only_errors"
+   },
+   "wire_bytes": 72
+  },
+  {
+   "class_population": 1,
+   "id": "relay-existing-list/ok-04",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r1",
+    "method": "relay.existing.list",
+    "params": {},
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r1",
+    "result": {
+     "items": [],
+     "next_cursor": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "watch",
+    "run": "full-1",
+    "test": "tests/test_relay_existing_scope.py::test_scope_group_and_source_bound_discovery_without_count_or_cursor_leakage"
+   },
+   "wire_bytes": 82
+  },
+  {
+   "class_population": 5,
+   "id": "relay-existing-list/ok-05",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r0",
+    "method": "relay.existing.list",
+    "params": {},
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r0",
+    "result": {
+     "items": [
+      {
+       "can_continue": true,
+       "conversation_id": "8c4b783d-7764-5e41-9981-4a45a9ab91c0",
+       "origin": "existing",
+       "source": "local",
+       "title": null,
+       "updated_at_ms": 1792638274851
+      }
+     ],
+     "next_cursor": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_existing_scope.py::test_owner_delegated_continuation_of_a_foreign_local_session_over_relay"
+   },
+   "wire_bytes": 240
+  },
+  {
+   "class_population": 2,
+   "id": "relay-existing-list/ok-06",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r0",
+    "method": "relay.existing.list",
+    "params": {
+     "limit": 1
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r0",
+    "result": {
+     "items": [
+      {
+       "can_continue": false,
+       "conversation_id": "dbe19108-8528-51d6-8170-adaf57f4681b",
+       "origin": "existing",
+       "source": "telegram",
+       "title": null,
+       "updated_at_ms": 1792638274258
+      }
+     ],
+     "next_cursor": "14J5g1H5XFzv0_xAZ24XuJOOLykTeGNM_X17V9TD0hRbMTc5MjMwMDkwMDAwMCwxXQ"
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_existing_scope.py::test_opt_out_withdraws_rows_cursors_bindings_and_output_without_a_generation_bump"
+   },
+   "wire_bytes": 308
+  }
+ ],
+ "method": "relay.existing.list"
+}

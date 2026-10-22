@@ -1,0 +1,63 @@
+{
+ "cases": [
+  {
+   "class_population": 1,
+   "id": "relay-conversation-detach/error-stale-binding-01",
+   "kind": "captured",
+   "outcome": "error:stale_binding",
+   "request": {
+    "id": "r10",
+    "method": "relay.conversation.detach",
+    "params": {
+     "binding_id": "c0ffee00-0000-4000-8000-000000000001"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "stale_binding"
+    },
+    "id": "r10",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "gap-7",
+    "test": "tests/test_native_relay_gap_vectors.py::test_adapter_level_wire_only_errors"
+   },
+   "wire_bytes": 75
+  },
+  {
+   "class_population": 3,
+   "id": "relay-conversation-detach/ok-02",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r4",
+    "method": "relay.conversation.detach",
+    "params": {
+     "binding_id": "ef49fc9b-45f0-4137-ae80-3d7d4325357c"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r4",
+    "result": {
+     "detached": true
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_bindings.py::test_detach_and_reattach_touch_only_own_subscription"
+   },
+   "wire_bytes": 68
+  }
+ ],
+ "method": "relay.conversation.detach"
+}

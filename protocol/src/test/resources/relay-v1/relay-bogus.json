@@ -1,0 +1,32 @@
+{
+ "cases": [
+  {
+   "class_population": 1,
+   "id": "relay-bogus/error-unsupported-01",
+   "kind": "captured",
+   "outcome": "error:unsupported",
+   "request": {
+    "id": "r7",
+    "method": "relay.bogus",
+    "params": {},
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "unsupported"
+    },
+    "id": "r7",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "gap-7",
+    "test": "tests/test_native_relay_gap_vectors.py::test_adapter_level_wire_only_errors"
+   },
+   "wire_bytes": 72
+  }
+ ],
+ "method": "relay.bogus"
+}

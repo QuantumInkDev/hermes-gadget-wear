@@ -1,0 +1,455 @@
+{
+ "cases": [
+  {
+   "class_population": 2,
+   "id": "relay-turn-cancel/error-conflict-01",
+   "kind": "captured",
+   "outcome": "error:conflict",
+   "request": {
+    "id": "r8",
+    "method": "relay.turn.cancel",
+    "params": {
+     "admission_id": "fe16f44b-9ba0-493d-a091-a6b091ee97af",
+     "authority_epoch": 1,
+     "binding_id": "5d97277b-c6f0-40b6-951f-7189dc2f3bda",
+     "generation": 1,
+     "request_id": "01a14d67-a300-7000-9637-76ce67990c9d"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "conflict"
+    },
+    "id": "r8",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_cancel.py::test_same_id_retries_report_the_stored_fact_and_never_act_twice"
+   },
+   "wire_bytes": 69
+  },
+  {
+   "class_population": 16,
+   "id": "relay-turn-cancel/error-invalid-request-02",
+   "kind": "captured",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "r3",
+    "method": "relay.turn.cancel",
+    "params": {
+     "admission_id": "90fe1370-c76a-4deb-bd13-f8b64266ea24",
+     "authority_epoch": 1,
+     "binding_id": "61ddeef2-95db-4b9a-aef7-bd84d5d664dc",
+     "extra": null,
+     "generation": null,
+     "request_id": "01a14d67-a300-7000-aa10-99b183ea7c1c"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "r3",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_cancel.py::test_parameters_are_exact_and_strictly_typed"
+   },
+   "wire_bytes": 76
+  },
+  {
+   "class_population": 3,
+   "id": "relay-turn-cancel/error-not-found-03",
+   "kind": "captured",
+   "outcome": "error:not_found",
+   "request": {
+    "id": "r6",
+    "method": "relay.turn.cancel",
+    "params": {
+     "admission_id": "7d663249-dca4-4315-b0ce-c521c9020428",
+     "authority_epoch": 1,
+     "binding_id": "c59f4b62-f08c-4b48-8dc7-801aa333c1c4",
+     "generation": null,
+     "request_id": "01a14d67-a300-7000-bec5-fb0ed39bdb8a"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "not_found"
+    },
+    "id": "r6",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_cancel.py::test_retired_binding_epoch_key_group_and_wrong_targets_refuse_without_effect"
+   },
+   "wire_bytes": 70
+  },
+  {
+   "class_population": 14,
+   "id": "relay-turn-cancel/error-permission-denied-04",
+   "kind": "captured",
+   "outcome": "error:permission_denied",
+   "request": {
+    "id": "r4",
+    "method": "relay.turn.cancel",
+    "params": {
+     "admission_id": "26193919-5762-460e-a956-b0a8a3ad8cb5",
+     "authority_epoch": 1,
+     "binding_id": "412a24a6-3dbf-4ac9-a3bc-e69e9b445f55",
+     "generation": null,
+     "request_id": "01a14d67-a300-7000-b48e-88e72a38234f"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "permission_denied"
+    },
+    "id": "r4",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_cancel.py::test_a_control_grant_added_after_attach_needs_an_explicit_reattach"
+   },
+   "wire_bytes": 78
+  },
+  {
+   "class_population": 3,
+   "id": "relay-turn-cancel/error-snapshot-required-snapshot-required-05",
+   "kind": "captured",
+   "outcome": "error:snapshot_required+snapshot_required",
+   "request": {
+    "id": "r5",
+    "method": "relay.turn.cancel",
+    "params": {
+     "admission_id": "a2565393-f596-4740-9ff3-eba165d56b57",
+     "authority_epoch": 1,
+     "binding_id": "75991e50-cc8f-4510-8036-33af96853c03",
+     "generation": 1,
+     "request_id": "01a14d67-a300-7000-a0b8-c6ef9d67e5a1"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "snapshot_required",
+     "snapshot_required": true
+    },
+    "id": "r5",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_cancel.py::test_a_cancelled_caller_does_not_cut_the_effect_and_a_crashed_intent_is_never_replayed"
+   },
+   "wire_bytes": 103
+  },
+  {
+   "class_population": 1,
+   "id": "relay-turn-cancel/error-stale-binding-06",
+   "kind": "captured",
+   "outcome": "error:stale_binding",
+   "request": {
+    "id": "r4",
+    "method": "relay.turn.cancel",
+    "params": {
+     "admission_id": "b1c961e0-9b9d-4086-9e4f-f1978c794a0a",
+     "authority_epoch": 1,
+     "binding_id": "88d4b152-a3f5-4af0-b074-5d00b3ab6509",
+     "generation": null,
+     "request_id": "01a14d67-a300-7000-802b-4beaa8b543c5"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "stale_binding"
+    },
+    "id": "r4",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_cancel.py::test_retired_binding_epoch_key_group_and_wrong_targets_refuse_without_effect"
+   },
+   "wire_bytes": 74
+  },
+  {
+   "class_population": 1,
+   "id": "relay-turn-cancel/error-stale-epoch-07",
+   "kind": "captured",
+   "outcome": "error:stale_epoch",
+   "request": {
+    "id": "r5",
+    "method": "relay.turn.cancel",
+    "params": {
+     "admission_id": "b1c961e0-9b9d-4086-9e4f-f1978c794a0a",
+     "authority_epoch": 2,
+     "binding_id": "c59f4b62-f08c-4b48-8dc7-801aa333c1c4",
+     "generation": null,
+     "request_id": "01a14d67-a300-7000-8bc7-ddb99b9920db"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "stale_epoch"
+    },
+    "id": "r5",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_cancel.py::test_retired_binding_epoch_key_group_and_wrong_targets_refuse_without_effect"
+   },
+   "wire_bytes": 72
+  },
+  {
+   "class_population": 1,
+   "id": "relay-turn-cancel/error-stale-epoch-snapshot-required-08",
+   "kind": "captured",
+   "outcome": "error:stale_epoch+snapshot_required",
+   "request": {
+    "id": "r6",
+    "method": "relay.turn.cancel",
+    "params": {
+     "admission_id": "85c08d23-731c-43b4-8ec6-bb433efceb18",
+     "authority_epoch": 1,
+     "binding_id": "fc46307c-281e-40eb-a0fa-3d1fdf343951",
+     "generation": 1,
+     "request_id": "01a14d67-a300-7000-8a6a-4edff673be8b"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "stale_epoch",
+     "snapshot_required": true
+    },
+    "id": "r6",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_cancel.py::test_late_clicks_after_settlement_never_stop_the_next_generation"
+   },
+   "wire_bytes": 97
+  },
+  {
+   "class_population": 4,
+   "id": "relay-turn-cancel/error-temporarily-unavailable-09",
+   "kind": "captured",
+   "outcome": "error:temporarily_unavailable",
+   "request": {
+    "id": "r5",
+    "method": "relay.turn.cancel",
+    "params": {
+     "admission_id": "3f40f017-3b68-42f5-89d7-fc026af074ca",
+     "authority_epoch": 1,
+     "binding_id": "c7727564-5500-444c-90b3-d4ea8d84308f",
+     "generation": 1,
+     "request_id": "01a14d67-a300-7000-beda-bc26abe9d2e4"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "temporarily_unavailable"
+    },
+    "id": "r5",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_cancel.py::test_post_effect_faults_are_uncertain_or_the_committed_fact_never_a_refusal"
+   },
+   "wire_bytes": 84
+  },
+  {
+   "class_population": 9,
+   "id": "relay-turn-cancel/error-unsupported-10",
+   "kind": "captured",
+   "outcome": "error:unsupported",
+   "request": {
+    "id": "r4",
+    "method": "relay.turn.cancel",
+    "params": {
+     "admission_id": "45ca24c2-b252-4c38-9079-3e96c596b46a",
+     "authority_epoch": 1,
+     "binding_id": "4afd6d67-b612-40c5-a94c-4fe602d3b0bc",
+     "generation": null,
+     "request_id": "01a14d67-a300-7000-b657-2addfbff8d6b"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "unsupported"
+    },
+    "id": "r4",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_cancel.py::test_an_absent_skewed_reshaped_or_broken_seam_disables_only_cancellation[absent]"
+   },
+   "wire_bytes": 72
+  },
+  {
+   "class_population": 3,
+   "id": "relay-turn-cancel/ok-11",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r4",
+    "method": "relay.turn.cancel",
+    "params": {
+     "admission_id": "f66549a3-c434-4780-b8ed-81918bcf4bf7",
+     "authority_epoch": 1,
+     "binding_id": "86f79e94-6a93-41fc-aa5d-ca7fb8e8072e",
+     "generation": 1,
+     "request_id": "01a14d67-a300-7000-8bab-f54dea6888ea"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r4",
+    "result": {
+     "admission_id": "f66549a3-c434-4780-b8ed-81918bcf4bf7",
+     "authority_epoch": 1,
+     "conversation_id": "8bff9f0e-d745-4da4-822c-095c538d909d",
+     "execution_generation": 1,
+     "outcome": "completed",
+     "request_id": "01a14d67-a300-7000-8bab-f54dea6888ea",
+     "status": "terminal"
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_cancel.py::test_a_stop_waiting_on_the_lock_while_its_turn_settles_never_reaches_the_next_one"
+   },
+   "wire_bytes": 302
+  },
+  {
+   "class_population": 7,
+   "id": "relay-turn-cancel/ok-12",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r4",
+    "method": "relay.turn.cancel",
+    "params": {
+     "admission_id": "55df4008-079f-4b85-8007-461247c0c67e",
+     "authority_epoch": 1,
+     "binding_id": "99765f74-4145-4528-8b1b-8ed6f7d4e81b",
+     "generation": null,
+     "request_id": "01a14d67-a300-7000-94ab-93e50ac8a08f"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r4",
+    "result": {
+     "admission_id": "55df4008-079f-4b85-8007-461247c0c67e",
+     "authority_epoch": 1,
+     "conversation_id": "c862080e-6b16-430e-9799-ffbc879657c5",
+     "execution_generation": 2,
+     "outcome": null,
+     "request_id": "01a14d67-a300-7000-94ab-93e50ac8a08f",
+     "status": "started"
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_cancel.py::test_a_queued_click_that_loses_the_claim_race_returns_the_started_receipt_and_stops_nothing"
+   },
+   "wire_bytes": 294
+  },
+  {
+   "class_population": 25,
+   "id": "relay-turn-cancel/ok-13",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r4",
+    "method": "relay.turn.cancel",
+    "params": {
+     "admission_id": "97663625-2ef6-4582-bd39-4b36cc64ee68",
+     "authority_epoch": 1,
+     "binding_id": "75991e50-cc8f-4510-8036-33af96853c03",
+     "generation": null,
+     "request_id": "01a14d67-a300-7000-9a2d-db2ee36d8897"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r4",
+    "result": {
+     "admission_id": "97663625-2ef6-4582-bd39-4b36cc64ee68",
+     "authority_epoch": 1,
+     "conversation_id": "cdb42e7f-f263-43ee-a4e9-4a51990a7fb1",
+     "execution_generation": null,
+     "outcome": "cancelled",
+     "request_id": "01a14d67-a300-7000-9a2d-db2ee36d8897",
+     "status": "terminal"
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_cancel.py::test_a_cancelled_caller_does_not_cut_the_effect_and_a_crashed_intent_is_never_replayed"
+   },
+   "wire_bytes": 305
+  }
+ ],
+ "method": "relay.turn.cancel"
+}

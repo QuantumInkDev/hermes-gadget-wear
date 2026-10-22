@@ -1,0 +1,98 @@
+{
+ "cases": [
+  {
+   "class_population": 2,
+   "id": "relay-outbox-ack/error-invalid-request-01",
+   "kind": "captured",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "r18",
+    "method": "relay.outbox.ack",
+    "params": {
+     "delivery_ids": []
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "r18",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "gap-7",
+    "test": "tests/test_native_relay_gap_vectors.py::test_adapter_level_wire_only_errors"
+   },
+   "wire_bytes": 77
+  },
+  {
+   "class_population": 1,
+   "id": "relay-outbox-ack/error-not-found-02",
+   "kind": "captured",
+   "outcome": "error:not_found",
+   "request": {
+    "id": "r20",
+    "method": "relay.outbox.ack",
+    "params": {
+     "delivery_ids": [
+      "c0ffee00-0000-4000-8000-000000000002"
+     ]
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "not_found"
+    },
+    "id": "r20",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "gap-7",
+    "test": "tests/test_native_relay_gap_vectors.py::test_adapter_level_wire_only_errors"
+   },
+   "wire_bytes": 71
+  },
+  {
+   "class_population": 12,
+   "id": "relay-outbox-ack/ok-03",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r1",
+    "method": "relay.outbox.ack",
+    "params": {
+     "delivery_ids": [
+      "08457ab6-beb1-41fe-924e-aade2fbdbba6"
+     ]
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r1",
+    "result": {
+     "acknowledged": [
+      "08457ab6-beb1-41fe-924e-aade2fbdbba6"
+     ]
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "gap-7",
+    "test": "tests/test_native_relay_gap_vectors.py::test_stock_final_text_copy_is_read_and_acknowledged_over_the_real_adapter"
+   },
+   "wire_bytes": 108
+  }
+ ],
+ "method": "relay.outbox.ack"
+}

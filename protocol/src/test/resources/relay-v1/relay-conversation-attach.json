@@ -1,0 +1,193 @@
+{
+ "cases": [
+  {
+   "class_population": 4,
+   "id": "relay-conversation-attach/error-not-found-01",
+   "kind": "captured",
+   "outcome": "error:not_found",
+   "request": {
+    "id": "r8",
+    "method": "relay.conversation.attach",
+    "params": {
+     "conversation_id": "792f34f8-9b9c-4e3a-a21b-36f307172848"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "not_found"
+    },
+    "id": "r8",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_canonical_delete.py::test_delete_retires_the_lineage_tombstones_and_purges_projections"
+   },
+   "wire_bytes": 70
+  },
+  {
+   "class_population": 1,
+   "id": "relay-conversation-attach/error-snapshot-required-02",
+   "kind": "captured",
+   "outcome": "error:snapshot_required",
+   "request": {
+    "id": "r2",
+    "method": "relay.conversation.attach",
+    "params": {
+     "conversation_id": "144a0e9f-06d3-49d5-bed2-2ed0430055c9"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "snapshot_required"
+    },
+    "id": "r2",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_bindings.py::test_fix1_binding_invalidation_under_real_send_lock[overflow-snapshot_required-relay.conversation.attach]"
+   },
+   "wire_bytes": 78
+  },
+  {
+   "class_population": 2,
+   "id": "relay-conversation-attach/error-stale-binding-03",
+   "kind": "captured",
+   "outcome": "error:stale_binding",
+   "request": {
+    "id": "r2",
+    "method": "relay.conversation.attach",
+    "params": {
+     "conversation_id": "dfa17598-9bd9-4f94-af41-e2da2e8a7730"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "stale_binding"
+    },
+    "id": "r2",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_bindings.py::test_fix1_binding_invalidation_under_real_send_lock[replace-stale_binding-relay.conversation.attach]"
+   },
+   "wire_bytes": 74
+  },
+  {
+   "class_population": 1,
+   "id": "relay-conversation-attach/error-stale-epoch-04",
+   "kind": "captured",
+   "outcome": "error:stale_epoch",
+   "request": {
+    "id": "r2",
+    "method": "relay.conversation.attach",
+    "params": {
+     "conversation_id": "d2e6b111-eb66-48f6-abd2-8adf1d5884c4"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "stale_epoch"
+    },
+    "id": "r2",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_bindings.py::test_fix1_binding_invalidation_under_real_send_lock[epoch-stale_epoch-relay.conversation.attach]"
+   },
+   "wire_bytes": 72
+  },
+  {
+   "class_population": 659,
+   "id": "relay-conversation-attach/ok-05",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r1",
+    "method": "relay.conversation.attach",
+    "params": {
+     "conversation_id": "02edd7cc-d7ee-4242-b30d-c76f260c7bc5"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r1",
+    "result": {
+     "authority_epoch": 1,
+     "binding_id": "f574b86e-6206-4286-9364-5d61412f7ca9",
+     "conversation_id": "02edd7cc-d7ee-4242-b30d-c76f260c7bc5",
+     "execution_generation": 0,
+     "execution_state": "idle",
+     "last_sequence": 0,
+     "replay_epoch": "cfea30a7-5d71-4df7-b7d4-45b397799ef4",
+     "revision": 0
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "gap-7",
+    "test": "tests/test_native_relay_gap_vectors.py::test_adapter_level_wire_only_errors"
+   },
+   "wire_bytes": 316
+  },
+  {
+   "class_population": 15,
+   "id": "relay-conversation-attach/ok-06",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r5",
+    "method": "relay.conversation.attach",
+    "params": {
+     "conversation_id": "ef804af7-a489-4661-873b-002190e6b166"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r5",
+    "result": {
+     "authority_epoch": 1,
+     "binding_id": "ce54feff-d722-4b8d-bef9-5489d47bf4e3",
+     "conversation_id": "ef804af7-a489-4661-873b-002190e6b166",
+     "execution_generation": 1,
+     "execution_state": "running",
+     "last_sequence": 0,
+     "replay_epoch": "893cd805-432c-48c8-bfd1-eb70690c7fe3",
+     "revision": 0
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_cancel.py::test_a_control_grant_added_after_attach_needs_an_explicit_reattach"
+   },
+   "wire_bytes": 319
+  }
+ ],
+ "method": "relay.conversation.attach"
+}

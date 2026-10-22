@@ -1,0 +1,83 @@
+"""One canonical strict run per core, adapted from the accepted Task10 run_matrix.py: same wrapper, same flags
+(-j 1 --file-retries 0 -W error -q -rA), no retries, no installs. Differences (own paths only): OWN/EVIDENCE/BASES,
+isolated HOME, and the passive ``-p native_relay_recorder`` plugin.
+
+usage: run_capture.py LABEL --sdk-tests a.py,b.py [--k expr]
+"""
+from pathlib import Path
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import time
+
+OWN = Path(__file__).resolve().parent
+EVIDENCE = OWN.parent / 'evidence' / 'capture-runs'
+SDK = OWN / 'upstream/continuity-sdk'
+CORE = OWN / 'upstream/continuity-core'
+BASES = {'continuity-sdk': '286e13482f12a71b1eb81e66c43470df09da2f05',
+         'continuity-core': '7c17e6d72a3b9ec2974b3566f02dab1ed4b94eae'}
+
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def tracked_and_untracked(repo):
+    names = subprocess.check_output(['git', 'diff', '--name-only', BASES[repo.name]], cwd=repo, text=True).splitlines()
+    names += subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard'], cwd=repo,
+                                     text=True).splitlines()
+    return [repo / name for name in sorted(set(names))]
+
+
+def main():
+    label = sys.argv[1]
+    options = dict(zip(sys.argv[2::2], sys.argv[3::2]))
+    sdk_tests = [SDK / 'tests' / n for n in options['--sdk-tests'].split(',') if n]
+    out = EVIDENCE / label
+    out.mkdir(parents=True, exist_ok=False)
+    home = OWN / 'homes' / label
+    (home / 'hermes').mkdir(parents=True, exist_ok=False)
+    (home / 'run').mkdir()
+    (home / 'user').mkdir()
+    env = os.environ.copy()
+    for name in list(env):  # no credential / provider / live variable reaches the run
+        if name.startswith(('HERMES_', 'OPENAI', 'ANTHROPIC', 'ELEVEN', 'AWS_', 'GITHUB', 'GH_')) or name.endswith(('_TOKEN', '_KEY', '_SECRET')):
+            env.pop(name)
+    env.update(HOME=str(home / 'user'), HERMES_PYTHON=str(OWN / 'task4-env/bin/python'),
+               HERMES_HOME=str(home / 'hermes'), HERMES_TEST_SANDBOX_HOME=str(home / 'hermes'),
+               HERMES_RUNTIME_DIR=str(home / 'run'), HERMES_AGENT_DIR=str(CORE))
+    probe = subprocess.run([env['HERMES_PYTHON'], '-c',
+        'import inspect,json,hermes_gadget_plugin.relay_conversations as s,gateway.session_authority as c;'
+        'print(json.dumps({"sdk":inspect.getfile(s),"core":inspect.getfile(c)}))'],
+        cwd=CORE, env=env, capture_output=True, text=True)
+    assert probe.returncode == 0, probe.stderr
+    imports = json.loads(probe.stdout.strip().splitlines()[-1])
+    assert Path(imports['sdk']).resolve() == (SDK / 'plugin/relay_conversations.py').resolve(), imports
+    assert Path(imports['core']).resolve() == (CORE / 'gateway/session_authority.py').resolve(), imports
+    assert all(p.is_file() for p in sdk_tests), sdk_tests
+    source = list(dict.fromkeys(tracked_and_untracked(CORE) + tracked_and_untracked(SDK) + sdk_tests
+                                + [OWN / 'task4-imports/sitecustomize.py', OWN / 'task4-imports/native_relay_recorder.py',
+                                   CORE / 'scripts/run_tests.sh']))
+    before = {str(p): digest(p) for p in source}
+    argv = ['bash', 'scripts/run_tests.sh', '-j', '1', '--file-retries', '0', '-W', 'error', '-q', '-rA',
+            '-p', 'native_relay_recorder', *[str(p) for p in sdk_tests], *(['-k', options['--k']] if '--k' in options else [])]
+    command = dict(argv=argv, cwd=str(CORE), imports=imports, source_test_guard_sha256=before,
+                   core_head=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=CORE, text=True).strip(),
+                   core_tree=subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], cwd=CORE, text=True).strip(),
+                   sdk_head=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=SDK, text=True).strip(),
+                   sdk_tree=subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], cwd=SDK, text=True).strip(),
+                   core_used='continuity-core (7c17e6d); continuity-core-clean (1d8e5aa) NOT used',
+                   automatic_retries=0, started_at=time.time())
+    (out / 'command.json').write_text(json.dumps(command, indent=2) + '\n')
+    with (out / 'output.log').open('w') as log:
+        result = subprocess.run(argv, cwd=CORE, env=env, stdout=log, stderr=subprocess.STDOUT)
+    after = {str(p): digest(p) for p in source}
+    receipt = dict(exit_code=result.returncode, completed_at=time.time(), sources_tests_unchanged=before == after)
+    (out / 'exit.json').write_text(json.dumps(receipt, indent=2) + '\n')
+    print(json.dumps(dict(label=label, **receipt)), flush=True)
+    raise SystemExit(result.returncode or int(before != after))
+
+
+main()

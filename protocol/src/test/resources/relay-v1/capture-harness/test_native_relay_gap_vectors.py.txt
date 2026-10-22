@@ -1,0 +1,142 @@
+"""Native Relay Task1 capture-only gap cases (NEW file in the private capture copy; not part of the accepted SDK).
+
+Drives only the registered adapter/hub entry points of the accepted rig (``relay_bridge_support``) and asserts
+nothing about product behaviour beyond "the real code answered"; the recorder (-p native_relay_recorder) captures
+the frames. The hub is never started: no listener, socket or provider exists. Each case fills a coverage gap that
+the accepted tests do not reach: transport-level refusals, the rate limit, and wire-only error shapes.
+"""
+import asyncio
+import hashlib
+import json
+from pathlib import Path
+import time
+from types import SimpleNamespace
+
+import pytest
+
+from relay_bridge_support import bridge as bridge, rig as rig, request_id
+from hermes_gadget_plugin.hub import DeviceHub
+
+
+OUT = Path(__file__).resolve().parents[3] / 'vectors-raw'
+
+
+def hub_for(f):
+    return DeviceHub(f.devices, f.rig.adapter)
+
+
+async def raw(f, text, case, recipe, device='phone'):
+    """Feed one raw text frame to the real hub entry point; record the exact replies with a rebuild recipe."""
+    session = f.sessions[device]
+    session._relay_rate = (20.0, time.monotonic())
+    before = len(session._ws.frames)
+    await hub_for(f)._on_text(session, text)
+    frames = [json.loads(s) for s in session._ws.frames[before:]]
+    OUT.mkdir(parents=True, exist_ok=True)
+    with (OUT / 'hub-level.jsonl').open('a') as stream:
+        stream.write(json.dumps(dict(case=case, recipe=recipe, request_utf8_bytes=len(text.encode('utf-8')),
+                                     request_sha256=hashlib.sha256(text.encode('utf-8')).hexdigest(),
+                                     responses=frames), sort_keys=True) + '\n')
+    return frames
+
+
+def envelope(method, params, identifier='h1', **changes):
+    return json.dumps(dict(dict(type='relay.request', v=1, id=identifier, method=method, params=params), **changes),
+                      separators=(',', ':'), ensure_ascii=False)
+
+
+@pytest.mark.asyncio
+async def test_hub_level_transport_refusals(bridge):
+    f = bridge
+    # 65,537 UTF-8 bytes -> bare invalid_request (no id: the frame was refused unparsed for correlation).
+    pad = 65537 - len(envelope('', {}, 'a' * 64).encode())
+    text = envelope('m' * pad, {}, 'a' * 64)
+    assert len(text.encode('utf-8')) == 65537
+    frames = await raw(f, text, 'oversize-65537', dict(kind='envelope', id='a' * 64, params={},
+                       method=dict(prefix='', repeat='m', count=pad, suffix='')))
+    assert frames and frames[-1]['error']['code'] == 'invalid_request' and 'id' not in frames[-1]
+    # Exactly 65,536 UTF-8 bytes (multi-byte filler) is inside the outer bound: the SDK answers unsupported.
+    base = envelope('x', {}, 'edge')
+    filler = 65536 - len(base.encode('utf-8'))
+    text = envelope('x' + 'é' * (filler // 2) + 'x' * (filler % 2), {}, 'edge')
+    assert len(text.encode('utf-8')) == 65536
+    frames = await raw(f, text, 'edge-65536-multibyte', dict(kind='envelope', id='edge', params={},
+                       method=dict(prefix='x', repeat='é', count=filler // 2, suffix='x' * (filler % 2))))
+    assert frames[-1]['id'] == 'edge' and frames[-1]['error']['code'] == 'unsupported'
+    # Depth: root 1, params 2 ... a scalar at depth 8 passes the outer bound; depth 9 is refused unparsed.
+    deep8 = {"a": {"b": {"c": {"d": {"e": {"f": 1}}}}}}  # params depth2 .. scalar at depth 8
+    frames = await raw(f, envelope('relay.info', deep8, 'depth8'), 'depth-8-inside', dict(kind='literal', text=envelope('relay.info', deep8, 'depth8')))
+    assert frames[-1]['id'] == 'depth8' and frames[-1]['error']['code'] == 'invalid_request'
+    deep9 = {"a": {"b": {"c": {"d": {"e": {"f": {"g": 1}}}}}}}
+    frames = await raw(f, envelope('relay.info', deep9, 'depth9'), 'depth-9-refused', dict(kind='literal', text=envelope('relay.info', deep9, 'depth9')))
+    assert frames[-1]['error']['code'] == 'invalid_request' and 'id' not in frames[-1]
+
+
+@pytest.mark.asyncio
+async def test_adapter_level_wire_only_errors(bridge):
+    f = bridge
+    await f.create()
+    phone = f.sessions['phone']
+    # No id / wrong envelope: the reply has no id.
+    for message in (dict(type='relay.request', v=1, method='relay.info', params={}),
+                    dict(type='relay.request', v=1, id='bad id!', method='relay.info', params={}),
+                    dict(type='relay.request', v=2, id='v2', method='relay.info', params={}),
+                    dict(type='relay.request', v=1, id='noparams', method='relay.info'),
+                    dict(type='relay.request', v=1, id='badmethod', method=5, params={})):
+        phone._relay_rate = (20.0, time.monotonic())
+        await f.rig.adapter.on_relay_request(phone, message)
+    # Unknown methods answer unsupported after authorization.
+    assert (await f.call('relay.bogus', {}))['error']['code'] == 'unsupported'
+    # Existing/optional feature methods while their feature flag is off.
+    assert (await f.call('relay.existing.prompt.get', {'binding_id': f.bridge.bindings[id(phone)].id}))['error']['code'] == 'unsupported'
+    assert (await f.call('relay.existing.list', {}))['error']['code'] == 'unsupported'
+    # Detach / events / submit with a binding this transport does not hold.
+    stranger = 'c0ffee00-0000-4000-8000-000000000001'
+    assert (await f.call('relay.conversation.detach', {'binding_id': stranger}))['error']['code'] == 'stale_binding'
+    assert (await f.call('relay.events.read', dict(binding_id=stranger, replay_epoch='x', after_sequence=0)))['error']['code'] == 'stale_binding'
+    # Submit validations (request is refused before admission; nothing is executed).
+    for changes in (dict(text=''), dict(text='x' * 4001), dict(text='é' * 8193), dict(attachment_ids=['a'])):
+        reply = await f.call('relay.turn.submit', f.turn(**changes))
+        assert 'error' in reply, reply
+    # Outbox methods: parameter errors and an unknown delivery id.
+    assert (await f.call('relay.outbox.read', {'limit': 0}))['error']['code'] == 'invalid_request'
+    assert (await f.call('relay.outbox.read', {'limit': 51}))['error']['code'] == 'invalid_request'
+    assert (await f.call('relay.outbox.ack', {'delivery_ids': []}))['error']['code'] == 'invalid_request'
+    assert (await f.call('relay.outbox.ack', {'delivery_ids': ['not-a-uuid']}))['error']['code'] == 'invalid_request'
+    unknown = await f.call('relay.outbox.ack', {'delivery_ids': ['c0ffee00-0000-4000-8000-000000000002']})
+    assert unknown['error']['code'] == 'not_found'
+    assert (await f.call('relay.info', {'extra': 1}))['error']['code'] == 'invalid_request'
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_burst_without_resetting_the_bucket(bridge):
+    f = bridge
+    session = f.sessions['watch']
+    session._relay_rate = (20.0, time.monotonic())
+    codes = []
+    for index in range(30):
+        await f.rig.adapter.on_relay_request(session, dict(type='relay.request', v=1, id='burst%d' % index,
+                                                           method='relay.info', params={}))
+        reply = json.loads(session._ws.frames[-1])
+        codes.append(reply.get('error', {}).get('code', 'ok'))
+    assert 'rate_limited' in codes and codes[0] == 'ok'
+
+
+@pytest.mark.asyncio
+async def test_stock_final_text_copy_is_read_and_acknowledged_over_the_real_adapter(bridge):
+    """The O5 stock final (no message_id) with server-derived identifiers: captured, then acknowledged."""
+    f = bridge
+    key = f.keys['phone']
+    generation = f.service._device_context('phone')['generation']
+    event = SimpleNamespace(source=SimpleNamespace(user_id='phone', chat_id='phone'),
+                            message_id='relay1:%s:%d:%s' % (hashlib.sha256(key).hexdigest(), generation, '0' * 64),
+                            ledger_message_id='stock-final-1', text='synthetic final')
+    assert await f.service.capture(event, 'stock-session', 'synthetic stock final text', False)
+    reply = await f.call('relay.outbox.read', {})
+    items = reply['result']['items']
+    assert len(items) == 1 and items[0]['payload'] == {'kind': 'final_text', 'text': 'synthetic stock final text'}
+    again = await f.call('relay.outbox.ack', {'delivery_ids': [items[0]['delivery_id']]})
+    assert again['result'] == {'acknowledged': [items[0]['delivery_id']]}
+    repeat = await f.call('relay.outbox.ack', {'delivery_ids': [items[0]['delivery_id']]})
+    assert repeat['result'] == {'acknowledged': [items[0]['delivery_id']]}  # repeating for a lost response is safe
+    assert (await f.call('relay.outbox.read', {}))['result']['items'] == []

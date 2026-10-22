@@ -1,0 +1,112 @@
+{
+ "cases": [
+  {
+   "case": "oversize-65537",
+   "kind": "captured",
+   "recipe": {
+    "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "kind": "envelope",
+    "method": {
+     "count": 65411,
+     "prefix": "",
+     "repeat": "m",
+     "suffix": ""
+    },
+    "params": {}
+   },
+   "request_sha256": "42698dd1f1c405852201b21bdb1630cf565f8e71828ff2ac032d306d57e48f56",
+   "request_utf8_bytes": 65537,
+   "responses": [
+    {
+     "error": {
+      "code": "invalid_request"
+     },
+     "type": "relay.response",
+     "v": 1
+    }
+   ],
+   "source": {
+    "run": "gap-7",
+    "test": "tests/test_native_relay_gap_vectors.py::test_hub_level_transport_refusals"
+   }
+  },
+  {
+   "case": "edge-65536-multibyte",
+   "kind": "captured",
+   "recipe": {
+    "id": "edge",
+    "kind": "envelope",
+    "method": {
+     "count": 32734,
+     "prefix": "x",
+     "repeat": "\u00e9",
+     "suffix": "x"
+    },
+    "params": {}
+   },
+   "request_sha256": "177b540bb88e63892f851411cd49329b84f6bf093dbf3da363007590b8e5e423",
+   "request_utf8_bytes": 65536,
+   "responses": [
+    {
+     "error": {
+      "code": "unsupported"
+     },
+     "id": "edge",
+     "type": "relay.response",
+     "v": 1
+    }
+   ],
+   "source": {
+    "run": "gap-7",
+    "test": "tests/test_native_relay_gap_vectors.py::test_hub_level_transport_refusals"
+   }
+  },
+  {
+   "case": "depth-8-inside",
+   "kind": "captured",
+   "recipe": {
+    "kind": "literal",
+    "text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"depth8\",\"method\":\"relay.info\",\"params\":{\"a\":{\"b\":{\"c\":{\"d\":{\"e\":{\"f\":1}}}}}}}"
+   },
+   "request_sha256": "f012acfb07583f1744c42cf222c7ce5b74d867d4768ec96de62f70bcd96a4f67",
+   "request_utf8_bytes": 113,
+   "responses": [
+    {
+     "error": {
+      "code": "invalid_request"
+     },
+     "id": "depth8",
+     "type": "relay.response",
+     "v": 1
+    }
+   ],
+   "source": {
+    "run": "gap-7",
+    "test": "tests/test_native_relay_gap_vectors.py::test_hub_level_transport_refusals"
+   }
+  },
+  {
+   "case": "depth-9-refused",
+   "kind": "captured",
+   "recipe": {
+    "kind": "literal",
+    "text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"depth9\",\"method\":\"relay.info\",\"params\":{\"a\":{\"b\":{\"c\":{\"d\":{\"e\":{\"f\":{\"g\":1}}}}}}}}"
+   },
+   "request_sha256": "4ee16c6956b292e4bc46c01a288379e6608e53581b38f10079f63211a53378ca",
+   "request_utf8_bytes": 119,
+   "responses": [
+    {
+     "error": {
+      "code": "invalid_request"
+     },
+     "type": "relay.response",
+     "v": 1
+    }
+   ],
+   "source": {
+    "run": "gap-7",
+    "test": "tests/test_native_relay_gap_vectors.py::test_hub_level_transport_refusals"
+   }
+  }
+ ]
+}

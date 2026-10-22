@@ -1,0 +1,225 @@
+{
+ "core": {
+  "head": "7c17e6d72a3b9ec2974b3566f02dab1ed4b94eae",
+  "not_used": "continuity-core-clean 1d8e5aa4de4d8f0f42fda3115820af1673022ddc",
+  "tree": "680abe7642528e1b5d85a9bf1ba9f3d1d6f5c5a9",
+  "used": "continuity-core"
+ },
+ "coverage": [
+  {
+   "cases": 1,
+   "file": "malformed-envelope.json",
+   "method": "(malformed envelope)",
+   "sha256": "0f2aed464bcee24893e5ae4e89c431e60d472d801662cd125f48c48cccbad355"
+  },
+  {
+   "cases": 1,
+   "file": "relay-bogus.json",
+   "method": "relay.bogus",
+   "sha256": "156a3c63bcfabca917eafdeb55245ec61fd2e5363cc02a776aa8c03ae10b4fef"
+  },
+  {
+   "cases": 6,
+   "file": "relay-conversation-attach.json",
+   "method": "relay.conversation.attach",
+   "sha256": "4e9b0c9f9a805cf84ae0018aa30186e0931adc2161c26feb4d39d9439aa6b589"
+  },
+  {
+   "cases": 6,
+   "file": "relay-conversation-create.json",
+   "method": "relay.conversation.create",
+   "sha256": "97730cf068c30668e62351d1866afcadc9bf2d4e16a81d8287191d90034e8b61"
+  },
+  {
+   "cases": 10,
+   "file": "relay-conversation-delete.json",
+   "method": "relay.conversation.delete",
+   "sha256": "63fe4bb19426fd4279873e56f31f3d49538e85c52397537180f3811ab7f5de64"
+  },
+  {
+   "cases": 2,
+   "file": "relay-conversation-detach.json",
+   "method": "relay.conversation.detach",
+   "sha256": "c2669ef4a25c90b5a9c74300c06d0d6f3c3d9dfdca1167e9e961ea21aafdf3f3"
+  },
+  {
+   "cases": 13,
+   "file": "relay-conversation-update.json",
+   "method": "relay.conversation.update",
+   "sha256": "0c2caf26b7e8db2acaa62139b524553705363c2852c60e16b2b276d5cfa40850"
+  },
+  {
+   "cases": 24,
+   "file": "relay-conversations-list.json",
+   "method": "relay.conversations.list",
+   "sha256": "68954176dc15ead99a7002ea5e98ed6243a47b34d17bf3d151d0412fa8b1318d"
+  },
+  {
+   "cases": 24,
+   "file": "relay-events-read.json",
+   "method": "relay.events.read",
+   "sha256": "616d1cf22d66ed789db4308cc56531b7946c770e6bd34096ec7383a6da32cc22"
+  },
+  {
+   "cases": 7,
+   "file": "relay-existing-attach.json",
+   "method": "relay.existing.attach",
+   "sha256": "c4eb76eb3f4ebd67afb94875c0a027ea4419ca93b84f109a013b04e1a40f74ff"
+  },
+  {
+   "cases": 4,
+   "file": "relay-existing-history-page.json",
+   "method": "relay.existing.history.page",
+   "sha256": "021bdb62b3572dca520d7d79228b2e1af93c6f51d8b441d3d88e369f7db90434"
+  },
+  {
+   "cases": 6,
+   "file": "relay-existing-list.json",
+   "method": "relay.existing.list",
+   "sha256": "6af1f2cd8155020e066441b9b441431bf4ffa1dc9bd4651adf10576bea8d6058"
+  },
+  {
+   "cases": 4,
+   "file": "relay-existing-prompt-get.json",
+   "method": "relay.existing.prompt.get",
+   "sha256": "66c719c635e6f0d71df9e3d5f299f12651bdafa8f05ddf4a5ef8e383338886c0"
+  },
+  {
+   "cases": 6,
+   "file": "relay-existing-tasks-list.json",
+   "method": "relay.existing.tasks.list",
+   "sha256": "b6cc455f9d62a0033f9cdab0ce08fb2da78c91f5b239c2b7c9f8fbba2acbf96d"
+  },
+  {
+   "cases": 14,
+   "file": "relay-history-page.json",
+   "method": "relay.history.page",
+   "sha256": "dda4a2d61d84f0e4fd8dca74205b564a8c289e633216cf68b492fe88bf5b131b"
+  },
+  {
+   "cases": 5,
+   "file": "relay-info.json",
+   "method": "relay.info",
+   "sha256": "924ff4ffee1c65ed4de30eaaccd347ee7293fe1098fe1e73a5e5aa8a8e92bb1e"
+  },
+  {
+   "cases": 3,
+   "file": "relay-outbox-ack.json",
+   "method": "relay.outbox.ack",
+   "sha256": "9c0f16b1f23afa3e7d2c23dfd65bea7958d9d9133b462577e8fde3fb0059e33b"
+  },
+  {
+   "cases": 17,
+   "file": "relay-outbox-read.json",
+   "method": "relay.outbox.read",
+   "sha256": "def43dea156f7aea0563b406439738037550b187960076d4d19241557b729a90"
+  },
+  {
+   "cases": 14,
+   "file": "relay-prompt-respond.json",
+   "method": "relay.prompt.respond",
+   "sha256": "39b8d94b4904defe4ceb3397f5d8739c2f20b40ce587636204125d7a93cb130e"
+  },
+  {
+   "cases": 16,
+   "file": "relay-task-get.json",
+   "method": "relay.task.get",
+   "sha256": "ccef9f29cb562da03cb3afc734f3e28a038c83276c2986e6c809a2008b12dc2d"
+  },
+  {
+   "cases": 16,
+   "file": "relay-tasks-list.json",
+   "method": "relay.tasks.list",
+   "sha256": "c7f856a367392d07c4d9158e384bd33d5d687a28bce34ef089ddba6b6aa1b6bd"
+  },
+  {
+   "cases": 13,
+   "file": "relay-turn-cancel.json",
+   "method": "relay.turn.cancel",
+   "sha256": "c193d672249333213420070aaa9b3ee5205a9ec621279f13204cd067f41730d8"
+  },
+  {
+   "cases": 7,
+   "file": "relay-turn-receipt.json",
+   "method": "relay.turn.receipt",
+   "sha256": "1d02684eb79aad1e0db33da31736039d5bc908f7d5b53d766a45e6580f51bb82"
+  },
+  {
+   "cases": 13,
+   "file": "relay-turn-submit.json",
+   "method": "relay.turn.submit",
+   "sha256": "24599c5cdc9206359178207fff056c965408233f919b52bb515d8bdc8fb33876"
+  },
+  {
+   "cases": 4,
+   "file": "hub-level.json",
+   "method": "(hub transport)",
+   "sha256": "8e6dcfc8f2ff8bf3bc487a2605a100bd38ff94905ca1a5a8f13348251dfb297f"
+  }
+ ],
+ "format": "relay-v1-captured-vectors/1",
+ "harness": {
+  "command": "scripts/run_tests.sh -j 1 --file-retries 0 -W error -q -rA -p native_relay_recorder <test files>",
+  "gap_test_sha256": "4f5b7372a597501b7f8cb61f0ee8d14b8a972d10e983120bed1e5fffb029dca6",
+  "guard_sitecustomize_sha256": "cdcad6fa89d92900f2a417f9ef792a1de45b9d8aedd1a024ca5465e4edaa04ba",
+  "recorder_sha256": "425d8214939415e422d6f757d57047acbdb9841949f535dc07af6624ad508ede",
+  "runner_sha256": "23e251ae5b8529d9c89ea1204654d4c2b7816a6463f353cb452e36ec3abe40cd",
+  "runs": {
+   "full_1": [
+    "tests/test_relay_bindings.py",
+    "tests/test_relay_cancel.py",
+    "tests/test_relay_canonical_delete.py",
+    "tests/test_relay_conversations.py",
+    "tests/test_relay_core_compat.py",
+    "tests/test_relay_existing_scope.py",
+    "tests/test_relay_existing_tasks.py",
+    "tests/test_relay_external_retirement.py",
+    "tests/test_relay_history.py",
+    "tests/test_relay_metadata.py",
+    "tests/test_relay_metadata_compat.py",
+    "tests/test_relay_metadata_isolation.py",
+    "tests/test_relay_metadata_recovery.py",
+    "tests/test_relay_metadata_search.py",
+    "tests/test_relay_prompt_controls.py",
+    "tests/test_relay_search.py",
+    "tests/test_relay_shared_delivery.py",
+    "tests/test_relay_task_counter.py",
+    "tests/test_relay_task_outbox.py",
+    "tests/test_relay_task_outbox_existing.py",
+    "tests/test_relay_tasks.py"
+   ],
+   "gap_7": [
+    "tests/test_native_relay_gap_vectors.py"
+   ]
+  }
+ },
+ "note": "Synthetic Relay-only frames recorded passively from the accepted SDK tests running on the real registered adapter / SessionAuthority; nothing is hand-built. kind=captured entries are verbatim; kind=constructed entries are generated in the Kotlin tests and labelled there.",
+ "sdk": {
+  "head": "286e13482f12a71b1eb81e66c43470df09da2f05",
+  "tree": "6fbdf453f23295281227918bdbca990ec3addf64"
+ },
+ "source_test_sha256": {
+  "tests/test_native_relay_gap_vectors.py": "4f5b7372a597501b7f8cb61f0ee8d14b8a972d10e983120bed1e5fffb029dca6",
+  "tests/test_relay_bindings.py": "b99cc02b8e9a8bb007f64f972eca40cce81baa8f39790484aa7238d33ce43513",
+  "tests/test_relay_cancel.py": "b166f81be6fff761e7c270f1586b8b042af163b9b564f2b632aaccbc2ea24851",
+  "tests/test_relay_canonical_delete.py": "401bfaec5f94d302fac8964fd75b8ded8e12fc4cf80147ec254fe39e0a8c6541",
+  "tests/test_relay_conversations.py": "fb5e3f2ee6f0c532e02670a76bb14672b8b7f3914a43d89c58b9cbce1c74d509",
+  "tests/test_relay_core_compat.py": "8aa2dfd8581a0eae5cb3322a5ff33c797c712b6ffddc63c61cd8c59600caeda0",
+  "tests/test_relay_existing_scope.py": "17f1743f5269b874d5fda81b49a56d8d11f712035a1577329531ff877cc72d3e",
+  "tests/test_relay_existing_tasks.py": "95b9dc863c258ccb3da4f930cca673afe995fc08e0962618247cf65c1f2806ca",
+  "tests/test_relay_external_retirement.py": "37a0665338a35c06a30deedc656abbe6616088ceb470eb44ba8dd2e6e3951fba",
+  "tests/test_relay_history.py": "b0c7552415114eb1c661a7951392ec8e62cc32c1067adc7b87b8c3d6685f94df",
+  "tests/test_relay_metadata.py": "57c366a4a86624b7d936a0911f2bfced5f743e6de2a07e02649788080f5ec992",
+  "tests/test_relay_metadata_compat.py": "ab0978c6ec8e29d3f4b62ac4860703b2d90564ad60258b92dd4cc89d6b93cfe8",
+  "tests/test_relay_metadata_isolation.py": "49a1f10b6131b50b883a1946a8c80fe9df686adf2f0f2236e68a240bfd08c4bd",
+  "tests/test_relay_metadata_recovery.py": "c1d8e7ae9935c9f371cbe68e9c1adb370618a5a48248f1c894252095b4804f75",
+  "tests/test_relay_metadata_search.py": "ace50accfa3c091bde1bd42cb7b78fc6261a0593157a33d377f0e0e4fee3b2f6",
+  "tests/test_relay_prompt_controls.py": "82570f18077100e61ab43cf25aef811f19d3733f37671d06974bd0942ffa4b6a",
+  "tests/test_relay_search.py": "fa2854151b7c2a7ec30c31a42c48492e3ac7420afb9036f9039f0ccd603bd6bf",
+  "tests/test_relay_shared_delivery.py": "b76139c9e33fde2237888da7dd94a16be8b86ddaabb203bd58493c08d7b8c40e",
+  "tests/test_relay_task_counter.py": "32537c245a330b193b6e68394f56e19079e9aebd4dc558945c90b497bf5c7107",
+  "tests/test_relay_task_outbox.py": "ed95e7e1e561f4708ad2db2f89aab19e0fd059d47ffdc461ea2bfcc2dd147321",
+  "tests/test_relay_task_outbox_existing.py": "bf839eefa6507b19c6208bb5ddb317771cf3630486eaf15a0ed241eb30eda46e",
+  "tests/test_relay_tasks.py": "ed5e46a5b2aa838b81d5be54acc4050f01bbc0d5e76085f40e22e9efe0bab931"
+ }
+}

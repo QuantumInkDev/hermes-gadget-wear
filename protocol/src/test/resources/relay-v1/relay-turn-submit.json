@@ -1,0 +1,456 @@
+{
+ "cases": [
+  {
+   "class_population": 9,
+   "id": "relay-turn-submit/error-busy-01",
+   "kind": "captured",
+   "outcome": "error:busy",
+   "request": {
+    "id": "r2",
+    "method": "relay.turn.submit",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "72d5a3ee-54eb-4cb6-8e13-cd955e001e19",
+     "expires_at_ms": 1792300030000,
+     "request_id": "01a14d67-a300-7000-964f-b9138cde2e3a",
+     "text": "ordinary question"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "busy"
+    },
+    "id": "r2",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_canonical_delete.py::test_core_lineage_idleness_fences_an_admission_relay_did_not_journal"
+   },
+   "wire_bytes": 65
+  },
+  {
+   "class_population": 1,
+   "id": "relay-turn-submit/error-conflict-02",
+   "kind": "captured",
+   "outcome": "error:conflict",
+   "request": {
+    "id": "r4",
+    "method": "relay.turn.submit",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "9694fe51-2c73-4fcc-ad32-53ec541514b7",
+     "expires_at_ms": 1792300030000,
+     "request_id": "01a14d67-a300-7000-879f-d6eadbd62e87",
+     "text": "changed"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "conflict"
+    },
+    "id": "r4",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_conversations.py::test_replay_expiry_conflict_shared_receipt_and_watch_author"
+   },
+   "wire_bytes": 69
+  },
+  {
+   "class_population": 1,
+   "id": "relay-turn-submit/error-expired-03",
+   "kind": "captured",
+   "outcome": "error:expired",
+   "request": {
+    "id": "r5",
+    "method": "relay.turn.submit",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "9694fe51-2c73-4fcc-ad32-53ec541514b7",
+     "expires_at_ms": 1792300059999,
+     "request_id": "01a14d66-b8a0-7000-9c22-20becd96af1b",
+     "text": "ordinary question"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "expired"
+    },
+    "id": "r5",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_conversations.py::test_replay_expiry_conflict_shared_receipt_and_watch_author"
+   },
+   "wire_bytes": 68
+  },
+  {
+   "class_population": 8,
+   "id": "relay-turn-submit/error-invalid-request-04",
+   "kind": "captured",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "r2",
+    "method": "relay.turn.submit",
+    "params": {
+     "attachment_ids": {},
+     "authority_epoch": 1,
+     "binding_id": "aa3d84bc-534f-4b03-9886-da8c62e799b9",
+     "expires_at_ms": 1792300030000,
+     "request_id": "01a14d67-a300-7000-8fce-f1c985693665",
+     "text": "ordinary question"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "r2",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_conversations.py::test_refusals_never_dispatch[change1-invalid_request]"
+   },
+   "wire_bytes": 76
+  },
+  {
+   "class_population": 4,
+   "id": "relay-turn-submit/error-permission-denied-05",
+   "kind": "captured",
+   "outcome": "error:permission_denied",
+   "request": {
+    "id": "r4",
+    "method": "relay.turn.submit",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "c7b1a547-b082-4286-90f8-5e7fc89edac1",
+     "expires_at_ms": 1792300060000,
+     "request_id": "01a14d67-a300-7000-b347-df63f3002825",
+     "text": "from the watch"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "permission_denied"
+    },
+    "id": "r4",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_existing_scope.py::test_read_only_attach_never_submits_answers_or_controls"
+   },
+   "wire_bytes": 78
+  },
+  {
+   "class_population": 3,
+   "id": "relay-turn-submit/error-snapshot-required-06",
+   "kind": "captured",
+   "outcome": "error:snapshot_required",
+   "request": {
+    "id": "r3",
+    "method": "relay.turn.submit",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "40890f01-7995-4b04-a66e-c692fbc91a48",
+     "expires_at_ms": 1792300030000,
+     "request_id": "01a14d67-a300-7000-8de4-9704112d813c",
+     "text": "ordinary question"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "snapshot_required"
+    },
+    "id": "r3",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_bindings.py::test_sdk_queue_bound_reserves_gap_and_unsubscribes"
+   },
+   "wire_bytes": 78
+  },
+  {
+   "class_population": 3,
+   "id": "relay-turn-submit/error-stale-binding-07",
+   "kind": "captured",
+   "outcome": "error:stale_binding",
+   "request": {
+    "id": "r2",
+    "method": "relay.turn.submit",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "53cf671b-06ef-4015-9f9c-83da66da27bd",
+     "expires_at_ms": 1792300030000,
+     "request_id": "01a14d67-a300-7000-9f3a-17469850b711",
+     "text": "ordinary question"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "stale_binding"
+    },
+    "id": "r2",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_bindings.py::test_fix1_stale_submit_response_does_not_cancel_committed_work"
+   },
+   "wire_bytes": 74
+  },
+  {
+   "class_population": 2,
+   "id": "relay-turn-submit/error-stale-epoch-08",
+   "kind": "captured",
+   "outcome": "error:stale_epoch",
+   "request": {
+    "id": "r2",
+    "method": "relay.turn.submit",
+    "params": {
+     "authority_epoch": false,
+     "binding_id": "6d359fee-4673-409a-a409-0d861a67c6c7",
+     "expires_at_ms": 1792300030000,
+     "request_id": "01a14d67-a300-7000-9a27-d483867fe547",
+     "text": "ordinary question"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "stale_epoch"
+    },
+    "id": "r2",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_conversations.py::test_refusals_never_dispatch[change7-stale_epoch]"
+   },
+   "wire_bytes": 72
+  },
+  {
+   "class_population": 2,
+   "id": "relay-turn-submit/error-temporarily-unavailable-09",
+   "kind": "captured",
+   "outcome": "error:temporarily_unavailable",
+   "request": {
+    "id": "r3",
+    "method": "relay.turn.submit",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "ac38e814-5169-4ff1-a7b0-c2a21625989f",
+     "expires_at_ms": 1792300030000,
+     "request_id": "01a14d67-a300-7000-a3c7-227f4a6256ac",
+     "text": "ordinary question"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "temporarily_unavailable"
+    },
+    "id": "r3",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_shared_delivery.py::test_inflight_commit_reports_unknown_not_absent"
+   },
+   "wire_bytes": 84
+  },
+  {
+   "class_population": 5,
+   "id": "relay-turn-submit/error-unsupported-10",
+   "kind": "captured",
+   "outcome": "error:unsupported",
+   "request": {
+    "id": "r2",
+    "method": "relay.turn.submit",
+    "params": {
+     "attachment_ids": [
+      "file"
+     ],
+     "authority_epoch": 1,
+     "binding_id": "638fc507-3934-4901-af81-7e59082aa8ec",
+     "expires_at_ms": 1792300030000,
+     "request_id": "01a14d67-a300-7000-a79b-bdea3eed7978",
+     "text": "ordinary question"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "unsupported"
+    },
+    "id": "r2",
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_conversations.py::test_refusals_never_dispatch[change0-unsupported]"
+   },
+   "wire_bytes": 72
+  },
+  {
+   "class_population": 6,
+   "id": "relay-turn-submit/ok-11",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r6",
+    "method": "relay.turn.submit",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "5fdf3a70-7527-40cd-8ef2-946c9745cbfe",
+     "expires_at_ms": 1792300030000,
+     "request_id": "01a14d67-a300-7000-9d20-a4e7c867f2ae",
+     "text": "ordinary question"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r6",
+    "result": {
+     "admission_id": "b51c880f-2574-4650-99fb-cd685725b5b3",
+     "authority_epoch": 1,
+     "conversation_id": "ee4c282b-6b21-437d-9c22-2f5442385c0e",
+     "execution_generation": 1,
+     "outcome": "completed",
+     "request_id": "01a14d67-a300-7000-9d20-a4e7c867f2ae",
+     "status": "terminal"
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_conversations.py::test_fix1_public_admission_uuid_preserves_internal_identity_across_recovery"
+   },
+   "wire_bytes": 302
+  },
+  {
+   "class_population": 158,
+   "id": "relay-turn-submit/ok-12",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r2",
+    "method": "relay.turn.submit",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "75991e50-cc8f-4510-8036-33af96853c03",
+     "expires_at_ms": 1792300030000,
+     "request_id": "01a14d67-a300-7000-9c5f-507e4dac5f55",
+     "text": "first"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r2",
+    "result": {
+     "admission_id": "a2565393-f596-4740-9ff3-eba165d56b57",
+     "authority_epoch": 1,
+     "conversation_id": "cdb42e7f-f263-43ee-a4e9-4a51990a7fb1",
+     "execution_generation": 1,
+     "outcome": null,
+     "request_id": "01a14d67-a300-7000-9c5f-507e4dac5f55",
+     "status": "started"
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_cancel.py::test_a_cancelled_caller_does_not_cut_the_effect_and_a_crashed_intent_is_never_replayed"
+   },
+   "wire_bytes": 294
+  },
+  {
+   "class_population": 124,
+   "id": "relay-turn-submit/ok-13",
+   "kind": "captured",
+   "outcome": "ok",
+   "request": {
+    "id": "r2",
+    "method": "relay.turn.submit",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "f089a15d-398f-470b-9f63-43b58a698440",
+     "expires_at_ms": 1792300030000,
+     "request_id": "01a14d67-a300-7000-ae7d-ebbf5ee243c6",
+     "text": "ordinary question"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "r2",
+    "result": {
+     "admission_id": "a885fe07-4cde-44b0-85b9-4457fa6f9b0d",
+     "authority_epoch": 1,
+     "conversation_id": "b5ba6d5f-a156-46d1-ad2b-f00b53042eee",
+     "execution_generation": null,
+     "outcome": null,
+     "request_id": "01a14d67-a300-7000-ae7d-ebbf5ee243c6",
+     "status": "queued"
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "source": {
+    "device": "phone",
+    "run": "full-1",
+    "test": "tests/test_relay_bindings.py::test_core_frames_reconcile_task_state_without_final_text"
+   },
+   "wire_bytes": 296
+  }
+ ],
+ "method": "relay.turn.submit"
+}
