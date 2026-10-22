@@ -991,10 +991,10 @@ index 0000000000000000000000000000000000000000..07a74e2487eda4f44f27f5f07a9a5984
 +    return _make(configured_state, None, None, provider)
 diff --git a/gateway/session_native_voice_tts.py b/gateway/session_native_voice_tts.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..47b8671b86898afcc80ab364baaaec60fe5bdbec
+index 0000000000000000000000000000000000000000..c738bf9d3422fb34bce62799e4b9567f5a72d9db
 --- /dev/null
 +++ b/gateway/session_native_voice_tts.py
-@@ -0,0 +1,325 @@
+@@ -0,0 +1,329 @@
 +"""Configured one-request-per-chunk text-to-speech for the native voice seam (``session_native_voice``).
 +
 +The profile's own TTS configuration (provider, voice, model) is read at call time through the stock
@@ -1035,6 +1035,7 @@ index 0000000000000000000000000000000000000000..47b8671b86898afcc80ab364baaaec60
 +    code_points: int = 0
 +    answered: bool = False  # every request that was sent got a usable answer
 +    unaccounted: bool = False  # audio was produced (or a send happened) outside the gate: accounting is unknown
++    produced: bool = False  # at least one chunk was completed (paid and answered, or a local engine chunk converted)
 +
 +
 +def _make(state, path, code_points, source, provider):
@@ -1262,6 +1263,7 @@ index 0000000000000000000000000000000000000000..47b8671b86898afcc80ab364baaaec60
 +            _remove([_final_path(output_dir, run_id)])
 +    verdict.answered = run.answered
 +    verdict.unaccounted = run.unaccounted
++    verdict.produced = run.done > 0
 +    return verdict
 +
 +
@@ -1281,7 +1283,9 @@ index 0000000000000000000000000000000000000000..47b8671b86898afcc80ab364baaaec60
 +    if policy.refusal == 'closed':  # closed by the deadline fence, else by Stop/cancellation (N-2: a probe may notice first)
 +        return 'timeout' if policy.deadline is not None and time.monotonic() >= policy.deadline else 'cancelled'
 +    if policy.refusal == 'unsupported':
-+        return 'unavailable' if not policy.sends else 'failed'  # after a paid chunk nothing is "unavailable": the join etc. failed
++        # nothing is "unavailable" once a chunk was paid OR a local engine chunk was produced (a vanished joiner, a lost launcher);
++        # a helper that replies "unavailable" for its FIRST chunk, or any prelaunch refusal, still is
++        return 'unavailable' if not (policy.sends or synth.produced) else 'failed'
 +    if policy.local_launched:
 +        return 'failed'  # a local child really started: a failure after a local invocation, never "nothing was tried"
 +    return 'unavailable' if not policy.sends else 'failed'
@@ -1581,10 +1585,10 @@ index 0000000000000000000000000000000000000000..a9896b7f7fb9b7249a3a990be360e7ff
 +    print('NATIVE_VOICE_MEASURE ' + json.dumps({'label': label, **values}, sort_keys=True))
 diff --git a/tests/gateway/native_voice_support.py b/tests/gateway/native_voice_support.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..8a3d52dd7eeb70630443c6e551b7319d9a688f76
+index 0000000000000000000000000000000000000000..6fc2168847ecdafcf64ac4e59a6798424310ac50
 --- /dev/null
 +++ b/tests/gateway/native_voice_support.py
-@@ -0,0 +1,557 @@
+@@ -0,0 +1,586 @@
 +"""Synthetic provider transport for the native voice seam tests.
 +
 +Only the network bytes are replaced: the real OpenAI SDK, real httpx client (with whatever timeout,
@@ -1773,12 +1777,31 @@ index 0000000000000000000000000000000000000000..8a3d52dd7eeb70630443c6e551b7319d
 +    return path
 +
 +
-+def synth_mp3(path, seconds=1.0, frequency=440):
-+    """A real MP3 made by the real ffmpeg from a local synthetic sine (no URL, no network)."""
++def synth_mp3(path, seconds=1.0, frequency=440, rate=24000, channels=1, kbps=48, extra=()):
++    """A real MP3 made by the real ffmpeg from a local synthetic sine (no URL, no network). The defaults are the original
++    24 kHz / 48 kbps mono fixture; ``extra`` are ffmpeg output options (e.g. ``-write_xing 0``, large ``-metadata``)."""
 +    subprocess.run([ffmpeg_path(), '-loglevel', 'error', '-y', '-f', 'lavfi', '-i',
-+                    f'sine=frequency={frequency}:duration={seconds}', '-ac', '1', '-ar', '24000', '-b:a', '48k', str(path)],
++                    f'sine=frequency={frequency}:duration={seconds}:sample_rate={rate}', '-ac', str(channels), '-ar', str(rate),
++                    '-b:a', f'{kbps}k', *extra, str(path)],
 +                   check=True, capture_output=True, timeout=60, stdin=subprocess.DEVNULL)
 +    return Path(path).read_bytes()
++
++
++def ffprobe_path():
++    """The approved owned ffprobe on PATH; skip when the host has none."""
++    path = shutil.which('ffprobe')
++    if path is None:
++        pytest.skip('ffprobe is not available on PATH')
++    return path
++
++
++def packets(path):
++    """Compressed AUDIO packets of the first audio stream as the real ffprobe counts them (tags and the Info/Xing frame are
++    not packets)."""
++    out = subprocess.run([ffprobe_path(), '-v', 'error', '-select_streams', 'a:0', '-count_packets', '-show_entries',
++                          'stream=nb_read_packets', '-of', 'csv=p=0', str(path)], capture_output=True, text=True, check=True,
++                         timeout=60, stdin=subprocess.DEVNULL).stdout
++    return int(out.strip())
 +
 +
 +def tone_and_silence_wav(path, tone_s=2.0, silence_s=12.0, rate=16000):
@@ -1953,20 +1976,30 @@ index 0000000000000000000000000000000000000000..8a3d52dd7eeb70630443c6e551b7319d
 +    return False
 +
 +
++FAULTY_STATES = frozenset({
++    'fail-concat', 'silent-concat', 'junk-concat', 'fail-join', 'hold-join', 'hold-probe', 'hold-convert', 'hold-any', 'head-concat',
++    'head-join', 'grow-join', 'grow-convert', 'junk-convert', 'droplast-concat', 'droplast-join', 'fail-probe', 'junk-probe'})
++# state -> (the tool name ``shutil.which`` is asked for, what it answers): None = absent; a callable = a present-but-wrong binary
++WHICH_STATES = {
++    'missing': ('ffmpeg', lambda: None),
++    'broken': ('ffmpeg', lambda: str(Path(ffmpeg_path()).with_name('ffprobe'))),  # executable, cannot convert or concat
++    'missing-ffprobe': ('ffprobe', lambda: None),  # the joiner proper is fine; the packet-count tool is absent
++    'broken-ffprobe': ('ffprobe', lambda: shutil.which('ffmpeg')),  # executable, but it is ffmpeg: it cannot count packets
++}
++
++
 +def joiner(monkeypatch, tmp_path, how):
 +    """Put the owned tools in the state ``how``; returns the stall/readiness state path."""
 +    state = tmp_path / 'launcher-state'
-+    real_which = shutil.which
-+    if how in ('fail-concat', 'silent-concat', 'junk-concat', 'fail-join', 'hold-join', 'hold-probe', 'hold-convert', 'hold-any',
-+               'head-concat', 'head-join', 'grow-join', 'grow-convert', 'junk-convert'):
++    if how in FAULTY_STATES:
 +        faulty_launcher(monkeypatch, how, state)
 +        return state
 +    qualify(monkeypatch)
-+    if how == 'missing':
-+        monkeypatch.setattr(shutil, 'which', lambda name, *a, **k: None if name == 'ffmpeg' else real_which(name, *a, **k))
-+    elif how == 'broken':  # present and executable, but cannot convert or concat: the owned ffprobe
-+        broken = str(Path(ffmpeg_path()).with_name('ffprobe'))
-+        monkeypatch.setattr(shutil, 'which', lambda name, *a, **k: broken if name == 'ffmpeg' else real_which(name, *a, **k))
++    real_which = shutil.which
++    if how in WHICH_STATES:
++        tool, answer = WHICH_STATES[how]
++        replacement = answer()
++        monkeypatch.setattr(shutil, 'which', lambda name, *a, **k: replacement if name == tool else real_which(name, *a, **k))
 +    elif how == 'no-launcher':
 +        from tools import native_local_launcher
 +        monkeypatch.setattr(native_local_launcher, 'QUALIFIED', ())
@@ -6038,10 +6071,10 @@ index 0000000000000000000000000000000000000000..c26a92331c20544fe981acc58dafa5e4
 +    assert 'PROVIDER-TEXT-2099' not in caplog.text and not [r for r in caplog.records if r.name.startswith('mistralai')]
 diff --git a/tests/gateway/test_native_voice_pipeline.py b/tests/gateway/test_native_voice_pipeline.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..c7323f7f5877f32ecae35512a5ac4feaabbc37bb
+index 0000000000000000000000000000000000000000..2e86661125c3b389d2ac06adb38b7e74f1b8940f
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_pipeline.py
-@@ -0,0 +1,413 @@
+@@ -0,0 +1,546 @@
 +"""Native voice seam: the usable multi-chunk join (Task4 B) for remote and local routes.
 +
 +REAL: the pinned OpenAI SDK + httpx (synthetic bytes only), the real runner / process group / pipes, the real ``ffmpeg`` for
@@ -6138,8 +6171,12 @@ index 0000000000000000000000000000000000000000..c7323f7f5877f32ecae35512a5ac4fea
 +    assert wire.count == count and cb.before_send_calls == count
 +    # the join capability was proved BEFORE the first paid request, and the real join ran AFTER the last one
 +    first, last = events.index('request'), len(events) - 1 - events[::-1].index('request')
-+    assert events[:first].count('spawn') >= 2 and events[last:].count('spawn') == 1
-+    join = support.audio_spawns(spawns)[-1]
++    assert events[:first].count('spawn') >= 4  # converter, concat and the ffprobe packet counts of the capability probe
++    after = [s for s in support.audio_spawns(spawns)][len(support.audio_spawns(spawns)) - (1 + count + 1):]
++    assert events[last:].count('spawn') == 1 + count + 1  # the join, then one packet count per chunk and one for the joined file
++    kinds = [support.program_of(s).rsplit('/', 1)[-1] + (':concat' if 'concat' in s['args'] else '') for s in after]
++    assert kinds == ['ffmpeg:concat'] + ['ffprobe'] * (count + 1), kinds
++    join = after[0]
 +    argv = join['args']
 +    assert argv[:4] == [sys.executable, str(support.PASSTHROUGH), '-p', launcher.PROFILE]  # inside the (stand-in) launcher
 +    flags = argv[argv.index('-nostdin'):]
@@ -6171,7 +6208,8 @@ index 0000000000000000000000000000000000000000..c7323f7f5877f32ecae35512a5ac4fea
 +    assert spawns == [] and Path(result.path).read_bytes() == b'ID3one-chunk'
 +
 +
-+JOINERS = ['missing', 'broken', 'no-launcher', 'fail-concat', 'silent-concat', 'junk-concat', 'head-concat']
++JOINERS = ['missing', 'broken', 'no-launcher', 'fail-concat', 'silent-concat', 'junk-concat', 'head-concat', 'droplast-concat',
++           'missing-ffprobe', 'broken-ffprobe', 'fail-probe', 'junk-probe']
 +
 +
 +@pytest.mark.asyncio
@@ -6322,7 +6360,8 @@ index 0000000000000000000000000000000000000000..c7323f7f5877f32ecae35512a5ac4fea
 +
 +
 +@pytest.mark.asyncio
-+@pytest.mark.parametrize('how', ['broken', 'fail-concat', 'silent-concat', 'junk-concat', 'head-concat'])
++@pytest.mark.parametrize('how', ['broken', 'fail-concat', 'silent-concat', 'junk-concat', 'head-concat', 'droplast-concat',
++                                 'missing-ffprobe', 'broken-ffprobe', 'fail-probe', 'junk-probe'])
 +async def test_an_unusable_joiner_refuses_a_local_multi_chunk_call_before_any_engine_child(
 +        monkeypatch, tmp_path, out, scratch, engine, how):
 +    """CV-F's converter probe passes (the WAV->MP3 conversion works) yet the engine must not run: only an actual concat
@@ -6455,6 +6494,133 @@ index 0000000000000000000000000000000000000000..c7323f7f5877f32ecae35512a5ac4fea
 +                except subprocess.CalledProcessError:
 +                    pass
 +                assert seen == [pytest.approx(expect, abs=1e-9)]
++
++
++# ---- Task4 fix2 NI-1 / NM-2: input-derived completeness (audio packets), format-aware, no fixed byte budget ----------------------
++# A SMALL bounded format set, not a cross product: the original 24 kHz/48 kbps mono pin, 32 kHz/128 kbps mono, 44.1 kHz/192 kbps
++# stereo, 48 kHz/320 kbps stereo, plus one large-ID3 case and one no-Info/Xing case. Real ffmpeg conversion and copy-concat.
++BIG_ID3 = ('-metadata', 'title=' + 'T' * 3000, '-metadata', 'comment=' + 'C' * 3000)
++FORMATS = [
++    pytest.param(dict(rate=24000, channels=1, kbps=48), (), id='24k-48k-mono-pin'),
++    pytest.param(dict(rate=32000, channels=1, kbps=128), (), id='32k-128k-mono'),
++    pytest.param(dict(rate=44100, channels=2, kbps=192), (), id='44k-192k-stereo'),
++    pytest.param(dict(rate=48000, channels=2, kbps=320), (), id='48k-320k-stereo'),
++    pytest.param(dict(rate=32000, channels=1, kbps=128), BIG_ID3, id='32k-128k-mono-large-id3'),
++    pytest.param(dict(rate=48000, channels=2, kbps=320), ('-write_xing', '0'), id='48k-320k-stereo-no-info'),
++]
++
++
++def format_chunks(tmp_path, count, fmt, extra, last=0.05):
++    """``count`` real MP3 files in one format: distinct tones, lengths 0.5, 0.7, ... and a deliberately TINY last chunk."""
++    spans = [round(0.5 + 0.2 * i, 1) for i in range(count - 1)] + [last]
++    paths = [tmp_path / f'c{i}.mp3' for i in range(count)]
++    audio = [support.synth_mp3(path, seconds=span, frequency=440 * (i + 1), extra=extra, **fmt)
++             for i, (path, span) in enumerate(zip(paths, spans))]
++    return audio, paths, spans
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('fmt, extra', FORMATS)
++async def test_a_legitimate_mp3_format_is_joined_with_every_audio_packet_in_order(
++        monkeypatch, tmp_path, out, scratch, launcher, fmt, extra):
++    """NI-1: the fix1 byte-budget rule rejected correct joins of several ordinary formats after payment. The completeness
++    proof is now the compressed-audio PACKET count (tags and the Info/Xing frame are not packets): the joined file holds exactly
++    the packets of the inputs, whatever the bitrate, sample rate, tag size or Info frame. NM-2: that includes the tiny last chunk."""
++    support.ffmpeg_path()
++    support.ffprobe_path()
++    support.write_config(get_hermes_home(), openai_config())
++    count = chunk_total(LONG_TEXT, 60)
++    audio, paths, spans = format_chunks(tmp_path, count, fmt, extra)
++    wire = support.Wire([('ok', {'audio': a}) for a in audio])
++    cb = support.Callbacks()
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.provider) == ('synthesized', 'completed') and wire.count == count == cb.before_send_calls
++    assert support.packets(result.path) == sum(support.packets(path) for path in paths)  # no audio packet lost at any boundary
++    expected = [440 * (i + 1) for i in range(count)]
++    heard = support.tone_sequence(result.path, spans[:-1])  # the tiny last chunk is too short for a stable frequency estimate
++    assert [abs(f - e) < 40 for f, e in zip(heard, expected)] == [True] * (count - 1)
++    assert os.listdir(out) == [os.path.basename(result.path)] and os.listdir(scratch) == []
++
++
++@pytest.mark.asyncio
++async def test_a_join_that_lost_only_the_final_short_chunk_is_refused_after_payment(monkeypatch, tmp_path, out, scratch):
++    """NM-2: the stand-in's real join runs the REAL ffmpeg on a list without the last (tiny) chunk: a valid MP3, only a few
++    hundred bytes smaller - inside the old fixed allowance. The packet count refuses it: ``failed``/``completed``, nothing left."""
++    support.ffmpeg_path()
++    support.ffprobe_path()
++    support.write_config(get_hermes_home(), openai_config(max_text_length=30))  # more chunks: the old allowance grows with them
++    support.joiner(monkeypatch, tmp_path, 'droplast-join')
++    count = chunk_total(LONG_TEXT, 30)
++    assert count >= 4
++    audio, _, _ = format_chunks(tmp_path, count, dict(rate=24000, channels=1, kbps=48), ())
++    wire = support.Wire([('ok', {'audio': a}) for a in audio])
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out)
++    assert (result.state, result.path, result.provider) == ('failed', None, 'completed')
++    assert os.listdir(out) == [] and os.listdir(scratch) == []
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('how', ['missing-ffprobe', 'broken-ffprobe'])
++async def test_single_chunk_speech_needs_no_ffprobe(monkeypatch, tmp_path, out, scratch, how):
++    """The packet-count tool is a prerequisite of the multi-chunk join ONLY: one chunk is a rename and never asks for it."""
++    support.write_config(get_hermes_home(), openai_config(max_text_length=4000))
++    support.joiner(monkeypatch, tmp_path, how)
++    spawns = support.record_spawns(monkeypatch)
++    wire = support.Wire([('ok', {'audio': b'ID3one-chunk'})])
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, text='Hello there, friend.')
++    assert (result.state, result.provider, wire.count) == ('synthesized', 'completed', 1) and spawns == []
++
++
++def test_the_stock_shared_concat_is_unchanged_and_needs_no_ffprobe(monkeypatch, tmp_path):
++    """Stock-off pin (green before and after): the shared ``_concat_audio_files`` still joins with ffmpeg alone."""
++    from tools.tts_tool_delivery import _concat_audio_files
++    support.ffmpeg_path()
++    real = shutil.which
++    monkeypatch.setattr(shutil, 'which', lambda name, *a, **k: None if name == 'ffprobe' else real(name, *a, **k))
++    parts = [tmp_path / f'p{i}.mp3' for i in range(2)]
++    for i, part in enumerate(parts):
++        support.synth_mp3(part, seconds=0.3, frequency=440 * (i + 1))
++    joined = _concat_audio_files([str(p) for p in parts], str(tmp_path / 'stock.mp3'), voice_compatible=False)
++    assert joined == str(tmp_path / 'stock.mp3') and Path(joined).stat().st_size > 0
++
++
++# ---- Task4 fix2 NM-1: a join refusal after LOCAL engine chunks is failed (a local child really started) ---------------------
++@pytest.mark.asyncio
++@pytest.mark.parametrize('how', ['vanished', 'broken'])
++async def test_a_joiner_that_goes_bad_after_the_local_engine_chunks_is_failed_not_unavailable(
++        monkeypatch, out, scratch, launcher, engine, how):
++    """The probe passed and every engine chunk ran (``local_launched``); then the joiner vanished / became an executable that
++    cannot join. ``unavailable`` would claim nothing was tried; the truth is ``failed`` with ``not_started`` (no provider)."""
++    from tools import tts_tool_local
++    support.ffmpeg_path()
++    total = chunk_total(LOCAL_TEXT, 60)
++    real_chunk, real_which, calls = tts_tool_local.native_engine_chunk, shutil.which, []
++
++    def spoil(*args, **kwargs):
++        real_chunk(*args, **kwargs)
++        calls.append(1)
++        if len(calls) == total:
++            broken = str(Path(support.ffmpeg_path()).with_name('ffprobe'))
++            replacement = None if how == 'vanished' else broken
++            monkeypatch.setattr(shutil, 'which', lambda name, *a, **k: replacement if name == 'ffmpeg' else real_which(name, *a, **k))
++    monkeypatch.setattr(tts_tool_local, 'native_engine_chunk', spoil)
++    result = await speak(out, text=LOCAL_TEXT)
++    assert len(calls) == total >= 3
++    assert (result.state, result.path, result.provider) == ('failed', None, 'not_started')
++    assert os.listdir(out) == [] and os.listdir(scratch) == []
++
++
++@pytest.mark.asyncio
++async def test_a_launcher_refusal_before_any_local_launch_stays_unavailable_not_started(monkeypatch, out, scratch, launcher, engine):
++    """NM-1 pin (prelaunch): an unqualified launcher refuses BEFORE any engine child: still ``unavailable``/``not_started``."""
++    monkeypatch.setattr(launcher, 'QUALIFIED', ())
++    spawns = support.record_spawns(monkeypatch)
++    result = await speak(out, text=LOCAL_TEXT)
++    assert (result.state, result.path, result.provider) == ('unavailable', None, 'not_started')
++    assert engine_spawns(spawns) == [] and os.listdir(out) == []
 diff --git a/tests/gateway/test_native_voice_rest_fences.py b/tests/gateway/test_native_voice_rest_fences.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..2d32781e677e84eeddbd3a9da5acf2c6ba45bd27
@@ -6597,10 +6763,10 @@ index 0000000000000000000000000000000000000000..2d32781e677e84eeddbd3a9da5acf2c6
 +    assert os.listdir(out) == []
 diff --git a/tests/gateway/test_native_voice_rest_tts.py b/tests/gateway/test_native_voice_rest_tts.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..a492df942b5e315d4f8a62a534a9cc48331a88ed
+index 0000000000000000000000000000000000000000..ff4c769b888d35a333a3f27e6823c76b5f30ae78
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_rest_tts.py
-@@ -0,0 +1,650 @@
+@@ -0,0 +1,652 @@
 +"""Native voice seam, REST TTS (xAI, MiniMax, Gemini): real request construction, one gated send per chunk, bounds.
 +
 +The stock generators (``tools.tts_tool_providers._generate_*``) run unchanged inside the seam; the REAL ``requests``
@@ -7173,6 +7339,8 @@ index 0000000000000000000000000000000000000000..a492df942b5e315d4f8a62a534a9cc48
 +    head = Path(result.path).read_bytes()[:3]
 +    assert head == b'ID3' or head[0] == 0xFF  # a real MP3, not concatenated blobs
 +    assert support.media_seconds(result.path) == pytest.approx(sum(spans), abs=0.5)
++    if name != 'gemini':  # NM-2: every audio packet of the real chunk files is in the join (Gemini's chunks are converted internally)
++        assert support.packets(result.path) == sum(support.packets(tmp_path / f'c{i}.mp3') for i in range(count))
 +    if name != 'gemini':
 +        assert [abs(f - 440 * (i + 1)) < 40 for i, f in enumerate(support.tone_sequence(result.path, spans))] == [True] * count
 +    assert os.listdir(out) == [os.path.basename(result.path)]
@@ -7253,10 +7421,10 @@ index 0000000000000000000000000000000000000000..a492df942b5e315d4f8a62a534a9cc48
 +    assert held.pulled <= 2 * CHUNK and held.closed and os.listdir(out) == []
 diff --git a/tests/gateway/test_native_voice_sdk_boundaries.py b/tests/gateway/test_native_voice_sdk_boundaries.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..5c8e75790be6eb60286131fc39a5ad71e0cc2be0
+index 0000000000000000000000000000000000000000..39338018c2232f0a251dc700614861bea43fe29a
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_sdk_boundaries.py
-@@ -0,0 +1,337 @@
+@@ -0,0 +1,339 @@
 +"""Native voice seam against the REAL pinned SDK clients and the real Edge stack.
 +
 +``elevenlabs==1.59.0`` and ``edge-tts==7.2.7`` are the lock-pinned wheels of the owned offline
@@ -7520,10 +7688,12 @@ index 0000000000000000000000000000000000000000..5c8e75790be6eb60286131fc39a5ad71
 +    assert result.code_points == sum(len(text) for text in spoken)
 +    assert os.listdir(out) == [os.path.basename(result.path)]
 +    assert abs(support.media_seconds(result.path) - chunks * 1.0) < 0.5  # the REAL ffmpeg joined real MP3 chunks
++    assert support.packets(result.path) == chunks * support.packets(tmp_path / 'sine.mp3')  # NM-2: not one audio packet lost
 +
 +
 +@pytest.mark.asyncio
-+@pytest.mark.parametrize('how', ['missing', 'broken', 'no-launcher', 'fail-concat', 'silent-concat', 'junk-concat'])
++@pytest.mark.parametrize('how', ['missing', 'broken', 'no-launcher', 'fail-concat', 'silent-concat', 'junk-concat',
++                                 'droplast-concat', 'missing-ffprobe', 'broken-ffprobe', 'fail-probe'])
 +async def test_an_unusable_joiner_refuses_a_full_edge_text_before_any_handshake(monkeypatch, out, edge, tmp_path, how):
 +    support.joiner(monkeypatch, tmp_path, how)
 +    boundary = await support.EdgeBoundary(audio=b'ID3edge-audio').start(monkeypatch)
@@ -7537,7 +7707,7 @@ index 0000000000000000000000000000000000000000..5c8e75790be6eb60286131fc39a5ad71
 +
 +
 +@pytest.mark.asyncio
-+@pytest.mark.parametrize('how', ['missing', 'no-launcher', 'fail-concat'])
++@pytest.mark.parametrize('how', ['missing', 'no-launcher', 'fail-concat', 'missing-ffprobe', 'broken-ffprobe'])
 +async def test_a_concise_edge_text_is_independent_of_the_joiner(monkeypatch, out, edge, tmp_path, how):
 +    """<= 600 code points is one chunk: no join, no preflight, one handshake, whatever the joiner's state. No tail truncation."""
 +    from gateway.session_native_voice import speakable_text
@@ -9670,10 +9840,10 @@ index 0000000000000000000000000000000000000000..43fecdc53f953cdf5507671e96fa2429
 +stream.flush()
 diff --git a/tests/tools/native_command_fixtures/launcher_faulty.py b/tests/tools/native_command_fixtures/launcher_faulty.py
 new file mode 100755
-index 0000000000000000000000000000000000000000..3bc2e456803d9e961b0e276d37edac46f76a27a1
+index 0000000000000000000000000000000000000000..1e2e600bb6f46152ac72d56b86a87d7ed501b5c9
 --- /dev/null
 +++ b/tests/tools/native_command_fixtures/launcher_faulty.py
-@@ -0,0 +1,76 @@
+@@ -0,0 +1,93 @@
 +"""HARNESS stand-in for the qualified network-deny launcher (NOT a sandbox, NOT launcher proof) that misbehaves on purpose
 +for audio-tool children only. Usage: ``launcher_faulty.py MODE STATE -p PROFILE PROGRAM [ARGS...]`` (the product's wrapping
 +argv ``-p <fixed profile> <program> <args...>`` behind two harness words). A concat child is an ffmpeg child with
@@ -9687,7 +9857,9 @@ index 0000000000000000000000000000000000000000..3bc2e456803d9e961b0e276d37edac46
 +exits 0 (a truncated join). ``grow-convert`` / ``grow-join``: the first conversion / the second concat child writes 64 KiB
 +blocks to its output (the last argument) until it holds 8 MiB, writes its pid to STATE (readiness: the growth is under way),
 +then waits at most 20 s for STATE + '.release' and ONLY THEN writes STATE + '.finished'; a product that ends it earlier
-+(the size watch) never sees the marker. ``fail-concat`` / ``silent-concat`` / ``junk-concat``: EVERY concat child exits 1 / exits 0 writing nothing / writes junk to
++(the size watch) never sees the marker. ``droplast-concat`` / ``droplast-join``: every / only the second concat child runs the REAL ffmpeg on a copy of its list with
++the LAST listed input removed (a valid MP3 that lost the final, short chunk). ``fail-probe`` / ``junk-probe``: every ffprobe child
++exits 1 / prints junk and exits 0. ``fail-concat`` / ``silent-concat`` / ``junk-concat``: EVERY concat child exits 1 / exits 0 writing nothing / writes junk to
 +its output (the last argument) and exits 0. ``fail-join``: only the second concat child exits 1. ``junk-convert``: every
 +conversion child writes junk to its output (the last argument) and exits 0. Every other child is
 +exec'd unchanged. Network-free; bounded; writes only STATE, STATE + '.concat' (a counter) and the concat output it was handed."""
@@ -9701,6 +9873,7 @@ index 0000000000000000000000000000000000000000..3bc2e456803d9e961b0e276d37edac46
 +    raise SystemExit(64)
 +program, args = sys.argv[5], sys.argv[6:]
 +is_ffmpeg = os.path.basename(program) == 'ffmpeg'
++is_ffprobe = os.path.basename(program) == 'ffprobe'
 +concat = is_ffmpeg and 'concat' in args
 +nth = 0
 +if concat:
@@ -9711,7 +9884,8 @@ index 0000000000000000000000000000000000000000..3bc2e456803d9e961b0e276d37edac46
 +hit = {'hold-convert': is_ffmpeg and not concat, 'hold-probe': concat and nth == 1, 'hold-join': concat and nth == 2,
 +       'hold-any': is_ffmpeg, 'fail-concat': concat, 'silent-concat': concat, 'junk-concat': concat,
 +       'fail-join': concat and nth == 2, 'junk-convert': is_ffmpeg and not concat, 'head-concat': concat,
-+       'head-join': concat and nth == 2, 'grow-convert': is_ffmpeg and not concat and not os.path.exists(state + '.grew'),
++       'head-join': concat and nth == 2, 'droplast-concat': concat, 'droplast-join': concat and nth == 2,
++       'fail-probe': is_ffprobe, 'junk-probe': is_ffprobe, 'grow-convert': is_ffmpeg and not concat and not os.path.exists(state + '.grew'),
 +       'grow-join': concat and nth == 2}[mode]
 +if hit and mode.startswith('hold'):
 +    with open(state, 'w') as handle:
@@ -9724,6 +9898,19 @@ index 0000000000000000000000000000000000000000..3bc2e456803d9e961b0e276d37edac46
 +    print('harness: concat refused', file=sys.stderr)
 +    raise SystemExit(1)
 +elif hit and mode == 'silent-concat':
++    raise SystemExit(0)
++elif hit and mode in ('droplast-concat', 'droplast-join'):
++    list_path = args[args.index('-i') + 1]
++    lines = open(list_path).read().splitlines()
++    shortened = list_path + '.droplast'
++    with open(shortened, 'w') as handle:
++        handle.write('\n'.join(lines[:-1]) + '\n')
++    args[args.index('-i') + 1] = shortened
++elif hit and mode == 'fail-probe':
++    print('harness: ffprobe refused', file=sys.stderr)
++    raise SystemExit(1)
++elif hit and mode == 'junk-probe':
++    print('not a packet count at all')
 +    raise SystemExit(0)
 +elif hit and mode in ('head-concat', 'head-join'):
 +    listed = open(args[args.index('-i') + 1]).read().splitlines()[0].split("'")[1]
@@ -11141,29 +11328,43 @@ index 0000000000000000000000000000000000000000..5ff5c62f947ca0aba0872f5934717bef
 +    measured('stock_tts_edge_403_then_ok', handshakes=boundary.handshakes)
 diff --git a/tools/native_audio_pipeline.py b/tools/native_audio_pipeline.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..feed37bf6dc42c328e4958a5347735d48e677fd2
+index 0000000000000000000000000000000000000000..f7f137b9ce59874dbadf69095f307ed60f57e502
 --- /dev/null
 +++ b/tools/native_audio_pipeline.py
-@@ -0,0 +1,167 @@
+@@ -0,0 +1,205 @@
 +"""Native audio pipeline: the usable multi-chunk JOIN of a native (Relay) speech call.
 +
 +A multi-chunk call pays for (or runs) every chunk before it can join them, so the join is proved BEFORE the first chunk
-+request, engine child or Edge handshake: :func:`native_concat_preflight` runs the real ffmpeg on a tiny synthetic file
-+(a 0.1 s WAV -> MP3, then a concat of that MP3 with itself) under the qualified network-deny launcher, and also checks that the
-+caller's output directory can be named in a concat list at all. Presence, ``-version`` or a WAV -> MP3 conversion alone is not
-+concat capability. The probe is neither a provider send nor an engine launch (``probe=True``: it never marks a local launch and
-+needs no ``before_send``), so a refusal is a truthful ``unsent``.
++request, engine child or Edge handshake: :func:`native_concat_preflight` runs the real ffmpeg on a tiny synthetic file (a 0.1 s
++WAV -> MP3, then a concat of that MP3 with itself) under the qualified network-deny launcher, COUNTS the compressed audio packets
++of the input and of the join with the real ffprobe (the same launcher), and also checks that the caller's output directory can be
++named in a concat list at all. Presence, ``-version`` or a WAV -> MP3 conversion alone is not concat capability. The probe is
++neither a provider send nor an engine launch (``probe=True``: it never marks a local launch and needs no ``before_send``), so a
++refusal is a truthful ``unsent``.
++
++**Completeness is input-derived, not a byte budget.** A stream-copy concat drops each later input's ID3 tag and Info/Xing frame; how
++many bytes that is depends on the bitrate, sample rate, tag size and whether an Info frame exists (measured here, 24 kHz/48 kbps
++dropped 236 bytes per extra input, 44.1 kHz/192 kbps stereo 670 and 48 kHz/320 kbps stereo 1004, a 3000-character tag thousands,
++and an input without an Info frame makes the output LARGER), so no fixed allowance is correct. The audio itself is never dropped:
++for every measured format the joined file held exactly the sum of its inputs' compressed audio packets (ffprobe
++``-count_packets``; tags and the Info frame are not packets), which is also what the DTS diagnostics ffmpeg prints at the
++boundaries of inputs that carry an Info frame turned out to be about. A join is accepted only when it is an MP3 AND its packet
++count equals the sum of the inputs' counts, so a truncated join, one that lost only a short final chunk, or a head-only file is
++refused. That makes ffprobe a new prerequisite of the MULTI-chunk native join only (see below).
++
++**Prerequisite and cost.** Native multi-chunk speech needs, besides ffmpeg and a qualified launcher, a usable ``ffprobe`` found on
++``PATH`` like ffmpeg (no install, fetch or fallback to another binary), proven by an actual launcher-wrapped packet count in the
++preflight BEFORE any chunk; missing or broken refuses ``unavailable``/``not_started`` with no paid work. Single-chunk calls (every
++Edge text of 600 code points or fewer) and the stock shared concat never need it.
 +
 +:func:`native_concat` is the real join. It is a launcher-wrapped, Stop-aware, deadline-bounded ``run_native_argv`` child with
 +the exact remaining float deadline (no 300/120 s stock timeout, no ``int()`` rounding, no artificial minimum: once nothing
 +remains no child is started and the call is a ``timeout``). It reads only local files (``-protocol_whitelist file``, ``-nostdin``,
 +a private concat list, no URL, no shell) and stages its output next to the final file under a size watch (the total
-+speech-audio cap ends the child while it runs, not only a check afterwards). The staged file is renamed only after it passes
-+:func:`_complete`: an ID3/frame-sync head AND a size within a small per-extra-input tag allowance of the inputs' sum (real small
-+fixtures measured 236 bytes dropped per extra input; 512 is allowed), so a join that kept only the first input is refused. That
-+is not a byte-equality rule and needs no ffprobe. Stock-off, the shared ``tools.tts_tool_delivery._concat_audio_files`` is
-+unchanged. Neither function retries or falls back. A refusal AFTER the chunks were paid (a vanished joiner, an unusable launcher)
-+is reported by the seam as ``failed``, never ``unavailable``.
++speech-audio cap ends the child while it runs, not only a check afterwards). The staged file is renamed only after
++:func:`_complete`. Stock-off, the shared ``tools.tts_tool_delivery._concat_audio_files`` is unchanged. Neither function retries or
++falls back. A refusal AFTER chunks were paid or a local engine child started (a vanished joiner, an unusable launcher) is reported
++by the seam as ``failed``, never ``unavailable``.
 +
 +Not sandbox proof: the launcher is whatever ``tools.native_local_launcher`` qualified for this host.
 +"""
@@ -11178,8 +11379,8 @@ index 0000000000000000000000000000000000000000..feed37bf6dc42c328e4958a5347735d4
 +
 +from tools import native_send_policy
 +
-+_TAG_ALLOWANCE = 512  # bytes per extra input that a copy-concat may drop (measured 236 on real small fixtures)
-+_GROWTH_SLACK = 1024  # a muxer may add one small header frame
++_PROBE_INPUT = ("-v", "error", "-protocol_whitelist", "file", "-select_streams", "a:0", "-count_packets", "-show_entries",
++                "stream=nb_read_packets", "-of", "csv=p=0")
 +_JOIN_INPUT = ("-nostdin", "-hide_banner", "-loglevel", "error", "-protocol_whitelist", "file", "-f", "concat", "-safe", "0",
 +               "-i")
 +
@@ -11208,16 +11409,31 @@ index 0000000000000000000000000000000000000000..feed37bf6dc42c328e4958a5347735d4
 +    return head[:3] == b"ID3" or head[:1] == b"\xff"
 +
 +
-+def _complete(inputs: list[str], output: str) -> bool:
-+    """A usable join: an MP3 head AND an output that did not lose inputs (size within the tag allowance of their sum)."""
++def _count_packets(ffprobe: str, path: str, policy, cwd: str) -> int:
++    """The number of compressed audio packets of ``path`` as the real ffprobe counts them, as a launcher-wrapped, Stop-aware,
++    exactly-bounded child (never a launch: ``probe=True``). Anything but one positive integer is a refusal of the tool."""
++    from tools.tts_command_provider import run_native_argv
++    from tools.tts_tool_local import _ENGINE_STREAM_BYTES, _native_child_env, _remaining
++    try:
++        reply = run_native_argv([ffprobe, *_PROBE_INPUT, path], timeout=_remaining(policy), env=_native_child_env(), cwd=cwd,
++                                max_stream_bytes=_ENGINE_STREAM_BYTES, probe=True).stdout.strip()
++        count = int(reply)
++    except subprocess.TimeoutExpired:
++        raise native_send_policy.refuse("timeout") from None
++    except (subprocess.CalledProcessError, OSError, ValueError):
++        raise _unsupported() from None
++    if count <= 0:
++        raise _unsupported()
++    return count
++
++
++def _complete(ffprobe: str, inputs: list[str], output: str, policy, cwd: str) -> bool:
++    """A usable join: an MP3 head AND exactly the compressed audio packets of the inputs (tags and the Info/Xing frame are not
++    packets). Input-derived and format-independent, so it neither rejects a legitimate bitrate/sample-rate/tag/Info variation nor
++    admits a join that lost audio, however short the lost chunk."""
 +    if not _is_mp3(output):
 +        return False
-+    try:
-+        total = sum(os.path.getsize(path) for path in inputs)
-+        size = os.path.getsize(output)
-+    except OSError:
-+        return False
-+    return total - _TAG_ALLOWANCE * (len(inputs) - 1) <= size <= total + _GROWTH_SLACK
++    return _count_packets(ffprobe, output, policy, cwd) == sum(_count_packets(ffprobe, path, policy, cwd) for path in inputs)
 +
 +
 +def _run_join(ffmpeg: str, list_path: str, output: str, policy, cwd: str, probe: bool, limit: Optional[int] = None) -> None:
@@ -11254,6 +11470,13 @@ index 0000000000000000000000000000000000000000..feed37bf6dc42c328e4958a5347735d4
 +    return policy, ffmpeg
 +
 +
++def _packet_tool() -> str:
++    ffprobe = shutil.which("ffprobe")
++    if ffprobe is None or not os.access(ffprobe, os.X_OK):
++        raise _unsupported()
++    return ffprobe
++
++
 +def native_concat_preflight(output_dir: Optional[str] = None) -> None:
 +    """Native call only, BEFORE any chunk request, engine child or Edge handshake of a multi-chunk call: prove with the real
 +    ffmpeg, under the qualified launcher, that a synthetic MP3 can be converted AND concatenated into a complete output, and
@@ -11263,6 +11486,7 @@ index 0000000000000000000000000000000000000000..feed37bf6dc42c328e4958a5347735d4
 +    from tools.native_local_launcher import qualified_prefix
 +    from tools.tts_tool_local import _native_convert, _write_probe_wav
 +    policy, ffmpeg = _tool()
++    ffprobe = _packet_tool()
 +    if qualified_prefix() is None:
 +        raise _unsupported()
 +    if output_dir is not None:
@@ -11280,7 +11504,7 @@ index 0000000000000000000000000000000000000000..feed37bf6dc42c328e4958a5347735d4
 +            raise native_send_policy.refuse("timeout") from None
 +        except (subprocess.CalledProcessError, OSError):
 +            raise _unsupported() from None
-+        if not _complete([mp3, mp3], joined):
++        if not _complete(ffprobe, [mp3, mp3], joined, policy, work):
 +            raise _unsupported()
 +    finally:
 +        shutil.rmtree(work, ignore_errors=True)
@@ -11294,13 +11518,14 @@ index 0000000000000000000000000000000000000000..feed37bf6dc42c328e4958a5347735d4
 +    reports ``failed``: ``RuntimeError`` here, or a policy refusal that is not ``unavailable`` once chunks were paid); it is
 +    never retried."""
 +    policy, ffmpeg = _tool()
++    ffprobe = _packet_tool()
 +    staged = os.path.join(os.path.dirname(output), f".{os.path.basename(output)}.{uuid.uuid4().hex}.joining.mp3")
 +    if track is not None:
 +        track(staged)
 +    work = tempfile.mkdtemp(prefix="hermes-native-concat-")
 +    try:
 +        _join_files(ffmpeg, paths, staged, policy, work, probe=False, limit=limit)
-+        if not _complete(paths, staged):
++        if not _complete(ffprobe, paths, staged, policy, work):
 +            raise RuntimeError("native join produced no usable audio")
 +        os.replace(staged, output)
 +    except (subprocess.CalledProcessError, OSError):

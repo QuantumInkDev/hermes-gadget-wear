@@ -146,7 +146,7 @@ hook on the injected httpx client (it runs before httpx's eager read), xAI/Eleve
 read from the raw urllib3 body 64 KiB at a time, undecoded, in a Requests RESPONSE HOOK: Requests dispatches it before its own
 redirect step, which would otherwise read and decode a 3xx-with-`Location` body whole even with `allow_redirects=False`. An advertised `Content-Length` over the cap is refused with zero
 body reads; an absent or false length stops at the crossing; the response is closed on every exit. The same hook now guards the
-OpenAI/ElevenLabs TTS clients (the chunk audio cap), the plugin transport and Mistral, and the REST TTS post checks the encoding.
+OpenAI/ElevenLabs TTS clients (the chunk audio cap), the plugin transport and Mistral, and the REST TTS response hook checks the encoding.
 The bound is chunk-granular (kept data is at most the cap plus the one underlying read that crosses it): it is **not** an
 allocation-hard heap limit, and a declared length is only an early-rejection aid. Stop and the deadline are checked between
 reads (no callback, no send); a vendor read that is already blocked in the stream or socket is NOT preempted - it ends when the
@@ -163,10 +163,19 @@ tool, or an unqualified host, is `unavailable`/`not_started` with zero chunk req
 `before_send` calls and nothing left behind. The probe is not a send or an engine launch. The real join is the same wrapped,
 Stop-aware child bounded by the exact remaining float deadline (no artificial minimum: once nothing remains no child starts and
 the call is a `timeout`), local-file protocols only, a staged output under a size watch that ends the child, renamed only after it
-is checked to be a usable join (MP3 head and a size within a small per-extra-input tag allowance of the inputs' sum, so a join
-that kept only the first input is refused); the caller's output directory is checked for eligibility before any payment, and a
-join problem after payment is `failed`, never `unavailable`. A multi-chunk native call therefore needs a qualified launcher (on this release: Darwin 27.0.0 arm64);
-elsewhere it is unavailable, which is the stated cost of not joining outside the launcher. *Managed whisper.cpp.* A non-WAV
+is checked to be a usable join: an MP3 head AND exactly the compressed audio packets of its inputs, counted by the real ffprobe
+under the same launcher (`-count_packets`; ID3 tags and the Info/Xing frame are not packets). The packet count is input-derived
+and format-independent: a stream-copy concat drops each later input's tag and Info frame, a byte amount that varies with bitrate,
+sample rate, tag size and whether an Info frame exists (measured 236 B at 24 kHz/48 kbps, 670 B at 44.1 kHz/192 kbps stereo, 1004 B
+at 48 kHz/320 kbps stereo, thousands with a large tag, and negative without an Info frame), so no fixed byte allowance is right, while
+every measured format kept every audio packet (the DTS diagnostics ffmpeg prints at the boundaries of inputs that carry an Info
+frame did not coincide with any lost packet). A join that kept only the first input or lost only a short final chunk is refused.
+The caller's output directory is checked for eligibility before any payment, and a join problem after payment, or after a local
+engine chunk was produced, is `failed`, never `unavailable`. A multi-chunk native call therefore needs a qualified launcher (on this
+release: Darwin 27.0.0 arm64) AND a usable `ffprobe` on `PATH` (a new native-host prerequisite of the multi-chunk join only,
+proved by an actual launcher-wrapped packet count BEFORE any chunk; missing or broken is `unavailable`/`not_started`); single-chunk
+speech (every Edge text of 600 code points or fewer) and the stock shared concat never need it. Elsewhere multi-chunk is unavailable,
+which is the stated cost of not joining outside the launcher. *Managed whisper.cpp.* A non-WAV
 input is normalized by the real ffmpeg under the same launcher with Stop, the exact deadline, capped streams and a capped,
 checked WAV (missing converter: unavailable; a converter that ran and failed or left no WAV: `failed`); already-native formats need
 no converter, the model/language rules, cached-hash verification and the no-download/no-PATH-whisper rules are unchanged.
