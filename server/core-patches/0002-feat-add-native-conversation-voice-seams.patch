@@ -45,7 +45,7 @@ index 14703329aef89b5516dc67f6379d3f284627d99c..7741eb05aacf82bdf9b232d4e2c9b06e
          return await read_native_admissions(self, actor, ref, adapter=adapter, source=source,
 diff --git a/gateway/session_native_voice.py b/gateway/session_native_voice.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..ad55ae0a0381fe1e986754c95520a65e8ddcfb63
+index 0000000000000000000000000000000000000000..ec23a3b0423825a87237af2b409ca4460aed9243
 --- /dev/null
 +++ b/gateway/session_native_voice.py
 @@ -0,0 +1,112 @@
@@ -89,7 +89,7 @@ index 0000000000000000000000000000000000000000..ad55ae0a0381fe1e986754c95520a65e
 +MAX_SPEECH_UTF16_UNITS = 4096
 +MAX_DEADLINE_S = 600.0
 +STT_REQUEST_TIMEOUT_S = 60.0  # POLICY: caps the configured stt.openai.timeout (default 60 s)
-+MAX_STT_RESPONSE_BYTES = 1024 * 1024  # a transcript is <= 16 KiB; the provider's JSON answer is read whole, so bounded
++MAX_STT_RESPONSE_BYTES = 1024 * 1024  # a transcript is <= 16 KiB. ONLY the Mistral STT response hook enforces this; the OpenAI-SDK and REST (xAI, ElevenLabs) STT answers are not yet bounded here
 +TTS_REQUEST_TIMEOUT_S = 60.0  # NEW POLICY: the current unconfigured ElevenLabs client has no such bound
 +MAX_CHUNK_AUDIO_BYTES = 16 * 1024 * 1024
 +MAX_SPEECH_AUDIO_BYTES = 32 * 1024 * 1024
@@ -763,10 +763,10 @@ index 0000000000000000000000000000000000000000..8f7611fb4e09fb1c83ba0ecd21c37d2e
 +    return _make(configured_state, None, None, provider)
 diff --git a/gateway/session_native_voice_tts.py b/gateway/session_native_voice_tts.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..d6c884428cc7394d79382edec173939f8a4da4ad
+index 0000000000000000000000000000000000000000..771bd16be35283e47e24afbe927dcd64a0a313c9
 --- /dev/null
 +++ b/gateway/session_native_voice_tts.py
-@@ -0,0 +1,248 @@
+@@ -0,0 +1,249 @@
 +"""Configured one-request-per-chunk text-to-speech for the native voice seam (``session_native_voice``).
 +
 +The profile's own TTS configuration (provider, voice, model) is read at call time through the stock
@@ -786,11 +786,12 @@ index 0000000000000000000000000000000000000000..d6c884428cc7394d79382edec173939f
 +from gateway import session_native_voice_gate as gate
 +from tools import native_send_policy
 +
-+# Voices whose transport the seam can hold to one request per chunk. Others - MiniMax, xAI, Gemini, local
-+# engines, command and plugin providers - are refused UNSENT, never replaced by another provider.
-+TTS_PROVIDERS = frozenset({'edge', 'elevenlabs', 'openai', 'deepinfra', 'mistral'})
-+# Every covered engine sends through a client the seam hooks (httpx for the SDKs, the aiohttp connector for
-+# Edge): its identity is proven before the call and exactly one gated send is required after it.
++# Voices whose transport the seam can hold to one request per chunk. Others - local engines, command and plugin
++# providers - are refused UNSENT, never replaced by another provider.
++TTS_PROVIDERS = frozenset({'edge', 'elevenlabs', 'openai', 'deepinfra', 'mistral', 'xai', 'minimax', 'gemini'})
++# Every covered SDK engine sends through a client the seam hooks (httpx for the SDKs, the aiohttp connector for
++# Edge): its identity is proven before the call and exactly one gated send is required after it. xAI, MiniMax and
++# Gemini have no SDK: their one ``requests.post`` (``tts_tool_providers._post_json``) is preceded immediately by the gate.
 +HOOKED_PROVIDERS = TTS_PROVIDERS
 +EDGE_CHUNK_CODE_POINTS = 600  # one Edge websocket message set per chunk (the library splits at 4,096 escaped bytes)
 +MAX_NORMALIZED_CODE_POINTS = 2 * 4096
@@ -1519,6 +1520,247 @@ index 0000000000000000000000000000000000000000..2e0952a763ad0ffaa3606508396023af
 +                           timeout=60, stdin=subprocess.DEVNULL, check=False)
 +    h, m, sec = re.search(r'Duration: (\d+):(\d+):([\d.]+)', probe.stderr).groups()
 +    return int(h) * 3600 + int(m) * 60 + float(sec)
+diff --git a/tests/gateway/rest_voice_support.py b/tests/gateway/rest_voice_support.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..495f4b9ea3ef79dc86fb542862641d71af0c8a33
+--- /dev/null
++++ b/tests/gateway/rest_voice_support.py
+@@ -0,0 +1,235 @@
++"""Synthetic REST transports for the native REST TTS / xAI OAuth tests.
++
++Only network bytes are replaced, and only at the lowest layer that still lets the real library run:
++
++* ``RestWire`` replaces the ``requests`` transport adapter (what would open the socket). The REAL ``requests``
++  session builds the request, applies ``allow_redirects``/``timeout``/headers, follows (or not) redirects and streams
++  the body through a real ``urllib3`` response, so ``iter_content``, ``raise_for_status``, content-length enforcement and
++  content decoding are the library's own.
++* ``OAuthWire`` replaces ``httpx.HTTPTransport.handle_request``. The REAL stock xAI discovery, refresh POST, credential
++  pool, token store and JWT handling run above it.
++
++A count recorded here is the number of requests that would have left the process.
++"""
++from __future__ import annotations
++
++import asyncio
++import base64
++import gzip
++import io
++import json
++import threading
++import time
++from contextlib import contextmanager
++from urllib.parse import parse_qs
++
++import httpx
++
++from hermes_constants import get_hermes_home
++
++
++class RestWire:
++    """Scripted ``requests`` provider. Steps: ``('audio', bytes)``, ``('json', obj)``, ``('raw', status, headers, body)``,
++    ``('status', code[, body])``, ``('redirect', url)``, ``('raise', exc)``. ``declared`` overrides Content-Length (a
++    truncated or lying body); ``hold`` stalls a request after it was recorded until the test releases it."""
++
++    def __init__(self, script=None, tap=None, hold=None):
++        self.script = list(script or [])
++        self.requests = []
++        self.tap = tap
++        self.hold = hold
++        self.entered = threading.Event()
++
++    @property
++    def count(self):
++        return len(self.requests)
++
++    def adapter(self):
++        import requests
++        from urllib3.response import HTTPResponse
++        wire = self
++
++        class Adapter(requests.adapters.HTTPAdapter):
++            def send(self, request, **kwargs):
++                wire.requests.append((request, kwargs))
++                wire.entered.set()
++                if wire.tap is not None:
++                    wire.tap(request)
++                if wire.hold is not None:
++                    assert wire.hold.wait(30), 'the test never released the stalled provider'
++                step = wire.script.pop(0) if wire.script else ('audio', b'ID3synthetic-audio')
++                kind = step[0]
++                if kind == 'raise':
++                    raise step[1]
++                status, headers, body, declared = wire.shape(step)
++                headers = dict(headers)
++                if declared is not False:  # False: no Content-Length at all (a body of unknown length)
++                    headers['Content-Length'] = str(len(body) if declared is None else declared)
++                raw = HTTPResponse(body=io.BytesIO(body), headers=headers, status=status, preload_content=False,
++                                   decode_content=True, request_url=request.url, enforce_content_length=True)
++                return self.build_response(request, raw)
++
++            def close(self):
++                pass
++        return Adapter()
++
++    @staticmethod
++    def shape(step):
++        kind = step[0]
++        declared = None
++        if kind == 'audio':
++            return 200, {'Content-Type': 'audio/mpeg'}, step[1], declared
++        if kind == 'json':
++            return 200, {'Content-Type': 'application/json'}, json.dumps(step[1]).encode(), declared
++        if kind == 'status':
++            return step[1], {'Content-Type': 'text/plain'}, step[2] if len(step) > 2 else b'synthetic provider failure', declared
++        if kind == 'redirect':
++            return 307, {'Location': step[1]}, b'', declared
++        assert kind == 'raw', kind
++        status, headers, body = step[1:4]
++        return status, headers, body, step[4] if len(step) > 4 else None
++
++    def body_json(self, index=0):
++        return json.loads(self.requests[index][0].body)
++
++    def timeouts(self):
++        return [kwargs.get('timeout') for _, kwargs in self.requests]
++
++
++@contextmanager
++def rest_wire(monkeypatch, wire):
++    import requests
++    adapter = wire.adapter()
++    monkeypatch.setattr(requests.Session, 'get_adapter', lambda self, url: adapter)
++    yield wire
++
++
++def pcm_bytes(seconds=1.0, rate=24000):
++    """Real 24 kHz mono 16-bit little-endian PCM (a sine), the Gemini TTS answer format."""
++    import math
++    import struct
++    return b''.join(struct.pack('<h', int(6000 * math.sin(2 * math.pi * 440 * i / rate))) for i in range(int(seconds * rate)))
++
++
++def gemini_answer(pcm):
++    return ('json', {'candidates': [{'content': {'parts': [{'inlineData': {'mimeType': 'audio/L16;rate=24000',
++                                                                           'data': base64.b64encode(pcm).decode()}}]}}]})
++
++
++def minimax_answer(audio):
++    return ('json', {'base_resp': {'status_code': 0, 'status_msg': 'success'}, 'data': {'audio': audio.hex()}})
++
++
++def gzipped(body):
++    return gzip.compress(body)
++
++
++# --- xAI OAuth: synthetic auth data and a synthetic OAuth authority below the real httpx client ---------------------
++
++def jwt(exp, tag='t'):
++    """A JWT-shaped bearer with an ``exp`` claim (None = no claim)."""
++    def part(data):
++        return base64.urlsafe_b64encode(json.dumps(data).encode()).rstrip(b'=').decode()
++    claims = {'tag': tag} if exp is None else {'exp': exp, 'tag': tag}
++    return f'{part({"alg": "none"})}.{part(claims)}.synthetic-signature'
++
++
++def write_oauth_store(access, refresh='rt-singleton', pool=()):
++    """The profile's real ``auth.json``: the xAI OAuth singleton and/or pool-only multi-account rows."""
++    store = {'version': 1, 'providers': {}}
++    if access is not None:
++        store['providers']['xai-oauth'] = {'tokens': {'access_token': access, 'refresh_token': refresh},
++                                           'auth_mode': 'oauth_device_code'}
++    if pool:
++        store['credential_pool'] = {'xai-oauth': [
++            {'id': ident, 'label': ident, 'auth_type': 'oauth', 'priority': index, 'source': 'manual:synthetic',
++             'access_token': token, 'refresh_token': refresh_token}
++            for index, (ident, token, refresh_token) in enumerate(pool)]}
++    (get_hermes_home() / 'auth.json').write_text(json.dumps(store))
++
++
++def read_oauth_store():
++    return json.loads((get_hermes_home() / 'auth.json').read_text())
++
++
++class OAuthWire:
++    """Synthetic xAI OAuth authority. ``token_script`` steps: ``('ok', {access_token, refresh_token})``,
++    ``('status', n)``, ``('redirect', url)``, ``('badjson',)``, ``('raise', exc)``. ``hold`` stalls the token POST."""
++
++    def __init__(self, token_script=None, hold=None, events=None):
++        self.token_script = list(token_script or [])
++        self.requests = []
++        self.hold = hold
++        self.events = events
++        self.entered = threading.Event()
++
++    @property
++    def posts(self):
++        return [r for r in self.requests if r.method == 'POST']
++
++    def refresh_tokens_sent(self):
++        return [parse_qs(r.content.decode())['refresh_token'][0] for r in self.posts]
++
++    def __call__(self, request):
++        self.requests.append(request)
++        if self.events is not None:
++            self.events.append('oauth-discovery' if request.method == 'GET' else 'oauth-refresh')
++        if request.method == 'GET':
++            return httpx.Response(200, request=request, json={'authorization_endpoint': 'https://auth.x.ai/oauth2/authorize',
++                                                              'token_endpoint': 'https://auth.x.ai/oauth2/token'})
++        self.entered.set()
++        if self.hold is not None:
++            assert self.hold.wait(30), 'the test never released the stalled OAuth authority'
++        kind, *rest = self.token_script.pop(0) if self.token_script else ('ok', {})
++        if kind == 'raise':
++            raise rest[0]
++        if kind == 'status':
++            return httpx.Response(rest[0], request=request, text='synthetic oauth failure')
++        if kind == 'redirect':
++            return httpx.Response(307, request=request, headers={'location': rest[0]})
++        if kind == 'badjson':
++            return httpx.Response(200, request=request, text='<html>not json</html>')
++        body = {'access_token': jwt(time.time() + 3 * 3600, 'refreshed'), 'refresh_token': 'rt-rotated',
++                'expires_in': 10800, **rest[0]}
++        return httpx.Response(200, request=request, json=body)
++
++
++@contextmanager
++def oauth_wire(monkeypatch, wire):
++    monkeypatch.setattr(httpx.HTTPTransport, 'handle_request', lambda self, request: wire(request))
++    yield wire
++
++
++class EventDeadline:
++    """An event-armed call deadline for the seam's bounded wait: it expires when the test calls :meth:`fire`, after the
++    test saw the worker reach the point it wants to fence, not after a wall-clock window that a loaded machine could
++    overrun before the worker is ready. Only the gate module's ``asyncio.wait_for`` is replaced; everything else it
++    uses of ``asyncio`` is the real module."""
++
++    def __init__(self, monkeypatch):
++        from gateway import session_native_voice_gate as gate
++        self.fired = asyncio.Event()
++        outer = self
++
++        class Shim:
++            def __getattr__(self, name):
++                return getattr(asyncio, name)
++
++            async def wait_for(self, awaitable, timeout):
++                work = asyncio.ensure_future(awaitable)
++                expiry = asyncio.ensure_future(outer.fired.wait())
++                try:
++                    done, _ = await asyncio.wait({work, expiry}, return_when=asyncio.FIRST_COMPLETED)
++                except asyncio.CancelledError:
++                    work.cancel()
++                    raise
++                finally:
++                    expiry.cancel()
++                if work in done:
++                    return work.result()
++                work.cancel()
++                raise TimeoutError
++        monkeypatch.setattr(gate, 'asyncio', Shim())
++
++    def fire(self):
++        self.fired.set()
 diff --git a/tests/gateway/test_native_voice_display.py b/tests/gateway/test_native_voice_display.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..885ebcba74591c415366feb8d6b2db5916538161
@@ -2162,6 +2404,115 @@ index 0000000000000000000000000000000000000000..62c2d0a07f4d900f3db24f5c9abdbfaf
 +    assert (result.state, result.transcript, result.source, result.provider) == (
 +        'transcribed', 'local words', 'local_fallback', 'failed_after_send')
 +    assert wire.count == 1 and cb.before_send_calls == 1 and len(fallback) == 1
+diff --git a/tests/gateway/test_native_voice_exception_entry_tts.py b/tests/gateway/test_native_voice_exception_entry_tts.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..f3dc572e8128176d2e66427bab6f30d50dff4a6b
+--- /dev/null
++++ b/tests/gateway/test_native_voice_exception_entry_tts.py
+@@ -0,0 +1,103 @@
++"""Native voice seam: direct OpenAI / DeepInfra TTS that RAISES after entering the provider invocation.
++
++Carried V1 minor m2. A labelled stand-in OpenAI client passes the injected-client identity proof (its ``_client`` IS the
++injected httpx client), then sends once through ITS OWN client over the synthetic transport, receives the provider's
++answer and raises. The consumer has no durable in-flight record (``before_send`` never ran), so the result is
++``failed`` with ``provider='unknown'`` and there is no fallback. These are exception-entry controls; they are distinct
++from the real-SDK proofs in ``test_native_voice_sdk_boundaries`` and from the real-client control below, where the same
++failure through the gated client is a truthful ``failed_after_send``.
++"""
++import os
++import types
++
++import httpx
++import openai
++import pytest
++
++from gateway.session_native_voice import synthesize_native_once
++from hermes_constants import get_hermes_home
++from tests.gateway import native_voice_support as support
++
++KEY = 'sk-synthetic-exception-entry'
++
++
++@pytest.fixture
++def out(tmp_path):
++    path = tmp_path / 'caller-output'
++    path.mkdir()
++    return str(path)
++
++
++async def speak(out, callbacks, text='Hello there, friend.'):
++    return await synthesize_native_once(text, output_dir=out, authorize=callbacks.authorize,
++                                        before_send=callbacks.before_send, deadline_s=60)
++
++
++def profile(provider):
++    if provider == 'openai':
++        config = {'tts': {'provider': 'openai', 'openai': {'api_key': KEY, 'model': 'gpt-4o-mini-tts', 'voice': 'nova'}}}
++    else:
++        config = {'tts': {'provider': 'deepinfra', 'deepinfra': {'model': 'hexgrad/Kokoro-82M', 'voice': 'af_bella'}}}
++        (get_hermes_home() / '.env').write_text('DEEPINFRA_API_KEY=di-synthetic-key\n')
++    support.write_config(get_hermes_home(), config)
++
++
++class DivergesThenRaises(openai.OpenAI):
++    """Labelled stand-in: ``_client`` IS the injected client (the identity proof PASSES), but the speech request goes out
++    through a client of its own, is answered, and the stand-in then raises."""
++
++    def __init__(self, *args, http_client=None, **kwargs):
++        super().__init__(*args, http_client=http_client, **kwargs)
++        own = httpx.Client()
++
++        class Streaming:
++            def create(self, **kw):
++                try:
++                    response = own.post('https://api.openai.com/v1/audio/speech', content=b'x')
++                    response.raise_for_status()
++                finally:
++                    own.close()
++                raise RuntimeError('stand-in failed after its own send')
++        self.audio = types.SimpleNamespace(speech=types.SimpleNamespace(with_streaming_response=Streaming(), create=Streaming().create))
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('provider', ['openai', 'deepinfra'])
++async def test_a_diverging_client_that_raises_after_entry_is_failed_unknown_with_no_callback(monkeypatch, out, provider):
++    profile(provider)
++    monkeypatch.setattr('tools.tts_tool._import_openai_client', lambda: DivergesThenRaises)
++    cb = support.Callbacks()
++    wire = support.Wire([('status', 500)] * 3)
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.path, result.provider) == ('failed', None, 'unknown')
++    assert wire.count == 1 and cb.before_send_calls == 0 and os.listdir(out) == []  # request 1, callback 0
++    assert support.SECRET not in repr(result) and KEY not in repr(result)
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('provider', ['openai', 'deepinfra'])
++async def test_the_same_failure_through_the_gated_client_is_a_truthful_failed_after_send(monkeypatch, out, provider):
++    profile(provider)  # the REAL OpenAI SDK and httpx client: the gate saw the send, so it is not "unknown"
++    cb = support.Callbacks()
++    wire = support.Wire([('status', 500)] * 3)
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.path, result.provider) == ('failed', None, 'failed_after_send')
++    assert wire.count == 1 and cb.before_send_calls == 1 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('provider', ['openai', 'deepinfra'])
++async def test_a_pre_entry_failure_stays_unsent_and_a_policy_refusal_is_not_unknown(monkeypatch, out, provider):
++    profile(provider)
++    cb = support.Callbacks(refuse_before_send=True)  # a refusal AFTER the identity proof: nothing left, nothing unknown
++    wire = support.Wire([('ok', {'audio': b'ID3x'})])
++    with support.provider_wire(monkeypatch, wire):
++        refused = await speak(out, cb)
++    assert (refused.state, refused.provider, wire.count) == ('refused', 'not_started', 0)
++    support.write_config(get_hermes_home(), {'tts': {'provider': provider}})
++    (get_hermes_home() / '.env').write_text('')
++    with support.provider_wire(monkeypatch, wire):
++        missing = await speak(out, support.Callbacks())
++    assert (missing.state, missing.provider, wire.count) == ('unavailable', 'not_started', 0)
 diff --git a/tests/gateway/test_native_voice_existing_display.py b/tests/gateway/test_native_voice_existing_display.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..5c40d2d3d8bd567bb2cc85ec15628e5aaa9da4b3
@@ -3473,6 +3824,704 @@ index 0000000000000000000000000000000000000000..635a7f102b572e3a0702dde54c1ba276
 +        mistral.tts_profile()
 +        await speak(out, support.Callbacks())
 +    assert wire.count == 2 and installs == []
+diff --git a/tests/gateway/test_native_voice_mistral_gate_and_logs.py b/tests/gateway/test_native_voice_mistral_gate_and_logs.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..67b18551d8127d3e3690fd06595d55727501ed7b
+--- /dev/null
++++ b/tests/gateway/test_native_voice_mistral_gate_and_logs.py
+@@ -0,0 +1,103 @@
++"""Native voice seam, Mistral: carried review obligations M10 (consumer gate refusal) and M3 (provider log text).
++
++The REAL pinned ``mistralai`` SDK over a synthetic transport. M10: a real consumer ``authorize`` / ``before_send``
++refusal leaves the wire untouched, is a truthful ``not_started`` and never runs the STT fallback. M3: the SDK's
++deprecation WARNING carries provider-controlled text and must not be logged during a native call, while the same call
++outside a native call still logs it.
++"""
++import json
++import logging
++import os
++
++import pytest
++
++from tests.gateway import mistral_voice_support as mistral
++from tests.gateway import native_voice_support as support
++from tests.gateway.mistral_voice_support import hear, speak
++
++
++@pytest.fixture
++def clip(tmp_path):
++    return support.write_wav(tmp_path / 'clip.wav')
++
++
++@pytest.fixture
++def out(tmp_path):
++    path = tmp_path / 'caller-output'
++    path.mkdir()
++    return str(path)
++
++
++@pytest.fixture
++def sdk(monkeypatch):
++    return mistral.observe_sdk(monkeypatch)
++
++
++@pytest.fixture
++def local_fallback(monkeypatch):
++    calls = []
++    monkeypatch.setattr('tools.transcription_tools._HAS_FASTER_WHISPER', True)
++    monkeypatch.setattr('tools.transcription_tools._transcribe_local',
++                        lambda path, model, **kw: calls.append(path) or {'success': True, 'transcript': 'local words'})
++    return calls
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('refusal', [dict(refuse_before_send=True), dict(refuse_authorize_at=2), dict(refuse_authorize_at=1)],
++                         ids=['before_send', 'authorize-at-the-gate', 'authorize-first'])
++async def test_a_consumer_gate_refusal_sends_nothing_and_never_falls_back(monkeypatch, clip, out, sdk, local_fallback, refusal):
++    mistral.stt_profile()
++    cb = support.Callbacks(**refusal)
++    wire = mistral.MistralWire([('ok', {})])
++    with support.provider_wire(monkeypatch, wire):
++        heard = await hear(clip, cb)
++        mistral.tts_profile()
++        cb_tts = support.Callbacks(**refusal)
++        spoken = await speak(out, cb_tts)
++    assert (heard.state, heard.transcript, heard.source, heard.provider) == ('refused', None, None, 'not_started')
++    assert (spoken.state, spoken.path, spoken.provider) == ('refused', None, 'not_started')
++    assert wire.count == 0 and local_fallback == [] and os.listdir(out) == []  # wire 0, no STT fallback, no file
++    assert support.SECRET not in repr(heard) + repr(spoken)
++
++
++class DeprecatedWire(mistral.MistralWire):
++    """A Mistral answer that carries the provider's model-deprecation header (provider-controlled text)."""
++
++    def respond(self, request, value):
++        response = super().respond(request, value)
++        response.headers['x-model-deprecation-timestamp'] = 'PROVIDER-TEXT-2099-01-01'
++        return response
++
++
++@pytest.mark.asyncio
++async def test_the_sdk_deprecation_warning_is_not_logged_in_a_native_call_but_stock_still_logs_it(monkeypatch, clip, sdk, caplog):
++    from tools.transcription_tools import transcribe_audio
++    caplog.set_level(logging.DEBUG)
++    mistral.stt_profile()
++    wire = DeprecatedWire([('ok', {'text': 'native words'})])
++    with support.provider_wire(monkeypatch, wire):
++        heard = await hear(clip, support.Callbacks())
++    assert (heard.state, heard.transcript) == ('transcribed', 'native words')
++    assert 'PROVIDER-TEXT-2099' not in caplog.text and not [r for r in caplog.records if r.name.startswith('mistralai')]
++    caplog.clear()
++    wire = DeprecatedWire([('ok', {'text': 'stock words'})])
++    with support.provider_wire(monkeypatch, wire):
++        result = transcribe_audio(clip)
++    assert result['success'] and result['transcript'] == 'stock words'
++    assert [r for r in caplog.records if r.name == 'mistralai.client._hooks.deprecation_warning' and 'PROVIDER-TEXT-2099' in r.getMessage()]
++
++
++@pytest.mark.asyncio
++async def test_native_mistral_requests_ask_for_an_uncompressed_answer_and_stock_requests_do_not(monkeypatch, clip, out, sdk):
++    """M5 proportional hardening: the per-chunk wire bound is not an allocation cap, so no inflating encoding is requested."""
++    from tools.transcription_tools import transcribe_audio
++    mistral.stt_profile()
++    wire = mistral.MistralWire([('ok', {}), ('ok', {'audio': b'ID3x'}), ('ok', {})])
++    with support.provider_wire(monkeypatch, wire):
++        await hear(clip, support.Callbacks())
++        mistral.tts_profile()
++        await speak(out, support.Callbacks())
++        mistral.stt_profile()
++        transcribe_audio(clip)
++    assert wire.requests[2].headers['accept-encoding'] != 'identity'  # the stock call keeps the SDK/httpx default
++    assert wire.requests[0].headers['accept-encoding'] == wire.requests[1].headers['accept-encoding'] == 'identity'
+diff --git a/tests/gateway/test_native_voice_rest_fences.py b/tests/gateway/test_native_voice_rest_fences.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..072f2904434d182a18985a0588245c63fd5d518f
+--- /dev/null
++++ b/tests/gateway/test_native_voice_rest_fences.py
+@@ -0,0 +1,133 @@
++"""Native voice seam, REST TTS: Stop and deadline fences, held gates, stalled providers, no late callback or file.
++
++Deterministic: the loop callback that runs the consumer's ``authorize`` / ``before_send`` is held (or the synthetic
++transport is held) with events, never with sleeps. Same shape as the Mistral fences.
++"""
++import asyncio
++import os
++import threading
++
++import pytest
++
++from tests.gateway import native_voice_support as support
++from tests.gateway import rest_voice_support as rest
++from tests.gateway.mistral_voice_support import HeldGate, speak, watch_worker
++from tests.gateway.test_native_voice_rest_tts import CASES, PROVIDERS
++
++
++@pytest.fixture
++def out(tmp_path):
++    path = tmp_path / 'caller-output'
++    path.mkdir()
++    return str(path)
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('how', ['cancel', 'deadline'])
++@pytest.mark.parametrize('name', PROVIDERS)
++async def test_callbacks_never_run_after_stop_or_the_deadline_while_the_gate_is_held(monkeypatch, out, name, how):
++    from gateway import session_native_voice_tts as tts_module
++    CASES[name]['profile']()
++    finished = watch_worker(monkeypatch, tts_module, '_synthesize')
++    cb = support.Callbacks()
++    wire = rest.RestWire([CASES[name]['ok']])
++    held = HeldGate(monkeypatch)
++    deadline = rest.EventDeadline(monkeypatch)
++    with rest.rest_wire(monkeypatch, wire):
++        if how == 'cancel':
++            task = asyncio.create_task(speak(out, cb))
++            await held.wait_enqueued()
++            task.cancel()
++            with pytest.raises(asyncio.CancelledError):
++                await task
++        else:
++            task = asyncio.create_task(speak(out, cb, deadline_s=30))
++            await held.wait_enqueued()  # the worker is AT the gate: only now does the deadline pass
++            deadline.fire()
++            result = await task
++            assert (result.state, result.provider) == ('timeout', 'not_started')
++        await held.release()
++        assert await asyncio.to_thread(finished.wait, 10)
++    assert cb.authorize_calls == 1 and cb.before_send_calls == 0 and wire.count == 0 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('name', PROVIDERS)
++async def test_a_stalled_provider_ends_only_our_wait_and_the_late_worker_does_nothing(monkeypatch, out, name):
++    from gateway import session_native_voice_tts as tts_module
++    CASES[name]['profile']()
++    finished = watch_worker(monkeypatch, tts_module, '_synthesize')
++    release = threading.Event()
++    cb = support.Callbacks()
++    wire = rest.RestWire([CASES[name]['ok']], hold=release)
++    deadline = rest.EventDeadline(monkeypatch)
++    try:
++        with rest.rest_wire(monkeypatch, wire):
++            task = asyncio.create_task(speak(out, cb, deadline_s=30))
++            assert await asyncio.to_thread(wire.entered.wait, 10)  # the request is on the wire and stalled
++            deadline.fire()
++            spoken = await task
++            calls = (cb.authorize_calls, cb.before_send_calls)
++            release.set()
++            assert await asyncio.to_thread(finished.wait, 10)
++    finally:
++        release.set()
++    assert (spoken.state, spoken.path, spoken.provider, wire.count) == ('timeout', None, 'unknown', 1)
++    assert (cb.authorize_calls, cb.before_send_calls) == calls and os.listdir(out) == []  # a fenced worker leaves no file
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('name', PROVIDERS)
++async def test_stop_while_the_request_is_in_flight_leaves_no_file_and_no_late_callback(monkeypatch, out, name):
++    from gateway import session_native_voice_tts as tts_module
++    CASES[name]['profile']()
++    finished = watch_worker(monkeypatch, tts_module, '_synthesize')
++    release = threading.Event()
++    cb = support.Callbacks()
++    wire = rest.RestWire([CASES[name]['ok']], hold=release)
++    try:
++        with rest.rest_wire(monkeypatch, wire):
++            task = asyncio.create_task(speak(out, cb))
++            assert await asyncio.to_thread(wire.entered.wait, 10)
++            task.cancel()
++            with pytest.raises(asyncio.CancelledError):
++                await task
++            calls = (cb.authorize_calls, cb.before_send_calls)
++            release.set()
++            assert await asyncio.to_thread(finished.wait, 10)
++    finally:
++        release.set()
++    assert wire.count == 1 and calls == (2, 1) and (cb.authorize_calls, cb.before_send_calls) == calls
++    assert os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_stop_between_chunks_sends_no_further_request_and_cleans_up(monkeypatch, out):
++    from gateway import session_native_voice_tts as tts_module
++    CASES['xai']['profile'](max_text_length=60)
++    finished = watch_worker(monkeypatch, tts_module, '_synthesize')
++    first_answered = threading.Event()
++    release = threading.Event()
++    state = {'n': 0}
++
++    def tap(request):
++        state['n'] += 1
++        if state['n'] == 2:  # the second chunk's request is the one that stalls
++            first_answered.set()
++            assert release.wait(30)
++    cb = support.Callbacks()
++    wire = rest.RestWire([('audio', b'ID3one'), ('audio', b'ID3two'), ('audio', b'ID3three')], tap=tap)
++    from tests.gateway.test_native_voice_rest_tts import LONG_TEXT
++    try:
++        with rest.rest_wire(monkeypatch, wire):
++            task = asyncio.create_task(speak(out, cb, text=LONG_TEXT))
++            assert await asyncio.to_thread(first_answered.wait, 10)
++            task.cancel()
++            with pytest.raises(asyncio.CancelledError):
++                await task
++            release.set()
++            assert await asyncio.to_thread(finished.wait, 10)
++    finally:
++        release.set()
++    assert wire.count == 2  # chunk 3 is never sent
++    assert os.listdir(out) == []
+diff --git a/tests/gateway/test_native_voice_rest_tts.py b/tests/gateway/test_native_voice_rest_tts.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..beb341159946bdddbc57bf9e6aa142c1b677de97
+--- /dev/null
++++ b/tests/gateway/test_native_voice_rest_tts.py
+@@ -0,0 +1,444 @@
++"""Native voice seam, REST TTS (xAI, MiniMax, Gemini): real request construction, one gated send per chunk, bounds.
++
++The stock generators (``tools.tts_tool_providers._generate_*``) run unchanged inside the seam; the REAL ``requests``
++session builds and sends every request over a synthetic adapter (``rest_voice_support.RestWire``) and Gemini PCM goes
++through the real ffmpeg. The profile's TTS settings are the real ``config.yaml`` read at call time.
++"""
++import base64
++import logging
++import os
++from pathlib import Path
++
++import pytest
++import requests
++
++from gateway.session_native_voice import speakable_text, synthesize_native_once
++from hermes_constants import get_hermes_home
++from tests.gateway import native_voice_support as support
++from tests.gateway import rest_voice_support as rest
++
++KEY = 'rest-synthetic-key'
++TEXT = 'Hello there, friend.'
++SENTENCES = ('The first sentence is deliberately rather long. ', 'The second sentence is also fairly long here. ',
++             'The third sentence closes out the whole text.')
++LONG_TEXT = ''.join(SENTENCES)
++
++
++def _profile(provider, env_var, **section):
++    from hermes_cli.config import invalidate_env_cache
++    support.write_config(get_hermes_home(), {'tts': {'provider': provider, provider: section}})
++    (get_hermes_home() / '.env').write_text(f'{env_var}={KEY}\n')
++    invalidate_env_cache()
++
++
++def xai_profile(**section):
++    _profile('xai', 'XAI_API_KEY', **section)
++
++
++def minimax_profile(**section):
++    _profile('minimax', 'MINIMAX_API_KEY', **section)
++
++
++def gemini_profile(**section):
++    _profile('gemini', 'GEMINI_API_KEY', **section)
++
++
++CASES = {
++    'xai': dict(profile=xai_profile, ok=('audio', b'ID3xai-audio'), host='api.x.ai', path='/v1/tts',
++                audio=b'ID3xai-audio', bad_body=[('raw', 200, {'Content-Type': 'audio/mpeg'}, b'ID3short', 5000)]),
++    'minimax': dict(profile=minimax_profile, ok=rest.minimax_answer(b'ID3mm-audio'), host='api.minimax.io',
++                    path='/v1/t2a_v2', audio=b'ID3mm-audio',
++                    bad_body=[('raw', 200, {'Content-Type': 'application/json'}, b'{"data":', 5000),
++                              ('raw', 200, {'Content-Type': 'application/json'}, b'{"data": {"audio": "zz-not-hex"}', None),
++                              ('json', {'base_resp': {'status_code': 1004, 'status_msg': 'synthetic'}}),
++                              ('json', {'base_resp': {'status_code': 0}, 'data': {'audio': ''}})]),
++    'gemini': dict(profile=gemini_profile, ok=rest.gemini_answer(rest.pcm_bytes(1.0)),
++                   host='generativelanguage.googleapis.com',
++                   path='/v1beta/models/gemini-2.5-flash-preview-tts:generateContent', audio=None,
++                   bad_body=[('raw', 200, {'Content-Type': 'application/json'}, b'{"candidates":', 5000),
++                             ('json', {'candidates': []}),
++                             ('json', {'candidates': [{'content': {'parts': [{'text': 'no audio here'}]}}]}),
++                             ('json', {'candidates': [{'content': {'parts': [{'inlineData': {'data': ''}}]}}]}),
++                             ('json', {'candidates': [{'content': {'parts': [{'inlineData': {'data': '%%%not-base64'}}]}}]})]),
++}
++PROVIDERS = sorted(CASES)
++
++
++@pytest.fixture
++def out(tmp_path):
++    path = tmp_path / 'caller-output'
++    path.mkdir()
++    return str(path)
++
++
++@pytest.fixture
++def joined(monkeypatch):
++    """Byte-wise join for the multi-chunk concat step."""
++    def concat(paths, output, voice_compatible=False):
++        with open(output, 'wb') as joined_file:
++            for path in paths:
++                with open(path, 'rb') as part:
++                    joined_file.write(part.read())
++        return output
++    monkeypatch.setattr('tools.tts_tool_delivery._concat_audio_files', concat)
++
++
++async def speak(out, callbacks, text=TEXT, deadline_s=60):
++    return await synthesize_native_once(text, output_dir=out, authorize=callbacks.authorize,
++                                        before_send=callbacks.before_send, deadline_s=deadline_s)
++
++
++def outcome(result):
++    return result.state, result.path, result.provider
++
++
++# --- real request construction ------------------------------------------------------------------------------------
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('name', PROVIDERS)
++async def test_each_provider_sends_once_through_the_gate_with_the_stock_request(monkeypatch, out, name):
++    case = CASES[name]
++    case['profile']()
++    events = []
++    cb = support.Callbacks(events)
++    wire = rest.RestWire([case['ok']], tap=lambda request: events.append('request'))
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.provider, result.source, wire.count) == ('synthesized', 'completed', 'configured', 1)
++    assert events == ['authorize', 'authorize', 'before_send', 'request', 'authorize']  # gate immediately before the wire
++    request, kwargs = wire.requests[0]
++    assert request.url.split('?')[0].endswith(case['path']) and case['host'] in request.url
++    assert kwargs['timeout'] == 60.0
++    assert request.headers['Accept-Encoding'] == 'identity'
++    if case['audio'] is not None:
++        assert Path(result.path).read_bytes() == case['audio']
++    else:
++        assert support.media_seconds(result.path) == pytest.approx(1.0, abs=0.2)  # real PCM through the real ffmpeg
++    assert os.listdir(out) == [os.path.basename(result.path)]
++    assert KEY not in repr(result)
++
++
++@pytest.mark.asyncio
++async def test_xai_carries_the_configured_voice_language_and_every_option(monkeypatch, out):
++    xai_profile(voice_id='ara', language='de', speed=1.2, optimize_streaming_latency=1, text_normalization=True,
++                sample_rate=22050, bit_rate=96000)
++    wire = rest.RestWire([('audio', b'ID3x')])
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks(), text='Hello there [laugh] friend.')
++    assert result.state == 'synthesized'
++    request, _ = wire.requests[0]
++    assert wire.body_json() == {
++        'text': 'Hello there [laugh] friend.', 'voice_id': 'ara', 'language': 'de',
++        'output_format': {'codec': 'mp3', 'sample_rate': 22050, 'bit_rate': 96000},
++        'speed': 1.2, 'optimize_streaming_latency': 1, 'text_normalization': True}  # explicit tag untouched
++    assert request.headers['Authorization'] == f'Bearer {KEY}' and request.headers['User-Agent'].startswith('Hermes-Agent/')
++
++
++@pytest.mark.asyncio
++async def test_minimax_carries_the_configured_model_voice_region_and_group(monkeypatch, out):
++    minimax_profile(model='speech-2.6-hd', voice_id='Narrator_X', speed=1.1, vol=0.9, pitch=2, emotion='calm',
++                    sample_rate=24000, bitrate=64000, group_id='grp-77')
++    wire = rest.RestWire([rest.minimax_answer(b'ID3mm')])
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert result.state == 'synthesized'
++    request, _ = wire.requests[0]
++    assert request.url == 'https://api.minimax.io/v1/t2a_v2?GroupId=grp-77'
++    assert wire.body_json() == {
++        'model': 'speech-2.6-hd', 'text': TEXT,
++        'voice_setting': {'voice_id': 'Narrator_X', 'speed': 1.1, 'vol': 0.9, 'pitch': 2, 'emotion': 'calm'},
++        'audio_setting': {'sample_rate': 24000, 'bitrate': 64000, 'format': 'mp3', 'channel': 1}}
++    assert request.headers['Authorization'] == f'Bearer {KEY}'
++    # the CN region binds the CN endpoint and its own credential atomically
++    from hermes_cli.config import invalidate_env_cache
++    support.write_config(get_hermes_home(), {'tts': {'provider': 'minimax', 'minimax': {'region': 'cn'}}})
++    (get_hermes_home() / '.env').write_text('MINIMAX_CN_API_KEY=cn-key\n')
++    invalidate_env_cache()
++    wire = rest.RestWire([rest.minimax_answer(b'ID3cn')])
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert result.state == 'synthesized' and wire.requests[0][0].url.startswith('https://api.minimaxi.com/v1/t2a_v2')
++    assert wire.requests[0][0].headers['Authorization'] == 'Bearer cn-key'
++
++
++@pytest.mark.asyncio
++async def test_minimax_legacy_flat_endpoint_and_its_raw_audio_answer(monkeypatch, out):
++    minimax_profile(base_url='https://api.minimax.io/v1/text_to_speech', model='m', voice_id='v')
++    wire = rest.RestWire([('audio', b'ID3legacy')])
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert result.state == 'synthesized' and Path(result.path).read_bytes() == b'ID3legacy'
++    assert wire.body_json() == {'model': 'm', 'text': TEXT, 'voice_id': 'v'}
++    # a JSON error where audio was expected is a counted, failed send
++    wire = rest.RestWire([rest.minimax_answer(b'x')])
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert (outcome(result), wire.count) == (('failed', None, 'failed_after_send'), 1)
++
++
++@pytest.mark.asyncio
++async def test_gemini_carries_the_configured_voice_model_persona_and_header_key(monkeypatch, out):
++    (get_hermes_home() / 'persona.md').write_text('AUDIO PROFILE: a calm narrator. {{transcript}}')
++    gemini_profile(model='gemini-2.5-pro-preview-tts', voice='Puck', persona_prompt_file='persona.md')
++    wire = rest.RestWire([rest.gemini_answer(rest.pcm_bytes(0.5))])
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert result.state == 'synthesized'
++    request, _ = wire.requests[0]
++    assert request.url == 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-preview-tts:generateContent'
++    assert request.headers['x-goog-api-key'] == KEY and KEY not in request.url
++    body = wire.body_json()
++    prompt = body['contents'][0]['parts'][0]['text']
++    assert 'AUDIO PROFILE: a calm narrator.' in prompt and TEXT in prompt and 'DIRECTOR' in prompt
++    assert body['generationConfig'] == {'responseModalities': ['AUDIO'], 'speechConfig': {
++        'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': 'Puck'}}}}
++
++
++@pytest.mark.asyncio
++async def test_each_send_is_bounded_by_the_call_deadline(monkeypatch, out):
++    xai_profile()
++    wire = rest.RestWire([('audio', b'ID3x')])
++    with rest.rest_wire(monkeypatch, wire):
++        await speak(out, support.Callbacks(), deadline_s=40)
++    assert wire.timeouts() == [40.0]  # min(stock 60, the call's request bound)
++
++
++# --- auxiliary speech tags: zero auxiliary requests in a native call, unchanged outside --------------------------------
++
++class Auxiliary:
++    """Counts REAL calls of the auxiliary client entry the tag rewrite imports at call time (and answers it)."""
++
++    def __init__(self, monkeypatch, reply):
++        self.calls = []
++        self.reply = reply
++        monkeypatch.setattr('agent.auxiliary_client.call_llm', self)
++
++    def __call__(self, **kwargs):
++        self.calls.append(kwargs)
++        message = type('M', (), {'content': self.reply})()
++        return type('R', (), {'choices': [type('C', (), {'message': message})()]})()
++
++
++@pytest.mark.asyncio
++async def test_native_xai_speech_tags_use_the_local_pass_with_zero_auxiliary_calls(monkeypatch, out):
++    xai_profile(auto_speech_tags=True)
++    aux = Auxiliary(monkeypatch, 'AUX-REWRITTEN [whisper]text[/whisper]')
++    wire = rest.RestWire([('audio', b'ID3x'), ('audio', b'ID3x')])
++    two_paragraphs = 'First paragraph is here.\n\nSecond paragraph follows now.'
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks(), text=two_paragraphs)
++        tagged = await speak(out, support.Callbacks(), text='A sentence with [sigh] an explicit tag.')
++    assert (result.state, tagged.state) == ('synthesized', 'synthesized')
++    assert aux.calls == []  # not one auxiliary request, whatever the helper does
++    assert wire.body_json(0)['text'] == 'First paragraph is here. [pause] Second paragraph follows now.'  # stock local pass
++    assert wire.body_json(1)['text'] == 'A sentence with [sigh] an explicit tag.'
++
++
++@pytest.mark.asyncio
++async def test_native_gemini_audio_tags_keep_the_unchanged_transcript_with_zero_auxiliary_calls(monkeypatch, out):
++    gemini_profile(model='gemini-3.1-flash-tts-preview', audio_tags=True, voice='Kore')
++    aux = Auxiliary(monkeypatch, '[excitedly] AUX REWRITE')
++    wire = rest.RestWire([rest.gemini_answer(rest.pcm_bytes(0.5))])
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks(), text='Plain words only.')
++    assert result.state == 'synthesized' and aux.calls == []
++    assert wire.body_json()['contents'][0]['parts'][0]['text'] == 'Plain words only.'
++    assert wire.body_json()['generationConfig']['speechConfig']['voiceConfig']['prebuiltVoiceConfig']['voiceName'] == 'Kore'
++
++
++@pytest.mark.asyncio
++async def test_a_failing_auxiliary_entry_is_never_reached_in_a_native_call(monkeypatch, out):
++    xai_profile(auto_speech_tags=True)
++    calls = []
++    monkeypatch.setattr('agent.auxiliary_client.call_llm', lambda **kw: calls.append(kw) or (_ for _ in ()).throw(RuntimeError('boom')))
++    wire = rest.RestWire([('audio', b'ID3x')])
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks(), text='Some plain words to say.')
++    assert result.state == 'synthesized' and calls == []
++
++
++# --- the failure matrix: every failure is one counted send, never resent, cleaned up -----------------------------------
++
++FAILURES = [('status', 401), ('status', 403), ('status', 429), ('status', 500), ('status', 503),
++            ('raise', requests.exceptions.ReadTimeout('synthetic')),
++            ('raise', requests.exceptions.ConnectionError('synthetic')),
++            ('redirect', 'https://elsewhere.example/tts')]
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('name', PROVIDERS)
++async def test_failures_are_one_send_with_no_retry_redirect_or_leftover(monkeypatch, out, name):
++    CASES[name]['profile']()
++    for step in FAILURES:
++        cb = support.Callbacks()
++        wire = rest.RestWire([step] * 4 + [CASES[name]['ok']] * 4)  # a hidden retry/redirect would consume more
++        with rest.rest_wire(monkeypatch, wire):
++            result = await speak(out, cb)
++        assert (outcome(result), wire.count, cb.before_send_calls) == (('failed', None, 'failed_after_send'), 1, 1), step[:2]
++        assert os.listdir(out) == []
++        assert 'synthetic' not in repr(result) and KEY not in repr(result)
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('name', PROVIDERS)
++async def test_truncated_malformed_and_empty_answers_after_the_send_are_failed_after_send(monkeypatch, out, name):
++    CASES[name]['profile']()
++    for step in CASES[name]['bad_body']:
++        wire = rest.RestWire([step, CASES[name]['ok']])
++        with rest.rest_wire(monkeypatch, wire):
++            result = await speak(out, support.Callbacks())
++        assert (outcome(result), wire.count) == (('failed', None, 'failed_after_send'), 1), step[:2]
++        assert os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_an_empty_audio_answer_is_failed_with_the_existing_completed_accounting(monkeypatch, out):
++    xai_profile()
++    wire = rest.RestWire([('audio', b''), ('audio', b'ID3x')])
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert (outcome(result), wire.count) == (('failed', None, 'completed'), 1) and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_gemini_conversion_error_after_a_paid_answer_is_failed_after_send(monkeypatch, out):
++    gemini_profile()
++    wire = rest.RestWire([rest.gemini_answer(b'\x01'), rest.gemini_answer(rest.pcm_bytes(0.2))])  # one byte: not audio
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert result.state == 'failed' and result.provider in ('failed_after_send', 'completed')
++    assert wire.count == 1 and os.listdir(out) == []
++
++
++# --- request/response/output bounds ---------------------------------------------------------------------------------
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('name', ['xai', 'minimax', 'gemini'])
++async def test_a_body_over_the_cap_is_too_long_whether_or_not_its_length_is_declared(monkeypatch, out, name):
++    CASES[name]['profile']()
++    monkeypatch.setattr('gateway.session_native_voice.MAX_CHUNK_AUDIO_BYTES', 4096)
++    big = b'ID3' + b'\0' * 9000
++    shapes = {'xai': [('raw', 200, {'Content-Type': 'audio/mpeg'}, big, None), ('raw', 200, {'Content-Type': 'audio/mpeg'}, big, False)],
++              'minimax': [('raw', 200, {'Content-Type': 'application/json'}, b'{"pad":"' + b'a' * 9000 + b'"}', None),
++                          ('raw', 200, {'Content-Type': 'application/json'}, b'{"pad":"' + b'a' * 9000 + b'"}', False)],
++              'gemini': [('raw', 200, {'Content-Type': 'application/json'}, b'{"pad":"' + b'a' * 9000 + b'"}', None),
++                         ('raw', 200, {'Content-Type': 'application/json'}, b'{"pad":"' + b'a' * 9000 + b'"}', False)]}[name]
++    for step in shapes:
++        wire = rest.RestWire([step, CASES[name]['ok']])
++        with rest.rest_wire(monkeypatch, wire):
++            result = await speak(out, support.Callbacks())
++        assert (result.state, result.path, result.provider, wire.count) == ('too_long', None, 'failed_after_send', 1)
++        assert os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_a_real_size_oversize_body_is_too_long_and_a_cap_sized_one_is_not_refused_by_the_reader(monkeypatch, out):
++    xai_profile()
++    wire = rest.RestWire([('raw', 200, {'Content-Type': 'audio/mpeg'}, b'\0' * (16 * 1024 * 1024 + 1), False)])
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert (result.state, result.provider, wire.count) == ('too_long', 'failed_after_send', 1) and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_gemini_output_over_the_chunk_cap_after_conversion_is_too_long(monkeypatch, out):
++    gemini_profile()
++    monkeypatch.setattr('gateway.session_native_voice.MAX_CHUNK_AUDIO_BYTES', 2048)
++    wire = rest.RestWire([rest.gemini_answer(rest.pcm_bytes(2.0))])  # a 2 s mp3 is larger than 2 KiB
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert result.state == 'too_long' and wire.count == 1 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_a_compressed_answer_is_never_requested_so_no_decoded_inflation_beyond_the_chunk_reads(monkeypatch, out):
++    xai_profile()
++    wire = rest.RestWire([('audio', b'ID3x')])
++    with rest.rest_wire(monkeypatch, wire):
++        await speak(out, support.Callbacks())
++    assert wire.requests[0][0].headers['Accept-Encoding'] == 'identity'
++
++
++# --- refusal before send and multi-chunk behaviour ------------------------------------------------------------------
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('name', PROVIDERS)
++async def test_a_refused_gate_sends_nothing(monkeypatch, out, name):
++    CASES[name]['profile']()
++    for cb, state in ((support.Callbacks(refuse_before_send=True), 'refused'), (support.Callbacks(refuse_authorize_at=2), 'refused'),
++                      (support.Callbacks(refuse_authorize_at=1), 'refused')):
++        wire = rest.RestWire([CASES[name]['ok']])
++        with rest.rest_wire(monkeypatch, wire):
++            result = await speak(out, cb)
++        assert (outcome(result), wire.count) == ((state, None, 'not_started'), 0), name
++        assert os.listdir(out) == [] and support.SECRET not in repr(result)
++
++
++@pytest.mark.asyncio
++async def test_missing_credentials_and_bad_settings_are_unsent_unavailable(monkeypatch, out):
++    wire = rest.RestWire([('audio', b'ID3x')])
++    cb = support.Callbacks()
++    with rest.rest_wire(monkeypatch, wire):
++        from hermes_cli.config import invalidate_env_cache
++        for provider, section in (('xai', {}), ('minimax', {}), ('gemini', {}), ('minimax', {'region': 'mars'})):
++            support.write_config(get_hermes_home(), {'tts': {'provider': provider, provider: section}})
++            (get_hermes_home() / '.env').write_text('')
++            invalidate_env_cache()
++            result = await speak(out, cb)
++            assert (outcome(result), wire.count) == (('unavailable', None, 'not_started'), 0), (provider, section)
++        # a Gemini prompt that outgrows the provider request limit is refused before the wire
++        gemini_profile(max_text_length=20)
++        (get_hermes_home() / 'persona.md').write_text('P' * 200)
++        support.write_config(get_hermes_home(), {'tts': {'provider': 'gemini', 'gemini': {
++            'max_text_length': 20, 'persona_prompt_file': 'persona.md'}}})
++        result = await speak(out, cb)
++        assert (outcome(result), wire.count) == (('unavailable', None, 'not_started'), 0)
++    assert cb.before_send_calls == 0 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('name', ['xai', 'minimax'])
++async def test_the_first_failed_chunk_stops_the_call_and_removes_every_file(monkeypatch, out, joined, name):
++    CASES[name]['profile'](max_text_length=60)
++    ok = CASES[name]['ok']
++    cb = support.Callbacks()
++    wire = rest.RestWire([ok, ('status', 500), ok])
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, cb, text=LONG_TEXT)
++    assert (outcome(result), wire.count, cb.before_send_calls) == (('failed', None, 'failed_after_send'), 2, 2)
++    assert os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('name', PROVIDERS)
++async def test_multiple_chunks_make_one_gated_request_each_and_join_in_order(monkeypatch, out, joined, name):
++    CASES[name]['profile'](max_text_length=60)
++    from tools.tts_tool_delivery import _split_text_for_tts
++    expected = len(_split_text_for_tts(speakable_text(LONG_TEXT), 60))
++    assert expected >= 2
++    events = []
++    cb = support.Callbacks(events)
++    wire = rest.RestWire([CASES[name]['ok']] * expected, tap=lambda request: events.append('request'))
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, cb, text=LONG_TEXT)
++    assert (result.state, result.provider, wire.count, cb.before_send_calls) == ('synthesized', 'completed', expected, expected)
++    sends = [e for e in events if e in ('before_send', 'request')]
++    assert sends == ['before_send', 'request'] * expected  # each chunk is gated immediately before its own wire
++    assert os.listdir(out) == [os.path.basename(result.path)]
++
++
++@pytest.mark.asyncio
++async def test_results_and_logs_carry_no_key_text_provider_body_or_path(monkeypatch, out, caplog):
++    caplog.set_level(logging.DEBUG)
++    for name in PROVIDERS:
++        CASES[name]['profile']()
++        for script in ([CASES[name]['ok']], [('status', 500, b'PROVIDER-BODY-TEXT')], [CASES[name]['ok']]):
++            cb = support.Callbacks()
++            wire = rest.RestWire(script)
++            with rest.rest_wire(monkeypatch, wire):
++                result = await speak(out, cb, text='Private words to speak.')
++            assert KEY not in repr(result) and 'PROVIDER-BODY-TEXT' not in repr(result)
++    leaks = [line for line in caplog.text.splitlines()
++             if KEY in line or out in line or 'Private words' in line or 'PROVIDER-BODY-TEXT' in line]
++    assert not leaks, leaks
++    assert not [r for r in caplog.records if r.name.startswith(('gateway.session_native_voice', 'tools.native_send'))]
 diff --git a/tests/gateway/test_native_voice_sdk_boundaries.py b/tests/gateway/test_native_voice_sdk_boundaries.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..1afba30574aaf001f769e8b94c8d5e598b1caf0a
@@ -3701,10 +4750,10 @@ index 0000000000000000000000000000000000000000..1afba30574aaf001f769e8b94c8d5e59
 +    assert abs(support.media_seconds(result.path) - chunks * 1.0) < 0.5  # the REAL ffmpeg joined real MP3 chunks
 diff --git a/tests/gateway/test_native_voice_stt.py b/tests/gateway/test_native_voice_stt.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..7ff893c02701fb0fff7c56bb152b3d2b2580c60a
+index 0000000000000000000000000000000000000000..d1a2cba9c8b9a760dbfe43a88a08b1637f5476e4
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_stt.py
-@@ -0,0 +1,385 @@
+@@ -0,0 +1,388 @@
 +"""Native voice seam: configured speech-to-text sent once, truthful outcomes, no leaks.
 +
 +Real OpenAI SDK, real httpx client and real ``requests`` session over a synthetic network transport
@@ -3715,6 +4764,7 @@ index 0000000000000000000000000000000000000000..7ff893c02701fb0fff7c56bb152b3d2b
 +import asyncio
 +import logging
 +import threading
++import time
 +
 +import httpx
 +import pytest
@@ -3722,6 +4772,7 @@ index 0000000000000000000000000000000000000000..7ff893c02701fb0fff7c56bb152b3d2b
 +from gateway.session_native_voice import transcribe_native_once
 +from hermes_constants import get_hermes_home
 +from tests.gateway import native_voice_support as support
++from tests.gateway import rest_voice_support as rest
 +
 +KEY = 'sk-synthetic-native-stt'
 +
@@ -4046,7 +5097,8 @@ index 0000000000000000000000000000000000000000..7ff893c02701fb0fff7c56bb152b3d2b
 +async def test_oauth_refresh_retry_is_not_a_second_send(monkeypatch, clip):
 +    support.write_config(get_hermes_home(), {'stt': {'provider': 'xai', 'cloud_trim_silence': False}})
 +    refreshed = []
-+    creds = {'provider': 'xai-oauth', 'api_key': 'oauth-1', 'base_url': 'https://api.x.ai/v1'}
++    # a bearer with a future expiry claim: an opaque one is refused UNSENT in a native call (test_native_voice_xai_freshness)
++    creds = {'provider': 'xai-oauth', 'api_key': rest.jwt(time.time() + 3 * 3600, 'oauth-1'), 'base_url': 'https://api.x.ai/v1'}
 +
 +    def resolve(force_refresh=False, api_key_hint=None, **kw):
 +        if force_refresh:
@@ -4092,10 +5144,10 @@ index 0000000000000000000000000000000000000000..7ff893c02701fb0fff7c56bb152b3d2b
 +    assert len(calls) == 1 and cb.before_send_calls == 0
 diff --git a/tests/gateway/test_native_voice_tts.py b/tests/gateway/test_native_voice_tts.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..b2293d0c345f6f77aae312eb09ead4f912fd27fc
+index 0000000000000000000000000000000000000000..1341ba950d1fbef5529cfbeb09e68d1a577043ac
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_tts.py
-@@ -0,0 +1,323 @@
+@@ -0,0 +1,324 @@
 +"""Native voice seam: configured text-to-speech, one request per chunk, stop at the first failed chunk.
 +
 +Real OpenAI SDK, real httpx client over a synthetic network transport; the profile's TTS
@@ -4349,7 +5401,8 @@ index 0000000000000000000000000000000000000000..b2293d0c345f6f77aae312eb09ead4f9
 +    wire = support.Wire([audio('x')])
 +    cases = {
 +        'voice-off-or-unknown': {'tts': {'provider': 'none'}},
-+        'unsupported-cloud': {'tts': {'provider': 'minimax', 'minimax': {'api_key': 'mm-key'}}},
++        'unsupported-local': {'tts': {'provider': 'piper'}},
++        'unsupported-command': {'tts': {'provider': 'neutts'}},
 +        'elevenlabs-without-key': {'tts': {'provider': 'elevenlabs'}},
 +    }
 +    with support.provider_wire(monkeypatch, wire):
@@ -4419,6 +5472,392 @@ index 0000000000000000000000000000000000000000..b2293d0c345f6f77aae312eb09ead4f9
 +        result = await seam('Hello there, friend.', out, support.Callbacks())
 +    assert (result.state, result.provider, wire.count, catalog) == ('synthesized', 'completed', 1, [])
 +    assert wire.requests[0].url.host == 'api.deepinfra.com'
+diff --git a/tests/gateway/test_native_voice_xai_freshness.py b/tests/gateway/test_native_voice_xai_freshness.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7741558b850fcea2844576371b63ffac0680b76b
+--- /dev/null
++++ b/tests/gateway/test_native_voice_xai_freshness.py
+@@ -0,0 +1,380 @@
++"""Native voice seam, xAI OAuth pre-send freshness (M2) against the REAL resolver, pool and token store.
++
++Nothing credential-related is stubbed: ``resolve_xai_http_credentials`` / ``CredentialPool.select`` read a synthetic
++``auth.json`` in the test profile and the stock discovery + refresh POST run over a synthetic OAuth authority below the
++real ``httpx`` client (``OAuthWire``). The audio request goes through the real ``requests`` stack over ``RestWire``.
++
++The contract under test: the single paid send carries a bearer that is provably fresh; the OAuth exchange is never a paid
++attempt (no ``before_send``, no accounting); a Stop/deadline/authority change while refreshing can never become a late
++send; a bearer whose freshness cannot be established is refused UNSENT; and nothing is refreshed or resent after an
++auth failure.
++"""
++import asyncio
++import logging
++import os
++import threading
++import time
++
++import httpx
++import pytest
++
++from gateway.session_native_voice import synthesize_native_once, transcribe_native_once
++from hermes_constants import get_hermes_home
++from tests.gateway import native_voice_support as support
++from tests.gateway import rest_voice_support as rest
++from tests.gateway.mistral_voice_support import watch_worker
++
++TEXT = 'Hello there, friend.'
++HOUR = 3600
++
++
++def tts_profile(api_key=None, **section):
++    from hermes_cli.config import invalidate_env_cache
++    support.write_config(get_hermes_home(), {'tts': {'provider': 'xai', 'xai': section}})
++    (get_hermes_home() / '.env').write_text(f'XAI_API_KEY={api_key}\n' if api_key else '')
++    invalidate_env_cache()
++
++
++def stt_profile():
++    from hermes_cli.config import invalidate_env_cache
++    support.write_config(get_hermes_home(), {'stt': {'provider': 'xai', 'cloud_trim_silence': False}})
++    (get_hermes_home() / '.env').write_text('')
++    invalidate_env_cache()
++
++
++@pytest.fixture
++def out(tmp_path):
++    path = tmp_path / 'caller-output'
++    path.mkdir()
++    return str(path)
++
++
++@pytest.fixture
++def clip(tmp_path):
++    return support.write_wav(tmp_path / 'clip.wav')
++
++
++async def speak(out, callbacks, text=TEXT, deadline_s=60):
++    return await synthesize_native_once(text, output_dir=out, authorize=callbacks.authorize,
++                                        before_send=callbacks.before_send, deadline_s=deadline_s)
++
++
++async def hear(clip, callbacks, deadline_s=60):
++    return await transcribe_native_once(clip, authorize=callbacks.authorize, before_send=callbacks.before_send,
++                                        deadline_s=deadline_s)
++
++
++def bearer(wire, index=0):
++    return wire.requests[index][0].headers['Authorization']
++
++
++def fresh_token(tag='fresh'):
++    return rest.jwt(time.time() + 3 * HOUR, tag)
++
++
++# --- freshness before the first paid send: real resolver, real pool, real refresh -------------------------------------
++
++@pytest.mark.asyncio
++async def test_a_fresh_bearer_is_sent_once_with_no_oauth_traffic(monkeypatch, out):
++    token = fresh_token()
++    tts_profile()
++    rest.write_oauth_store(token)
++    oauth = rest.OAuthWire()
++    events = []
++    cb = support.Callbacks(events)
++    wire = rest.RestWire([('audio', b'ID3x')], tap=lambda request: events.append('request'))
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.provider, wire.count, oauth.requests) == ('synthesized', 'completed', 1, [])
++    assert bearer(wire) == f'Bearer {token}' and wire.requests[0][0].url == 'https://api.x.ai/v1/tts'
++    assert events == ['authorize', 'authorize', 'before_send', 'request', 'authorize']
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('exp_offset', [90, -60], ids=['inside-the-refresh-window', 'expired'])
++async def test_an_expiring_or_expired_bearer_is_refreshed_before_the_one_paid_send(monkeypatch, out, exp_offset):
++    stale = rest.jwt(time.time() + exp_offset, 'stale')
++    tts_profile()
++    rest.write_oauth_store(stale, refresh='rt-singleton')
++    events = []
++    oauth = rest.OAuthWire(events=events)
++    cb = support.Callbacks(events)
++    wire = rest.RestWire([('audio', b'ID3x')], tap=lambda request: events.append('request'))
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.provider, wire.count) == ('synthesized', 'completed', 1)
++    assert events == ['authorize', 'oauth-discovery', 'oauth-refresh', 'authorize', 'before_send', 'request', 'authorize']
++    assert oauth.refresh_tokens_sent() == ['rt-singleton'] and bearer(wire) != f'Bearer {stale}'
++    assert cb.before_send_calls == 1  # the credential exchange is not a paid attempt: one before_send, for the audio
++    assert all(r.extensions['timeout']['read'] >= 5 for r in oauth.posts)  # the stock refresh timeout is finite
++    assert rest.read_oauth_store()['providers']['xai-oauth']['tokens']['refresh_token'] == 'rt-rotated'  # rotation persisted
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('step', [('status', 400), ('status', 401), ('status', 403), ('status', 500), ('badjson',),
++                                  ('redirect', 'https://evil.example/token'),
++                                  ('raise', httpx.ReadTimeout('synthetic'))], ids=str)
++async def test_a_failed_refresh_refuses_unsent_and_never_retries_or_sends(monkeypatch, out, step):
++    tts_profile()
++    rest.write_oauth_store(rest.jwt(time.time() - 60, 'expired'))
++    oauth = rest.OAuthWire([step] * 3)
++    cb = support.Callbacks()
++    wire = rest.RestWire([('audio', b'ID3x')])
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.path, result.provider) == ('unavailable', None, 'not_started')
++    assert wire.count == 0 and cb.before_send_calls == 0 and len(oauth.posts) == 1  # one refresh try, no resend, no loop
++    assert os.listdir(out) == []
++    assert all('evil.example' not in str(r.url) for r in oauth.requests)  # a redirect is not followed
++
++
++@pytest.mark.asyncio
++async def test_missing_oauth_credentials_are_refused_unsent_without_oauth_traffic(monkeypatch, out):
++    tts_profile()
++    oauth = rest.OAuthWire()
++    cb = support.Callbacks()
++    wire = rest.RestWire([('audio', b'ID3x')])
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.provider, wire.count, oauth.requests, cb.before_send_calls) == ('unavailable', 'not_started', 0, [], 0)
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('access', [rest.jwt(None, 'no-exp'), 'opaque-bearer-without-expiry'], ids=['jwt-without-exp', 'opaque'])
++async def test_a_bearer_whose_freshness_cannot_be_established_is_refused_unsent(monkeypatch, out, access):
++    tts_profile()
++    rest.write_oauth_store(access)
++    oauth = rest.OAuthWire()
++    cb = support.Callbacks()
++    wire = rest.RestWire([('audio', b'ID3x')])
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.path, result.provider) == ('unavailable', None, 'not_started')
++    assert wire.count == 0 and cb.before_send_calls == 0 and oauth.requests == []  # honest existing tokens: not refreshed, not bypassed
++    assert rest.read_oauth_store()['providers']['xai-oauth']['tokens']['access_token'] == access
++
++
++def test_the_freshness_check_requires_the_whole_request_window_and_ignores_api_keys():
++    from tools import native_send_policy
++    from tools.xai_http import require_native_fresh_bearer
++    policy = native_send_policy.SendPolicy(timeout_s=60.0, providers=frozenset())
++    oauth = lambda exp: {'provider': 'xai-oauth', 'api_key': rest.jwt(exp)}
++    require_native_fresh_bearer(oauth(None))  # outside a native call: stock, nothing is checked
++    with native_send_policy.activate(policy):
++        require_native_fresh_bearer(oauth(time.time() + HOUR))
++        require_native_fresh_bearer({'provider': 'xai', 'api_key': 'xai-explicit-key'})  # an API key has no expiry
++        for exp in (time.time() + 30, time.time() - 1, None):
++            with pytest.raises(native_send_policy.NativeSendRefused) as refused:
++                require_native_fresh_bearer(oauth(exp))
++            assert refused.value.reason == 'credentials'
++        policy.close()
++        with pytest.raises(native_send_policy.NativeSendRefused) as closed:
++            require_native_fresh_bearer(oauth(time.time() + HOUR))
++        assert closed.value.reason == 'closed'
++
++
++@pytest.mark.asyncio
++async def test_the_explicit_api_key_is_preferred_and_oauth_is_never_touched(monkeypatch, out):
++    tts_profile(api_key='xai-explicit-key')
++    rest.write_oauth_store(rest.jwt(time.time() - 60, 'expired-oauth'))  # would need a refresh if it were used
++    oauth = rest.OAuthWire()
++    wire = rest.RestWire([('audio', b'ID3x')])
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert (result.state, wire.count, oauth.requests) == ('synthesized', 1, [])
++    assert bearer(wire) == 'Bearer xai-explicit-key'
++
++
++@pytest.mark.asyncio
++async def test_origin_pinning_an_override_cannot_redirect_the_bearer(monkeypatch, out):
++    token = fresh_token()
++    from hermes_cli.config import invalidate_env_cache
++    tts_profile(base_url='https://proxy.example/v1')  # a config base_url is for API keys only
++    rest.write_oauth_store(token)
++    (get_hermes_home() / '.env').write_text('HERMES_XAI_BASE_URL=https://evil.example/v1\n')
++    invalidate_env_cache()
++    wire = rest.RestWire([('audio', b'ID3x')])
++    with rest.oauth_wire(monkeypatch, rest.OAuthWire()), rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert result.state == 'synthesized'
++    assert wire.requests[0][0].url == 'https://api.x.ai/v1/tts' and bearer(wire) == f'Bearer {token}'
++    # the explicit API-key path keeps its stock behaviour: the operator's own tts.xai.base_url applies, env override pinned
++    tts_profile(api_key='xai-explicit-key', base_url='https://proxy.example/v1')
++    (get_hermes_home() / '.env').write_text('XAI_API_KEY=xai-explicit-key\nHERMES_XAI_BASE_URL=https://evil.example/v1\n')
++    invalidate_env_cache()
++    wire = rest.RestWire([('audio', b'ID3x')])
++    with rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert result.state == 'synthesized' and wire.requests[0][0].url == 'https://proxy.example/v1/tts'
++
++
++@pytest.mark.asyncio
++async def test_the_bearer_sent_is_the_issuing_accounts_and_no_other_refresh_token_is_spent(monkeypatch, out):
++    expired_a, token_b = rest.jwt(time.time() - 60, 'a-expired'), fresh_token('account-b')
++    tts_profile()
++    rest.write_oauth_store(None, pool=[('acct-a', expired_a, 'rt-A'), ('acct-b', token_b, 'rt-B')])
++    oauth = rest.OAuthWire([('ok', {'refresh_token': 'rt-A2'})])
++    wire = rest.RestWire([('audio', b'ID3x')])
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert (result.state, wire.count) == ('synthesized', 1)
++    assert bearer(wire) == f'Bearer {token_b}'  # the account that is fresh serves; the expired one is not resurrected
++    assert oauth.refresh_tokens_sent() == ['rt-A']  # only the expired account's own token, never rt-B
++    # a lone expired account is refreshed under its own refresh token and its refreshed bearer is the one sent
++    rest.write_oauth_store(None, pool=[('acct-a', expired_a, 'rt-A')])
++    oauth = rest.OAuthWire([('ok', {'refresh_token': 'rt-A3'})])
++    wire = rest.RestWire([('audio', b'ID3x')])
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert result.state == 'synthesized' and oauth.refresh_tokens_sent() == ['rt-A'] and bearer(wire) != f'Bearer {expired_a}'
++
++
++# --- no refresh or resend after an auth failure ---------------------------------------------------------------------
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('status', [401, 403])
++async def test_an_auth_failure_after_the_send_is_never_refreshed_or_resent(monkeypatch, out, status):
++    tts_profile()
++    rest.write_oauth_store(fresh_token())
++    oauth = rest.OAuthWire()
++    cb = support.Callbacks()
++    wire = rest.RestWire([('status', status)] * 3)
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.provider, wire.count, cb.before_send_calls) == ('failed', 'failed_after_send', 1, 1)
++    assert oauth.requests == []  # no force_refresh, no second account, no different provider
++    # even when a refresh DID run before the send, an auth failure afterwards adds none
++    rest.write_oauth_store(rest.jwt(time.time() - 60, 'expired'))
++    oauth = rest.OAuthWire()
++    wire = rest.RestWire([('status', status)] * 3)
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert (result.state, wire.count, len(oauth.posts)) == ('failed', 1, 1)
++
++
++# --- Stop / deadline / authority while the OAuth exchange is in flight ----------------------------------------------
++
++def start_held_refresh():
++    tts_profile()
++    rest.write_oauth_store(rest.jwt(time.time() - 60, 'expired'))
++    release = threading.Event()
++    oauth = rest.OAuthWire(hold=release)
++    wire = rest.RestWire([('audio', b'ID3late')])
++    return oauth, wire, release
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('how', ['cancel', 'deadline', 'authority'])
++async def test_stop_deadline_or_lost_authority_while_refreshing_can_never_become_a_late_send(monkeypatch, out, how):
++    from gateway import session_native_voice_tts as tts_module
++    finished = watch_worker(monkeypatch, tts_module, '_synthesize')
++    cb = support.Callbacks(refuse_authorize_at=2) if how == 'authority' else support.Callbacks()
++    oauth, wire, release = start_held_refresh()
++    try:
++        with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
++            deadline = rest.EventDeadline(monkeypatch)  # installed before the call starts waiting
++            task = asyncio.create_task(speak(out, cb, deadline_s=30))
++            assert await asyncio.to_thread(oauth.entered.wait, 10)  # the OAuth exchange is in flight, held
++            if how == 'deadline':
++                deadline.fire()
++                result = await task
++                assert (result.state, result.provider) == ('timeout', 'not_started')
++            else:
++                if how == 'cancel':
++                    task.cancel()
++                    with pytest.raises(asyncio.CancelledError):
++                        await task
++            release.set()  # the late refresh result arrives
++            if how == 'authority':
++                result = await task
++                assert (result.state, result.path, result.provider) == ('refused', None, 'not_started')
++            assert await asyncio.to_thread(finished.wait, 10)
++    finally:
++        release.set()
++    assert wire.count == 0 and cb.before_send_calls == 0 and os.listdir(out) == []  # no late gate, no late send, no file
++    assert len(oauth.posts) == 1
++
++
++@pytest.mark.asyncio
++async def test_a_policy_closed_before_the_exchange_starts_never_starts_one(monkeypatch, out):
++    from tools import native_send_policy
++    from tools.tts_tool_providers import _generate_xai_tts
++    tts_profile()
++    rest.write_oauth_store(rest.jwt(time.time() - 60, 'expired'))
++    oauth = rest.OAuthWire()
++    policy = native_send_policy.SendPolicy(timeout_s=60.0, providers=frozenset({'xai'}), gate=lambda: None)
++    policy.close()
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, rest.RestWire()):
++        with native_send_policy.activate(policy), pytest.raises(native_send_policy.NativeSendRefused) as refused:
++            _generate_xai_tts(TEXT, os.path.join(out, 'x.mp3'), {})
++    assert refused.value.reason == 'closed' and oauth.requests == [] and policy.sends == 0
++
++
++# --- xAI STT shares the resolver: same freshness, begin_send adjacency kept ------------------------------------------
++
++@pytest.mark.asyncio
++async def test_stt_refreshes_before_its_one_send_and_keeps_the_begin_send_adjacency(monkeypatch, clip):
++    stt_profile()
++    rest.write_oauth_store(rest.jwt(time.time() - 60, 'expired'))
++    events = []
++    oauth = rest.OAuthWire(events=events)
++    cb = support.Callbacks(events)
++    wire = rest.RestWire([('json', {'text': 'hello world'})], tap=lambda request: events.append('request'))
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
++        result = await hear(clip, cb)
++    assert (result.state, result.transcript, result.provider, wire.count) == ('transcribed', 'hello world', 'completed', 1)
++    assert events == ['authorize', 'oauth-discovery', 'oauth-refresh', 'authorize', 'before_send', 'request', 'authorize']
++    assert cb.before_send_calls == 1 and wire.requests[0][0].url == 'https://api.x.ai/v1/stt'
++
++
++@pytest.mark.asyncio
++async def test_stt_refuses_unsent_without_fresh_credentials_and_only_the_cached_local_fallback_runs(monkeypatch, clip):
++    fallback = []
++    monkeypatch.setattr('tools.transcription_tools._HAS_FASTER_WHISPER', True)
++    monkeypatch.setattr('tools.transcription_tools._transcribe_local',
++                        lambda path, model, **kw: fallback.append(path) or {'success': True, 'transcript': ' local words '})
++    for store, steps in ((rest.jwt(time.time() - 60, 'expired'), [('status', 500)] * 3), ('opaque-bearer', [])):
++        stt_profile()
++        rest.write_oauth_store(store)
++        oauth = rest.OAuthWire(steps)
++        cb = support.Callbacks()
++        wire = rest.RestWire([('json', {'text': 'must not be sent'})])
++        with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
++            result = await hear(clip, cb)
++        assert (result.state, result.transcript, result.source, result.provider) == (
++            'transcribed', 'local words', 'local_fallback', 'not_started')
++        assert wire.count == 0 and cb.before_send_calls == 0
++    assert len(fallback) == 2
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('status', [401, 403])
++async def test_stt_never_refreshes_and_resends_after_an_auth_failure(monkeypatch, clip, status):
++    stt_profile()
++    rest.write_oauth_store(fresh_token())
++    oauth = rest.OAuthWire()
++    wire = rest.RestWire([('status', status)] * 3)
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, wire):
++        result = await hear(clip, support.Callbacks())
++    assert (result.state, wire.count, oauth.requests) == ('failed', 1, [])
++
++
++# --- logs: provider-controlled OAuth text stays out of a native call, stock logging is unchanged ----------------------
++
++@pytest.mark.asyncio
++async def test_refresh_failure_text_is_not_logged_in_a_native_call_but_stock_logging_is_unchanged(monkeypatch, out, caplog):
++    from tools.xai_http import resolve_xai_http_credentials
++    caplog.set_level(logging.DEBUG)
++    tts_profile()
++    rest.write_oauth_store(rest.jwt(time.time() - 60, 'expired'))
++    oauth = rest.OAuthWire([('status', 401)] * 3)
++    with rest.oauth_wire(monkeypatch, oauth), rest.rest_wire(monkeypatch, rest.RestWire()):
++        result = await speak(out, support.Callbacks())
++    assert result.state == 'unavailable'
++    assert 'synthetic oauth failure' not in caplog.text and not [r for r in caplog.records if r.name == 'agent.credential_pool']
++    caplog.clear()
++    rest.write_oauth_store(rest.jwt(time.time() - 60, 'expired'))  # the stock (no native policy) path, same data
++    oauth = rest.OAuthWire([('status', 401)] * 3)
++    with rest.oauth_wire(monkeypatch, oauth):
++        credentials = resolve_xai_http_credentials(prefer_api_key=True)
++    assert credentials['api_key'] == '' and 'synthetic oauth failure' in caplog.text  # stock still logs it
 diff --git a/tests/tools/test_mistral_stock_transport.py b/tests/tools/test_mistral_stock_transport.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..d71fd2d793a816adf175fd6c226b941427dd54b5
@@ -4517,6 +5956,120 @@ index 0000000000000000000000000000000000000000..d71fd2d793a816adf175fd6c226b9414
 +    assert not failed['success'] and wire.count == 1
 +    assert [r for r in caplog.records if r.name == 'tools.tts_tool' and r.levelno >= logging.ERROR]
 +    measured('stock_mistral_tts_redirect_and_5xx', followed_requests=2, failed_requests=wire.count)
+diff --git a/tests/tools/test_native_rest_stock_transport.py b/tests/tools/test_native_rest_stock_transport.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..a88d835f28eb1dd5f336628a2514963eda3334f8
+--- /dev/null
++++ b/tests/tools/test_native_rest_stock_transport.py
+@@ -0,0 +1,108 @@
++"""Stock REST TTS behaviour that the native voice seam must not change.
++
++Measured on the stock generators with only the ``requests`` adapter replaced (``tests/gateway/rest_voice_support``). When
++no native call is active every native-policy hook is inert: 60 s timeout, followed redirects, the library's own request
++encoding, the auxiliary-model speech-tag rewrite and its failure fallback, the 16 MiB reader error type, an OAuth bearer
++without an expiry claim and the provider-text log lines.
++"""
++import os
++from pathlib import Path
++
++import pytest
++import requests
++
++from hermes_constants import get_hermes_home
++from tests.gateway import native_voice_support as support
++from tests.gateway import rest_voice_support as rest
++
++
++def configure(provider, env, **section):
++    from hermes_cli.config import invalidate_env_cache
++    support.write_config(get_hermes_home(), {'tts': {'provider': provider, provider: section}})
++    (get_hermes_home() / '.env').write_text(env)
++    invalidate_env_cache()
++
++
++class Auxiliary:
++    def __init__(self, monkeypatch, reply=None, error=None):
++        self.calls = []
++        self.reply, self.error = reply, error
++        monkeypatch.setattr('agent.auxiliary_client.call_llm', self)
++
++    def __call__(self, **kwargs):
++        self.calls.append(kwargs)
++        if self.error:
++            raise self.error
++        message = type('M', (), {'content': self.reply})()
++        return type('R', (), {'choices': [type('C', (), {'message': message})()]})()
++
++
++def generate(name, tmp_path, text='Hello there, friend.', config=None):
++    from tools import tts_tool, tts_tool_providers as providers
++    generator = {'xai': providers._generate_xai_tts, 'minimax': providers._generate_minimax_tts,
++                 'gemini': providers._generate_gemini_tts}[name]
++    return generator(text, str(tmp_path / f'{name}.mp3'), config if config is not None else tts_tool._load_tts_config())
++
++
++def test_stock_requests_keep_the_sixty_second_timeout_follow_redirects_and_default_encoding(monkeypatch, tmp_path):
++    configure('xai', 'XAI_API_KEY=xai-key\n')
++    wire = rest.RestWire([('redirect', 'https://api.x.ai/v1/tts/elsewhere'), ('audio', b'ID3followed')])
++    with rest.rest_wire(monkeypatch, wire):
++        path = generate('xai', tmp_path)
++    assert Path(path).read_bytes() == b'ID3followed' and wire.count == 2  # stock follows a redirect (a second request)
++    assert wire.timeouts() == [60, 60] and wire.requests[0][0].headers['Accept-Encoding'] != 'identity'
++    configure('minimax', 'MINIMAX_API_KEY=mm-key\n')
++    wire = rest.RestWire([rest.minimax_answer(b'ID3mm')])
++    with rest.rest_wire(monkeypatch, wire):
++        generate('minimax', tmp_path)
++    assert wire.timeouts() == [60] and wire.requests[0][0].headers['Accept-Encoding'] != 'identity'
++
++
++def test_stock_xai_tags_still_ask_the_auxiliary_model_and_fall_back_when_it_fails(monkeypatch, tmp_path):
++    configure('xai', 'XAI_API_KEY=xai-key\n', auto_speech_tags=True)
++    aux = Auxiliary(monkeypatch, reply='Plain words [whisper]here[/whisper] now.')
++    wire = rest.RestWire([('audio', b'ID3x')])
++    with rest.rest_wire(monkeypatch, wire):
++        generate('xai', tmp_path, text='Plain words here now.')
++    assert len(aux.calls) == 1 and aux.calls[0]['task'] == 'tts_audio_tags'
++    assert wire.body_json()['text'] == 'Plain words [whisper]here[/whisper] now.'  # stock sends the auxiliary rewrite
++    aux = Auxiliary(monkeypatch, error=RuntimeError('auxiliary down'))
++    wire = rest.RestWire([('audio', b'ID3x')])
++    with rest.rest_wire(monkeypatch, wire):
++        generate('xai', tmp_path, text='First paragraph is here.\n\nSecond paragraph follows now.')
++    assert len(aux.calls) == 1 and wire.body_json()['text'] == 'First paragraph is here. [pause] Second paragraph follows now.'
++
++
++def test_stock_gemini_audio_tags_still_ask_the_auxiliary_model(monkeypatch, tmp_path):
++    configure('gemini', 'GEMINI_API_KEY=g-key\n', model='gemini-3.1-flash-tts-preview', audio_tags=True)
++    aux = Auxiliary(monkeypatch, reply='[excitedly] Plain words only.')
++    wire = rest.RestWire([rest.gemini_answer(rest.pcm_bytes(0.3))])
++    with rest.rest_wire(monkeypatch, wire):
++        generate('gemini', tmp_path, text='Plain words only.')
++    assert len(aux.calls) == 1 and wire.body_json()['contents'][0]['parts'][0]['text'] == '[excitedly] Plain words only.'
++
++
++def test_stock_oversize_body_is_still_a_runtime_error_and_a_declared_length_is_still_read(monkeypatch, tmp_path):
++    from tools.tts_tool_providers import TTS_RESPONSE_BODY_LIMIT_BYTES
++    configure('xai', 'XAI_API_KEY=xai-key\n')
++    wire = rest.RestWire([('raw', 200, {'Content-Type': 'audio/mpeg'}, b'\0' * (TTS_RESPONSE_BODY_LIMIT_BYTES + 1), False)])
++    with rest.rest_wire(monkeypatch, wire), pytest.raises(RuntimeError, match='response exceeds') as raised:
++        generate('xai', tmp_path)
++    assert type(raised.value) is RuntimeError  # not a native refusal
++
++
++def test_stock_oauth_bearer_without_an_expiry_claim_is_still_used(monkeypatch, tmp_path):
++    configure('xai', '')
++    rest.write_oauth_store('opaque-bearer-without-expiry')
++    wire = rest.RestWire([('audio', b'ID3x')])
++    with rest.oauth_wire(monkeypatch, rest.OAuthWire()), rest.rest_wire(monkeypatch, wire):
++        generate('xai', tmp_path)
++    assert wire.requests[0][0].headers['Authorization'] == 'Bearer opaque-bearer-without-expiry'
++
++
++def test_stock_post_failures_are_not_wrapped_or_reclassified(monkeypatch, tmp_path):
++    configure('gemini', 'GEMINI_API_KEY=g-key\n')
++    wire = rest.RestWire([('status', 429, b'{"error": {"message": "quota"}}')])
++    with rest.rest_wire(monkeypatch, wire), pytest.raises(RuntimeError, match=r'Gemini TTS API error \(HTTP 429\): quota'):
++        generate('gemini', tmp_path)
++    assert wire.count == 1 and not [name for name in os.listdir(tmp_path) if name.endswith('.mp3')]
 diff --git a/tests/tools/test_native_voice_stock_transport.py b/tests/tools/test_native_voice_stock_transport.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..5ff5c62f947ca0aba0872f5934717bef0a40443c
@@ -4682,10 +6235,10 @@ index 0000000000000000000000000000000000000000..5ff5c62f947ca0aba0872f5934717bef
 +    measured('stock_tts_edge_403_then_ok', handshakes=boundary.handshakes)
 diff --git a/tools/native_send_policy.py b/tools/native_send_policy.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..451e086bed8d041e94d8fcabdb2a707e5b9674c5
+index 0000000000000000000000000000000000000000..833145e108e9416f5452369a4a473f276f9beeb2
 --- /dev/null
 +++ b/tools/native_send_policy.py
-@@ -0,0 +1,367 @@
+@@ -0,0 +1,408 @@
 +"""One-send transport policy for a native (Relay) voice call.
 +
 +``gateway.session_native_voice`` activates a :class:`SendPolicy` around exactly one configured
@@ -4846,14 +6399,26 @@ index 0000000000000000000000000000000000000000..451e086bed8d041e94d8fcabdb2a707e
 +class _QuietInNativeCalls(logging.Filter):
 +    """Drops the stock provider helpers' log records while a native call is active in THIS context:
 +    their lines carry provider messages, tracebacks and audio basenames (design 8.1, 10.3). Other
-+    threads and ordinary stock calls are untouched."""
++    threads and ordinary stock calls are untouched. A dropped record is dropped for EVERY handler
++    (a logger filter runs before any handler), so during a native call it is not available in an
++    operator's local log either."""
 +
 +    def filter(self, record: logging.LogRecord) -> bool:
 +        return _current.get() is None
 +
 +
++# Python applies a logger's filters only to records created on THAT logger, so each logger that can print
++# provider-controlled text is named exactly: the stock STT/TTS helpers, the credential pool (an OAuth refresh
++# failure logs the authority's response body) and the pinned Mistral SDK's hook loggers (the deprecation
++# WARNING carries a provider-supplied date).
++_QUIET_LOGGERS = (
++    'tools.transcription_tools', 'tools.tts_tool', 'agent.credential_pool', 'mistralai.client',
++    'mistralai.client._hooks.deprecation_warning', 'mistralai.client._hooks.tracing',
++    'mistralai.client._hooks.workflow_encoding_hook')
++
++
 +def _install_quiet_filter() -> None:
-+    for name in ('tools.transcription_tools', 'tools.tts_tool'):
++    for name in _QUIET_LOGGERS:
 +        logger = logging.getLogger(name)
 +        if not any(isinstance(f, _QuietInNativeCalls) for f in logger.filters):
 +            logger.addFilter(_QuietInNativeCalls())
@@ -4879,6 +6444,19 @@ index 0000000000000000000000000000000000000000..451e086bed8d041e94d8fcabdb2a707e
 +    """False inside a native call: it uses only what is already installed and cached, never a lazy
 +    SDK install nor a model download."""
 +    return _current.get() is None
++
++
++def auxiliary_llm_allowed() -> bool:
++    """False inside a native call: it makes no auxiliary-model request (a hidden second paid request on an
++    unrelated provider, outside the send gate), so optional speech-tag rewrites keep their stock fallback text."""
++    return _current.get() is None
++
++
++def require_open() -> None:
++    """Inside a native call: refuse UNSENT once Stop or the deadline closed the policy, before any credential work."""
++    policy = _current.get()
++    if policy is not None and policy.is_closed():
++        raise policy.refusal_for('closed')
 +
 +
 +def no_resend() -> bool:
@@ -4921,6 +6499,20 @@ index 0000000000000000000000000000000000000000..451e086bed8d041e94d8fcabdb2a707e
 +def requests_kwargs() -> dict:
 +    """Extra ``requests.post`` kwargs: a 307/308 is an answer, never a second POST the policy cannot see."""
 +    return {} if _current.get() is None else {'allow_redirects': False}
++
++
++def rest_headers(headers: dict) -> dict:
++    """Request headers for a native REST send: the body is requested uncompressed, so a decoded read is never larger
++    than the bytes on the wire. Outside a native call the headers are returned untouched."""
++    return headers if _current.get() is None else {**headers, 'Accept-Encoding': 'identity'}
++
++
++def response_limit(default: int) -> int:
++    """Body cap for a REST answer: the stock limit, never above the native output cap. The read is chunk-granular
++    (64 KiB reads), so this bounds what is kept to the limit plus one chunk; it is not an allocation-hard heap cap."""
++    policy = _current.get()
++    cap = None if policy is None else policy.max_output_bytes
++    return default if cap is None else min(default, cap)
 +
 +
 +def bounded_stream(chunks: Iterable[bytes]) -> Iterator[bytes]:
@@ -4970,19 +6562,16 @@ index 0000000000000000000000000000000000000000..451e086bed8d041e94d8fcabdb2a707e
 +    return None if policy is None else {'max_retries': 0, 'timeout_in_seconds': policy.timeout_s}
 +
 +
-+def close_tracked_clients() -> None:
-+    """Release the pools of every client this call built (a no-op outside a native call)."""
-+    policy = _current.get()
-+    if policy is not None:
-+        policy.close_clients()
-+
-+
 +_JSON_ENVELOPE_BYTES = 4096  # a base64 audio body is wrapped in a small JSON object
 +
 +
 +def _bounded_answer(limit: int) -> Callable[[Any], None]:
 +    """httpx ``response`` event hook: a body is refused once it exceeds ``limit`` DECODED bytes, whether or not
-+    its length was declared (the SDK reads it whole, so nothing else bounds it)."""
++    its length was declared (the SDK reads it whole, so nothing else bounds it).
++
++    The check runs per decoded chunk: a chunk that inflates is allocated before it is counted (a compressed answer
++    can transiently exceed the limit by the inflation of one chunk). This is NOT an allocation-hard heap cap. The
++    clients built here ask for ``Accept-Encoding: identity`` so a conforming provider sends no inflating encoding."""
 +    def hook(response) -> None:
 +        declared = response.headers.get('content-length', '')
 +        if declared.isdigit() and int(declared) > limit:
@@ -5015,7 +6604,8 @@ index 0000000000000000000000000000000000000000..451e086bed8d041e94d8fcabdb2a707e
 +    if policy.max_output_bytes is not None:
 +        limit = policy.max_output_bytes
 +        hooks['response'] = [_bounded_answer((limit + 2) // 3 * 4 + _JSON_ENVELOPE_BYTES if base64_audio else limit)]
-+    http_client = policy.track(httpx.Client(timeout=timeout_ms / 1000, follow_redirects=False, event_hooks=hooks))
++    http_client = policy.track(httpx.Client(timeout=timeout_ms / 1000, follow_redirects=False, event_hooks=hooks,
++                                            headers={'Accept-Encoding': 'identity'}))
 +    return {'client': http_client, 'timeout_ms': timeout_ms, 'retry_config': None, 'debug_logger': NoOpLogger()}
 +
 +
@@ -5023,7 +6613,11 @@ index 0000000000000000000000000000000000000000..451e086bed8d041e94d8fcabdb2a707e
 +    """Per-call options for the pinned Mistral SDK; refuses UNSENT, before the invocation is entered, unless the
 +    installed SDK sends through the injected client and every endpoint can be told zero retries and an explicit
 +    timeout (and takes every request field in ``needs``). Disables the SDK's opt-in trace exporter, a second
-+    outbound path the gate would never see. Outside a native call: nothing."""
++    outbound path the gate would never see. Outside a native call: nothing.
++
++    The ``telemetry`` read-back below is NOT proof the SDK honours the switch (the pinned 2.4.8 configuration is a plain
++    object that reads back whatever was assigned). The proof is the SDK's own ``getattr`` of the attribute plus the
++    behavioural exporter test in ``tests/gateway/test_native_voice_mistral_fences.py``, which must run on any SDK change."""
 +    policy = _current.get()
 +    if policy is None:
 +        return {}
@@ -5054,7 +6648,7 @@ index 0000000000000000000000000000000000000000..451e086bed8d041e94d8fcabdb2a707e
 +    return {'connector': GatedConnector(), 'connect_timeout': max(1, int(min(10, policy.timeout_s))),
 +            'receive_timeout': max(1, int(policy.timeout_s))}
 diff --git a/tools/transcription_cloud.py b/tools/transcription_cloud.py
-index b54514ae29fc3e63a2c46dc783411f7ddc586daa..39b1183662e1f782ee6e847476c437cddeb460f1 100644
+index b54514ae29fc3e63a2c46dc783411f7ddc586daa..c3adaf1db23f4d59a62ff55387bfe2b0b5c470d3 100644
 --- a/tools/transcription_cloud.py
 +++ b/tools/transcription_cloud.py
 @@ -17,6 +17,7 @@ from typing import Any, Callable, Dict, Optional
@@ -5141,7 +6735,27 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..39b1183662e1f782ee6e847476c437cd
  
  
  def _rest_provider(
-@@ -299,7 +319,8 @@ def _transcribe_xai(
+@@ -255,9 +275,10 @@ def _transcribe_xai(
+     """Transcribe via xAI ``POST /v1/stt`` (multipart). Supports ITN, diarization, word timestamps."""
+     from hermes_cli.config import get_env_value
+     from tools.transcription_tools import _load_stt_config, _resolve_stt_language
+-    from tools.xai_http import resolve_xai_http_credentials
++    from tools.xai_http import require_native_fresh_bearer, resolve_xai_http_credentials
+     if prompt:
+         _log_prompt_unsupported("STT provider 'xai'")
++    native_send_policy.require_open()  # Stop/deadline already fired: start no credential exchange for a dead call
+     # STT is API-billed: prefer the explicit XAI_API_KEY over the xAI OAuth/Grok-subscription
+     # credential, which may be valid for Grok yet hit spending-limit errors on /v1/stt.
+     direct_api_key = str(get_env_value("XAI_API_KEY") or "").strip()
+@@ -267,6 +288,7 @@ def _transcribe_xai(
+     api_key = str(creds.get("api_key") or "").strip()
+     if not api_key:
+         return _error_result("No xAI credentials found. Configure xAI OAuth in `hermes model` or set XAI_API_KEY")
++    require_native_fresh_bearer(creds)  # a native call cannot refresh-and-resend after a 401: refuse UNSENT if not provably fresh
+     stt_config = _load_stt_config()
+     xai_config = stt_config.get("xai") or {}
+ 
+@@ -299,7 +321,8 @@ def _transcribe_xai(
              return _post_audio_multipart(f"{endpoint_base_url}/stt", headers, file_path, data)
  
          response = _post_transcription(api_key, _resolve_base_url(creds))
@@ -5151,7 +6765,7 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..39b1183662e1f782ee6e847476c437cd
              logger.info("xAI STT got HTTP %d; refreshing OAuth credentials and retrying once", response.status_code)
              try:
                  refreshed_creds = resolve_xai_http_credentials(force_refresh=True, api_key_hint=api_key)
-@@ -372,6 +393,8 @@ def _transcribe_deepinfra(
+@@ -372,6 +395,8 @@ def _transcribe_deepinfra(
      from hermes_cli.models import deepinfra_base_url, deepinfra_model_ids
      # ``stt.deepinfra: null`` in YAML yields None, not {} — coalesce.
      base_url = deepinfra_base_url(_get_stt_section(_load_stt_config(), "deepinfra"))
@@ -5301,7 +6915,7 @@ index aa10ff3607bcf460f3585c9e5e0e11d7bc55348f..407445daecc1dd237bd360b57ba7953f
          if not candidates:
              raise ValueError(
 diff --git a/tools/tts_tool_providers.py b/tools/tts_tool_providers.py
-index 15b0ad8ea39cbcad7166a86a235827eb78901d40..ab713f0d2e5db41545a5a0737a1c23552da41728 100644
+index 15b0ad8ea39cbcad7166a86a235827eb78901d40..876d7bd9da881b2d789638b4876a11b682074770 100644
 --- a/tools/tts_tool_providers.py
 +++ b/tools/tts_tool_providers.py
 @@ -11,6 +11,7 @@ from __future__ import annotations
@@ -5320,7 +6934,76 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..ab713f0d2e5db41545a5a0737a1c2355
  from tools.tts_tool_delivery import _origin, _section, _wrap_pcm_as_wav, _write_wav_bytes_as
  from tools.xai_http import hermes_xai_user_agent
  
-@@ -200,7 +202,9 @@ async def _generate_edge_tts(text: str, output_path: str, tts_config: dict[str,
+@@ -99,12 +101,20 @@ def _close_response(response: Any) -> None:
+             close()
+ 
+ 
++def _declared_length(response: Any) -> int:
++    """The answer's declared ``Content-Length`` (0 when absent or not a number)."""
++    declared = str(response.headers.get("Content-Length", "")).strip()
++    return int(declared) if declared.isdigit() else 0
++
++
+ def _read_tts_response_bytes(response: Any, *, label: str, limit: Optional[int] = None) -> bytes:
+     """Read an upstream TTS response with a hard byte cap."""
+-    limit = TTS_RESPONSE_BODY_LIMIT_BYTES if limit is None else limit
++    limit = native_send_policy.response_limit(TTS_RESPONSE_BODY_LIMIT_BYTES if limit is None else limit)
+     chunks: list[bytes] = []
+     total = 0
+     try:
++        if native_send_policy.no_resend() and _declared_length(response) > limit:
++            raise native_send_policy.refuse("too_long")  # refused before the body is read
+         if _response_has_explicit_stream(response):
+             iterator = response.iter_content(chunk_size=TTS_RESPONSE_BODY_CHUNK_BYTES)
+         else:
+@@ -119,6 +129,8 @@ def _read_tts_response_bytes(response: Any, *, label: str, limit: Optional[int]
+             total += len(chunk)
+             if total > limit:
+                 _close_response(response)
++                if native_send_policy.no_resend():
++                    raise native_send_policy.refuse("too_long")
+                 raise RuntimeError(f"{label} response exceeds {limit} bytes")
+             chunks.append(chunk)
+         return b"".join(chunks)
+@@ -150,9 +162,21 @@ def _write_bytes(output_path: str, audio_bytes: bytes) -> str:
+ 
+ 
+ def _post_json(url: str, payload: dict[str, Any], headers: dict[str, str], **extra: Any):
+-    """Streaming ``requests.post`` with the shared 60s timeout (body read via the bounded readers)."""
++    """Streaming ``requests.post`` with the shared 60s timeout (body read via the bounded readers).
++
++    Inside a native voice call this is the actual HTTP boundary of the xAI, MiniMax and Gemini generators: the send gate
++    runs immediately before the wire, the timeout is bounded by the call, a redirect is an answer (never a second POST)
++    and the body is requested uncompressed. Outside a native call nothing here differs from stock."""
+     import requests
+-    return requests.post(url, headers=headers, json=payload, timeout=60, stream=True, **extra)
++    timeout = native_send_policy.request_timeout(60)
++    native_options = native_send_policy.requests_kwargs()
++    headers = native_send_policy.rest_headers(headers)
++    native_send_policy.begin_send()
++    response = requests.post(url, headers=headers, json=payload, timeout=timeout, stream=True, **native_options, **extra)
++    if native_send_policy.no_resend() and 300 <= response.status_code < 400:
++        _close_response(response)
++        raise RuntimeError("TTS provider answered with a redirect")  # counted send, unusable answer; never followed
++    return response
+ 
+ 
+ # --- Auxiliary-model speech-tag rewrites ---
+@@ -179,7 +203,12 @@ _TAG_REWRITE_TAIL = "- Do not explain or comment.\n- Return only the tagged TTS
+ def _rewrite_with_auxiliary_model(
+     system_prompt: str, user_prompt: str, fallback: str, *, label: str, fallback_label: str, level: int,
+ ) -> str:
+-    """Ask the auxiliary model (task ``tts_audio_tags``) to rewrite a script; *fallback* on any failure/empty reply."""
++    """Ask the auxiliary model (task ``tts_audio_tags``) to rewrite a script; *fallback* on any failure/empty reply.
++
++    A native voice call never asks: the rewrite is a second, ungated paid request on another provider, so the call
++    sends the stock fallback script (the locally tagged text for xAI, the unchanged transcript for Gemini)."""
++    if not native_send_policy.auxiliary_llm_allowed():
++        return fallback
+     try:
+         from agent.auxiliary_client import call_llm
+         response = call_llm(
+@@ -200,7 +229,9 @@ async def _generate_edge_tts(text: str, output_path: str, tts_config: dict[str,
      kwargs = {"voice": edge_config.get("voice", DEFAULT_EDGE_VOICE)}
      if speed != 1.0:
          kwargs["rate"] = f"{round((speed - 1.0) * 100):+d}%"
@@ -5331,7 +7014,7 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..ab713f0d2e5db41545a5a0737a1c2355
      return output_path
  
  
-@@ -216,16 +220,34 @@ def _elevenlabs_environment_kwargs(el_config: dict[str, Any]) -> dict[str, Any]:
+@@ -216,16 +247,34 @@ def _elevenlabs_environment_kwargs(el_config: dict[str, Any]) -> dict[str, Any]:
      return {"environment": ElevenLabsEnvironment(base=base_url, wss=wss_url)}
  
  
@@ -5369,7 +7052,26 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..ab713f0d2e5db41545a5a0737a1c2355
      return output_path
  
  
-@@ -453,15 +475,20 @@ def _generate_mistral_tts(text: str, output_path: str, tts_config: dict[str, Any
+@@ -285,8 +334,9 @@ def _clamped_number(raw: Any, cast, lo, hi):
+ 
+ 
+ def _generate_xai_tts(text: str, output_path: str, tts_config: dict[str, Any]) -> str:
+-    from tools.xai_http import resolve_xai_http_credentials
++    from tools.xai_http import require_native_fresh_bearer, resolve_xai_http_credentials
+ 
++    native_send_policy.require_open()  # Stop/deadline already fired: start no credential exchange for a dead call
+     # TTS is API-billed: a subscription OAuth bearer can authorize chat while
+     # returning 403 for /v1/tts, so prefer an explicit XAI_API_KEY over OAuth.
+     # See #87045, #88040.
+@@ -294,6 +344,7 @@ def _generate_xai_tts(text: str, output_path: str, tts_config: dict[str, Any]) -
+     api_key = str(creds.get("api_key") or "").strip()
+     if not api_key:
+         raise ValueError("No xAI credentials found. Configure xAI OAuth in `hermes model` or set XAI_API_KEY.")
++    require_native_fresh_bearer(creds)  # the one paid send cannot be retried after a 401: refuse UNSENT if not provably fresh
+     xai_config = tts_config.get("xai") or {}
+     voice_id = str(xai_config.get("voice_id", DEFAULT_XAI_VOICE_ID)).strip() or DEFAULT_XAI_VOICE_ID
+     language = str(xai_config.get("language", DEFAULT_XAI_LANGUAGE)).strip() or DEFAULT_XAI_LANGUAGE
+@@ -453,15 +504,20 @@ def _generate_mistral_tts(text: str, output_path: str, tts_config: dict[str, Any
      if mi_config.get("base_url"):
          client_kwargs["server_url"] = mi_config["base_url"]  # the Mistral SDK calls it server_url
      Mistral = _origin()._import_mistral_client()  # ImportError must escape the RuntimeError wrap
@@ -5395,3 +7097,41 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..ab713f0d2e5db41545a5a0737a1c2355
      except Exception as e:
          logger.error("Mistral TTS failed: %s", e, exc_info=True)
          raise RuntimeError(f"Mistral TTS failed: {type(e).__name__}") from e
+diff --git a/tools/xai_http.py b/tools/xai_http.py
+index 7ad9df97ab55966325dd9fa681987e2a4d35c489..1caa18842b09068519aab2716f0e36ccaaa14cff 100644
+--- a/tools/xai_http.py
++++ b/tools/xai_http.py
+@@ -5,9 +5,12 @@ from __future__ import annotations
+ import datetime
+ import json
+ import os
++import time
+ import uuid
+ from typing import Any, Dict, Optional
+ 
++from tools import native_send_policy
++
+ 
+ DEFAULT_XAI_BASE_URL = "https://api.x.ai/v1"
+ MAX_XAI_STORAGE_EXPIRES_AFTER_SECONDS = 30 * 24 * 60 * 60
+@@ -227,3 +230,20 @@ def resolve_xai_http_credentials(
+     api_key = _resolve_explicit_xai_api_key()
+     base_url = str(get_env_value("XAI_BASE_URL") or DEFAULT_XAI_BASE_URL).strip().rstrip("/")
+     return {"provider": "xai", "api_key": api_key, "base_url": base_url}
++
++
++def require_native_fresh_bearer(creds: dict[str, str]) -> None:
++    """Inside a native voice call, refuse UNSENT unless an xAI OAuth bearer is provably fresh for the whole request window.
++
++    The resolver above refreshes an expiring or expired OAuth token before returning it and does not return one whose
++    refresh failed; what it cannot vouch for is a bearer without a decodable JWT ``exp``. Stock STT covers that case by
++    refreshing after a 401 and resending, which a native call must never do (one paid send), so freshness has to be
++    established BEFORE the send. An explicit ``XAI_API_KEY`` has no expiry and passes. Outside a native call: nothing."""
++    policy = native_send_policy.current()
++    if policy is None or creds.get("provider") != "xai-oauth":
++        return
++    native_send_policy.require_open()
++    from hermes_cli.auth_xai import _xai_jwt_exp
++    expires_at = _xai_jwt_exp(creds.get("api_key"))
++    if expires_at is None or expires_at <= time.time() + policy.timeout_s:
++        raise native_send_policy.refuse("credentials")

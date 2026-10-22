@@ -116,11 +116,11 @@ category below on the registered fixtures, then ONE source review and a current-
 | --- | --- |
 | STT Mistral | real installed SDK transport, one gated send, zero hidden retries — **source delivered** (patch 0002, V1-P Task 1; review pending): pinned `mistralai` 2.4.8, a configured `stt.prompt` the SDK cannot carry is refused UNSENT |
 | STT command and plugin (including `local_command`) | native-once capability adapter: no implicit install/download, explicit cancellation and output bounds; incapable custom implementations refuse UNSENT |
-| TTS MiniMax / xAI / Gemini | instrument each actual HTTP boundary, including auxiliary transformations (tag rewrite calls); no hidden second paid request; fail closed before a disallowed send |
+| TTS MiniMax / xAI / Gemini | instrument each actual HTTP boundary, including auxiliary transformations (tag rewrite calls); no hidden second paid request; fail closed before a disallowed send — **source delivered** (patch 0002, V1-P Task 2; review pending): the gate precedes the one `requests.post` in `_post_json`; a native call makes zero auxiliary tag calls (xAI keeps its local pass, Gemini the unchanged transcript; the script differs from an ordinary call's) |
 | TTS Mistral | real installed SDK boundary and zero-retry proof — **source delivered** (patch 0002, V1-P Task 1; review pending) |
 | TTS NeuTTS / Kitten / Piper | installed AND cached assets only, no downloads, bounded local execution, truthful `not_started` remote accounting, no paid-provider fallback |
 | TTS command and plugin | the same native-once capability contract as STT; an arbitrary program cannot be certified single-attempt by a provider-name allowlist |
-| Pre-send credential freshness (xAI OAuth, M2) | refresh BEFORE the paid send with synthetic transport proof; never refresh-and-resend after a send |
+| Pre-send credential freshness (xAI OAuth, M2) | refresh BEFORE the paid send with synthetic transport proof; never refresh-and-resend after a send — **source delivered** (patch 0002, V1-P Task 2; review pending): real resolver/pool/token store over a synthetic OAuth transport; an OAuth bearer without a future `exp` is refused UNSENT; the exchange is never a paid attempt |
 | Edge full range and the joiner (round-2 N2) | test a full-range (> 600 code points) Edge call with the real ffmpeg joiner and the missing-joiner outcome (`unavailable`/`not_started` before any send, no paid fallback, no silent truncation); concise ≤ 600 code points independent |
 
 Until V1-P passes, V1 alone is not configured-provider acceptance and V2 cannot start. The full fifteen-feature scope is

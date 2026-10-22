@@ -1038,7 +1038,7 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   reviewed contract: no new wire value is introduced.
 * **V1 prerequisite provider coverage (stage amendment, plan V1/V1-P).** The seam holds to one request: STT
   `openai`, `groq`, `deepinfra` (pinned model), `xai`, `elevenlabs`, `mistral`, cached local `faster-whisper`
-  fallback; TTS `edge`, `elevenlabs`, `openai`, `deepinfra` (pinned model), `mistral`. Everything else is refused
+  fallback; TTS `edge`, `elevenlabs`, `openai`, `deepinfra` (pinned model), `mistral`, `minimax`, `xai`, `gemini`. Everything else is refused
   **unsent** (`unavailable`) — never replaced by another provider — until its V1-P gate passes. This is not the final
   provider scope and is not configured-provider acceptance. **Mistral (V1-P Task 1, source delivered, review
   pending):** the real pinned `mistralai` 2.4.8 SDK is held to one gated request per STT call / TTS chunk (client
@@ -1051,14 +1051,28 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   gates (plan V1-P, mirrored here) are: STT Mistral — real installed SDK transport, one gated send, zero hidden
   retries (delivered as above); STT command
   and plugin (including `local_command`) — native-once capability adapter, no implicit install/download, explicit
-  cancellation and output bounds, incapable custom implementations refuse UNSENT; TTS MiniMax/xAI/Gemini —
-  instrument each actual HTTP boundary including auxiliary transformations, no hidden second paid request, fail
-  closed before a disallowed send; TTS Mistral — real installed SDK boundary and zero-retry proof (delivered as above); TTS
-  NeuTTS/Kitten/Piper — installed AND cached assets only, no downloads, bounded local execution, truthful
-  `not_started` remote accounting, no paid-provider fallback; TTS command and plugin — the same native-once
-  capability contract (an arbitrary program cannot be certified single-attempt by a provider-name allowlist);
-  pre-send credential freshness (xAI OAuth, M2) with synthetic transport proof; full-range Edge and the
-  missing-joiner behaviour below.
+  cancellation and output bounds, incapable custom implementations refuse UNSENT; TTS NeuTTS/Kitten/Piper — installed
+  AND cached assets only, no downloads, bounded local execution, truthful `not_started` remote accounting, no
+  paid-provider fallback; TTS command and plugin — the same native-once capability contract (an arbitrary program
+  cannot be certified single-attempt by a provider-name allowlist); full-range Edge and the missing-joiner behaviour
+  below. **REST TTS MiniMax/xAI/Gemini and xAI OAuth pre-send freshness (V1-P Task 2, source delivered, review
+  pending):** these three send through one stock helper, `tts_tool_providers._post_json`, which inside a native call is
+  the HTTP boundary — the gate runs immediately before `requests.post` (the REST STT adjacency), the timeout is
+  min(60 s, call bound), redirects are not followed (a 3xx is a counted unusable answer), the body is requested
+  uncompressed and read in 64 KiB reads under the 16 MiB chunk cap (chunk-granular, not an allocation-hard cap). Failures
+  before the gate are `unavailable`/`not_started`; after it, `failed_after_send` with exactly one send; the first
+  failed chunk stops the call. **Auxiliary speech tags are omitted:** a native call makes zero
+  `call_llm(tts_audio_tags)` requests — xAI keeps its local `[pause]` pass, Gemini the unchanged transcript — so a
+  profile with `auto_speech_tags`/`audio_tags` does NOT speak the same script as an ordinary call. **xAI OAuth freshness:**
+  the stock resolver/pool refreshes an expiring token before returning it; a native call additionally refuses UNSENT an
+  OAuth bearer without a future JWT `exp` (opaque bearers are refused), never refreshes or resends after a 401/403, and
+  the OAuth exchange is never a paid attempt (no `before_send`, no accounting; a Stop/deadline in flight can never become
+  a late send). Carried Mistral review findings that bind this stage: the process-global OpenTelemetry provider residual
+  (M1, open until the current-profile gate inspects plugins and the tracer provider), the telemetry read-back is not proof
+  (M2; the behavioural exporter test is), the stock Mistral STT path forwards `stt.prompt` that the pinned SDK rejects (M9),
+  the 1 MiB STT answer bound is enforced by the Mistral hook only (M9), the Mistral wire bound is chunk-granular (M5), and
+  the native log filter now covers the credential-pool and Mistral hook loggers (M3; a dropped record is dropped for every
+  handler).
 * **Edge speech bound and its join dependency (round-2 N2).** The Edge library sends one websocket message set per
   4,096 escaped bytes, so a native Edge chunk is capped at 600 code points: one chunk = one gated handshake. Concise
   ranges (≤ 600 code points) are independent of any joiner. A full or multi-chunk Edge range is permitted only with
