@@ -3,6 +3,7 @@ package dev.quantumink.hermesgadget.protocol.relay.state
 import dev.quantumink.hermesgadget.protocol.relay.ConversationId
 import dev.quantumink.hermesgadget.protocol.relay.ReceiptStatus
 import dev.quantumink.hermesgadget.protocol.relay.RelayMethod
+import dev.quantumink.hermesgadget.protocol.relay.RelayOutcome
 import dev.quantumink.hermesgadget.protocol.relay.RelayVectors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -185,6 +186,44 @@ class RelayStateSnapshotTest {
             (behind as RestoreResult.Restored).notices.contains(
                 RestoreNotice.SERVER_CLOCK_BEHIND_SNAPSHOT
             )
+        )
+    }
+
+    @Test fun aRetainedReceiptIsLookedUpWhateverTheAgeOfItsIdOrItsDeadline() {
+        val l = Ledger()
+        val eightDays = 8L * 24 * 3600 * 1000
+        val state = restored(restore(snapshotOf(l.h.ledger), nowMs = eightDays))
+        val now = StateTestSupport.at(eightDays)
+        // Far too old for a NEW turn (and long past its own deadline) ...
+        assertEquals(IdAge.TOO_OLD, RequestIds.checkNew(l.timedOut.requestId, now.serverMs))
+        assertTrue(state.ledger.entry(l.timedOut)!!.deadlinePassed(now))
+        // ... yet its receipt is still looked up, and the exact answer settles exactly that turn.
+        var authority = RelayAuthority.fresh()
+        val step = authority.attach(l.h.enrollment, StateTestSupport.attached(0))
+        authority = step.authority
+        val planned = state.ledger.planLookup(
+            l.timedOut,
+            authority,
+            step.token,
+            now,
+            l.h.correlation()
+        )
+        val dispatch = (planned.result as PlanOutcome.Planned).dispatch
+        val receipt = l.h.receipt(l.timedOut, ReceiptStatus.TERMINAL, 1, "completed")
+        val settled = planned.ledger.onReply(dispatch.ref, RelayOutcome.Success(receipt))
+        assertEquals(TurnStatus.FINISHED_COMPLETED, settled.ledger.entry(l.timedOut)!!.status)
+        // The turn that was never sent is past its deadline too, and a late resend is refused, not rewritten.
+        val late = state.ledger.planSubmit(
+            l.prepared,
+            authority,
+            step.token,
+            now,
+            l.h.correlation()
+        )
+        assertEquals(PlanRefusal.DEADLINE_PASSED, (late.result as PlanOutcome.Refused).reason)
+        assertEquals(
+            l.h.ledger.entry(l.prepared)!!.expiresAtMs,
+            state.ledger.entry(l.prepared)!!.expiresAtMs
         )
     }
 
