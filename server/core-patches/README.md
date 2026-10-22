@@ -34,7 +34,7 @@ agreement or live deployment is claimed.
 Runtime baseline: the maintainer's Hermes runtime core `7c17e6d72a3b9ec2974b3566f02dab1ed4b94eae`
 (tree `680abe7642528e1b5d85a9bf1ba9f3d1d6f5c5a9`), **not** upstream `e6f57427…`. The
 [patch](0002-feat-add-native-conversation-voice-seams.patch) is the complete `7c17e6d..HEAD`
-delta of one core commit; it depends on everything already in that runtime baseline (the Relay
+delta of the series' core commits (the V1 seams, two corrections, the Mistral enablement below and its option assertions); it depends on everything already in that runtime baseline (the Relay
 native session seams and their prior core changes), none of which this stage exports. Patch 0001
 plus patch 0002 alone do **not** apply to a clean upstream `e6f57427`; the full clean-series
 export and a clean-core compatibility check are a later stage. Apply only to a fresh isolated
@@ -84,18 +84,33 @@ display token proves membership, physical row and content revision, not universa
 `display_kind` and the compressed-summary scalar is a mandatory prerequisite before any V3 consumer relies on it.
 
 **Stage coverage (explicit amendment).** This stage covers a prerequisite provider set: STT `openai`, `groq`,
-`deepinfra` (pinned model), `xai`, `elevenlabs` and the cached local fallback; TTS `edge`, `elevenlabs`, `openai`,
-`deepinfra` (pinned model). Every other configured provider — STT Mistral, user command (including the
-`local_command` template) and plugin providers; TTS MiniMax, xAI, Gemini, Mistral, NeuTTS/Kitten/Piper, command and
-plugin providers — is refused UNSENT (`unavailable`). They are the mandatory V1-P provider-parity gate of the plan,
-which must pass before V2; V1 alone is not configured-provider acceptance.
+`deepinfra` (pinned model), `xai`, `elevenlabs`, `mistral` and the cached local fallback; TTS `edge`, `elevenlabs`,
+`openai`, `deepinfra` (pinned model), `mistral`. Every other configured provider — STT user command (including the
+`local_command` template) and plugin providers; TTS MiniMax, xAI, Gemini, NeuTTS/Kitten/Piper, command and
+plugin providers — is refused UNSENT (`unavailable`). They are the remaining mandatory V1-P provider-parity gates of
+the plan, which must all pass before V2; no category's source is configured-provider acceptance by itself.
+
+**Mistral (V1-P category 1).** Configured Mistral STT and TTS run through the stock pipeline on the real pinned
+`mistralai` 2.4.8 SDK. The policy builds the SDK client itself — explicit timeout (≤ 60 s and the deadline), redirects
+not followed, the request hook on the very `httpx` client the SDK sends through (proven before the invocation),
+`retries=None` on every call, no SDK debug logger and the SDK's opt-in trace exporter switched off (a second outbound
+path that carries the key) — and inspects the installed endpoint signatures first: a field the SDK cannot carry is
+refused UNSENT. The pinned STT endpoint has **no `prompt` parameter**, so a configured `stt.prompt` makes a native Mistral
+STT call `unavailable`/`not_started` rather than being dropped or discovered as a failure after the invocation (the
+ordinary, non-native path still forwards it). The provider's answer is bounded as it is read — 1 MiB for STT, the
+base64 envelope of the 16 MiB chunk cap for TTS — whether or not a length is declared; a native call installs
+nothing. Accounting uses the existing entry rules, with the documented trade-off: a failure after the invocation
+was entered with no gated send is `failed`/`unknown` and runs **no** STT fallback — also when the true failure was
+local (an unbuildable request, for instance), because the seam cannot tell it from a send it never saw. Failures
+before entry (no key, no SDK, an SDK that cannot be told "no retry", an unproven client) stay `unavailable`/`not_started`.
 
 Outcomes are stable tokens only: results carry no provider message, exception text, credential or
 path except the audio file a successful synthesis wrote, and the stock provider helpers' log lines are suppressed
 during a native call. `provider` is billing evidence about the configured remote provider (`not_started`,
 `completed`, `failed_after_send`, `unknown`).
 
-Focused evidence is in the stage report, not in this directory: warning-strict canonical-runner suites over the
-real OpenAI SDK, the real lock-pinned ElevenLabs 1.59.0 and Edge 7.2.7 SDKs and `requests` with only the network
-transport (for Edge, the socket) replaced, the real ffmpeg on local synthetic audio, the registered core owner for
-display reads, and stock-off controls. No provider, SDK-in-production, native, live or physical acceptance is claimed.
+Focused evidence is in the stage reports, not in this directory: warning-strict canonical-runner suites over the
+real OpenAI SDK, the real lock-pinned ElevenLabs 1.59.0, Edge 7.2.7 and Mistral 2.4.8 SDKs and `requests` with only
+the network transport (for Edge, the socket) replaced, the real ffmpeg on local synthetic audio, the registered core
+owner for display reads, and stock-off controls. No provider, SDK-in-production, native, live or physical acceptance
+is claimed.

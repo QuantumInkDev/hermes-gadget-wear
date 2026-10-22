@@ -1036,16 +1036,24 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   fallback); an exception from the consumer's `matches` predicate escapes `locate_native_display` unchanged; neither
   is mapped by the core. The mapping from each `(state, provider)` pair to the wire `state`/`reason` is V2/V3's
   reviewed contract: no new wire value is introduced.
-* **V1 prerequisite provider coverage (stage amendment, plan V1/V1-P).** The V1 seam holds to one request: STT
-  `openai`, `groq`, `deepinfra` (pinned model), `xai`, `elevenlabs`, cached local `faster-whisper` fallback; TTS
-  `edge`, `elevenlabs`, `openai`, `deepinfra` (pinned model). Everything else is refused **unsent**
-  (`unavailable`) — never replaced by another provider — until its V1-P gate passes. This is not the final
-  provider scope and is not configured-provider acceptance. The mandatory V1-P provider-parity gates (plan V1-P,
-  mirrored here) are: STT Mistral — real installed SDK transport, one gated send, zero hidden retries; STT command
+* **V1 prerequisite provider coverage (stage amendment, plan V1/V1-P).** The seam holds to one request: STT
+  `openai`, `groq`, `deepinfra` (pinned model), `xai`, `elevenlabs`, `mistral`, cached local `faster-whisper`
+  fallback; TTS `edge`, `elevenlabs`, `openai`, `deepinfra` (pinned model), `mistral`. Everything else is refused
+  **unsent** (`unavailable`) — never replaced by another provider — until its V1-P gate passes. This is not the final
+  provider scope and is not configured-provider acceptance. **Mistral (V1-P Task 1, source delivered, review
+  pending):** the real pinned `mistralai` 2.4.8 SDK is held to one gated request per STT call / TTS chunk (client
+  built by the policy, identity proven before the invocation, `retries=None`, explicit timeout, no redirects, SDK
+  trace exporter and debug logger off, the answer bounded as it is read); an endpoint signature that cannot carry a
+  configured field is refused unsent — the pinned STT endpoint has no `prompt`, so a configured `stt.prompt`
+  makes native Mistral STT `unavailable`. The conservative-unknown rule stands and its consequence is accepted: a
+  failure after an entered invocation with no gated send is `failed`/`unknown` with no STT fallback, also when the
+  true failure was local; V2's wire mapping must not promise otherwise. The remaining mandatory V1-P provider-parity
+  gates (plan V1-P, mirrored here) are: STT Mistral — real installed SDK transport, one gated send, zero hidden
+  retries (delivered as above); STT command
   and plugin (including `local_command`) — native-once capability adapter, no implicit install/download, explicit
   cancellation and output bounds, incapable custom implementations refuse UNSENT; TTS MiniMax/xAI/Gemini —
   instrument each actual HTTP boundary including auxiliary transformations, no hidden second paid request, fail
-  closed before a disallowed send; TTS Mistral — real installed SDK boundary and zero-retry proof; TTS
+  closed before a disallowed send; TTS Mistral — real installed SDK boundary and zero-retry proof (delivered as above); TTS
   NeuTTS/Kitten/Piper — installed AND cached assets only, no downloads, bounded local execution, truthful
   `not_started` remote accounting, no paid-provider fallback; TTS command and plugin — the same native-once
   capability contract (an arbitrary program cannot be certified single-attempt by a provider-name allowlist);

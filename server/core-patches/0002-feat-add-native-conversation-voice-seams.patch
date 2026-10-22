@@ -45,10 +45,10 @@ index 14703329aef89b5516dc67f6379d3f284627d99c..7741eb05aacf82bdf9b232d4e2c9b06e
          return await read_native_admissions(self, actor, ref, adapter=adapter, source=source,
 diff --git a/gateway/session_native_voice.py b/gateway/session_native_voice.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..7bfe706dfa03a5d57c580f535622f4f4feb2e579
+index 0000000000000000000000000000000000000000..ad55ae0a0381fe1e986754c95520a65e8ddcfb63
 --- /dev/null
 +++ b/gateway/session_native_voice.py
-@@ -0,0 +1,111 @@
+@@ -0,0 +1,112 @@
 +"""Generic native voice seam: one configured STT request, one TTS request per chunk, canonical display reads.
 +
 +An in-process extension seam for a consumer that owns its own registry, grants and accounting (the
@@ -70,8 +70,8 @@ index 0000000000000000000000000000000000000000..7bfe706dfa03a5d57c580f535622f4f4
 +comes back without exactly one gated send is ``failed`` with ``provider='unknown'``, never ``not_started``;
 +so is an invocation that, once entered, raises or answers a failure with zero gated sends (no STT fallback).
 +
-+V1 covers a prerequisite provider set (see ``session_native_voice_stt`` / ``_tts``); any other configured
-+provider is refused UNSENT until its V1-P gate passes.
++Coverage is a closed provider set (see ``session_native_voice_stt`` / ``_tts``); any other configured
++provider is refused UNSENT until its own gate passes.
 +
 +The display functions live on ``SessionAuthority`` (``locate_native_display`` and friends), beside the
 +other native readers; the implementation is ``session_native_voice_display``.
@@ -89,6 +89,7 @@ index 0000000000000000000000000000000000000000..7bfe706dfa03a5d57c580f535622f4f4
 +MAX_SPEECH_UTF16_UNITS = 4096
 +MAX_DEADLINE_S = 600.0
 +STT_REQUEST_TIMEOUT_S = 60.0  # POLICY: caps the configured stt.openai.timeout (default 60 s)
++MAX_STT_RESPONSE_BYTES = 1024 * 1024  # a transcript is <= 16 KiB; the provider's JSON answer is read whole, so bounded
 +TTS_REQUEST_TIMEOUT_S = 60.0  # NEW POLICY: the current unconfigured ElevenLabs client has no such bound
 +MAX_CHUNK_AUDIO_BYTES = 16 * 1024 * 1024
 +MAX_SPEECH_AUDIO_BYTES = 32 * 1024 * 1024
@@ -587,10 +588,10 @@ index 0000000000000000000000000000000000000000..37c365aa2aabc6c399d954b5d3d72fc4
 +    return PROVIDER_COMPLETED if answered else PROVIDER_FAILED
 diff --git a/gateway/session_native_voice_stt.py b/gateway/session_native_voice_stt.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..f90d9935baed144a63c938402f986e71ee9a6b13
+index 0000000000000000000000000000000000000000..8f7611fb4e09fb1c83ba0ecd21c37d2e942e27a4
 --- /dev/null
 +++ b/gateway/session_native_voice_stt.py
-@@ -0,0 +1,166 @@
+@@ -0,0 +1,169 @@
 +"""Configured-once speech-to-text for the native voice seam (see ``session_native_voice``).
 +
 +The profile's own STT configuration is read at call time through the stock resolvers, the audio is
@@ -610,10 +611,9 @@ index 0000000000000000000000000000000000000000..f90d9935baed144a63c938402f986e71
 +from gateway import session_native_voice_gate as gate
 +from tools import native_send_policy
 +
-+# V1 prerequisite coverage (stage amendment; the full configured-provider set is the V1-P gate): providers whose
-+# transport the seam can hold to one request. Anything else - Mistral, user command (including the
++# Providers whose transport the seam can hold to one request. Anything else - user command (including the
 +# ``local_command`` template) and plugin providers - is refused UNSENT, never replaced by another provider.
-+STT_PROVIDERS = frozenset({'local', 'openai', 'groq', 'deepinfra', 'xai', 'elevenlabs'})
++STT_PROVIDERS = frozenset({'local', 'openai', 'groq', 'deepinfra', 'xai', 'elevenlabs', 'mistral'})
 +LOCAL_PROVIDERS = frozenset({'local', 'local_command'})  # no remote request: never a fallback to themselves
 +SOURCE_LABEL = 'relay'
 +
@@ -629,18 +629,21 @@ index 0000000000000000000000000000000000000000..f90d9935baed144a63c938402f986e71
 +def _configured(path, policy):
 +    """Worker thread: the stock pipeline under the one-send policy."""
 +    from tools import transcription_tools as stt
-+    with native_send_policy.activate(policy):
-+        config = stt._load_stt_config()
-+        enabled = stt.is_stt_enabled(config)
-+        provider = stt._get_provider(config) if enabled else 'none'
-+        if not enabled:
-+            return _Attempt(None, provider, False)
-+        try:
-+            return _Attempt(stt.transcribe_audio(path, None, SOURCE_LABEL), provider, True)
-+        except native_send_policy.NativeSendRefused:
-+            return _Attempt(None, provider, True)  # the policy recorded why
-+        except Exception:  # health: allow BLE001 -- provider/library failure becomes the stable 'failed' token; its text must not leave
-+            return _Attempt(None, provider, True)
++    try:
++        with native_send_policy.activate(policy):
++            config = stt._load_stt_config()
++            enabled = stt.is_stt_enabled(config)
++            provider = stt._get_provider(config) if enabled else 'none'
++            if not enabled:
++                return _Attempt(None, provider, False)
++            try:
++                return _Attempt(stt.transcribe_audio(path, None, SOURCE_LABEL), provider, True)
++            except native_send_policy.NativeSendRefused:
++                return _Attempt(None, provider, True)  # the policy recorded why
++            except Exception:  # health: allow BLE001 -- provider/library failure becomes the stable 'failed' token; its text must not leave
++                return _Attempt(None, provider, True)
++    finally:
++        policy.close_clients()  # the pools of every client this call built, whatever the provider's SDK did
 +
 +
 +def _fallback(path, policy):
@@ -701,13 +704,14 @@ index 0000000000000000000000000000000000000000..f90d9935baed144a63c938402f986e71
 +
 +
 +async def transcribe_once(path, *, authorize, before_send, deadline_s):
-+    from gateway.session_native_voice import MAX_AUDIO_BYTES, STT_REQUEST_TIMEOUT_S
++    from gateway.session_native_voice import MAX_AUDIO_BYTES, MAX_STT_RESPONSE_BYTES, STT_REQUEST_TIMEOUT_S
 +    gate.validate_call(authorize, before_send, deadline_s)
 +    if not isinstance(path, str) or not path or '\0' in path:
 +        return _make('refused', None, None, gate.PROVIDER_NOT_STARTED)
 +    deadline = time.monotonic() + deadline_s
 +    policy = gate.new_policy(asyncio.get_running_loop(), authorize, before_send, deadline,
-+                             timeout_s=min(STT_REQUEST_TIMEOUT_S, float(deadline_s)), providers=STT_PROVIDERS)
++                             timeout_s=min(STT_REQUEST_TIMEOUT_S, float(deadline_s)), providers=STT_PROVIDERS,
++                             max_output_bytes=MAX_STT_RESPONSE_BYTES)
 +    refusal = gate.check(authorize)
 +    if refusal:
 +        return _make(refusal, None, None, gate.PROVIDER_NOT_STARTED)
@@ -759,10 +763,10 @@ index 0000000000000000000000000000000000000000..f90d9935baed144a63c938402f986e71
 +    return _make(configured_state, None, None, provider)
 diff --git a/gateway/session_native_voice_tts.py b/gateway/session_native_voice_tts.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..fa9821faed9cb7cd4c0eaf3f4f2767bcd13224d3
+index 0000000000000000000000000000000000000000..d6c884428cc7394d79382edec173939f8a4da4ad
 --- /dev/null
 +++ b/gateway/session_native_voice_tts.py
-@@ -0,0 +1,249 @@
+@@ -0,0 +1,248 @@
 +"""Configured one-request-per-chunk text-to-speech for the native voice seam (``session_native_voice``).
 +
 +The profile's own TTS configuration (provider, voice, model) is read at call time through the stock
@@ -782,10 +786,9 @@ index 0000000000000000000000000000000000000000..fa9821faed9cb7cd4c0eaf3f4f2767bc
 +from gateway import session_native_voice_gate as gate
 +from tools import native_send_policy
 +
-+# V1 prerequisite coverage (stage amendment; the full configured-voice set is the V1-P gate): voices whose
-+# transport the seam can hold to one request per chunk. Others - Mistral, MiniMax, xAI, Gemini, local engines,
-+# command and plugin providers - are refused UNSENT, never replaced by another provider.
-+TTS_PROVIDERS = frozenset({'edge', 'elevenlabs', 'openai', 'deepinfra'})
++# Voices whose transport the seam can hold to one request per chunk. Others - MiniMax, xAI, Gemini, local
++# engines, command and plugin providers - are refused UNSENT, never replaced by another provider.
++TTS_PROVIDERS = frozenset({'edge', 'elevenlabs', 'openai', 'deepinfra', 'mistral'})
 +# Every covered engine sends through a client the seam hooks (httpx for the SDKs, the aiohttp connector for
 +# Edge): its identity is proven before the call and exactly one gated send is required after it.
 +HOOKED_PROVIDERS = TTS_PROVIDERS
@@ -1012,6 +1015,150 @@ index 0000000000000000000000000000000000000000..fa9821faed9cb7cd4c0eaf3f4f2767bc
 +        return _make(state, None, synth.code_points if state in ('failed', 'too_long') else 0,
 +                     'configured' if policy.sends or synth.unaccounted else None, provider)
 +    return _make('synthesized', synth.path, synth.code_points, 'configured', provider)
+diff --git a/tests/gateway/mistral_voice_support.py b/tests/gateway/mistral_voice_support.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..d19830a52f92973329d654337576e93454d5b94d
+--- /dev/null
++++ b/tests/gateway/mistral_voice_support.py
+@@ -0,0 +1,138 @@
++"""Synthetic Mistral provider bytes and shared profile helpers for the native voice Mistral tests.
++
++Only the network bytes are replaced (the shared ``Wire`` / ``provider_wire`` transport of
++``native_voice_support``): the REAL pinned ``mistralai`` SDK builds, sends and parses every request.
++Answers are valid SDK envelopes, so the SDK's own response parser runs on them.
++"""
++from __future__ import annotations
++
++import asyncio
++import base64
++import functools
++import threading
++
++import httpx
++
++from hermes_constants import get_hermes_home
++from tests.gateway import native_voice_support as support
++
++KEY = 'mi-synthetic-key'
++TRANSCRIPTION_URL = 'https://api.mistral.ai/v1/audio/transcriptions'
++SPEECH_URL = 'https://api.mistral.ai/v1/audio/speech'
++LONG_TEXT = ('The first sentence is deliberately rather long. The second sentence is also fairly long here. '
++             'The third sentence closes out the whole text.')
++
++
++class MistralWire(support.Wire):
++    """Scripted Mistral answers. 'ok' values: ``text`` (STT), ``audio`` (TTS bytes, base64-wrapped),
++    ``content`` (raw body bytes) or ``chunks`` (a body of unknown length)."""
++
++    def respond(self, request, value):
++        if 'content' in value:
++            return httpx.Response(200, content=value['content'], headers={'content-type': 'application/json'},
++                                  request=request)
++        if 'chunks' in value:
++            return httpx.Response(200, content=iter(value['chunks']), headers={'content-type': 'application/json'},
++                                  request=request)
++        if request.url.path.endswith('/audio/speech'):
++            audio = base64.b64encode(value.get('audio', b'ID3mistral-audio')).decode()
++            return httpx.Response(200, json={'audio_data': audio}, request=request)
++        return httpx.Response(200, request=request, json={
++            'model': 'voxtral-mini-latest', 'text': value.get('text', 'hello world'), 'language': 'en',
++            'usage': {'prompt_tokens': 1, 'completion_tokens': 1, 'total_tokens': 2, 'prompt_audio_seconds': 1}})
++
++
++def stt_profile(**section):
++    """The profile's real ``config.yaml`` and ``.env`` for a Mistral STT (``section`` is ``stt.mistral``)."""
++    support.write_config(get_hermes_home(), {'stt': {'provider': 'mistral', 'cloud_trim_silence': False,
++                                                     'mistral': section}})
++    (get_hermes_home() / '.env').write_text(f'MISTRAL_API_KEY={KEY}\n')
++
++
++def tts_profile(**section):
++    """The same for a Mistral TTS (``section`` is ``tts.mistral``)."""
++    support.write_config(get_hermes_home(), {'tts': {'provider': 'mistral', 'mistral': section}})
++    (get_hermes_home() / '.env').write_text(f'MISTRAL_API_KEY={KEY}\n')
++
++
++async def hear(path, callbacks, deadline_s=30):
++    from gateway.session_native_voice import transcribe_native_once
++    return await transcribe_native_once(path, authorize=callbacks.authorize, before_send=callbacks.before_send,
++                                        deadline_s=deadline_s)
++
++
++async def speak(out, callbacks, text='Hello there, friend.', deadline_s=60):
++    from gateway.session_native_voice import synthesize_native_once
++    return await synthesize_native_once(text, output_dir=out, authorize=callbacks.authorize,
++                                        before_send=callbacks.before_send, deadline_s=deadline_s)
++
++
++class HeldGate:
++    """Holds the loop callback the worker enqueues for the consumer's callbacks until the test releases it."""
++
++    def __init__(self, monkeypatch):
++        self.loop = asyncio.get_running_loop()
++        self.enqueued = threading.Event()
++        self.held = None
++        self.real = self.loop.call_soon_threadsafe
++
++        def intercept(callback, *args, **kwargs):
++            if 'loop_gate' in getattr(callback, '__qualname__', ''):
++                self.held = callback
++                self.enqueued.set()
++                return None
++            return self.real(callback, *args, **kwargs)
++        monkeypatch.setattr(self.loop, 'call_soon_threadsafe', intercept)
++
++    async def wait_enqueued(self):
++        assert await asyncio.to_thread(self.enqueued.wait, 10)
++
++    async def release(self):
++        done = asyncio.Event()
++
++        def run():
++            self.held()
++            done.set()
++        self.real(run)
++        await done.wait()
++
++
++def watch_worker(monkeypatch, module, name):
++    """An Event set when the worker function has fully returned (the late path has finished)."""
++    finished = threading.Event()
++    original = getattr(module, name)
++
++    def watched(*args, **kwargs):
++        try:
++            return original(*args, **kwargs)
++        finally:
++            finished.set()
++    monkeypatch.setattr(module, name, watched)
++    return finished
++
++
++def record_calls(real, calls):
++    """``real`` with the options of each call noted; ``wraps`` keeps the signature the seam inspects."""
++    @functools.wraps(real)
++    def observed(*args, **kwargs):
++        calls.append({name: value for name, value in kwargs.items() if name not in ('file', 'input')})
++        return real(*args, **kwargs)
++    return observed
++
++
++def observe_sdk(monkeypatch):
++    """The REAL SDK class, observed (not replaced): what each client was built with, what it sends through and
++    which per-call options each real endpoint invocation received (the call itself still runs the real SDK)."""
++    from mistralai.client import Mistral
++    seen = []
++
++    class Observed(Mistral):
++        def __init__(self, *args, **kwargs):
++            super().__init__(*args, **kwargs)
++            record = {'kwargs': kwargs, 'sender': self.sdk_configuration.client, 'calls': []}
++            seen.append(record)
++            for endpoint in (self.audio.transcriptions, self.audio.speech):
++                endpoint.complete = record_calls(endpoint.complete, record['calls'])
++    monkeypatch.setattr('mistralai.client.Mistral', Observed)
++    monkeypatch.setattr('tools.tts_tool._import_mistral_client', lambda: Observed)
++    return seen
 diff --git a/tests/gateway/native_display_support.py b/tests/gateway/native_display_support.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..a9896b7f7fb9b7249a3a990be360e7ffa5605404
@@ -2536,6 +2683,796 @@ index 0000000000000000000000000000000000000000..e6a7f24d179c82266125dbdba2aa88f1
 +    monkeypatch.setattr('tools.transcription_tools._transcribe_local_command',
 +                        lambda *a, **k: ran.append(1) or {'success': True, 'transcript': 'by command'})
 +    assert transcribe_audio_local_fallback(clip)['transcript'] == 'by command' and ran == [1]
+diff --git a/tests/gateway/test_native_voice_mistral.py b/tests/gateway/test_native_voice_mistral.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..5e8df5a1ed9d852eba621ad17f9233e22377c62f
+--- /dev/null
++++ b/tests/gateway/test_native_voice_mistral.py
+@@ -0,0 +1,316 @@
++"""Native voice seam: configured Mistral STT and TTS through the stock pipeline and the REAL pinned ``mistralai`` SDK.
++
++``mistralai==2.4.8`` (and its newly staged pure-Python dependencies) are the lock-pinned wheels of the owned offline
++overlay: hash-verified, extracted inert, never installed, imported under the unchanged guard. Only the network bytes
++are synthetic (the httpx transport), so the SDK's own request builder, retry/redirect/timeout handling and response
++parser run for every case here. Stand-ins for misbehaving SDKs live in ``test_native_voice_mistral_accounting``.
++"""
++import json
++import os
++import sys
++from pathlib import Path
++
++import httpx
++import pytest
++
++from tests.gateway import mistral_voice_support as mistral
++from tests.gateway import native_voice_support as support
++from tests.gateway.mistral_voice_support import hear, speak
++
++
++@pytest.fixture
++def clip(tmp_path):
++    return support.write_wav(tmp_path / 'clip.wav')
++
++
++@pytest.fixture
++def out(tmp_path):
++    path = tmp_path / 'caller-output'
++    path.mkdir()
++    return str(path)
++
++
++@pytest.fixture
++def sdk(monkeypatch):
++    return mistral.observe_sdk(monkeypatch)
++
++
++# --- speech to text ---------------------------------------------------------------------------------------
++
++@pytest.mark.asyncio
++async def test_mistral_stt_sends_one_gated_request_through_the_injected_client(monkeypatch, clip, sdk):
++    mistral.stt_profile(model='voxtral-mini-2602', language='fr')
++    events = []
++    cb = support.Callbacks(events)
++    wire = mistral.MistralWire([('ok', {'text': 'bonjour le monde'})], tap=lambda request: events.append('request'))
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, cb, deadline_s=90)  # the request timeout is min(60 s policy, deadline)
++    assert (result.state, result.transcript, result.source, result.provider) == (
++        'transcribed', 'bonjour le monde', 'configured', 'completed')
++    assert wire.count == 1 and events == ['authorize', 'authorize', 'before_send', 'request', 'authorize']
++    (built,) = sdk
++    assert built['kwargs']['client'] is built['sender']  # the SDK sends through the very client that carries the hook
++    assert built['kwargs']['retry_config'] is None and built['kwargs']['timeout_ms'] == 60000
++    assert [(c['retries'], c['timeout_ms'], c['language']) for c in built['calls']] == [(None, 60000, 'fr')]
++    assert (built['sender'].follow_redirects, built['sender'].timeout.read) == (False, 60.0)  # the options it carries
++    assert built['kwargs']['client'].is_closed  # no pool leak per call
++    request = wire.requests[0]
++    body = request.read()
++    assert str(request.url) == mistral.TRANSCRIPTION_URL
++    assert request.headers['authorization'] == f'Bearer {mistral.KEY}'
++    assert request.headers['user-agent'].startswith('mistral-client-python/')
++    assert b'voxtral-mini-2602' in body and b'name="language"' in body and b'fr' in body  # profile model + language
++    assert {t['read'] for t in wire.timeouts()} == {60.0}
++
++
++@pytest.mark.asyncio
++async def test_mistral_stt_language_follows_the_stock_resolution_order(monkeypatch, clip, sdk):
++    support.write_config(mistral.get_hermes_home(), {'stt': {'provider': 'mistral', 'cloud_trim_silence': False,
++                                                             'language': 'de'}})
++    (mistral.get_hermes_home() / '.env').write_text(f'MISTRAL_API_KEY={mistral.KEY}\n')
++    wire = mistral.MistralWire([('ok', {})])
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, support.Callbacks())
++    assert (result.state, wire.count) == ('transcribed', 1)
++    assert b'name="language"' in wire.requests[0].read() and b'de' in wire.requests[0].read()
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('script', [
++    [('status', 500)] * 3, [('status', 429)] * 3, [('raise', httpx.ReadTimeout('synthetic'))] * 3,
++    [('redirect', mistral.TRANSCRIPTION_URL + '?elsewhere')] + [('ok', {'text': 'followed'})] * 2],
++    ids=['5xx', '429', 'timeout', 'redirect'])
++async def test_mistral_stt_failures_are_never_resent(monkeypatch, clip, sdk, script):
++    mistral.stt_profile()
++    cb = support.Callbacks()
++    wire = mistral.MistralWire(script)
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, cb)
++    assert (result.state, result.transcript, result.source, result.provider) == ('failed', None, None, 'failed_after_send')
++    assert wire.count == 1 and cb.before_send_calls == 1  # the SDK default is no retry; a redirect is an answer
++    assert sdk[0]['kwargs']['client'].is_closed
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('body', [
++    b'this is not json', b'{}', b'{"model":"m","text":5,"language":null,"usage":{}}', b'{"model":"m","text":"x"'],
++    ids=['not-json', 'empty-object', 'wrong-type', 'truncated'])
++async def test_mistral_stt_unparseable_paid_answer_is_a_failure_after_send_and_not_resent(monkeypatch, clip, sdk, body):
++    mistral.stt_profile()
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {'content': body})] * 3)
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, cb)
++    assert (result.state, result.transcript, result.provider) == ('failed', None, 'failed_after_send')
++    assert wire.count == 1 and cb.before_send_calls == 1
++
++
++@pytest.mark.asyncio
++async def test_mistral_stt_silence_is_an_answer_and_a_known_failure_may_use_the_cached_local_fallback(
++        monkeypatch, clip, sdk):
++    mistral.stt_profile()
++    wire = mistral.MistralWire([('ok', {'text': ''})])
++    with support.provider_wire(monkeypatch, wire):
++        silent = await hear(clip, support.Callbacks())
++    assert (silent.state, silent.transcript, silent.source, silent.provider) == ('empty', None, 'configured', 'completed')
++    fallback = []
++    monkeypatch.setattr('tools.transcription_tools._HAS_FASTER_WHISPER', True)
++    monkeypatch.setattr('tools.transcription_tools._transcribe_local',
++                        lambda path, model, **kw: fallback.append(path) or {'success': True, 'transcript': ' local words '})
++    wire = mistral.MistralWire([('status', 500)] * 3)
++    with support.provider_wire(monkeypatch, wire):
++        failed = await hear(clip, support.Callbacks())
++    assert (failed.state, failed.transcript, failed.source, failed.provider) == (
++        'transcribed', 'local words', 'local_fallback', 'failed_after_send')
++    assert wire.count == 1 and len(fallback) == 1  # one cloud send, then only the installed local backend
++
++
++@pytest.mark.asyncio
++async def test_mistral_stt_response_bodies_are_bounded_even_without_a_declared_length(monkeypatch, clip, sdk):
++    mistral.stt_profile()
++    huge = b'{"model":"m","language":null,"usage":{},"text":"' + b'a' * (2 * 1024 * 1024) + b'"}'
++    chunked = [huge[i:i + 65536] for i in range(0, len(huge), 65536)]
++    for step in ({'content': huge}, {'chunks': chunked}):
++        cb = support.Callbacks()
++        wire = mistral.MistralWire([('ok', step)] * 3)
++        with support.provider_wire(monkeypatch, wire):
++            result = await hear(clip, cb)
++        assert (result.state, result.transcript, result.provider) == ('failed', None, 'failed_after_send')
++        assert wire.count == 1 and cb.before_send_calls == 1
++    long_text = 'a' * 4001
++    wire = mistral.MistralWire([('ok', {'text': long_text})])
++    with support.provider_wire(monkeypatch, wire):
++        over = await hear(clip, support.Callbacks())
++    assert (over.state, over.transcript, over.provider) == ('too_long', None, 'completed')  # the transcript bound stands
++
++
++@pytest.mark.asyncio
++async def test_mistral_stt_prompt_the_pinned_sdk_cannot_carry_is_refused_unsent(monkeypatch, clip, sdk):
++    mistral.stt_profile()
++    support.write_config(mistral.get_hermes_home(), {'stt': {'provider': 'mistral', 'cloud_trim_silence': False,
++                                                             'prompt': 'domain hint words'}})
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {})])
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, cb)
++    assert (result.state, result.transcript, result.provider) == ('unavailable', None, 'not_started')
++    assert wire.count == 0 and cb.before_send_calls == 0  # the real signature has no ``prompt``: never silently dropped
++
++
++@pytest.mark.asyncio
++async def test_mistral_stt_without_a_key_is_unavailable_and_unsent(monkeypatch, clip, sdk):
++    mistral.stt_profile()
++    (mistral.get_hermes_home() / '.env').write_text('')
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {})])
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, cb)
++    assert (result.state, result.provider) == ('unavailable', 'not_started')
++    assert wire.count == 0 and cb.before_send_calls == 0 and sdk == []
++
++
++@pytest.mark.asyncio
++async def test_mistral_stt_without_the_sdk_is_unavailable_and_unsent(monkeypatch, clip):
++    mistral.stt_profile()
++    monkeypatch.setattr('tools.transcription_tools._HAS_MISTRAL', False)
++    monkeypatch.setitem(sys.modules, 'mistralai.client', None)
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {})])
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, cb)
++    assert (result.state, result.provider) == ('unavailable', 'not_started')
++    assert wire.count == 0 and cb.before_send_calls == 0
++
++
++# --- text to speech ---------------------------------------------------------------------------------------
++
++def absent():
++    raise ImportError('synthetic: the SDK is not installed')
++
++
++@pytest.mark.asyncio
++async def test_mistral_tts_sends_one_gated_request_with_the_profile_voice(monkeypatch, out, sdk):
++    mistral.tts_profile(model='voxtral-mini-tts-2603', voice_id='voice-profile-1', base_url='https://eu.mistral.example/')
++    events = []
++    cb = support.Callbacks(events)
++    wire = mistral.MistralWire([('ok', {'audio': b'ID3real'})], tap=lambda request: events.append('request'))
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.provider, result.source) == ('synthesized', 'completed', 'configured')
++    assert wire.count == 1 and events == ['authorize', 'authorize', 'before_send', 'request', 'authorize']
++    assert Path(result.path).read_bytes() == b'ID3real' and os.listdir(out) == [os.path.basename(result.path)]
++    (built,) = sdk
++    assert built['kwargs']['client'] is built['sender'] and built['kwargs']['retry_config'] is None
++    assert built['kwargs']['timeout_ms'] == 60000 and built['kwargs']['client'].is_closed
++    assert [(c['retries'], c['timeout_ms']) for c in built['calls']] == [(None, 60000)]  # zero retries, explicit timeout
++    assert (built['sender'].follow_redirects, built['sender'].timeout.read) == (False, 60.0)
++    assert built['kwargs']['server_url'] == 'https://eu.mistral.example/'  # tts.mistral.base_url -> SDK server_url
++    request = wire.requests[0]
++    assert str(request.url) == 'https://eu.mistral.example/v1/audio/speech'
++    assert request.headers['authorization'] == f'Bearer {mistral.KEY}'
++    assert request.headers['user-agent'].startswith('mistral-client-python/')
++    sent = json.loads(request.read())
++    assert (sent['model'], sent['voice_id'], sent['input'], sent['response_format']) == (
++        'voxtral-mini-tts-2603', 'voice-profile-1', 'Hello there, friend.', 'mp3')
++    assert {t['read'] for t in wire.timeouts()} == {60.0}
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('script', [
++    [('status', 500)] * 3, [('status', 429)] * 3, [('raise', httpx.ReadTimeout('synthetic'))] * 3,
++    [('redirect', mistral.SPEECH_URL + '?elsewhere')] + [('ok', {'audio': b'ID3followed'})] * 2],
++    ids=['5xx', '429', 'timeout', 'redirect'])
++async def test_mistral_tts_failures_are_never_resent_and_leave_no_file(monkeypatch, out, sdk, script):
++    mistral.tts_profile()
++    cb = support.Callbacks()
++    wire = mistral.MistralWire(script)
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.path, result.provider) == ('failed', None, 'failed_after_send')
++    assert wire.count == 1 and cb.before_send_calls == 1 and os.listdir(out) == []
++    assert sdk[0]['kwargs']['client'].is_closed
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('body', [b'not json', b'{}', b'{"audio_data":5}', b'{"audio_data":"abc"}'],
++                         ids=['not-json', 'missing-audio', 'wrong-type', 'bad-base64'])
++async def test_mistral_tts_unparseable_paid_answer_is_a_failure_after_send_and_not_resent(monkeypatch, out, sdk, body):
++    mistral.tts_profile()
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {'content': body})] * 3)
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.path, result.provider) == ('failed', None, 'failed_after_send')
++    assert wire.count == 1 and cb.before_send_calls == 1 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_mistral_tts_empty_audio_is_a_failure_with_the_answer_accounted(monkeypatch, out, sdk):
++    mistral.tts_profile()
++    wire = mistral.MistralWire([('ok', {'audio': b''})])
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert (result.state, result.path, result.provider) == ('failed', None, 'completed')
++    assert wire.count == 1 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_mistral_tts_responses_are_bounded_on_the_wire_and_when_decoded(monkeypatch, out, sdk):
++    mistral.tts_profile()
++    monkeypatch.setattr('gateway.session_native_voice.MAX_CHUNK_AUDIO_BYTES', 300)
++    wire_body = b'{"audio_data":"' + b'A' * 8192 + b'"}'
++    for step in ({'content': wire_body}, {'chunks': [wire_body[i:i + 1024] for i in range(0, len(wire_body), 1024)]}):
++        cb = support.Callbacks()
++        wire = mistral.MistralWire([('ok', step)] * 3)
++        with support.provider_wire(monkeypatch, wire):
++            result = await speak(out, cb)
++        assert (result.state, result.path, result.provider) == ('too_long', None, 'failed_after_send')
++        assert wire.count == 1 and os.listdir(out) == []
++    wire = mistral.MistralWire([('ok', {'audio': b'x' * 301})])  # small on the wire, over the cap once decoded
++    with support.provider_wire(monkeypatch, wire):
++        decoded = await speak(out, support.Callbacks())
++    assert (decoded.state, decoded.path, decoded.provider) == ('too_long', None, 'completed')
++    assert wire.count == 1 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_mistral_tts_without_a_key_or_the_sdk_is_unavailable_and_unsent(monkeypatch, out, sdk):
++    mistral.tts_profile()
++    (mistral.get_hermes_home() / '.env').write_text('')
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {})])
++    with support.provider_wire(monkeypatch, wire):
++        keyless = await speak(out, cb)
++        mistral.tts_profile()
++        monkeypatch.setattr('tools.tts_tool._import_mistral_client', absent)
++        sdkless = await speak(out, cb)
++    assert [(r.state, r.provider) for r in (keyless, sdkless)] == [('unavailable', 'not_started')] * 2
++    assert wire.count == 0 and cb.before_send_calls == 0 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_mistral_tts_multi_chunk_join_uses_one_gated_request_per_chunk_and_the_real_ffmpeg(
++        monkeypatch, out, sdk, tmp_path):
++    mistral.tts_profile(max_text_length=60)
++    mp3 = support.synth_mp3(tmp_path / 'sine.mp3', seconds=1.0)
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {'audio': mp3})] * 5)
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb, text=mistral.LONG_TEXT)
++    assert (result.state, result.provider) == ('synthesized', 'completed')
++    assert wire.count == cb.before_send_calls == len(sdk) >= 3  # one client, one send per chunk
++    assert all(built['kwargs']['client'].is_closed for built in sdk)
++    assert os.listdir(out) == [os.path.basename(result.path)]
++    assert abs(support.media_seconds(result.path) - wire.count) < 0.6
++
++
++@pytest.mark.asyncio
++async def test_mistral_tts_stops_at_the_first_failed_chunk_and_removes_every_owned_file(monkeypatch, out, sdk, tmp_path):
++    mistral.tts_profile(max_text_length=60)
++    mp3 = support.synth_mp3(tmp_path / 'sine.mp3', seconds=1.0)
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {'audio': mp3}), ('status', 500), ('ok', {'audio': mp3})])
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb, text=mistral.LONG_TEXT)
++    assert (result.state, result.path) == ('failed', None)
++    assert wire.count == 2 and cb.before_send_calls == 2 and os.listdir(out) == []  # the third chunk never left
+diff --git a/tests/gateway/test_native_voice_mistral_accounting.py b/tests/gateway/test_native_voice_mistral_accounting.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..10e238b0ab96e1279b5c0de18c9f6dadb39077f0
+--- /dev/null
++++ b/tests/gateway/test_native_voice_mistral_accounting.py
+@@ -0,0 +1,258 @@
++"""Native voice seam, Mistral: client identity, SDK options and accounting after an entered invocation.
++
++A hooked SDK that passes the identity proof and then sends outside the gate may also fail. The consumer then has no
++durable in-flight record: the result must be ``failed`` with ``provider='unknown'`` and a configured-STT failure of
++that kind must NOT run the local fallback (a conservative trade-off: when the true failure was local the fallback
++is lost too). Failures BEFORE the invocation is entered stay truthful ``unavailable`` / ``not_started``.
++
++The diverging and option-less SDKs below are LABELLED STAND-INS that misbehave on purpose; they are distinct from the
++real-SDK proof in ``test_native_voice_mistral``. The per-arm and pre-entry controls use the real pinned SDK for the
++chunk that is gated, and fail on a plain, non-refusal pre-entry error so policy refusal cannot mask them.
++"""
++import os
++import types
++
++import httpx
++import pytest
++
++from tests.gateway import mistral_voice_support as mistral
++from tests.gateway import native_voice_support as support
++from tests.gateway.mistral_voice_support import hear, speak
++
++
++@pytest.fixture
++def clip(tmp_path):
++    return support.write_wav(tmp_path / 'clip.wav')
++
++
++@pytest.fixture
++def out(tmp_path):
++    path = tmp_path / 'caller-output'
++    path.mkdir()
++    return str(path)
++
++
++@pytest.fixture
++def fallback(monkeypatch):
++    """A cached local STT backend that would answer if the seam ever fell back to it."""
++    calls = []
++    monkeypatch.setattr('tools.transcription_tools._HAS_FASTER_WHISPER', True)
++    monkeypatch.setattr('tools.transcription_tools._transcribe_local',
++                        lambda path, model, **kw: calls.append(path) or {'success': True, 'transcript': 'local words'})
++    return calls
++
++
++class Diverging:
++    """Labelled stand-in: reports the injected client as its sender (the identity proof PASSES), accepts the zero-retry
++    options, then sends once through ITS OWN client over the synthetic transport and fails or answers on its own."""
++
++    answer = 'raise'
++
++    def __init__(self, api_key=None, client=None, timeout_ms=None, retry_config=None, debug_logger=None, server_url=None):
++        self.sdk_configuration = types.SimpleNamespace(client=client)
++        self.own = httpx.Client()
++        self.audio = types.SimpleNamespace(
++            transcriptions=types.SimpleNamespace(complete=self.transcribe), speech=types.SimpleNamespace(complete=self.speak))
++
++    def __enter__(self):
++        return self
++
++    def __exit__(self, *exc):
++        self.own.close()
++
++    def transcribe(self, *, model, file, language=None, retries=None, timeout_ms=None):
++        response = self.own.post(mistral.TRANSCRIPTION_URL, content=b'x')
++        response.raise_for_status()
++        return types.SimpleNamespace(text=None, error='stand-in failure result')  # no text: the stock failure result
++
++    def speak(self, *, input, model=None, voice_id=None, response_format=None, retries=None, timeout_ms=None):
++        response = self.own.post(mistral.SPEECH_URL, content=b'x')
++        if type(self).answer == 'raise':
++            response.raise_for_status()
++        return types.SimpleNamespace(audio_data='SUQzZGl2ZXJnZWQ=')  # valid base64 audio nobody gated
++
++
++class IgnoresInjectedClient(Diverging):
++    """Labelled stand-in: builds and uses its OWN client whatever it is handed (the identity proof must FAIL)."""
++
++    def __init__(self, *args, **kwargs):
++        super().__init__(*args, **kwargs)
++        self.sdk_configuration = types.SimpleNamespace(client=self.own)
++
++
++class WithoutRetryOption(Diverging):
++    """Labelled stand-in: passes the identity proof but its endpoints cannot be told "no retry"."""
++
++    def __init__(self, *args, **kwargs):
++        super().__init__(*args, **kwargs)
++        self.audio = types.SimpleNamespace(
++            transcriptions=types.SimpleNamespace(complete=lambda *, model, file, language=None: self.never()),
++            speech=types.SimpleNamespace(complete=lambda *, input, model=None, voice_id=None, response_format=None: self.never()))
++
++    def never(self):
++        raise AssertionError('the seam must refuse before invoking an SDK it cannot hold to zero retries')
++
++
++def use_stt_sdk(monkeypatch, sdk):
++    monkeypatch.setattr('mistralai.client.Mistral', sdk)
++
++
++def use_tts_sdk(monkeypatch, sdk):
++    monkeypatch.setattr('tools.tts_tool._import_mistral_client', lambda: sdk)
++
++
++# --- divergent clients after the identity proof -------------------------------------------------------------
++
++@pytest.mark.asyncio
++async def test_a_diverging_stt_sdk_that_raises_after_its_own_send_is_failed_unknown_and_never_falls_back(
++        monkeypatch, clip, fallback):
++    mistral.stt_profile()
++    use_stt_sdk(monkeypatch, Diverging)
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('status', 500)] * 3)
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, cb)
++    assert (result.state, result.transcript, result.source, result.provider) == ('failed', None, None, 'unknown')
++    assert wire.count == 1 and cb.before_send_calls == 0 and fallback == []
++    assert support.SECRET not in repr(result)
++
++
++@pytest.mark.asyncio
++async def test_a_diverging_stt_sdk_that_returns_a_failure_result_is_failed_unknown_and_never_falls_back(
++        monkeypatch, clip, fallback):
++    mistral.stt_profile()
++
++    class ReturnsFailure(Diverging):
++        def transcribe(self, *, model, file, language=None, retries=None, timeout_ms=None):
++            self.own.post(mistral.TRANSCRIPTION_URL, content=b'x')
++            return types.SimpleNamespace(text=None, error='stand-in failure result')
++    use_stt_sdk(monkeypatch, ReturnsFailure)
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {})] * 3)
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, cb)
++    assert (result.state, result.transcript, result.source, result.provider) == ('failed', None, None, 'unknown')
++    assert wire.count == 1 and cb.before_send_calls == 0 and fallback == []
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('answer, state, provider', [('raise', 'failed', 'unknown'), ('answer', 'failed', 'unknown')],
++                         ids=['raises', 'returns-audio-nobody-gated'])
++async def test_a_diverging_tts_sdk_is_failed_unknown_and_leaves_no_file(monkeypatch, out, answer, state, provider):
++    mistral.tts_profile()
++    use_tts_sdk(monkeypatch, type('Diverged', (Diverging,), {'answer': answer}))
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('status', 500)] * 3)
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.path, result.provider) == (state, None, provider)
++    assert wire.count == 1 and cb.before_send_calls == 0 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_a_later_chunk_that_diverges_leaves_the_aggregate_unknown_and_cleans_up(monkeypatch, out):
++    from mistralai.client import Mistral
++    mistral.tts_profile(max_text_length=60)
++    built = []
++
++    def importer():
++        built.append(1)
++        # call 1 is the engine-availability probe, call 2 builds chunk 1 (real, gated), call 3 builds chunk 2 (diverges)
++        return Mistral if len(built) <= 2 else Diverging
++    monkeypatch.setattr('tools.tts_tool._import_mistral_client', importer)
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {'audio': b'ID3first'}), ('status', 500), ('ok', {'audio': b'ID3never'})])
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb, text=mistral.LONG_TEXT)
++    assert (result.state, result.path, result.provider) == ('failed', None, 'unknown')
++    assert len(built) == 3, 'no third chunk is attempted after the unaccounted one'
++    assert wire.count == 2 and cb.before_send_calls == 1 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_an_sdk_that_retries_by_itself_through_the_injected_client_is_held_to_one_send(monkeypatch, clip, out):
++    """Labelled stand-in: honest about identity and options, but its endpoint posts twice through the injected client
++    (what a retrying SDK would do). The second attempt is refused at the gate, before anything leaves."""
++    class Retries(Diverging):
++        def transcribe(self, *, model, file, language=None, retries=None, timeout_ms=None):
++            for _ in range(2):
++                self.sdk_configuration.client.post(mistral.TRANSCRIPTION_URL, content=b'x')
++            return types.SimpleNamespace(text='never', error=None)
++
++        def speak(self, *, input, model=None, voice_id=None, response_format=None, retries=None, timeout_ms=None):
++            for _ in range(2):
++                self.sdk_configuration.client.post(mistral.SPEECH_URL, content=b'x')
++            return types.SimpleNamespace(audio_data='SUQzbmV2ZXI=')
++    use_stt_sdk(monkeypatch, Retries)
++    use_tts_sdk(monkeypatch, Retries)
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('status', 500)] * 4)
++    with support.provider_wire(monkeypatch, wire):
++        mistral.stt_profile()
++        text = await hear(clip, cb)
++        mistral.tts_profile()
++        speech = await speak(out, cb)
++    assert (text.state, text.provider, speech.state, speech.provider) == ('failed', 'failed_after_send') * 2
++    assert wire.count == 2 and cb.before_send_calls == 2 and os.listdir(out) == []  # one send per call, never two
++
++
++# --- before the invocation is entered: truthful unavailable / not_started ------------------------------------
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('sdk', [IgnoresInjectedClient, WithoutRetryOption], ids=['ignores-injected', 'no-retry-option'])
++async def test_an_sdk_that_ignores_the_injected_client_or_cannot_be_told_no_retry_is_refused_unsent(
++        monkeypatch, clip, out, sdk):
++    use_stt_sdk(monkeypatch, sdk)
++    use_tts_sdk(monkeypatch, sdk)
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {'audio': b'ID3x'}), ('ok', {})])
++    with support.provider_wire(monkeypatch, wire):
++        mistral.tts_profile()
++        speech = await speak(out, cb)
++        mistral.stt_profile()
++        text = await hear(clip, cb)
++    assert (speech.state, speech.provider) == ('unavailable', 'not_started')
++    assert (text.state, text.provider) == ('unavailable', 'not_started')
++    assert wire.count == 0 and cb.before_send_calls == 0 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_a_plain_non_refusal_failure_before_entry_is_not_unknown_for_stt_or_a_later_tts_chunk(
++        monkeypatch, clip, out, fallback):
++    """The SDK cannot even be constructed: no policy refusal explains it, no invocation was entered, nothing left."""
++    class Unbuildable:
++        def __init__(self, *args, **kwargs):
++            raise RuntimeError('synthetic construction failure')
++    mistral.stt_profile()
++    use_stt_sdk(monkeypatch, Unbuildable)
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {})])
++    with support.provider_wire(monkeypatch, wire):
++        heard = await hear(clip, cb)
++    assert (heard.state, heard.transcript, heard.source, heard.provider) == (
++        'transcribed', 'local words', 'local_fallback', 'not_started')
++    assert wire.count == 0 and cb.before_send_calls == 0 and len(fallback) == 1
++
++
++@pytest.mark.asyncio
++async def test_each_tts_chunk_starts_a_fresh_entry_scope_so_a_later_pre_entry_failure_stays_known(monkeypatch, out):
++    """Chunk 1 is entered and gated; chunk 2 fails with a plain error BEFORE its invocation. Entry state carried over
++    from chunk 1 would turn that known failure into ``unknown``; a per-arm reset keeps it ``completed``."""
++    from mistralai.client import Mistral
++
++    class Unbuildable:
++        def __init__(self, *args, **kwargs):
++            raise RuntimeError('synthetic construction failure')
++    mistral.tts_profile(max_text_length=60)
++    built = []
++
++    def importer():
++        built.append(1)
++        return Mistral if len(built) <= 2 else Unbuildable  # probe, chunk 1 real, chunk 2 unbuildable
++    monkeypatch.setattr('tools.tts_tool._import_mistral_client', importer)
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {'audio': b'ID3first'}), ('ok', {'audio': b'ID3never'})])
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb, text=mistral.LONG_TEXT)
++    assert (result.state, result.path, result.provider) == ('failed', None, 'completed')
++    assert wire.count == 1 and cb.before_send_calls == 1 and len(built) == 3 and os.listdir(out) == []
+diff --git a/tests/gateway/test_native_voice_mistral_fences.py b/tests/gateway/test_native_voice_mistral_fences.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..635a7f102b572e3a0702dde54c1ba27669d23169
+--- /dev/null
++++ b/tests/gateway/test_native_voice_mistral_fences.py
+@@ -0,0 +1,198 @@
++"""Native voice seam, Mistral: Stop and deadline fences, no late callbacks or files, and no hidden SDK side channel.
++
++The REAL pinned ``mistralai`` SDK over a synthetic transport. Deterministic: the loop callback that runs the consumer's
++``authorize`` / ``before_send`` is held (or the transport is held) with events, never with sleeps.
++"""
++import asyncio
++import logging
++import os
++import threading
++
++import pytest
++
++from tests.gateway import mistral_voice_support as mistral
++from tests.gateway import native_voice_support as support
++from tests.gateway.mistral_voice_support import HeldGate, hear, speak, watch_worker
++
++
++@pytest.fixture
++def clip(tmp_path):
++    return support.write_wav(tmp_path / 'clip.wav')
++
++
++@pytest.fixture
++def out(tmp_path):
++    path = tmp_path / 'caller-output'
++    path.mkdir()
++    return str(path)
++
++
++@pytest.fixture
++def sdk(monkeypatch):
++    return mistral.observe_sdk(monkeypatch)
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('how', ['cancel', 'deadline'])
++async def test_stt_callbacks_never_run_after_stop_or_the_deadline_while_the_gate_is_held(monkeypatch, clip, sdk, how):
++    from gateway import session_native_voice_stt as stt_module
++    mistral.stt_profile()
++    finished = watch_worker(monkeypatch, stt_module, '_configured')
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {})])
++    held = HeldGate(monkeypatch)
++    with support.provider_wire(monkeypatch, wire):
++        if how == 'cancel':
++            task = asyncio.create_task(hear(clip, cb))
++            await held.wait_enqueued()
++            task.cancel()
++            with pytest.raises(asyncio.CancelledError):
++                await task
++        else:
++            result = await hear(clip, cb, deadline_s=0.3)
++            assert (result.state, result.provider) == ('timeout', 'not_started')
++        await held.release()
++        assert await asyncio.to_thread(finished.wait, 10)
++    assert cb.authorize_calls == 1 and cb.before_send_calls == 0 and wire.count == 0  # only the pre-work check
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('how', ['cancel', 'deadline'])
++async def test_tts_callbacks_never_run_after_stop_or_the_deadline_while_the_gate_is_held(monkeypatch, out, sdk, how):
++    from gateway import session_native_voice_tts as tts_module
++    mistral.tts_profile()
++    finished = watch_worker(monkeypatch, tts_module, '_synthesize')
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {})])
++    held = HeldGate(monkeypatch)
++    with support.provider_wire(monkeypatch, wire):
++        if how == 'cancel':
++            task = asyncio.create_task(speak(out, cb))
++            await held.wait_enqueued()
++            task.cancel()
++            with pytest.raises(asyncio.CancelledError):
++                await task
++        else:
++            result = await speak(out, cb, deadline_s=0.3)
++            assert (result.state, result.provider) == ('timeout', 'not_started')
++        await held.release()
++        assert await asyncio.to_thread(finished.wait, 10)
++    assert cb.authorize_calls == 1 and cb.before_send_calls == 0 and wire.count == 0 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_a_stalled_provider_ends_only_our_wait_and_the_late_worker_does_nothing(monkeypatch, clip, out, sdk):
++    from gateway import session_native_voice_stt as stt_module
++    from gateway import session_native_voice_tts as tts_module
++    mistral.stt_profile()
++    finished = watch_worker(monkeypatch, stt_module, '_configured')
++    release = threading.Event()
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {})], hold=release)
++    try:
++        with support.provider_wire(monkeypatch, wire):
++            heard = await hear(clip, cb, deadline_s=0.5)
++            calls = (cb.authorize_calls, cb.before_send_calls)
++            release.set()
++            assert await asyncio.to_thread(finished.wait, 10)
++    finally:
++        release.set()
++    assert (heard.state, heard.transcript, heard.provider, wire.count) == ('timeout', None, 'unknown', 1)
++    assert {t['read'] for t in wire.timeouts()} == {0.5}  # the policy timeout never exceeds the deadline
++    assert calls == (2, 1) and (cb.authorize_calls, cb.before_send_calls) == calls  # nothing after the result
++
++    mistral.tts_profile()
++    finished = watch_worker(monkeypatch, tts_module, '_synthesize')
++    release = threading.Event()
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {'audio': b'ID3late'})], hold=release)
++    try:
++        with support.provider_wire(monkeypatch, wire):
++            spoken = await speak(out, cb, deadline_s=0.5)
++            calls = (cb.authorize_calls, cb.before_send_calls)
++            release.set()
++            assert await asyncio.to_thread(finished.wait, 10)
++    finally:
++        release.set()
++    assert (spoken.state, spoken.path, spoken.provider, wire.count) == ('timeout', None, 'unknown', 1)
++    assert (cb.authorize_calls, cb.before_send_calls) == calls and os.listdir(out) == []  # a fenced worker leaves no file
++
++
++@pytest.mark.asyncio
++async def test_stop_while_the_request_is_in_flight_leaves_no_file_and_no_late_callback(monkeypatch, out, sdk):
++    from gateway import session_native_voice_tts as tts_module
++    mistral.tts_profile()
++    finished = watch_worker(monkeypatch, tts_module, '_synthesize')
++    release = threading.Event()
++    cb = support.Callbacks()
++    wire = mistral.MistralWire([('ok', {'audio': b'ID3late'})], hold=release)
++    try:
++        with support.provider_wire(monkeypatch, wire):
++            task = asyncio.create_task(speak(out, cb))
++            assert await asyncio.to_thread(wire.entered.wait, 10)
++            task.cancel()
++            with pytest.raises(asyncio.CancelledError):
++                await task
++            calls = (cb.authorize_calls, cb.before_send_calls)
++            release.set()
++            assert await asyncio.to_thread(finished.wait, 10)
++    finally:
++        release.set()
++    assert wire.count == 1 and calls == (2, 1) and (cb.authorize_calls, cb.before_send_calls) == calls
++    assert os.listdir(out) == []
++
++
++# --- no hidden side channel of the pinned SDK ------------------------------------------------------------
++
++@pytest.mark.asyncio
++async def test_an_sdk_telemetry_opt_in_in_the_environment_cannot_add_a_hidden_export(monkeypatch, clip, out, sdk):
++    from mistralai.extra.observability import telemetry
++    loads = []
++
++    def load():
++        loads.append(1)
++        raise telemetry.TelemetryConfigurationError('exporter stand-in')
++    monkeypatch.setattr(telemetry, '_load_otel_sdk', load)
++    monkeypatch.setenv('MISTRAL_SDK_TELEMETRY', 'dedicated')
++    mistral.stt_profile()
++    wire = mistral.MistralWire([('ok', {}), ('ok', {'audio': b'ID3t'})])
++    with support.provider_wire(monkeypatch, wire):
++        heard = await hear(clip, support.Callbacks())
++        mistral.tts_profile()
++        spoken = await speak(out, support.Callbacks())
++    assert (heard.state, spoken.state, wire.count) == ('transcribed', 'synthesized', 2)
++    assert loads == []  # the SDK's trace exporter (a second outbound path carrying the key) is never built
++
++
++@pytest.mark.asyncio
++async def test_sdk_debug_logging_in_the_environment_cannot_leak_keys_audio_or_transcripts(monkeypatch, clip, out, sdk, caplog):
++    monkeypatch.setenv('MISTRAL_DEBUG', '1')
++    caplog.set_level(logging.DEBUG)
++    mistral.stt_profile()
++    wire = mistral.MistralWire([('ok', {'text': 'private transcript words'}), ('ok', {'audio': b'ID3private-audio'}),
++                                ('status', 500), ('status', 500)])
++    with support.provider_wire(monkeypatch, wire):
++        await hear(clip, support.Callbacks())
++        mistral.tts_profile()
++        await speak(out, support.Callbacks())
++        await speak(out, support.Callbacks())
++        mistral.stt_profile()
++        await hear(clip, support.Callbacks())
++    seen = '\n'.join(f'{r.name} {r.getMessage()}' for r in caplog.records)
++    for secret in (mistral.KEY, 'Bearer', 'private transcript words', 'private-audio', 'synthetic provider failure',
++                   'clip.wav', 'caller-output'):
++        assert secret not in seen, secret
++    assert not [r for r in caplog.records if r.name.startswith('mistralai')]
++
++
++@pytest.mark.asyncio
++async def test_a_native_call_never_installs_the_sdk(monkeypatch, clip, out, sdk):
++    installs = []
++    monkeypatch.setattr('pm.ensure_import', lambda extra, *a, **k: installs.append(extra))
++    mistral.stt_profile()
++    wire = mistral.MistralWire([('ok', {}), ('ok', {'audio': b'ID3x'})])
++    with support.provider_wire(monkeypatch, wire):
++        await hear(clip, support.Callbacks())
++        mistral.tts_profile()
++        await speak(out, support.Callbacks())
++    assert wire.count == 2 and installs == []
 diff --git a/tests/gateway/test_native_voice_sdk_boundaries.py b/tests/gateway/test_native_voice_sdk_boundaries.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..1afba30574aaf001f769e8b94c8d5e598b1caf0a
@@ -3482,6 +4419,104 @@ index 0000000000000000000000000000000000000000..b2293d0c345f6f77aae312eb09ead4f9
 +        result = await seam('Hello there, friend.', out, support.Callbacks())
 +    assert (result.state, result.provider, wire.count, catalog) == ('synthesized', 'completed', 1, [])
 +    assert wire.requests[0].url.host == 'api.deepinfra.com'
+diff --git a/tests/tools/test_mistral_stock_transport.py b/tests/tools/test_mistral_stock_transport.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..d71fd2d793a816adf175fd6c226b941427dd54b5
+--- /dev/null
++++ b/tests/tools/test_mistral_stock_transport.py
+@@ -0,0 +1,92 @@
++"""Stock Mistral STT/TTS behaviour that the native voice seam must not change.
++
++Measured on the REAL pinned ``mistralai`` SDK with only the network transport replaced
++(``tests/gateway/mistral_voice_support.py``). The native seam (``gateway.session_native_voice``) holds a Mistral call
++to exactly one gated request; these controls prove that none of that transport policy, nor the SDK-install
++suppression, leaks into the ordinary ``transcribe_audio`` / ``text_to_speech_tool`` paths when no native call is active.
++"""
++import json
++import logging
++
++import pytest
++
++from hermes_constants import get_hermes_home
++from tests.gateway import mistral_voice_support as mistral
++from tests.gateway import native_voice_support as support
++
++
++def measured(label, **values):
++    print('NATIVE_VOICE_STOCK_MEASURE ' + json.dumps({'label': label, **values}, sort_keys=True))
++
++
++@pytest.fixture
++def clip(tmp_path):
++    return support.write_wav(tmp_path / 'clip.wav')
++
++
++@pytest.fixture
++def sdk(monkeypatch):
++    return mistral.observe_sdk(monkeypatch)
++
++
++def test_stock_stt_builds_the_sdk_client_with_only_the_key_and_keeps_its_defaults(monkeypatch, clip, sdk):
++    from tools.transcription_tools import transcribe_audio
++    mistral.stt_profile()
++    wire = mistral.MistralWire([('ok', {'text': 'hello from stock'})])
++    with support.provider_wire(monkeypatch, wire):
++        result = transcribe_audio(clip)
++    assert result['success'] and result['transcript'] == 'hello from stock' and wire.count == 1
++    assert [built['kwargs'] for built in sdk] == [{'api_key': mistral.KEY}]  # no injected client, options or logger
++    assert {t['read'] for t in wire.timeouts()} == {60.0}  # the SDK's own default
++    measured('stock_mistral_stt_success', requests=wire.count, kwargs=sorted(sdk[0]['kwargs']))
++
++
++def test_stock_stt_follows_a_redirect_where_the_native_seam_refuses_it(monkeypatch, clip, sdk):
++    from tools.transcription_tools import transcribe_audio
++    mistral.stt_profile()
++    wire = mistral.MistralWire([('redirect', 'https://api.mistral.example/elsewhere'), ('ok', {'text': 'followed'})])
++    with support.provider_wire(monkeypatch, wire):
++        result = transcribe_audio(clip)
++    assert result['success'] and result['transcript'] == 'followed' and wire.count == 2
++    measured('stock_mistral_stt_redirect', requests=wire.count)
++
++
++def test_stock_stt_still_best_effort_installs_the_sdk_and_still_logs_a_failure(monkeypatch, clip, sdk, caplog):
++    from tools.transcription_tools import transcribe_audio
++    installs = []
++    monkeypatch.setattr('pm.ensure_import', lambda extra, *a, **k: installs.append(extra))
++    mistral.stt_profile()
++    wire = mistral.MistralWire([('status', 500)])
++    with support.provider_wire(monkeypatch, wire), caplog.at_level(logging.ERROR):
++        result = transcribe_audio(clip)
++    assert not result['success'] and wire.count == 1 and installs == ['mistral']
++    assert [r for r in caplog.records if r.name == 'tools.transcription_tools' and r.levelno >= logging.ERROR]
++    measured('stock_mistral_stt_5xx', requests=wire.count)
++
++
++def test_stock_tts_builds_the_sdk_client_with_only_key_and_server_url(monkeypatch, sdk):
++    from tools.tts_tool import text_to_speech_tool
++    mistral.tts_profile(base_url='https://eu.mistral.example')
++    wire = mistral.MistralWire([('ok', {'audio': b'ID3stock'})])
++    with support.provider_wire(monkeypatch, wire):
++        result = json.loads(text_to_speech_tool('hello world'))
++    assert result['success'] and wire.count == 1
++    assert [built['kwargs'] for built in sdk] == [{'api_key': mistral.KEY, 'server_url': 'https://eu.mistral.example'}]
++    assert str(wire.requests[0].url) == 'https://eu.mistral.example/v1/audio/speech'
++    assert {t['read'] for t in wire.timeouts()} == {60.0}
++    measured('stock_mistral_tts_success', requests=wire.count, kwargs=sorted(sdk[0]['kwargs']))
++
++
++def test_stock_tts_follows_a_redirect_and_still_logs_a_failure(monkeypatch, sdk, caplog):
++    from tools.tts_tool import text_to_speech_tool
++    mistral.tts_profile()
++    wire = mistral.MistralWire([('redirect', mistral.SPEECH_URL + '?elsewhere'), ('ok', {'audio': b'ID3followed'})])
++    with support.provider_wire(monkeypatch, wire):
++        followed = json.loads(text_to_speech_tool('hello world'))
++    assert followed['success'] and wire.count == 2
++    wire = mistral.MistralWire([('status', 500)])
++    with support.provider_wire(monkeypatch, wire), caplog.at_level(logging.ERROR):
++        failed = json.loads(text_to_speech_tool('hello world'))
++    assert not failed['success'] and wire.count == 1
++    assert [r for r in caplog.records if r.name == 'tools.tts_tool' and r.levelno >= logging.ERROR]
++    measured('stock_mistral_tts_redirect_and_5xx', followed_requests=2, failed_requests=wire.count)
 diff --git a/tests/tools/test_native_voice_stock_transport.py b/tests/tools/test_native_voice_stock_transport.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..5ff5c62f947ca0aba0872f5934717bef0a40443c
@@ -3647,10 +4682,10 @@ index 0000000000000000000000000000000000000000..5ff5c62f947ca0aba0872f5934717bef
 +    measured('stock_tts_edge_403_then_ok', handshakes=boundary.handshakes)
 diff --git a/tools/native_send_policy.py b/tools/native_send_policy.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..81f6ffae2bec9d8fe375a1d8d85966eb41e484de
+index 0000000000000000000000000000000000000000..451e086bed8d041e94d8fcabdb2a707e5b9674c5
 --- /dev/null
 +++ b/tools/native_send_policy.py
-@@ -0,0 +1,297 @@
+@@ -0,0 +1,367 @@
 +"""One-send transport policy for a native (Relay) voice call.
 +
 +``gateway.session_native_voice`` activates a :class:`SendPolicy` around exactly one configured
@@ -3670,6 +4705,7 @@ index 0000000000000000000000000000000000000000..81f6ffae2bec9d8fe375a1d8d85966eb
 +
 +import contextlib
 +import contextvars
++import inspect
 +import logging
 +import threading
 +from typing import Any, Callable, Iterable, Iterator, Optional
@@ -3934,6 +4970,75 @@ index 0000000000000000000000000000000000000000..81f6ffae2bec9d8fe375a1d8d85966eb
 +    return None if policy is None else {'max_retries': 0, 'timeout_in_seconds': policy.timeout_s}
 +
 +
++def close_tracked_clients() -> None:
++    """Release the pools of every client this call built (a no-op outside a native call)."""
++    policy = _current.get()
++    if policy is not None:
++        policy.close_clients()
++
++
++_JSON_ENVELOPE_BYTES = 4096  # a base64 audio body is wrapped in a small JSON object
++
++
++def _bounded_answer(limit: int) -> Callable[[Any], None]:
++    """httpx ``response`` event hook: a body is refused once it exceeds ``limit`` DECODED bytes, whether or not
++    its length was declared (the SDK reads it whole, so nothing else bounds it)."""
++    def hook(response) -> None:
++        declared = response.headers.get('content-length', '')
++        if declared.isdigit() and int(declared) > limit:
++            raise refuse('too_long')
++        iter_bytes = response.iter_bytes
++
++        def bounded(chunk_size=None):
++            total = 0
++            for chunk in iter_bytes(chunk_size):
++                total += len(chunk)
++                if total > limit:
++                    raise refuse('too_long')
++                yield chunk
++        response.iter_bytes = bounded
++    return hook
++
++
++def mistral_client_kwargs(*, base64_audio: bool = False) -> dict:
++    """Extra ``Mistral(...)`` kwargs: explicit timeout, zero SDK retries, no redirects, the send hook on the very
++    client it must use, the answer bounded on the wire and no SDK debug log (which would print keys and bodies).
++
++    ``base64_audio``: the answer is JSON carrying the base64 audio, so the cap is that of the audio, encoded."""
++    policy = _current.get()
++    if policy is None:
++        return {}
++    import httpx
++    from mistralai.client.utils.logger import NoOpLogger
++    timeout_ms = max(1, round(policy.timeout_s * 1000))
++    hooks: dict = {'request': [policy.on_request]}
++    if policy.max_output_bytes is not None:
++        limit = policy.max_output_bytes
++        hooks['response'] = [_bounded_answer((limit + 2) // 3 * 4 + _JSON_ENVELOPE_BYTES if base64_audio else limit)]
++    http_client = policy.track(httpx.Client(timeout=timeout_ms / 1000, follow_redirects=False, event_hooks=hooks))
++    return {'client': http_client, 'timeout_ms': timeout_ms, 'retry_config': None, 'debug_logger': NoOpLogger()}
++
++
++def mistral_request_options(client: Any, injected: dict, *endpoints: Callable, needs: Iterable[str] = ()) -> dict:
++    """Per-call options for the pinned Mistral SDK; refuses UNSENT, before the invocation is entered, unless the
++    installed SDK sends through the injected client and every endpoint can be told zero retries and an explicit
++    timeout (and takes every request field in ``needs``). Disables the SDK's opt-in trace exporter, a second
++    outbound path the gate would never see. Outside a native call: nothing."""
++    policy = _current.get()
++    if policy is None:
++        return {}
++    config = getattr(client, 'sdk_configuration', None)
++    prove_injected(getattr(config, 'client', None), injected.get('client'))
++    required = {'retries', 'timeout_ms', *needs}
++    for endpoint in endpoints:
++        if not required <= inspect.signature(endpoint).parameters.keys():
++            raise refuse('unsupported')
++    config.telemetry = False
++    if getattr(config, 'telemetry', None) is not False:
++        raise refuse('unsupported')
++    return {'retries': None, 'timeout_ms': injected['timeout_ms']}
++
++
 +def edge_communicate_kwargs() -> dict:
 +    """Extra ``edge_tts.Communicate(...)`` kwargs: every websocket handshake passes the gate, so the
 +    library's own 403 re-handshake (a second send) is refused, and the timeouts are explicit."""
@@ -3949,7 +5054,7 @@ index 0000000000000000000000000000000000000000..81f6ffae2bec9d8fe375a1d8d85966eb
 +    return {'connector': GatedConnector(), 'connect_timeout': max(1, int(min(10, policy.timeout_s))),
 +            'receive_timeout': max(1, int(policy.timeout_s))}
 diff --git a/tools/transcription_cloud.py b/tools/transcription_cloud.py
-index b54514ae29fc3e63a2c46dc783411f7ddc586daa..f60ca13302ba62ad2c153dd17ab1e6386e99ed6e 100644
+index b54514ae29fc3e63a2c46dc783411f7ddc586daa..39b1183662e1f782ee6e847476c437cddeb460f1 100644
 --- a/tools/transcription_cloud.py
 +++ b/tools/transcription_cloud.py
 @@ -17,6 +17,7 @@ from typing import Any, Callable, Dict, Optional
@@ -3995,7 +5100,36 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..f60ca13302ba62ad2c153dd17ab1e638
                  # 400 + container hint is the documented rejection; some OpenAI-compatible endpoints
                  # reject a container with a bare 5xx instead (#81644). A 5xx is ambiguous, so it earns
                  # the same single transcode retry and, when no transcode is possible, its own error.
-@@ -220,8 +229,10 @@ def _transcribe_mistral(
+@@ -200,14 +209,23 @@ def _transcribe_mistral(
+     if not api_key:
+         return _error_result("MISTRAL_API_KEY not set")
+     try:
+-        _lazy_ensure_quietly("mistral")
++        if native_send_policy.installs_allowed():  # a native voice call never installs an SDK
++            _lazy_ensure_quietly("mistral")
+         from mistralai.client import Mistral
+-        with Mistral(api_key=api_key) as client, open(file_path, "rb") as audio_file:
++        # Inside a native voice call: the client carrying the send hook, explicit timeout, zero retries, no redirects.
++        sdk_kwargs = native_send_policy.mistral_client_kwargs()
++        with Mistral(api_key=api_key, **sdk_kwargs) as client, open(file_path, "rb") as audio_file:
+             # Language: hook override > stt.mistral.language > stt.language > env > auto.
+             language = language or _resolve_stt_language("mistral")
+-            result = client.audio.transcriptions.complete(
+-                model=model_name, file={"content": audio_file, "file_name": Path(file_path).name},
+-                **_sdk_prompt_kwargs(language, prompt))
++            complete = client.audio.transcriptions.complete
++            hints = _sdk_prompt_kwargs(language, prompt)
++            # A field the installed SDK's endpoint cannot carry (the pinned one has no ``prompt``) refuses the call
++            # UNSENT: it is never dropped silently and never discovered as a TypeError after the invocation.
++            options = native_send_policy.mistral_request_options(
++                client, sdk_kwargs, complete, needs=("model", "file", *hints))
++            native_send_policy.mark_entered()
++            result = complete(
++                model=model_name, file={"content": audio_file, "file_name": Path(file_path).name}, **hints, **options)
+         transcript_text = _extract_transcript_text(result)
+         logger.info("Transcribed %s via Mistral API (%s, %d chars)",
+                     Path(file_path).name, model_name, len(transcript_text))
+@@ -220,8 +238,10 @@ def _transcribe_mistral(
  def _post_audio_multipart(url: str, headers: dict[str, str], file_path: str, data: dict[str, str]):
      import requests
      with open(file_path, "rb") as audio_file:
@@ -4007,7 +5141,7 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..f60ca13302ba62ad2c153dd17ab1e638
  
  
  def _rest_provider(
-@@ -299,7 +310,8 @@ def _transcribe_xai(
+@@ -299,7 +319,8 @@ def _transcribe_xai(
              return _post_audio_multipart(f"{endpoint_base_url}/stt", headers, file_path, data)
  
          response = _post_transcription(api_key, _resolve_base_url(creds))
@@ -4017,7 +5151,7 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..f60ca13302ba62ad2c153dd17ab1e638
              logger.info("xAI STT got HTTP %d; refreshing OAuth credentials and retrying once", response.status_code)
              try:
                  refreshed_creds = resolve_xai_http_credentials(force_refresh=True, api_key_hint=api_key)
-@@ -372,6 +384,8 @@ def _transcribe_deepinfra(
+@@ -372,6 +393,8 @@ def _transcribe_deepinfra(
      from hermes_cli.models import deepinfra_base_url, deepinfra_model_ids
      # ``stt.deepinfra: null`` in YAML yields None, not {} — coalesce.
      base_url = deepinfra_base_url(_get_stt_section(_load_stt_config(), "deepinfra"))
@@ -4167,7 +5301,7 @@ index aa10ff3607bcf460f3585c9e5e0e11d7bc55348f..407445daecc1dd237bd360b57ba7953f
          if not candidates:
              raise ValueError(
 diff --git a/tools/tts_tool_providers.py b/tools/tts_tool_providers.py
-index 15b0ad8ea39cbcad7166a86a235827eb78901d40..db3d0b908a5b953a41be03adaa53dd167ae3ee6e 100644
+index 15b0ad8ea39cbcad7166a86a235827eb78901d40..ab713f0d2e5db41545a5a0737a1c23552da41728 100644
 --- a/tools/tts_tool_providers.py
 +++ b/tools/tts_tool_providers.py
 @@ -11,6 +11,7 @@ from __future__ import annotations
@@ -4235,3 +5369,29 @@ index 15b0ad8ea39cbcad7166a86a235827eb78901d40..db3d0b908a5b953a41be03adaa53dd16
      return output_path
  
  
+@@ -453,15 +475,20 @@ def _generate_mistral_tts(text: str, output_path: str, tts_config: dict[str, Any
+     if mi_config.get("base_url"):
+         client_kwargs["server_url"] = mi_config["base_url"]  # the Mistral SDK calls it server_url
+     Mistral = _origin()._import_mistral_client()  # ImportError must escape the RuntimeError wrap
++    sdk_kwargs = native_send_policy.mistral_client_kwargs(base64_audio=True)
+     try:
+-        with Mistral(**client_kwargs) as client:
+-            response = client.audio.speech.complete(
++        with Mistral(**client_kwargs, **sdk_kwargs) as client:
++            speak = client.audio.speech.complete
++            options = native_send_policy.mistral_request_options(  # may refuse: still before the invocation is entered
++                client, sdk_kwargs, speak, needs=("model", "input", "voice_id", "response_format"))
++            native_send_policy.mark_entered()
++            response = speak(
+                 model=mi_config.get("model", DEFAULT_MISTRAL_TTS_MODEL), input=text,
+                 voice_id=mi_config.get("voice_id") or DEFAULT_MISTRAL_TTS_VOICE_ID,
+-                response_format=_tts_response_format_from_path(output_path))
++                response_format=_tts_response_format_from_path(output_path), **options)
+             audio_bytes = base64.b64decode(response.audio_data)
+-    except ValueError:
+-        raise
++    except (ValueError, native_send_policy.NativeSendRefused):
++        raise  # a missing key, or a refusal the policy already recorded
+     except Exception as e:
+         logger.error("Mistral TTS failed: %s", e, exc_info=True)
+         raise RuntimeError(f"Mistral TTS failed: {type(e).__name__}") from e

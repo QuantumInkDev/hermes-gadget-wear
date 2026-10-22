@@ -114,10 +114,10 @@ category below on the registered fixtures, then ONE source review and a current-
 
 | Provider | Exit gate |
 | --- | --- |
-| STT Mistral | real installed SDK transport, one gated send, zero hidden retries |
+| STT Mistral | real installed SDK transport, one gated send, zero hidden retries — **source delivered** (patch 0002, V1-P Task 1; review pending): pinned `mistralai` 2.4.8, a configured `stt.prompt` the SDK cannot carry is refused UNSENT |
 | STT command and plugin (including `local_command`) | native-once capability adapter: no implicit install/download, explicit cancellation and output bounds; incapable custom implementations refuse UNSENT |
 | TTS MiniMax / xAI / Gemini | instrument each actual HTTP boundary, including auxiliary transformations (tag rewrite calls); no hidden second paid request; fail closed before a disallowed send |
-| TTS Mistral | real installed SDK boundary and zero-retry proof |
+| TTS Mistral | real installed SDK boundary and zero-retry proof — **source delivered** (patch 0002, V1-P Task 1; review pending) |
 | TTS NeuTTS / Kitten / Piper | installed AND cached assets only, no downloads, bounded local execution, truthful `not_started` remote accounting, no paid-provider fallback |
 | TTS command and plugin | the same native-once capability contract as STT; an arbitrary program cannot be certified single-attempt by a provider-name allowlist |
 | Pre-send credential freshness (xAI OAuth, M2) | refresh BEFORE the paid send with synthetic transport proof; never refresh-and-resend after a send |
