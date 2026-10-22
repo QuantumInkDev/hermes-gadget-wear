@@ -1,0 +1,3074 @@
+diff --git a/gateway/session_authority.py b/gateway/session_authority.py
+index 14703329aef89b5516dc67f6379d3f284627d99c..9d500968b398ff3845d7c417fa294ed5ad168995 100644
+--- a/gateway/session_authority.py
++++ b/gateway/session_authority.py
+@@ -348,6 +348,35 @@ class SessionAuthority:
+         from gateway.session_history_segments import check_history_position
+         return check_history_position(self, actor, ref, authorize=authorize, position=position)
+ 
++    # Identity-addressed canonical display reads for the native voice seam (gateway/session_native_voice.py,
++    # implemented in gateway/session_native_voice_display.py). Same visible-row projection, ``session:read``
++    # before and after, 2 s deadline and progress handler as the position reader.
++    NATIVE_VOICE_VERSION = 1
++
++    async def locate_native_display(self, actor, ref, *, authorize, matches, max_rows=65536):
++        from gateway.session_native_voice_display import locate_display
++        return await locate_display(self, actor, ref, authorize=authorize, matches=matches, max_rows=max_rows)
++
++    async def read_native_display(self, actor, ref, *, authorize, identity, segment=0, max_bytes=65536):
++        from gateway.session_native_voice_display import read_display
++        return await read_display(self, actor, ref, authorize=authorize, identity=identity, segment=segment,
++                                  max_bytes=max_bytes)
++
++    def check_native_display(self, actor, ref, *, authorize, identity):
++        from gateway.session_native_voice_display import check_display
++        return check_display(self, actor, ref, authorize=authorize, identity=identity)
++
++    async def locate_existing_display(self, actor, target, *, adapter, source, authorize, matches, max_rows=65536):
++        from gateway.session_native_voice_display import locate_existing
++        return await locate_existing(self, actor, target, adapter=adapter, source=source, authorize=authorize,
++                                     matches=matches, max_rows=max_rows)
++
++    async def read_existing_display(self, actor, target, *, adapter, source, authorize, row_id, segment=0,
++                                    max_bytes=65536):
++        from gateway.session_native_voice_display import read_existing
++        return await read_existing(self, actor, target, adapter=adapter, source=source, authorize=authorize,
++                                   row_id=row_id, segment=segment, max_bytes=max_bytes)
++
+     async def read_native_admissions(self, actor, ref, *, adapter, source, authorize, after=0, limit=25):
+         from gateway.session_admission_projection import read_native_admissions
+         return await read_native_admissions(self, actor, ref, adapter=adapter, source=source,
+diff --git a/gateway/session_native_voice.py b/gateway/session_native_voice.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..1ce98cf37bf591daf5eb8c5b2d9f7dd50c7325ab
+--- /dev/null
++++ b/gateway/session_native_voice.py
+@@ -0,0 +1,97 @@
++"""Generic native voice seam: one configured STT request, one TTS request per chunk, canonical display reads.
++
++An in-process extension seam for a consumer that owns its own registry, grants and accounting (the
++Relay bridge); it is never a model tool, a listener, a gateway auto-TTS path or an admission route.
++Nothing here is reachable unless the consumer calls it, and ordinary voice/STT/TTS behaviour is
++untouched: ``NativeAdmissionOptions`` stays TEXT-only.
++
++Results are frozen dataclasses of stable tokens only. They never carry provider messages, exception
++text, credentials or paths other than the caller-owned audio file a successful synthesis produced.
++``provider`` is billing evidence about the CONFIGURED remote provider and nothing else:
++
++* ``not_started`` - no request was (or could have been) sent;
++* ``completed`` / ``failed_after_send`` - one request was sent and answered / failed;
++* ``unknown`` - a request may have left and the outcome is not known (deadline).
++
++Local backends send nothing remote and therefore always report ``not_started``. A deadline bounds the
++caller's waiting; it never claims the provider stopped, and a worker that outlives it is fenced so it
++cannot start a send nor leave an audio file behind.
++
++The display functions live on ``SessionAuthority`` (``locate_native_display`` and friends), beside the
++other native readers; the implementation is ``session_native_voice_display``.
++"""
++from __future__ import annotations
++
++from dataclasses import dataclass
++
++NATIVE_VOICE_VERSION = 1
++
++# --- bounds (design 7.4); the consumer's own limits stay stricter where they differ ---
++MAX_AUDIO_BYTES = 2 * 1024 * 1024  # a 60 s 16 kHz PCM16 capture is 1,920,044 bytes as WAV
++MAX_TRANSCRIPT_CODE_POINTS = 4000
++MAX_TRANSCRIPT_BYTES = 16384
++MAX_SPEECH_UTF16_UNITS = 4096
++MAX_DEADLINE_S = 600.0
++STT_REQUEST_TIMEOUT_S = 60.0  # POLICY: caps the configured stt.openai.timeout (default 60 s)
++TTS_REQUEST_TIMEOUT_S = 60.0  # NEW POLICY: the current unconfigured ElevenLabs client has no such bound
++MAX_CHUNK_AUDIO_BYTES = 16 * 1024 * 1024
++MAX_SPEECH_AUDIO_BYTES = 32 * 1024 * 1024
++LOCATE_MAX_ROWS = 65536
++LOCATE_DEADLINE_S = 2.0  # the existing history read deadline; bounds the EFFECTIVE index
++
++
++@dataclass(frozen=True)
++class NativeTranscription:
++    """``state``: transcribed | empty | too_long | unavailable | failed | timeout | refused | cancelled."""
++    state: str
++    transcript: str | None
++    source: str | None  # configured | local_fallback | None
++    provider: str  # not_started | completed | failed_after_send | unknown
++
++
++@dataclass(frozen=True)
++class NativeSpeech:
++    """``state``: synthesized | empty | too_long | unavailable | failed | timeout | refused | cancelled."""
++    state: str
++    path: str | None  # one audio file inside the caller-owned output directory
++    code_points: int  # code points of the spoken text that was sent for synthesis
++    source: str | None  # configured | None
++    provider: str
++
++
++@dataclass(frozen=True)
++class NativeDisplayLocation:
++    """Identity scalars of one visible display row. ``identity`` is the canonical display ``row_id``;
++    ``physical_id`` is ``HistoryFragment.physical_id`` (two located rows of one lineage differ)."""
++    identity: str
++    physical_id: int
++    role: str
++    created_at_ms: int
++    segment_count: int
++    size_bytes: int
++
++
++async def transcribe_native_once(path, *, authorize, before_send, deadline_s):
++    """Transcribe one audio file with the runner's configured STT provider, sending at most once.
++
++    ``authorize`` is called before the send and after every await; ``before_send`` immediately
++    before the actual transport send and the send is refused if it raises. The installed-only local
++    fallback runs at most once, only after a configured failure, and never installs anything.
++    """
++    from gateway.session_native_voice_stt import transcribe_once
++    return await transcribe_once(path, authorize=authorize, before_send=before_send, deadline_s=deadline_s)
++
++
++async def synthesize_native_once(text, *, output_dir, authorize, before_send, deadline_s):
++    """Synthesize ``text`` with the profile's configured TTS voice: one request per necessary chunk,
++    never a retry, stopping at the first failed chunk. Audio is written only inside ``output_dir``."""
++    from gateway.session_native_voice_tts import synthesize_once
++    return await synthesize_once(text, output_dir=output_dir, authorize=authorize,
++                                 before_send=before_send, deadline_s=deadline_s)
++
++
++def speakable_text(text):
++    """The reviewed spoken-text normalization of ``text_to_speech_tool`` (markdown, emoji, think
++    blocks, units), without a length cap. Pure and deterministic; callers own offsets and bounds."""
++    from tools.tts_text_normalize import prepare_spoken_text
++    return prepare_spoken_text(text, max_chars=None)
+diff --git a/gateway/session_native_voice_display.py b/gateway/session_native_voice_display.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..2536b2836401e58dcf9ffa1cd13452339aba6fb3
+--- /dev/null
++++ b/gateway/session_native_voice_display.py
+@@ -0,0 +1,261 @@
++"""Identity-addressed canonical display reads for the native voice seam (``session_native_voice``).
++
++Playback of a message the consumer can only name by its public id needs the exact canonical text of
++ONE visible display row. These readers add no projection of their own: selection is the existing
++visible-row projection (``session_read_projection._selection``), bodies are the existing
++``HistoryFragment`` segments (``session_history_segments._body``), authority is the actual
++``SessionAuthority.authorize(..., 'session:read')`` before and after, and every query runs under the
++existing 2 s deadline and SQLite progress handler. Other rows' content is never hydrated.
++
++``locate`` streams identity scalars newest-first and stops at the first match. Its two budgets, the
++row bound and the deadline, both end with the existing ``RuntimeStoreError('read_budget')`` whose
++``field`` names the bound that stopped it: absent content is only ever reported by a search that
++completed, so "not found" and "not searched far enough" never look alike.
++"""
++from __future__ import annotations
++
++import asyncio
++import sqlite3
++import threading
++import time
++
++from gateway.session_history_segments import HistoryFragment, _body
++from gateway.session_read_projection import _lineage, _selection, _text
++from hermes_state_runtime import RuntimeStoreError
++
++MAX_IDENTITY_BYTES = 128
++READ_DEADLINE_S = 2.0
++MAX_INT64 = 9223372036854775807
++
++
++def _valid_identity(identity):
++    if (not isinstance(identity, str) or not identity
++            or len(identity.encode('utf-8', errors='replace')) > MAX_IDENTITY_BYTES):
++        raise RuntimeStoreError('invalid_params')
++    return identity
++
++
++def _valid_read(identity, segment, max_bytes):
++    _valid_identity(identity)
++    if (type(segment) is not int or not 0 <= segment <= MAX_INT64
++            or type(max_bytes) is not int or not 0 <= max_bytes <= 65536):
++        raise RuntimeStoreError('invalid_params')
++
++
++def _valid_locate(matches, max_rows):
++    if not callable(matches) or type(max_rows) is not int or not 1 <= max_rows <= 65536:
++        raise RuntimeStoreError('invalid_params')
++
++
++def _selected(conn, lineage, identity):
++    """``(physical_id, sort_id)`` of the visible display row with this identity, else None."""
++    return conn.execute(_selection(lineage) + 'SELECT row_id,sort_id FROM display_rows WHERE identity=?',
++                        (*lineage, identity)).fetchone()
++
++
++def _stamp_valid(conn, physical):
++    """Fail closed on a malformed content-revision stamp, exactly as the fragment fingerprint does."""
++    from hermes_state_common import DISPLAY_CONTENT_REVISION_PREFIX
++    row = conn.execute(
++        "SELECT CASE WHEN typeof(value)='text' AND length(CAST(value AS BLOB)) BETWEEN 1 AND 19 AND value<>'0' "
++        "THEN value ELSE 'invalid' END FROM state_meta WHERE key=?",
++        (DISPLAY_CONTENT_REVISION_PREFIX + str(physical),)).fetchone()
++    revision = row[0] if row else '0'
++    if revision != '0' and (not revision.isascii() or not revision.isdecimal()
++                            or not 0 < int(revision) <= MAX_INT64 or str(int(revision)) != revision):
++        raise RuntimeStoreError('temporarily_unavailable')
++
++
++def _created_ms(row):
++    created = row['timestamp']
++    if not isinstance(created, (int, float)) or not 0 <= created <= 9223372036854775:
++        raise RuntimeStoreError('projection_too_large')
++    return int(created * 1000)
++
++
++class _Budget:
++    """The read deadline and cancellation of one worker query, shared with its progress handler."""
++
++    def __init__(self, cancelled, deadline):
++        self.cancelled, self.deadline = cancelled, deadline
++
++    def stopped(self):
++        return self.cancelled.is_set() or time.monotonic() >= self.deadline
++
++
++def _guarded(db, budget, work, *, on_stop):
++    """Run ``work(conn)`` in one read snapshot under the progress handler; ``on_stop`` builds the
++    refusal when the budget ends it."""
++    with db._read_ctx() as conn:
++        conn.set_progress_handler(lambda: int(budget.stopped()), 1000)
++        conn.execute('BEGIN')
++        try:
++            if budget.stopped():
++                raise on_stop()
++            return work(conn)
++        except sqlite3.OperationalError as exc:
++            if budget.stopped():
++                raise on_stop() from exc
++            raise
++        finally:
++            conn.set_progress_handler(None, 0)
++            conn.execute('ROLLBACK')
++
++
++def _read_stop():
++    return RuntimeStoreError('read_deadline')
++
++
++def _fragment(db, conn, root, identity, segment, max_bytes, budget):
++    lineage = _lineage(conn, root, lambda: _raise_if(budget, _read_stop))
++    selected = _selected(conn, lineage, identity)
++    if selected is None:
++        raise RuntimeStoreError('not_found')
++    physical, order = selected
++    _stamp_valid(conn, physical)
++    row, text, count, _ = _body(db, conn, physical, segment, max_bytes)
++    if text is None:  # a carrier the canonical normalizer hides: not a displayable row
++        raise RuntimeStoreError('not_found')
++    return HistoryFragment(identity, physical, order, row['role'], text, _created_ms(row), segment, count)
++
++
++def _raise_if(budget, make):
++    if budget.stopped():
++        raise make()
++
++
++def read_fragment(db, root, identity, segment, max_bytes, budget):
++    """Worker thread: ONE visible row's ``HistoryFragment`` (the exact object the position reader yields)."""
++    return _guarded(db, budget, lambda conn: _fragment(db, conn, root, identity, segment, max_bytes, budget),
++                    on_stop=_read_stop)
++
++
++def _total_bytes(db, conn, physical):
++    """UTF-8 bytes of the row's canonical text: the projection for bodies the reader hydrates whole, the
++    stored size for the larger ones it slices as BLOBs."""
++    row = conn.execute(
++        "SELECT role,content,display_kind,COALESCE(_compressed_summary,0)<>0 AS _compressed_summary,"
++        "length(CAST(content AS BLOB)) AS size FROM messages WHERE id=?", (physical,)).fetchone()
++    if row['size'] > 64000:
++        return row['size']
++    return len(_text(db, row).encode('utf-8'))
++
++
++def _location(db, conn, physical, identity):
++    from gateway.session_native_voice import NativeDisplayLocation
++    row, text, count, _ = _body(db, conn, physical, 0, 65536)
++    if text is None:
++        return None  # a hidden carrier is not a playable row; the search goes on
++    return NativeDisplayLocation(identity, physical, row['role'], _created_ms(row), count,
++                                 _total_bytes(db, conn, physical))
++
++
++def _budget_refusal(bound, limit):
++    return RuntimeStoreError('read_budget', field='locate_' + bound, detail=f'stopped by the {bound} bound ({limit})')
++
++
++def locate_rows(db, root, matches, max_rows, budget, deadline_s):
++    """Worker thread: newest-first identity scalars; the first row ``matches`` accepts, else None
++    after a COMPLETED search. Stopping at either bound raises ``read_budget`` naming it."""
++    def work(conn):
++        lineage = _lineage(conn, root, lambda: _raise_if(budget, lambda: _budget_refusal('deadline', deadline_s)))
++        cursor = conn.execute(
++            _selection(lineage) + "SELECT row_id,CASE WHEN length(CAST(identity AS BLOB))<=128 THEN identity END "
++            "FROM display_rows ORDER BY sort_id DESC", lineage)
++        examined = 0
++        for physical, identity in cursor:
++            if examined >= max_rows:
++                raise _budget_refusal('rows', max_rows)
++            examined += 1
++            if budget.stopped():
++                raise _budget_refusal('deadline', deadline_s)
++            if identity is not None and matches(identity):
++                found = _location(db, conn, physical, identity)
++                if found is not None:
++                    return found
++        return None
++    return _guarded(db, budget, work, on_stop=lambda: _budget_refusal('deadline', deadline_s))
++
++
++async def _off_loop(work, deadline_s, on_timeout):
++    cancelled = threading.Event()
++    budget = _Budget(cancelled, time.monotonic() + deadline_s)
++    try:
++        return await asyncio.wait_for(asyncio.to_thread(work, budget), deadline_s)
++    except TimeoutError as exc:
++        cancelled.set()
++        raise on_timeout() from exc
++    except asyncio.CancelledError:
++        cancelled.set()
++        raise
++
++
++def _deadline():
++    from gateway import session_native_voice
++    return session_native_voice.LOCATE_DEADLINE_S
++
++
++async def locate_display(authority, actor, ref, *, authorize, matches, max_rows):
++    authorize()
++    authority.authorize(actor, ref, 'session:read')
++    _valid_locate(matches, max_rows)
++    limit = _deadline()
++    found = await _off_loop(lambda b: locate_rows(authority.db, ref.session_id, matches, max_rows, b, limit),
++                            limit, lambda: _budget_refusal('deadline', limit))
++    authorize()
++    authority.authorize(actor, ref, 'session:read')
++    return found
++
++
++async def read_display(authority, actor, ref, *, authorize, identity, segment, max_bytes):
++    authorize()
++    authority.authorize(actor, ref, 'session:read')
++    _valid_read(identity, segment, max_bytes)
++    fragment = await _off_loop(
++        lambda b: read_fragment(authority.db, ref.session_id, identity, segment, max_bytes, b),
++        READ_DEADLINE_S, _read_stop)
++    authorize()
++    authority.authorize(actor, ref, 'session:read')
++    return fragment
++
++
++def check_display(authority, actor, ref, *, authorize, identity):
++    """Scalar-bounded fence for the synchronous socket output-lock boundary: the identity is still a
++    visible, projectable display row of this lineage (segment 0 is the one row it hydrates)."""
++    authorize()
++    authority.authorize(actor, ref, 'session:read')
++    _valid_identity(identity)
++    budget = _Budget(threading.Event(), time.monotonic() + READ_DEADLINE_S)
++    read_fragment(authority.db, ref.session_id, identity, 0, 65536, budget)
++    authorize()
++    authority.authorize(actor, ref, 'session:read')
++
++
++async def locate_existing(authority, actor, target, *, adapter, source, authorize, matches, max_rows):
++    from gateway.session_existing import _prove, _readable, _targets, check_existing
++    _targets((target,))
++    _prove(authority, actor, adapter=adapter, source=source, authorize=authorize)
++    _valid_locate(matches, max_rows)
++    with authority.db._read_ctx() as conn:
++        if _readable(authority, conn, actor, target) is None:
++            raise RuntimeStoreError('not_found')
++    limit = _deadline()
++    found = await _off_loop(lambda b: locate_rows(authority.db, target.session_id, matches, max_rows, b, limit),
++                            limit, lambda: _budget_refusal('deadline', limit))
++    check_existing(authority, actor, (target,), adapter=adapter, source=source, authorize=authorize)
++    return found
++
++
++async def read_existing(authority, actor, target, *, adapter, source, authorize, row_id, segment, max_bytes):
++    from gateway.session_existing import _prove, _readable, _targets, check_existing
++    _targets((target,))
++    _prove(authority, actor, adapter=adapter, source=source, authorize=authorize)
++    _valid_read(row_id, segment, max_bytes)
++    with authority.db._read_ctx() as conn:
++        if _readable(authority, conn, actor, target) is None:
++            raise RuntimeStoreError('not_found')
++    fragment = await _off_loop(
++        lambda b: read_fragment(authority.db, target.session_id, row_id, segment, max_bytes, b),
++        READ_DEADLINE_S, _read_stop)
++    check_existing(authority, actor, (target,), adapter=adapter, source=source, authorize=authorize)
++    return fragment
+diff --git a/gateway/session_native_voice_gate.py b/gateway/session_native_voice_gate.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..b39062486dd207f41eb28387150db2a9b7dc75e5
+--- /dev/null
++++ b/gateway/session_native_voice_gate.py
+@@ -0,0 +1,101 @@
++"""Shared plumbing of the native voice seam: the send gate, bounded waiting and provider evidence.
++
++The consumer's ``authorize`` / ``before_send`` callables belong to the consumer's event loop (they
++touch its registry and durable accounting), so the worker thread that is about to send never runs
++them itself: it asks the loop to run them and blocks until the verdict arrives. The send happens
++only after ``before_send`` returned; any refusal leaves the request unsent.
++"""
++from __future__ import annotations
++
++import asyncio
++import concurrent.futures
++import threading
++import time
++
++from hermes_state_runtime import RuntimeStoreError
++from tools import native_send_policy
++
++PROVIDER_NOT_STARTED = 'not_started'
++PROVIDER_COMPLETED = 'completed'
++PROVIDER_FAILED = 'failed_after_send'
++PROVIDER_UNKNOWN = 'unknown'
++
++
++def validate_call(authorize, before_send, deadline_s):
++    if not callable(authorize) or not callable(before_send):
++        raise RuntimeStoreError('invalid_params')
++    if (isinstance(deadline_s, bool) or not isinstance(deadline_s, (int, float))
++            or not 0 < deadline_s <= 600):
++        raise RuntimeStoreError('invalid_params')
++
++
++def check(authorize):
++    """Run the consumer's authorization: None when it holds, else the stable refusal token."""
++    try:
++        authorize()
++    except asyncio.CancelledError:
++        return 'cancelled'
++    except Exception:  # health: allow BLE001 -- consumer callback; any raise is a refusal and its text must not leave
++        return 'refused'
++    return None
++
++
++def loop_gate(loop, authorize, before_send, deadline):
++    """The ``SendPolicy`` gate: authorize + ``before_send`` on the consumer's loop, awaited by the worker."""
++    def gate():
++        verdict: concurrent.futures.Future = concurrent.futures.Future()
++        abandoned = threading.Event()
++
++        def run():
++            if abandoned.is_set():
++                return  # the worker stopped waiting: never commit accounting for a send that cannot happen
++            refusal = check(authorize)
++            if refusal is None:
++                try:
++                    before_send()
++                except asyncio.CancelledError:
++                    refusal = 'cancelled'
++                except Exception:  # health: allow BLE001 -- consumer callback; any raise refuses the send
++                    refusal = 'refused'
++            verdict.set_result(refusal)
++        try:
++            loop.call_soon_threadsafe(run)
++            refusal = verdict.result(timeout=max(0.0, deadline - time.monotonic()))
++        except (RuntimeError, concurrent.futures.TimeoutError):
++            abandoned.set()
++            raise native_send_policy.NativeSendRefused('refused') from None
++        if refusal is not None:
++            raise native_send_policy.NativeSendRefused(refusal)
++    return gate
++
++
++TIMED_OUT = object()  # returned by :func:`bounded` when the deadline ended the wait first
++
++
++async def bounded(work, deadline, on_expiry):
++    """Await ``work`` in a worker thread, at most until ``deadline`` (monotonic).
++
++    The deadline only ends OUR waiting. On expiry ``on_expiry`` runs (it closes the send policy, so
++    the abandoned worker can start no further send) and its answer says whether a request may
++    already have left. Returns ``(value, maybe_sent)``; ``value`` is ``TIMED_OUT`` on expiry.
++    """
++    remaining = deadline - time.monotonic()
++    if remaining <= 0:
++        return TIMED_OUT, on_expiry()
++    try:
++        return await asyncio.wait_for(asyncio.to_thread(work), remaining), False
++    except TimeoutError:
++        return TIMED_OUT, on_expiry()
++    except asyncio.CancelledError:
++        on_expiry()
++        raise
++
++
++def provider_state(policy, answered):
++    """Billing evidence about the configured remote provider after the worker returned.
++
++    ``answered``: the one request was answered with a usable (even empty) result.
++    """
++    if not policy.sends:
++        return PROVIDER_NOT_STARTED
++    return PROVIDER_COMPLETED if answered else PROVIDER_FAILED
+diff --git a/gateway/session_native_voice_stt.py b/gateway/session_native_voice_stt.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..2646fd4e6416e89949083d039a311a3a9420c37c
+--- /dev/null
++++ b/gateway/session_native_voice_stt.py
+@@ -0,0 +1,158 @@
++"""Configured-once speech-to-text for the native voice seam (see ``session_native_voice``).
++
++The profile's own STT configuration is read at call time through the stock resolvers, the audio is
++handed to the stock ``transcribe_audio`` pipeline (validation, pre-send preparation, provider
++dispatch) with a one-send transport policy active, and the outcome is mapped to stable tokens.
++Local fallback is the stock installed-only ``transcribe_audio_local_fallback``: it never installs a
++backend and never reaches another cloud provider.
++"""
++from __future__ import annotations
++
++import asyncio
++from dataclasses import dataclass
++import os
++import stat
++import time
++
++from gateway import session_native_voice_gate as gate
++from tools import native_send_policy
++
++# Providers whose transport the seam can hold to one request (closed set; anything else is refused
++# before it can send: Mistral, user command providers and plugin providers are opaque to the guard).
++STT_PROVIDERS = frozenset({'local', 'local_command', 'openai', 'groq', 'deepinfra', 'xai', 'elevenlabs'})
++LOCAL_PROVIDERS = frozenset({'local', 'local_command'})
++SOURCE_LABEL = 'relay'
++
++
++@dataclass
++class _Attempt:
++    result: dict | None  # the stock envelope; None when the worker raised
++    provider: str  # the resolved configured provider ('none' when STT is disabled)
++    enabled: bool
++    invalid: bool = False  # the input was not an acceptable audio file; nothing was attempted
++
++
++def _configured(path, policy):
++    """Worker thread: the stock pipeline under the one-send policy."""
++    from tools import transcription_tools as stt
++    with native_send_policy.activate(policy):
++        config = stt._load_stt_config()
++        enabled = stt.is_stt_enabled(config)
++        provider = stt._get_provider(config) if enabled else 'none'
++        if not enabled:
++            return _Attempt(None, provider, False)
++        try:
++            return _Attempt(stt.transcribe_audio(path, None, SOURCE_LABEL), provider, True)
++        except native_send_policy.NativeSendRefused:
++            return _Attempt(None, provider, True)  # the policy recorded why
++        except Exception:  # health: allow BLE001 -- provider/library failure becomes the stable 'failed' token; its text must not leave
++            return _Attempt(None, provider, True)
++
++
++def _fallback(path):
++    """Worker thread: the stock installed-only local backend (no policy, nothing remote)."""
++    from tools import transcription_tools as stt
++    try:
++        return stt.transcribe_audio_local_fallback(path)
++    except Exception:  # health: allow BLE001 -- local backend failure becomes the stable 'failed' token; its text must not leave
++        return {'success': False, 'transcript': ''}
++
++
++def _text_state(text):
++    text = (text or '').strip()
++    if not text:
++        return 'empty', None
++    from gateway.session_native_voice import MAX_TRANSCRIPT_BYTES, MAX_TRANSCRIPT_CODE_POINTS
++    if len(text) > MAX_TRANSCRIPT_CODE_POINTS or len(text.encode('utf-8')) > MAX_TRANSCRIPT_BYTES:
++        return 'too_long', None
++    return 'transcribed', text
++
++
++def _failure_state(attempt, policy):
++    if policy.refusal in ('refused', 'cancelled'):
++        return policy.refusal
++    if policy.refusal == 'unsupported':
++        return 'unavailable'
++    local_attempt = attempt.provider in LOCAL_PROVIDERS and attempt.result is not None
++    return 'failed' if policy.sends or local_attempt else 'unavailable'  # nothing was tried otherwise
++
++
++def _configured_outcome(attempt, policy):
++    """``(state, transcript, answered)`` for the configured attempt."""
++    result = attempt.result
++    if not attempt.enabled:
++        return 'unavailable', None, False
++    if result is not None and result.get('success'):
++        state, text = _text_state(result.get('transcript'))
++        return state, text, True
++    if result is not None and result.get('no_speech') and policy.sends:
++        return 'empty', None, True  # HTTP 200 with no words: silence is an answer
++    return _failure_state(attempt, policy), None, False
++
++
++def _make(state, transcript, source, provider):
++    from gateway.session_native_voice import NativeTranscription
++    return NativeTranscription(state, transcript, source, provider)
++
++
++def _may_fall_back(attempt, state):
++    return (attempt.enabled and state in ('unavailable', 'failed')
++            and attempt.provider not in LOCAL_PROVIDERS)
++
++
++async def transcribe_once(path, *, authorize, before_send, deadline_s):
++    from gateway.session_native_voice import MAX_AUDIO_BYTES, STT_REQUEST_TIMEOUT_S
++    gate.validate_call(authorize, before_send, deadline_s)
++    if not isinstance(path, str) or not path or '\0' in path:
++        return _make('refused', None, None, gate.PROVIDER_NOT_STARTED)
++    loop = asyncio.get_running_loop()
++    deadline = time.monotonic() + deadline_s
++    policy = native_send_policy.SendPolicy(
++        timeout_s=min(STT_REQUEST_TIMEOUT_S, float(deadline_s)),
++        gate=gate.loop_gate(loop, authorize, before_send, deadline), providers=STT_PROVIDERS)
++    refusal = gate.check(authorize)
++    if refusal:
++        return _make(refusal, None, None, gate.PROVIDER_NOT_STARTED)
++    attempt, maybe_sent = await gate.bounded(lambda: _checked(path, policy, MAX_AUDIO_BYTES), deadline, policy.close)
++    if attempt is gate.TIMED_OUT:
++        return _make('timeout', None, None, gate.PROVIDER_UNKNOWN if maybe_sent else gate.PROVIDER_NOT_STARTED)
++    if attempt.invalid:
++        return _make('refused', None, None, gate.PROVIDER_NOT_STARTED)
++    state, transcript, answered = _configured_outcome(attempt, policy)
++    provider = gate.provider_state(policy, answered)
++    refusal = gate.check(authorize)
++    if refusal:  # authority lost during the await: the result is withheld
++        return _make(refusal, None, None, provider)
++    if state in ('transcribed', 'empty', 'too_long'):
++        return _make(state, transcript, 'configured', provider)
++    if not _may_fall_back(attempt, state):
++        return _make(state, None, None, provider)
++    return await _recover(path, state, provider, authorize, deadline)
++
++
++def _checked(path, policy, limit):
++    """Worker thread: refuse a non-file or oversized input before any provider work."""
++    try:
++        info = os.lstat(path)
++    except OSError:
++        return _Attempt(None, 'none', False, invalid=True)
++    if not stat.S_ISREG(info.st_mode) or not 0 < info.st_size <= limit:  # a symlink is not a regular file here
++        return _Attempt(None, 'none', False, invalid=True)
++    return _configured(path, policy)
++
++
++async def _recover(path, configured_state, provider, authorize, deadline):
++    """The single installed-only local fallback after a configured failure."""
++    refusal = gate.check(authorize)
++    if refusal:
++        return _make(refusal, None, None, provider)
++    result, _ = await gate.bounded(lambda: _fallback(path), deadline, lambda: False)
++    if result is gate.TIMED_OUT:
++        return _make('timeout', None, None, provider)
++    refusal = gate.check(authorize)
++    if refusal:
++        return _make(refusal, None, None, provider)
++    if result.get('success'):
++        state, text = _text_state(result.get('transcript'))
++        return _make(state, text, 'local_fallback', provider)
++    return _make(configured_state, None, None, provider)
+diff --git a/gateway/session_native_voice_tts.py b/gateway/session_native_voice_tts.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..aac7beb4d5a7b134e4302392c3d1a18fd6c9f5a9
+--- /dev/null
++++ b/gateway/session_native_voice_tts.py
+@@ -0,0 +1,227 @@
++"""Configured one-request-per-chunk text-to-speech for the native voice seam (``session_native_voice``).
++
++The profile's own TTS configuration (provider, voice, model) is read at call time through the stock
++resolvers; the stock chunker splits the normalized text; each chunk is synthesized by the stock
++provider generator under a one-send transport policy. There is no retry and no other provider: the
++first failed chunk ends the call and every audio file written for it is removed.
++"""
++from __future__ import annotations
++
++import asyncio
++from dataclasses import dataclass
++import os
++import time
++import uuid
++
++from gateway import session_native_voice_gate as gate
++from tools import native_send_policy
++
++# Providers whose transport the seam can hold to one request per chunk (closed set). Others - Mistral,
++# MiniMax, xAI, Gemini, local engines, command and plugin providers - are refused before they can send:
++# several of them make auxiliary calls or spawn processes the guard cannot see.
++TTS_PROVIDERS = frozenset({'edge', 'elevenlabs', 'openai', 'deepinfra'})
++HOOKED_PROVIDERS = frozenset({'elevenlabs', 'openai', 'deepinfra'})  # begin() runs on their httpx client
++MAX_NORMALIZED_CODE_POINTS = 2 * 4096
++FILE_PREFIX = 'native-speech-'
++
++
++@dataclass
++class _Synth:
++    state: str
++    path: str | None = None
++    code_points: int = 0
++    answered: bool = False  # every request that was sent got a usable answer
++
++
++def _make(state, path, code_points, source, provider):
++    from gateway.session_native_voice import NativeSpeech
++    return NativeSpeech(state, path, code_points, source, provider)
++
++
++def _utf16_units(text):
++    return len(text.encode('utf-16-le')) // 2
++
++
++def _owned_dir(output_dir):
++    return isinstance(output_dir, str) and os.path.isabs(output_dir) and os.path.isdir(output_dir)
++
++
++def _remove(paths):
++    for path in paths:
++        try:
++            os.remove(path)
++        except OSError:
++            continue  # already gone or never created: the goal of the cleanup is met
++
++
++@dataclass
++class _Run:
++    """One synthesis call inside its worker thread."""
++    policy: native_send_policy.SendPolicy
++    output_dir: str
++    run_id: str
++    paths: list
++    done: int = 0  # chunks whose request was answered and whose audio was kept
++
++    @property
++    def answered(self):
++        """Every request that was sent got an answer (a refused send or an early stop leaves none open)."""
++        return self.policy.sends == self.done
++
++
++def _chunk_audio(run, engine, config, chunk, path):
++    """One request: arm a fresh one-send scope, synthesize, bound the file. Returns an error state or None."""
++    from gateway.session_native_voice import MAX_CHUNK_AUDIO_BYTES
++    from tools import tts_tool as tts
++    run.policy.arm()
++    if engine not in HOOKED_PROVIDERS:
++        run.policy.begin()  # no httpx client to hook: the send is the engine call itself
++    tts._synthesize_builtin(engine, chunk, path, config, None)
++    run.done += 1
++    try:
++        size = os.path.getsize(path)
++    except OSError:
++        return 'failed'
++    if size <= 0:
++        return 'failed'
++    return 'too_long' if size > MAX_CHUNK_AUDIO_BYTES else None
++
++
++def _synthesize_chunks(run, engine, config, chunks):
++    """Stop at the first failed chunk; returns its failure state or None."""
++    from gateway.session_native_voice import MAX_SPEECH_AUDIO_BYTES
++    total = 0
++    for index, chunk in enumerate(chunks, start=1):
++        path = os.path.join(run.output_dir, f'.{FILE_PREFIX}{run.run_id}.chunk{index:03d}.mp3')
++        run.paths.append(path)
++        failure = _chunk_audio(run, engine, config, chunk, path)
++        if failure:
++            return failure
++        total += os.path.getsize(path)
++        if total > MAX_SPEECH_AUDIO_BYTES:
++            return 'too_long'
++    return None
++
++
++def _final_path(output_dir, run_id):
++    return os.path.join(output_dir, f'{FILE_PREFIX}{run_id}.mp3')
++
++
++def _join(run):
++    """One audio file from the chunk files (a rename for a single chunk, the stock concat otherwise)."""
++    final = _final_path(run.output_dir, run.run_id)
++    if len(run.paths) == 1:
++        os.replace(run.paths[0], final)
++        return final
++    from tools.tts_tool_delivery import _concat_audio_files
++    return _concat_audio_files(run.paths, final, voice_compatible=False)
++
++
++def _plan(text, config):
++    """``(engine, chunks)``; ``engine`` is None when the configured voice cannot be used."""
++    from gateway.session_native_voice import speakable_text
++    from tools import tts_tool as tts
++    from tools.tts_tool_delivery import _resolve_max_text_length, _split_text_for_tts
++    provider = tts._get_provider(config)
++    if provider not in TTS_PROVIDERS:
++        return None, []
++    engine, unavailable = tts._select_builtin_engine(provider)
++    if unavailable or engine != provider:
++        return None, []  # never the stock fallback to another engine
++    spoken = speakable_text(text)
++    chunks = _split_text_for_tts(spoken, _resolve_max_text_length(provider, config)) if spoken.strip() else []
++    return engine, chunks
++
++
++def _run_chunks(run, text):
++    """The synthesis proper, inside the policy; returns the worker's verdict."""
++    from tools import tts_tool as tts
++    if not _owned_dir(run.output_dir):
++        return _Synth('refused')
++    config = tts._load_tts_config()
++    engine, chunks = _plan(text, config)
++    if engine is None:
++        return _Synth('unavailable')
++    if not chunks:
++        return _Synth('empty')
++    code_points = sum(len(chunk) for chunk in chunks)
++    if code_points > MAX_NORMALIZED_CODE_POINTS:
++        return _Synth('too_long')
++    failure = _synthesize_chunks(run, engine, config, chunks)
++    if failure:
++        return _Synth(failure, code_points=code_points)
++    final = _join(run)
++    if not final:
++        return _Synth('failed', code_points=code_points)  # chunks that were paid for but cannot be joined
++    return _Synth('synthesized', final, code_points)
++
++
++def _synthesize(text, output_dir, policy, run_id):
++    """Worker thread. A fenced (deadline-abandoned) worker leaves no file behind."""
++    run = _Run(policy, output_dir, run_id, [])
++    try:
++        with native_send_policy.activate(policy):
++            verdict = _run_chunks(run, text)
++    except native_send_policy.NativeSendRefused:
++        verdict = _Synth('failed')  # the policy recorded why
++    except Exception:  # health: allow BLE001 -- provider/library failure becomes the stable 'failed' token; its text must not leave
++        verdict = _Synth('failed')
++    finally:
++        _remove(run.paths)  # chunk files; the joined file is a different path and survives
++        if policy.closed and isinstance(output_dir, str):
++            _remove([_final_path(output_dir, run_id)])
++    verdict.answered = run.answered
++    return verdict
++
++
++def _discard_run(output_dir, run_id):
++    """The abandoned worker removes its own files once fenced; this covers a finish that beat the fence."""
++    if isinstance(output_dir, str):
++        _remove([_final_path(output_dir, run_id)])
++
++
++def _failure_state(synth, policy):
++    if synth.state in ('refused', 'unavailable', 'empty', 'too_long'):
++        return synth.state
++    if policy.refusal in ('refused', 'cancelled', 'too_long'):
++        return policy.refusal
++    if policy.refusal == 'unsupported' or not policy.sends:
++        return 'unavailable'
++    return 'failed'
++
++
++async def synthesize_once(text, *, output_dir, authorize, before_send, deadline_s):
++    from gateway.session_native_voice import MAX_CHUNK_AUDIO_BYTES, TTS_REQUEST_TIMEOUT_S
++    gate.validate_call(authorize, before_send, deadline_s)
++    if not isinstance(text, str) or not text.strip():
++        return _make('empty', None, 0, None, gate.PROVIDER_NOT_STARTED)
++    from gateway.session_native_voice import MAX_SPEECH_UTF16_UNITS
++    if _utf16_units(text) > MAX_SPEECH_UTF16_UNITS:
++        return _make('too_long', None, 0, None, gate.PROVIDER_NOT_STARTED)
++    loop = asyncio.get_running_loop()
++    deadline = time.monotonic() + deadline_s
++    policy = native_send_policy.SendPolicy(
++        timeout_s=min(TTS_REQUEST_TIMEOUT_S, float(deadline_s)),
++        gate=gate.loop_gate(loop, authorize, before_send, deadline), providers=TTS_PROVIDERS,
++        max_output_bytes=MAX_CHUNK_AUDIO_BYTES)
++    refusal = gate.check(authorize)
++    if refusal:
++        return _make(refusal, None, 0, None, gate.PROVIDER_NOT_STARTED)
++    run_id = uuid.uuid4().hex
++    try:
++        synth, maybe_sent = await gate.bounded(
++            lambda: _synthesize(text, output_dir, policy, run_id), deadline, policy.close)
++    except asyncio.CancelledError:
++        _discard_run(output_dir, run_id)
++        raise
++    if synth is gate.TIMED_OUT:
++        _discard_run(output_dir, run_id)
++        return _make('timeout', None, 0, None, gate.PROVIDER_UNKNOWN if maybe_sent else gate.PROVIDER_NOT_STARTED)
++    provider = gate.provider_state(policy, synth.answered)
++    refusal = gate.check(authorize)
++    if refusal or synth.state != 'synthesized':
++        _remove([synth.path] if synth.path else [])
++        state = refusal or _failure_state(synth, policy)
++        return _make(state, None, synth.code_points if state in ('failed', 'too_long') else 0,
++                     'configured' if policy.sends else None, provider)
++    return _make('synthesized', synth.path, synth.code_points, 'configured', provider)
+diff --git a/tests/gateway/native_display_support.py b/tests/gateway/native_display_support.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..a9896b7f7fb9b7249a3a990be360e7ffa5605404
+--- /dev/null
++++ b/tests/gateway/native_display_support.py
+@@ -0,0 +1,76 @@
++"""Shared fixtures for the native display seam tests: real core rows, the existing reader as oracle."""
++from contextlib import contextmanager
++import json
++import time
++
++from gateway.session_contract import Principal
++
++
++def reader():
++    return Principal('viewer', 'default', frozenset({'session:read'}), 'test')
++
++
++async def fragments(authority, actor, ref):
++    """Every fragment the EXISTING position reader yields, in order (the oracle the seam must equal)."""
++    found, position = [], None
++    while True:
++        page = await authority.read_native_history_fragment(actor, ref, authorize=lambda: None, position=position)
++        if page.row is not None:
++            found.append(page.row)
++        position = page.position
++        if not page.more:
++            return found
++
++
++def by_identity(frags):
++    grouped = {}
++    for frag in frags:
++        grouped.setdefault(frag.row_id, []).append(frag)
++    return grouped
++
++
++def whole_text(parts):
++    return ''.join(f.text for f in sorted(parts, key=lambda f: f.segment_index))
++
++
++@contextmanager
++def traced_reads(db, statements):
++    """Record every SQL statement the reads under test execute (to prove what they never hydrate)."""
++    original = db._read_ctx
++
++    @contextmanager
++    def traced():
++        with original() as conn:
++            conn.set_trace_callback(statements.append)
++            try:
++                yield conn
++            finally:
++                conn.set_trace_callback(None)
++    db._read_ctx = traced
++    try:
++        yield statements
++    finally:
++        db._read_ctx = original
++
++
++def hydrated_ids(statements):
++    """Physical ids whose body columns a statement fetched by id."""
++    import re
++    ids = set()
++    for statement in statements:
++        if 'FROM messages WHERE id=' in statement and 'content' in statement:
++            ids.update(int(n) for n in re.findall(r'WHERE id=(\d+)', statement))
++    return ids
++
++
++def bulk_rows(db, session_id, count, *, start=0, role='assistant', text=lambda i: f'row {i}'):
++    """``count`` visible display rows in one write transaction (a large lineage without 65k commits)."""
++    stamp = time.time() - count - 10
++    rows = [(session_id, role, text(start + i), stamp + i, f'bulk-{start + i}') for i in range(count)]
++    db._execute_write(lambda conn: conn.executemany(
++        'INSERT INTO messages (session_id, role, content, timestamp, active, message_uid) VALUES (?,?,?,?,1,?)', rows))
++    return [r[4] for r in rows]
++
++
++def measured(label, **values):
++    print('NATIVE_VOICE_MEASURE ' + json.dumps({'label': label, **values}, sort_keys=True))
+diff --git a/tests/gateway/native_voice_support.py b/tests/gateway/native_voice_support.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..d84709627e4780b1374a183856a2e643a01a53bf
+--- /dev/null
++++ b/tests/gateway/native_voice_support.py
+@@ -0,0 +1,163 @@
++"""Synthetic provider transport for the native voice seam tests.
++
++Only the network bytes are replaced: the real OpenAI SDK, real httpx client (with whatever timeout,
++retry and event hooks the code under test configures) and real ``requests`` session run unchanged on
++top of these transports. Nothing here knows what a seam promises, so a count recorded here is the
++number of requests that would have left the process.
++"""
++from __future__ import annotations
++
++from contextlib import contextmanager
++from pathlib import Path
++import struct
++import threading
++import wave
++
++import httpx
++
++
++def write_wav(path, seconds=1.0, rate=16000):
++    """A real 16 kHz mono PCM WAV (silence), the container the SDK bridge hands the seam."""
++    frames = int(seconds * rate)
++    with wave.open(str(path), 'wb') as out:
++        out.setnchannels(1)
++        out.setsampwidth(2)
++        out.setframerate(rate)
++        out.writeframes(struct.pack('<h', 0) * frames)
++    return str(path)
++
++
++def write_config(home, config):
++    """The profile's real ``config.yaml`` (what ``load_config`` reads at call time)."""
++    import yaml
++    Path(home).mkdir(parents=True, exist_ok=True)
++    (Path(home) / 'config.yaml').write_text(yaml.safe_dump(config))
++
++
++class Wire:
++    """Scripted provider behaviour plus a record of every request that reached the transport.
++
++    ``tap`` sees each request first (to order it against caller callbacks); ``hold`` makes a request
++    wait, after it was recorded, until the test releases it (a provider that stalls)."""
++
++    def __init__(self, script=None, tap=None, hold=None):
++        self.script = list(script or [])
++        self.requests = []
++        self.tap = tap
++        self.hold = hold
++        self.entered = threading.Event()
++
++    def __call__(self, request):
++        self.requests.append(request)
++        self.entered.set()
++        if self.tap is not None:
++            self.tap(request)
++        if self.hold is not None:
++            assert self.hold.wait(30), 'the test never released the stalled provider'
++        step = self.script.pop(0) if self.script else ('ok', {})
++        kind, value = step
++        if kind == 'raise':
++            raise value
++        if kind == 'status':
++            return httpx.Response(value, text='synthetic provider failure', request=request)
++        return self.respond(request, value)
++
++    def respond(self, request, value):
++        if 'speech' in request.url.path:
++            return httpx.Response(200, content=value.get('audio', b'ID3synthetic-audio'),
++                                  headers={'content-type': 'audio/mpeg'}, request=request)
++        text = value.get('text', 'hello world')
++        if value.get('json', True):
++            return httpx.Response(200, json={'text': text}, request=request)
++        return httpx.Response(200, text=text, request=request)
++
++    @property
++    def count(self):
++        return len(self.requests)
++
++    def timeouts(self):
++        return [r.extensions.get('timeout') for r in self.requests]
++
++
++@contextmanager
++def provider_wire(monkeypatch, wire):
++    """Replace only the httpx network transport (every client built while active, SDK defaults included)."""
++    import httpx._client as client
++    monkeypatch.setattr(client, 'HTTPTransport', lambda **_: httpx.MockTransport(wire))
++    yield wire
++
++
++class RequestsWire:
++    """The same idea for ``requests``: the adapter that would open the socket, replaced."""
++
++    def __init__(self, script=None):
++        self.script = list(script or [])
++        self.requests = []
++
++    @property
++    def count(self):
++        return len(self.requests)
++
++    def adapter(self):
++        import requests
++        wire = self
++
++        class Adapter(requests.adapters.BaseAdapter):
++            def send(self, request, **kwargs):
++                wire.requests.append((request, kwargs))
++                kind, value = wire.script.pop(0) if wire.script else ('ok', {})
++                if kind == 'raise':
++                    raise value
++                response = requests.Response()
++                response.status_code = 200 if kind == 'ok' else value
++                response.request = request
++                response.url = request.url
++                body = b'{"text":"hello world"}' if kind == 'ok' else b'{"error":{"message":"synthetic"}}'
++                response.raw = __import__('io').BytesIO(body)
++                response._content = body
++                response.headers['content-type'] = 'application/json'
++                return response
++
++            def close(self):
++                pass
++        return Adapter()
++
++
++@contextmanager
++def requests_wire(monkeypatch, wire):
++    import requests
++    adapter = wire.adapter()
++    monkeypatch.setattr(requests.Session, 'get_adapter', lambda self, url: adapter)
++    yield wire
++
++
++SECRET = 'SECRET-CALLBACK-TEXT /private/secret/path'
++
++
++class Callbacks:
++    """The consumer's ``authorize`` / ``before_send``, recording the order they ran in.
++
++    ``refuse_authorize_at`` is the 1-based call that raises; ``refuse_before_send`` makes every
++    ``before_send`` raise. Their messages carry ``SECRET`` so a leak into any result or log shows."""
++
++    def __init__(self, events=None, refuse_authorize_at=None, refuse_before_send=False, authorize_error=None,
++                 refuse_before_send_at=None):
++        self.events = [] if events is None else events
++        self.refuse_authorize_at = refuse_authorize_at
++        self.refuse_before_send = refuse_before_send
++        self.refuse_before_send_at = refuse_before_send_at
++        self.authorize_error = authorize_error or PermissionError(SECRET)
++        self.authorize_calls = 0
++        self.before_send_calls = 0
++
++    def authorize(self):
++        self.authorize_calls += 1
++        self.events.append('authorize')
++        if self.refuse_authorize_at == self.authorize_calls:
++            raise self.authorize_error
++
++    def before_send(self):
++        self.before_send_calls += 1
++        self.events.append('before_send')
++        if self.refuse_before_send or self.refuse_before_send_at == self.before_send_calls:
++            raise OSError(SECRET)
+diff --git a/tests/gateway/test_native_voice_display.py b/tests/gateway/test_native_voice_display.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..30a96d817e93721a1511532b580842eab7926a6c
+--- /dev/null
++++ b/tests/gateway/test_native_voice_display.py
+@@ -0,0 +1,392 @@
++"""Native display seam on the registered core owner: identity-addressed read, locate and check.
++
++Real ``GatewayRunner`` / ``SessionAuthority`` / registered Gadget adapter / ``SessionDB`` (the
++``relay_native_support`` rig). The existing position reader (``read_native_history_fragment``) is the
++oracle: every identity read must equal the fragment it yields, byte for byte.
++"""
++from dataclasses import FrozenInstanceError, fields, replace
++import inspect
++import time
++
++import pytest
++import pytest_asyncio
++
++from agent.context_compressor import MODEL_ONLY_DISPLAY_METADATA_KEY
++from gateway.session_authority import SessionAuthority
++from gateway import session_native_voice as voice
++from hermes_state_common import DISPLAY_CONTENT_REVISION_PREFIX
++from hermes_state_runtime import RuntimeStoreError
++from tests.gateway import native_display_support as support
++from tests.gateway import relay_native_support
++
++rig = relay_native_support.rig
++reader = support.reader
++
++
++async def route(rig_, chat='relay-synthetic', user='phone'):
++    return await rig_.authority.register_native_route(rig_.event(user=user, chat=chat).source)
++
++
++def test_the_seam_contract_the_consumer_validates():
++    assert voice.NATIVE_VOICE_VERSION == 1 and SessionAuthority.NATIVE_VOICE_VERSION == 1
++    assert [f.name for f in fields(voice.NativeTranscription)] == ['state', 'transcript', 'source', 'provider']
++    assert [f.name for f in fields(voice.NativeSpeech)] == ['state', 'path', 'code_points', 'source', 'provider']
++    assert [f.name for f in fields(voice.NativeDisplayLocation)] == [
++        'identity', 'physical_id', 'role', 'created_at_ms', 'segment_count', 'size_bytes']
++    assert voice.NativeDisplayLocation.__dataclass_fields__['physical_id'].type in (int, 'int')
++    with pytest.raises(FrozenInstanceError):
++        voice.NativeTranscription('transcribed', 'x', 'configured', 'completed').state = 'failed'
++
++    def keyword_only(function, *names):
++        parameters = inspect.signature(function).parameters
++        assert [n for n in parameters if parameters[n].kind is inspect.Parameter.KEYWORD_ONLY][:len(names)] == list(names)
++    keyword_only(voice.transcribe_native_once, 'authorize', 'before_send', 'deadline_s')
++    keyword_only(voice.synthesize_native_once, 'output_dir', 'authorize', 'before_send', 'deadline_s')
++    keyword_only(SessionAuthority.locate_native_display, 'authorize', 'matches', 'max_rows')
++    keyword_only(SessionAuthority.read_native_display, 'authorize', 'identity', 'segment', 'max_bytes')
++    keyword_only(SessionAuthority.check_native_display, 'authorize', 'identity')
++    keyword_only(SessionAuthority.locate_existing_display, 'adapter', 'source', 'authorize', 'matches', 'max_rows')
++    keyword_only(SessionAuthority.read_existing_display, 'adapter', 'source', 'authorize', 'row_id', 'segment', 'max_bytes')
++
++
++@pytest_asyncio.fixture
++async def lineage(rig):
++    ref = await route(rig)
++    db = rig.authority.db
++    texts = {
++        'plain': 'A plain answer.',
++        'multi': 'm' * 20000,
++        'two-byte': 'a' + 'é' * 5000,
++        'emoji': 'abc' + '😀' * 3000 + 'z',
++        'cjk': '漢字' * 4000,
++    }
++    ids = {name: db.append_message(ref.session_id, 'assistant', text) for name, text in texts.items()}
++    ids['question'] = db.append_message(ref.session_id, 'user', 'What is the plan?')
++    return ref, texts, ids
++
++
++@pytest.mark.asyncio
++async def test_identity_read_equals_the_existing_fragment_reader_byte_for_byte(rig, lineage):
++    ref, texts, _ = lineage
++    oracle = support.by_identity(await support.fragments(rig.authority, reader(), ref))
++    assert len(oracle) == len(texts) + 1
++    segments = 0
++    for identity, parts in oracle.items():
++        for frag in parts:
++            got = await rig.authority.read_native_display(
++                reader(), ref, authorize=lambda: None, identity=identity, segment=frag.segment_index)
++            assert got == frag, (identity, frag.segment_index)
++            segments += 1
++    assert segments > len(oracle)  # multi-segment rows were really compared segment by segment
++    for name, text in texts.items():
++        assert [i for i, parts in oracle.items() if support.whole_text(parts) == text], name
++
++
++@pytest.mark.asyncio
++async def test_multibyte_text_is_split_only_at_codepoint_boundaries_exactly_like_the_reader(rig, lineage):
++    ref, _, _ = lineage
++    oracle = support.by_identity(await support.fragments(rig.authority, reader(), ref))
++    for identity, parts in oracle.items():
++        for frag in parts:
++            got = await rig.authority.read_native_display(
++                reader(), ref, authorize=lambda: None, identity=identity, segment=frag.segment_index)
++            assert got.text == frag.text and got.text.encode('utf-8').decode('utf-8') == got.text
++            assert (got.physical_id, got.sort_id, got.created_at_ms, got.segment_count) == (
++                frag.physical_id, frag.sort_id, frag.created_at_ms, frag.segment_count)
++
++
++@pytest.mark.asyncio
++async def test_rows_the_canonical_projection_hides_are_not_found(rig):
++    ref = await route(rig)
++    db = rig.authority.db
++    ids = {
++        'visible': db.append_message(ref.session_id, 'assistant', 'visible answer'),
++        'model-only': db.append_message(ref.session_id, 'assistant', 'model only text',
++                                        display_metadata={MODEL_ONLY_DISPLAY_METADATA_KEY: True}),
++        'internal': db.append_message(ref.session_id, 'assistant', 'internal note', display_kind='internal_notification'),
++        'tool': db.append_message(ref.session_id, 'assistant', 'tool output', tool_call_id='call-1'),
++        'summary': db.append_message(ref.session_id, 'assistant', 'compaction summary', _compressed_summary=True),
++        'rewound': db.append_message(ref.session_id, 'assistant', 'rewound away'),
++        'deleted': db.append_message(ref.session_id, 'assistant', 'deleted soon'),
++    }
++    with db._read_ctx() as conn:
++        uids = {name: conn.execute('SELECT message_uid FROM messages WHERE id=?', (row_id,)).fetchone()[0]
++                for name, row_id in ids.items()}
++    db._execute_write(lambda c: c.execute('UPDATE messages SET active=0, compacted=0 WHERE id=?', (ids['rewound'],)))
++    db._execute_write(lambda c: c.execute('DELETE FROM messages WHERE id=?', (ids['deleted'],)))
++    seen = []
++    for name in ids:
++        try:
++            fragment = await rig.authority.read_native_display(
++                reader(), ref, authorize=lambda: None, identity=uids[name])
++            seen.append((name, fragment.text))
++        except RuntimeStoreError as exc:
++            assert exc.reason == 'not_found', name
++            with pytest.raises(RuntimeStoreError, match='not_found'):
++                rig.authority.check_native_display(reader(), ref, authorize=lambda: None, identity=uids[name])
++    assert seen == [('visible', 'visible answer')]
++    rig.authority.check_native_display(reader(), ref, authorize=lambda: None, identity=uids['visible'])
++
++
++@pytest.mark.asyncio
++async def test_another_lineage_identity_is_not_found_and_never_leaks_its_text(rig):
++    first, second = await route(rig, 'relay-one'), await route(rig, 'relay-two')
++    db = rig.authority.db
++    db.append_message(first.session_id, 'assistant', 'first lineage answer')
++    db.append_message(second.session_id, 'assistant', 'second lineage secret')
++    other = (await support.fragments(rig.authority, reader(), second))[0].row_id
++    with pytest.raises(RuntimeStoreError, match='not_found'):
++        await rig.authority.read_native_display(reader(), first, authorize=lambda: None, identity=other)
++    assert await rig.authority.locate_native_display(
++        reader(), first, authorize=lambda: None, matches=lambda identity: identity == other) is None
++
++
++@pytest.mark.asyncio
++async def test_compaction_keeps_the_identity_readable_under_a_new_physical_id(rig):
++    ref = await route(rig)
++    db = rig.authority.db
++    db.append_message(ref.session_id, 'user', 'carried question')
++    db.append_message(ref.session_id, 'assistant', 'carried answer')
++    before = {f.row_id: f for f in await support.fragments(rig.authority, reader(), ref)}
++    tail = db.get_messages_as_conversation(ref.session_id, repair_alternation=False, include_row_ids=True)
++    db.publish_compression_child(parent_session_id=ref.session_id, child_session_id=ref.session_id + '-child',
++                                 source='gadget', messages=tail, require_compression_lease=False)
++    after = {f.row_id: f for f in await support.fragments(rig.authority, reader(), ref)}
++    assert set(after) == set(before)
++    for identity, old in before.items():
++        got = await rig.authority.read_native_display(reader(), ref, authorize=lambda: None, identity=identity)
++        assert got == after[identity] and got.text == old.text
++        assert got.physical_id != old.physical_id  # the alias hint must follow the live row
++
++
++@pytest.mark.asyncio
++async def test_user_edit_serves_the_revised_text_and_malformed_stamps_fail_closed(rig):
++    ref = await route(rig)
++    db = rig.authority.db
++    row_id = db.append_message(ref.session_id, 'user', 'old prompt')
++    (old,) = await support.fragments(rig.authority, reader(), ref)
++    assert db.set_user_message_content(ref.session_id, row_id, 'new prompt') == 1
++    got = await rig.authority.read_native_display(reader(), ref, authorize=lambda: None, identity=old.row_id)
++    (current,) = await support.fragments(rig.authority, reader(), ref)
++    assert got == current and got.text == 'new prompt'
++    for bad in (None, '0', '01', '9' * 40):
++        db._execute_write(lambda c: c.execute('DELETE FROM state_meta WHERE key=?', (DISPLAY_CONTENT_REVISION_PREFIX + str(row_id),)))
++        db._execute_write(lambda c: c.execute('INSERT INTO state_meta(key,value) VALUES (?,?)',
++                                              (DISPLAY_CONTENT_REVISION_PREFIX + str(row_id), bad)))
++        with pytest.raises(RuntimeStoreError, match='temporarily_unavailable'):
++            await rig.authority.read_native_display(reader(), ref, authorize=lambda: None, identity=old.row_id)
++        with pytest.raises(RuntimeStoreError, match='temporarily_unavailable'):
++            rig.authority.check_native_display(reader(), ref, authorize=lambda: None, identity=old.row_id)
++
++
++@pytest.mark.asyncio
++async def test_authority_is_proved_before_any_content_and_again_after(rig, lineage, monkeypatch):
++    ref, _, _ = lineage
++    (first, *_) = await support.fragments(rig.authority, reader(), ref)
++    db = rig.authority.db
++
++    def forbidden():
++        raise AssertionError('canonical read must not start')
++    monkeypatch.setattr(db, '_read_ctx', forbidden)
++    blind = replace(reader(), capabilities=frozenset())
++    calls = (
++        lambda a: rig.authority.read_native_display(blind, ref, authorize=a, identity=first.row_id, max_bytes=-1),
++        lambda a: rig.authority.locate_native_display(blind, ref, authorize=a, matches=None, max_rows=0),
++    )
++    for call in calls:
++        with pytest.raises(RuntimeStoreError, match='permission_denied'):
++            await call(lambda: None)
++    with pytest.raises(RuntimeStoreError, match='permission_denied'):
++        rig.authority.check_native_display(blind, ref, authorize=lambda: None, identity='')
++
++    def revoked():
++        raise RuntimeStoreError('permission_denied')
++    with pytest.raises(RuntimeStoreError, match='permission_denied'):
++        await rig.authority.read_native_display(reader(), ref, authorize=revoked, identity=first.row_id)
++    with pytest.raises(RuntimeStoreError, match='permission_denied'):
++        await rig.authority.locate_native_display(reader(), ref, authorize=revoked, matches=lambda i: True)
++    foreign = replace(reader(), profile_id='another-profile')
++    with pytest.raises(RuntimeStoreError, match='profile_mismatch'):
++        await rig.authority.read_native_display(foreign, ref, authorize=lambda: None, identity=first.row_id)
++
++
++@pytest.mark.asyncio
++async def test_authority_revoked_during_the_read_withholds_the_row(rig, lineage):
++    ref, _, _ = lineage
++    (first, *_) = await support.fragments(rig.authority, reader(), ref)
++    for operation in ('read', 'locate'):
++        calls = []
++
++        def revoke_after_the_read():
++            calls.append(1)
++            if len(calls) > 1:
++                raise RuntimeStoreError('permission_denied')
++        with pytest.raises(RuntimeStoreError, match='permission_denied'):
++            if operation == 'read':
++                await rig.authority.read_native_display(reader(), ref, authorize=revoke_after_the_read, identity=first.row_id)
++            else:
++                await rig.authority.locate_native_display(reader(), ref, authorize=revoke_after_the_read,
++                                                          matches=lambda identity: identity == first.row_id)
++        assert len(calls) == 2
++
++
++@pytest.mark.asyncio
++async def test_invalid_parameters_are_refused_without_reading(rig, lineage):
++    ref, _, _ = lineage
++    (first, *_) = await support.fragments(rig.authority, reader(), ref)
++    good = dict(authorize=lambda: None, identity=first.row_id)
++    for bad in (dict(identity=''), dict(identity='x' * 129), dict(identity=None), dict(segment=-1), dict(segment=True),
++                dict(max_bytes=65537), dict(max_bytes=-1), dict(max_bytes=1.5)):
++        with pytest.raises(RuntimeStoreError, match='invalid_params'):
++            await rig.authority.read_native_display(reader(), ref, **{**good, **bad})
++    for bad in (dict(matches=None), dict(max_rows=0), dict(max_rows=65537), dict(max_rows=True), dict(max_rows='9')):
++        with pytest.raises(RuntimeStoreError, match='invalid_params'):
++            await rig.authority.locate_native_display(reader(), ref, **{'authorize': lambda: None, 'matches': lambda i: True, **bad})
++    with pytest.raises(RuntimeStoreError, match='snapshot_required'):
++        await rig.authority.read_native_display(reader(), ref, **good, segment=9)
++    with pytest.raises(RuntimeStoreError, match='read_budget'):
++        await rig.authority.read_native_display(reader(), ref, **good, max_bytes=100)
++
++
++@pytest.mark.asyncio
++async def test_locate_scans_newest_first_and_stops_at_the_first_match(rig):
++    ref = await route(rig)
++    ids = support.bulk_rows(rig.authority.db, ref.session_id, 6)
++    visited = []
++
++    def matches(identity):
++        visited.append(identity)
++        return identity == ids[2]
++    found = await rig.authority.locate_native_display(reader(), ref, authorize=lambda: None, matches=matches)
++    assert visited == [ids[5], ids[4], ids[3], ids[2]]  # newest first, nothing past the hit
++    assert found.identity == ids[2]
++
++
++@pytest.mark.asyncio
++async def test_locate_budget_is_the_row_bound_and_a_completed_miss_is_not_a_budget_refusal(rig):
++    ref = await route(rig)
++    ids = support.bulk_rows(rig.authority.db, ref.session_id, 10)
++    locate = lambda target, rows: rig.authority.locate_native_display(
++        reader(), ref, authorize=lambda: None, matches=lambda identity: identity == target, max_rows=rows)
++    assert (await locate(ids[0], 10)).identity == ids[0]  # the oldest row, exactly at the bound
++    with pytest.raises(RuntimeStoreError) as stopped:
++        await locate(ids[0], 9)  # one row past the bound: NOT "absent"
++    assert stopped.value.reason == 'read_budget' and stopped.value.field == 'locate_rows'
++    assert await locate('never-a-row', 10) is None  # a COMPLETED search of every row
++    with pytest.raises(RuntimeStoreError) as stopped:
++        await locate('never-a-row', 9)
++    assert stopped.value.reason == 'read_budget'
++    assert await locate('never-a-row', 65536) is None
++
++
++@pytest.mark.asyncio
++async def test_locate_deadline_stops_a_real_scan_with_the_same_stable_refusal(rig, monkeypatch):
++    ref = await route(rig)
++    support.bulk_rows(rig.authority.db, ref.session_id, 20000)
++    monkeypatch.setattr(voice, 'LOCATE_DEADLINE_S', 0.001)
++    started = time.monotonic()
++    with pytest.raises(RuntimeStoreError) as stopped:
++        await rig.authority.locate_native_display(reader(), ref, authorize=lambda: None, matches=lambda identity: False)
++    assert (stopped.value.reason, stopped.value.field) == ('read_budget', 'locate_deadline')
++    assert time.monotonic() - started < 5  # it really stopped, it did not finish the scan
++
++
++@pytest.mark.asyncio
++async def test_two_located_rows_of_one_lineage_have_distinct_physical_ids_matching_the_reader(rig, lineage):
++    ref, _, _ = lineage
++    oracle = {f.row_id: f for f in await support.fragments(rig.authority, reader(), ref) if f.segment_index == 0}
++    first, second = next(iter(oracle)), list(oracle)[3]
++    located = {}
++    for identity in (first, second):
++        located[identity] = await rig.authority.locate_native_display(
++            reader(), ref, authorize=lambda: None, matches=lambda candidate, wanted=identity: candidate == wanted)
++        frag = oracle[identity]
++        assert isinstance(located[identity].physical_id, int) and not isinstance(located[identity].physical_id, bool)
++        assert (located[identity].identity, located[identity].physical_id, located[identity].role,
++                located[identity].created_at_ms, located[identity].segment_count) == (
++            frag.row_id, frag.physical_id, frag.role, frag.created_at_ms, frag.segment_count)
++        whole = support.whole_text([f for f in await support.fragments(rig.authority, reader(), ref) if f.row_id == identity])
++        assert located[identity].size_bytes == len(whole.encode('utf-8'))
++    assert located[first].physical_id != located[second].physical_id
++    with pytest.raises(FrozenInstanceError):
++        located[first].identity = 'other'
++
++
++@pytest.mark.asyncio
++async def test_locate_hydrates_only_the_matched_row(rig, monkeypatch):
++    ref = await route(rig)
++    db = rig.authority.db
++    ids = support.bulk_rows(db, ref.session_id, 30, text=lambda i: f'private content {i}')
++    statements = []
++    with support.traced_reads(db, statements):
++        found = await rig.authority.locate_native_display(
++            reader(), ref, authorize=lambda: None, matches=lambda identity: identity == ids[10])
++        assert support.hydrated_ids(statements) == {found.physical_id}
++        statements.clear()
++        assert await rig.authority.locate_native_display(
++            reader(), ref, authorize=lambda: None, matches=lambda identity: False) is None
++        assert support.hydrated_ids(statements) == set()  # a complete scan with no match reads no content at all
++
++
++@pytest.mark.asyncio
++async def test_a_hidden_carrier_matched_by_the_predicate_is_not_a_playable_location(rig):
++    ref = await route(rig)
++    db = rig.authority.db
++    summary = db.append_message(ref.session_id, 'assistant', 'compaction summary', _compressed_summary=True)
++    visible = db.append_message(ref.session_id, 'assistant', 'real answer')
++    with db._read_ctx() as conn:
++        uids = {name: conn.execute('SELECT message_uid FROM messages WHERE id=?', (row,)).fetchone()[0]
++                for name, row in (('summary', summary), ('visible', visible))}
++    found = await rig.authority.locate_native_display(
++        reader(), ref, authorize=lambda: None, matches=lambda identity: identity in uids.values())
++    assert found.identity == uids['visible']
++
++
++@pytest.mark.asyncio
++async def test_locate_on_a_65536_row_lineage_is_measured_against_the_real_budget(rig, monkeypatch):
++    ref = await route(rig)
++    db = rig.authority.db
++    ids = support.bulk_rows(db, ref.session_id, 65536, text=lambda i: f'row {i} ' + 'x' * 400)
++    import gateway.session_native_voice_display as display
++    hydrations = []
++    original = display._body
++    monkeypatch.setattr(display, '_body', lambda *a, **k: hydrations.append(a[2]) or original(*a, **k))
++    monkeypatch.setattr(voice, 'LOCATE_DEADLINE_S', 60.0)  # measure the true cost without a flaky verdict
++    timings = {}
++    for label, target, rows in (('newest', ids[-1], 1), ('oldest', ids[0], 65536), ('miss-complete', 'absent', 65536)):
++        hydrations.clear()
++        visited = []
++        started = time.monotonic()
++        found = await rig.authority.locate_native_display(
++            reader(), ref, authorize=lambda: None,
++            matches=lambda identity, wanted=target: visited.append(1) or identity == wanted)
++        timings[label] = round(time.monotonic() - started, 3)
++        assert (found is None) == (target == 'absent')
++        assert len(visited) == rows and len(hydrations) == (0 if found is None else 1)
++    support.measured('locate_65536_rows', seconds=timings, rows=65536, budget_s=2.0, deadline_override_s=60.0)
++    monkeypatch.undo()  # the real 2 s budget: the same worst case completes inside it on this rig
++    started = time.monotonic()
++    assert await rig.authority.locate_native_display(
++        reader(), ref, authorize=lambda: None, matches=lambda identity: False) is None
++    support.measured('locate_65536_rows_default_budget', seconds=round(time.monotonic() - started, 3))
++
++
++@pytest.mark.asyncio
++async def test_locate_cost_when_most_of_the_lineage_is_not_display_rows(rig, monkeypatch):
++    """65,536 display rows hidden among 131,072 tool/model-only rows: the shape of a long agent session."""
++    ref = await route(rig)
++    db = rig.authority.db
++    stamp = time.time() - 300000
++    noise = [(ref.session_id, 'tool', 'tool output ' + 'x' * 300, stamp + i, f'tool-{i}', f'call-{i}')
++             for i in range(131072)]
++    db._execute_write(lambda conn: conn.executemany(
++        'INSERT INTO messages (session_id, role, content, timestamp, active, message_uid, tool_call_id) '
++        'VALUES (?,?,?,?,1,?,?)', noise))
++    ids = support.bulk_rows(db, ref.session_id, 65536, text=lambda i: f'row {i} ' + 'x' * 400)
++    monkeypatch.setattr(voice, 'LOCATE_DEADLINE_S', 60.0)
++    started = time.monotonic()
++    found = await rig.authority.locate_native_display(
++        reader(), ref, authorize=lambda: None, matches=lambda identity: identity == ids[0])
++    elapsed = round(time.monotonic() - started, 3)
++    assert found.identity == ids[0]
++    support.measured('locate_65536_display_rows_among_131072_tool_rows', seconds=elapsed, budget_s=2.0)
+diff --git a/tests/gateway/test_native_voice_existing_display.py b/tests/gateway/test_native_voice_existing_display.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..72083ea5dbc55c31d952bb098a6a37424c0a6f61
+--- /dev/null
++++ b/tests/gateway/test_native_voice_existing_display.py
+@@ -0,0 +1,141 @@
++"""Existing-source analogs of the native display seam, on the real source authority.
++
++A messaging-source session (a Telegram conversation) is readable by a Gadget device principal that
++the registered adapter actually owns (``source_owner``) and that holds ``session:read``; the analogs
++reuse that proof, the existing target and its readability rules, and add nothing else. The SDK's
++8,192/65,536 response-bound regression of the existing-history path is NOT exercised or fixed here.
++"""
++from dataclasses import replace
++
++import pytest
++
++from gateway.session_contract import Principal
++from gateway.session_existing import ExistingTarget
++from gateway.session_native_admission import native_principal
++from hermes_state_runtime import RuntimeStoreError
++from tests.gateway import native_display_support as support
++from tests.gateway import relay_native_support
++
++rig = relay_native_support.rig
++
++
++def device(rig_, name='phone', capabilities=('session:read',)):
++    source = rig_.adapter.build_source(chat_id=name, chat_type='dm', user_id=name)
++    return Principal(native_principal(source), rig_.authority.profile_id, frozenset(capabilities), 'relay-existing-' + name), source
++
++
++def telegram(rig_, session_id='tg-1'):
++    db = rig_.authority.db
++    db.create_session(session_id, source='telegram')
++    return ExistingTarget('a', session_id, 'telegram')
++
++
++async def existing_fragments(rig_, actor, source, target):
++    """The fragments of the existing reader's rows, via the identity-addressed seam only (rows come
++    from ``read_existing_history``, the existing source reader, as the oracle for identity and text)."""
++    page = await rig_.authority.read_existing_history(actor, target, adapter=rig_.adapter, source=source,
++                                                      authorize=lambda: None)
++    return page.rows
++
++
++@pytest.mark.asyncio
++async def test_existing_identity_read_equals_the_existing_history_rows(rig):
++    actor, source = device(rig)
++    target = telegram(rig)
++    db = rig.authority.db
++    db.append_message('tg-1', 'user', 'telegram question')
++    db.append_message('tg-1', 'assistant', 'multi ' + 'é' * 6000)
++    db.append_message('tg-1', 'assistant', '😀' * 3000)
++    rows = await existing_fragments(rig, actor, source, target)
++    assert len(rows) == 3
++    for row in rows:
++        parts, segment = [], 0
++        while True:
++            fragment = await rig.authority.read_existing_display(
++                actor, target, adapter=rig.adapter, source=source, authorize=lambda: None, row_id=row.row_id,
++                segment=segment)
++            parts.append(fragment)
++            segment += 1
++            if segment == fragment.segment_count:
++                break
++        assert ''.join(p.text for p in parts) == row.text and {p.row_id for p in parts} == {row.row_id}
++        assert parts[0].role == row.role and parts[0].created_at_ms == int(row.created_at * 1000)
++    assert max(p.segment_count for p in parts) >= 1
++
++
++@pytest.mark.asyncio
++async def test_existing_locate_is_newest_first_bounded_and_distinguishes_budget_from_absence(rig):
++    actor, source = device(rig)
++    target = telegram(rig)
++    ids = support.bulk_rows(rig.authority.db, 'tg-1', 12)
++    visited = []
++    found = await rig.authority.locate_existing_display(
++        actor, target, adapter=rig.adapter, source=source, authorize=lambda: None,
++        matches=lambda identity: visited.append(identity) or identity == ids[8])
++    assert visited == [ids[11], ids[10], ids[9], ids[8]] and found.identity == ids[8]
++    other = await rig.authority.locate_existing_display(
++        actor, target, adapter=rig.adapter, source=source, authorize=lambda: None,
++        matches=lambda identity: identity == ids[3])
++    assert other.physical_id != found.physical_id and isinstance(other.physical_id, int)
++    with pytest.raises(RuntimeStoreError) as stopped:
++        await rig.authority.locate_existing_display(
++            actor, target, adapter=rig.adapter, source=source, authorize=lambda: None,
++            matches=lambda identity: identity == ids[0], max_rows=11)
++    assert (stopped.value.reason, stopped.value.field) == ('read_budget', 'locate_rows')
++    assert await rig.authority.locate_existing_display(
++        actor, target, adapter=rig.adapter, source=source, authorize=lambda: None,
++        matches=lambda identity: False, max_rows=12) is None
++
++
++@pytest.mark.asyncio
++async def test_existing_target_and_source_authority_are_kept(rig):
++    actor, source = device(rig)
++    target = telegram(rig)
++    rig.authority.db.append_message('tg-1', 'assistant', 'private telegram answer')
++    rig.authority.db.create_session('api-1', source='api_server')
++    rig.authority.db.append_message('api-1', 'assistant', 'API_PRIVATE')
++    (row,) = await existing_fragments(rig, actor, source, target)
++    call = dict(adapter=rig.adapter, authorize=lambda: None)
++    refused = (
++        # not a readable existing source (API server) or a source that does not match the declared one
++        (actor, ExistingTarget('b', 'api-1', 'api_server'), source, 'not_found'),
++        (actor, ExistingTarget('c', 'tg-1', 'discord'), source, 'not_found'),
++        (actor, ExistingTarget('d', 'tg-missing', 'telegram'), source, 'not_found'),
++        # the right principal through another device's source, and a principal without session:read
++        (actor, target, device(rig, 'watch')[1], 'permission_denied'),
++        (device(rig, 'phone', ('session:submit',))[0], target, source, 'permission_denied'),
++        (replace(actor, profile_id='another'), target, source, 'profile_mismatch'),
++    )
++    for who, where, via, reason in refused:
++        with pytest.raises(RuntimeStoreError, match=reason):
++            await rig.authority.read_existing_display(who, where, source=via, row_id=row.row_id, **call)
++        with pytest.raises(RuntimeStoreError, match=reason):
++            await rig.authority.locate_existing_display(who, where, source=via, matches=lambda i: True, **call)
++
++
++@pytest.mark.asyncio
++async def test_existing_reads_prove_authority_first_and_again_after(rig, monkeypatch):
++    actor, source = device(rig)
++    target = telegram(rig)
++    rig.authority.db.append_message('tg-1', 'assistant', 'answer')
++    (row,) = await existing_fragments(rig, actor, source, target)
++
++    def forbidden():
++        raise AssertionError('canonical read must not start')
++    blind = replace(actor, capabilities=frozenset())
++    real = rig.authority.db._read_ctx
++    monkeypatch.setattr(rig.authority.db, '_read_ctx', forbidden)
++    with pytest.raises(RuntimeStoreError, match='permission_denied'):
++        await rig.authority.read_existing_display(blind, target, adapter=rig.adapter, source=source,
++                                                  authorize=lambda: None, row_id=row.row_id)
++    monkeypatch.setattr(rig.authority.db, '_read_ctx', real)
++    calls = []
++
++    def revoke_after():
++        calls.append(1)
++        if len(calls) > 1:
++            raise RuntimeStoreError('permission_denied')
++    with pytest.raises(RuntimeStoreError, match='permission_denied'):
++        await rig.authority.read_existing_display(actor, target, adapter=rig.adapter, source=source,
++                                                  authorize=revoke_after, row_id=row.row_id)
++    assert len(calls) == 2  # once to prove the caller, again by the post-read fence
+diff --git a/tests/gateway/test_native_voice_stt.py b/tests/gateway/test_native_voice_stt.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7ff893c02701fb0fff7c56bb152b3d2b2580c60a
+--- /dev/null
++++ b/tests/gateway/test_native_voice_stt.py
+@@ -0,0 +1,385 @@
++"""Native voice seam: configured speech-to-text sent once, truthful outcomes, no leaks.
++
++Real OpenAI SDK, real httpx client and real ``requests`` session over a synthetic network transport
++(``native_voice_support``); the profile's STT configuration is the real ``config.yaml`` read at call
++time. Counts below are requests that reached the transport. The stock-path counterparts (2 and 4
++requests for the same failures) are recorded in ``tests/tools/test_native_voice_stock_transport.py``.
++"""
++import asyncio
++import logging
++import threading
++
++import httpx
++import pytest
++
++from gateway.session_native_voice import transcribe_native_once
++from hermes_constants import get_hermes_home
++from tests.gateway import native_voice_support as support
++
++KEY = 'sk-synthetic-native-stt'
++
++
++def openai_config(**stt):
++    return {'stt': {'provider': 'openai', 'cloud_trim_silence': False,
++                    'openai': {'api_key': KEY, 'model': 'whisper-1'}, **stt}}
++
++
++@pytest.fixture
++def clip(tmp_path):
++    return support.write_wav(tmp_path / 'clip.wav')
++
++
++@pytest.fixture
++def configured():
++    support.write_config(get_hermes_home(), openai_config())
++
++
++async def seam(clip, callbacks, deadline_s=30):
++    return await transcribe_native_once(clip, authorize=callbacks.authorize, before_send=callbacks.before_send,
++                                         deadline_s=deadline_s)
++
++
++def words(text='hello world'):
++    return ('ok', {'text': text, 'json': False})
++
++
++@pytest.mark.asyncio
++async def test_configured_success_sends_once_after_before_send(monkeypatch, clip, configured):
++    events = []
++    cb = support.Callbacks(events)
++    wire = support.Wire([words()], tap=lambda request: events.append('request'))
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam(clip, cb)
++    assert (result.state, result.transcript, result.source, result.provider) == (
++        'transcribed', 'hello world', 'configured', 'completed')
++    assert wire.count == 1
++    assert events == ['authorize', 'authorize', 'before_send', 'request', 'authorize']
++    assert wire.requests[0].headers['authorization'] == f'Bearer {KEY}'
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('failure', [
++    ('status', 500), ('status', 503), ('raise', httpx.ReadError('synthetic reset')),
++    ('raise', httpx.ConnectError('synthetic')), ('raise', httpx.ReadTimeout('synthetic'))],
++    ids=['5xx', '503', 'reset', 'connect', 'timeout'])
++async def test_provider_failure_is_not_resent(monkeypatch, clip, configured, failure):
++    cb = support.Callbacks()
++    wire = support.Wire([failure] * 8)
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam(clip, cb)
++    assert wire.count == 1
++    assert (result.state, result.transcript, result.provider) == ('failed', None, 'failed_after_send')
++    assert cb.before_send_calls == 1
++
++
++@pytest.mark.asyncio
++async def test_no_post_answer_transcode_retry_and_configured_retries_are_overridden(monkeypatch, clip):
++    support.write_config(get_hermes_home(), openai_config(openai={'api_key': KEY, 'max_retries': 5, 'timeout': 600}))
++    transcodes = []
++
++    def transcode(path, work):
++        transcodes.append(path)
++        return None, 'unreachable'
++    monkeypatch.setattr('tools.transcription_cloud._transcode_audio_for_stt', transcode)
++    wire = support.Wire([('status', 500)] * 8)
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam(clip, support.Callbacks(), deadline_s=45)
++    assert wire.count == 1 and transcodes == []
++    assert result.state == 'failed'
++    assert {t['read'] for t in wire.timeouts()} == {45.0}  # explicit: min(configured 600, deadline 45)
++
++
++@pytest.mark.asyncio
++async def test_request_timeout_is_the_policy_cap_not_the_sdk_default(monkeypatch, clip, configured):
++    wire = support.Wire([words()])
++    with support.provider_wire(monkeypatch, wire):
++        await seam(clip, support.Callbacks(), deadline_s=300)
++    assert {t['read'] for t in wire.timeouts()} == {60.0}
++
++
++@pytest.mark.asyncio
++async def test_empty_and_too_long_transcripts_are_stable_outcomes(monkeypatch, clip, configured):
++    for body, state in (('   ', 'empty'), ('x' * 4001, 'too_long'), ('😀' * 4001, 'too_long')):
++        wire = support.Wire([words(body)])
++        with support.provider_wire(monkeypatch, wire):
++            result = await seam(clip, support.Callbacks())
++        assert (result.state, result.transcript, result.provider, wire.count) == (state, None, 'completed', 1)
++    wire = support.Wire([words('é' * 4000)])  # 4,000 code points, 8,000 bytes: within both bounds
++    with support.provider_wire(monkeypatch, wire):
++        assert (await seam(clip, support.Callbacks())).state == 'transcribed'
++    wire = support.Wire([words('😀' * 4000)])  # 4,000 code points but 16,000 bytes
++    with support.provider_wire(monkeypatch, wire):
++        assert (await seam(clip, support.Callbacks())).state == 'transcribed'
++    wire = support.Wire([words('😀' * 4001)])
++    with support.provider_wire(monkeypatch, wire):
++        assert (await seam(clip, support.Callbacks())).state == 'too_long'
++
++
++@pytest.mark.asyncio
++async def test_transcript_byte_bound_is_enforced_separately(monkeypatch, clip, configured):
++    wire = support.Wire([words('€' * 3000 + 'a' * 1000)])  # 4,000 code points, 10,000 bytes: fine
++    with support.provider_wire(monkeypatch, wire):
++        assert (await seam(clip, support.Callbacks())).state == 'transcribed'
++    wire = support.Wire([words('€' * 3000 + '😀' * 1000)])  # 4,000 code points, 13,000 bytes: fine
++    with support.provider_wire(monkeypatch, wire):
++        assert (await seam(clip, support.Callbacks())).state == 'transcribed'
++    wire = support.Wire([words('😀' * 3999 + '€' * 1)])  # 4,000 code points, 15,999 bytes: fine
++    with support.provider_wire(monkeypatch, wire):
++        assert (await seam(clip, support.Callbacks())).state == 'transcribed'
++    wire = support.Wire([words('😀' * 3999 + '€€')])  # 4,001 code points
++    with support.provider_wire(monkeypatch, wire):
++        assert (await seam(clip, support.Callbacks())).state == 'too_long'
++
++
++@pytest.mark.asyncio
++async def test_unacceptable_input_never_reaches_the_provider(monkeypatch, tmp_path, configured):
++    wire = support.Wire([words()])
++    cb = support.Callbacks()
++    huge = tmp_path / 'huge.wav'
++    huge.write_bytes(b'\0' * (2 * 1024 * 1024 + 1))
++    empty = tmp_path / 'empty.wav'
++    empty.write_bytes(b'')
++    real = support.write_wav(tmp_path / 'real.wav')
++    link = tmp_path / 'link.wav'
++    link.symlink_to(real)
++    with support.provider_wire(monkeypatch, wire):
++        for path in (str(huge), str(empty), str(link), str(tmp_path / 'missing.wav'), str(tmp_path), '', 'a\0b'):
++            result = await seam(path, cb)
++            assert (result.state, result.provider) == ('refused', 'not_started'), path
++        with pytest.raises(Exception, match='invalid_params'):
++            await transcribe_native_once(real, authorize=cb.authorize, before_send=cb.before_send, deadline_s=0)
++        with pytest.raises(Exception, match='invalid_params'):
++            await transcribe_native_once(real, authorize=None, before_send=cb.before_send, deadline_s=5)
++    assert wire.count == 0 and cb.before_send_calls == 0
++
++
++@pytest.mark.asyncio
++async def test_before_send_refusal_sends_nothing(monkeypatch, clip, configured, caplog):
++    caplog.set_level(logging.DEBUG)
++    cb = support.Callbacks(refuse_before_send=True)
++    wire = support.Wire([words()])
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam(clip, cb)
++    assert (result.state, result.transcript, result.provider) == ('refused', None, 'not_started')
++    assert wire.count == 0 and cb.before_send_calls == 1
++    assert support.SECRET not in repr(result) + caplog.text
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('call, sent, provider', [(1, 0, 'not_started'), (2, 0, 'not_started'), (3, 1, 'completed')],
++                         ids=['before-work', 'at-the-send-gate', 'after-the-await'])
++async def test_authorize_refusal_at_each_point_withholds_the_result(monkeypatch, clip, configured, call, sent, provider):
++    cb = support.Callbacks(refuse_authorize_at=call)
++    wire = support.Wire([words('must not be returned')])
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam(clip, cb)
++    assert (result.state, result.transcript, result.provider) == ('refused', None, provider)
++    assert wire.count == sent
++    assert cb.before_send_calls == (1 if sent else 0)
++
++
++@pytest.mark.asyncio
++async def test_a_stop_signalled_through_authorize_is_cancelled_not_refused(monkeypatch, clip, configured):
++    cb = support.Callbacks(refuse_authorize_at=2, authorize_error=asyncio.CancelledError())
++    wire = support.Wire([words()])
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam(clip, cb)
++    assert (result.state, result.provider, wire.count) == ('cancelled', 'not_started', 0)
++
++
++@pytest.mark.asyncio
++async def test_deadline_ends_the_wait_and_claims_nothing_about_the_provider(monkeypatch, clip, configured):
++    release = threading.Event()
++    wire = support.Wire([words()], hold=release)
++    try:
++        with support.provider_wire(monkeypatch, wire):
++            result = await seam(clip, support.Callbacks(), deadline_s=0.5)
++    finally:
++        release.set()
++    assert (result.state, result.transcript, result.source, result.provider) == ('timeout', None, None, 'unknown')
++    assert wire.count == 1
++
++
++@pytest.mark.asyncio
++async def test_task_cancellation_propagates_and_fences_the_worker(monkeypatch, clip, configured):
++    release = threading.Event()
++    wire = support.Wire([words()], hold=release)
++    task = asyncio.create_task(seam(clip, support.Callbacks()))
++    try:
++        with support.provider_wire(monkeypatch, wire):
++            assert await asyncio.to_thread(wire.entered.wait, 10)
++            task.cancel()
++            with pytest.raises(asyncio.CancelledError):
++                await task
++    finally:
++        release.set()
++    assert wire.count == 1
++
++
++@pytest.mark.asyncio
++async def test_local_fallback_runs_once_after_a_configured_failure(monkeypatch, clip, configured):
++    calls = []
++    monkeypatch.setattr('tools.transcription_tools._HAS_FASTER_WHISPER', True)
++    monkeypatch.setattr('tools.transcription_tools._transcribe_local',
++                        lambda path, model, **kw: calls.append(path) or {'success': True, 'transcript': ' local words '})
++    wire = support.Wire([('status', 500)] * 4)
++    cb = support.Callbacks()
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam(clip, cb)
++    assert (result.state, result.transcript, result.source, result.provider) == (
++        'transcribed', 'local words', 'local_fallback', 'failed_after_send')
++    assert wire.count == 1 and len(calls) == 1
++    assert cb.before_send_calls == 1  # the free local backend is not a provider send
++
++
++@pytest.mark.asyncio
++async def test_fallback_without_an_installed_backend_installs_nothing(monkeypatch, clip, configured):
++    installs = []
++    monkeypatch.setattr('tools.transcription_tools._try_lazy_install_stt', lambda: installs.append(1) or False)
++    monkeypatch.setattr('tools.transcription_tools._HAS_FASTER_WHISPER', False)
++    monkeypatch.setattr('tools.transcription_tools._has_local_command', lambda: False)
++    wire = support.Wire([('status', 500)] * 4)
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam(clip, support.Callbacks())
++    assert (result.state, result.transcript, result.source, result.provider) == (
++        'failed', None, None, 'failed_after_send')
++    assert wire.count == 1 and installs == []
++
++
++@pytest.mark.asyncio
++async def test_fallback_is_not_used_after_empty_for_local_config_or_disabled_stt(monkeypatch, clip, tmp_path):
++    calls = []
++    monkeypatch.setattr('tools.transcription_tools._HAS_FASTER_WHISPER', True)
++    monkeypatch.setattr('tools.transcription_tools._transcribe_local',
++                        lambda path, model, **kw: calls.append(path) or {'success': True, 'transcript': 'local'})
++    wire = support.Wire([words('  ')])
++    support.write_config(get_hermes_home(), openai_config())
++    with support.provider_wire(monkeypatch, wire):
++        assert (await seam(clip, support.Callbacks())).state == 'empty'
++    assert calls == []
++    support.write_config(get_hermes_home(), {'stt': {'enabled': False}})
++    result = await seam(clip, support.Callbacks())
++    assert (result.state, result.provider) == ('unavailable', 'not_started') and calls == []
++    support.write_config(get_hermes_home(), {'stt': {'provider': 'local'}})
++    result = await seam(clip, support.Callbacks())
++    assert (result.state, result.source, result.provider) == ('transcribed', 'configured', 'not_started')
++    assert len(calls) == 1  # the configured local backend ran once, not a second fallback pass
++
++
++@pytest.mark.asyncio
++async def test_a_provider_the_seam_cannot_hold_to_one_send_is_refused_unsent(monkeypatch, clip):
++    support.write_config(get_hermes_home(), {'stt': {'provider': 'my-command', 'providers': {
++        'my-command': {'type': 'command', 'command': 'never-run {input_path}'}}}})
++    ran = []
++    monkeypatch.setattr('tools.transcription_tools._transcribe_command_stt', lambda *a, **k: ran.append(1))
++    cb = support.Callbacks()
++    result = await seam(clip, cb)
++    assert (result.state, result.provider) == ('unavailable', 'not_started')
++    assert ran == [] and cb.before_send_calls == 0
++
++
++@pytest.mark.asyncio
++async def test_profile_configuration_is_read_per_call_and_never_crosses_profiles(monkeypatch, clip, tmp_path):
++    home_a, home_b = tmp_path / 'profile-a', tmp_path / 'profile-b'
++    support.write_config(home_a, {'stt': {'provider': 'openai', 'cloud_trim_silence': False,
++                                          'openai': {'api_key': 'sk-profile-A', 'model': 'whisper-1'}}})
++    support.write_config(home_b, {'stt': {'provider': 'groq', 'cloud_trim_silence': False,
++                                          'groq': {}}})
++    (home_b / '.env').write_text('GROQ_API_KEY=gsk-profile-B\n')
++    seen = []
++    for home in (home_a, home_b, home_a):
++        monkeypatch.setenv('HERMES_HOME', str(home))
++        wire = support.Wire([words()])
++        with support.provider_wire(monkeypatch, wire):
++            result = await seam(clip, support.Callbacks())
++        assert result.state == 'transcribed', home
++        seen.append((str(wire.requests[0].url.host), wire.requests[0].headers['authorization']))
++    assert seen == [('api.openai.com', 'Bearer sk-profile-A'), ('api.groq.com', 'Bearer gsk-profile-B'),
++                    ('api.openai.com', 'Bearer sk-profile-A')]
++
++
++@pytest.mark.asyncio
++async def test_results_and_logs_carry_no_key_text_or_path(monkeypatch, clip, configured, caplog):
++    caplog.set_level(logging.INFO)
++    for script, cb in (([words('private spoken words')], support.Callbacks()),
++                       ([('status', 500)], support.Callbacks()),
++                       ([words('private spoken words')], support.Callbacks(refuse_before_send=True))):
++        wire = support.Wire(script)
++        with support.provider_wire(monkeypatch, wire):
++            result = await seam(clip, cb)
++        assert KEY not in repr(result) and str(clip) not in repr(result) and support.SECRET not in repr(result)
++    leaks = [line for line in caplog.text.splitlines()
++             if KEY in line or str(clip) in line or support.SECRET in line or 'private spoken words' in line]
++    assert not leaks, leaks
++    # The seam adds no log line of its own at any level (third-party DEBUG output is not its to police).
++    caplog.set_level(logging.DEBUG)
++    caplog.clear()
++    with support.provider_wire(monkeypatch, support.Wire([words()])):
++        await seam(clip, support.Callbacks())
++    assert not [r for r in caplog.records if r.name.startswith(('gateway.session_native_voice', 'tools.native_send'))]
++
++
++@pytest.mark.asyncio
++async def test_rest_providers_send_once_with_an_explicit_timeout(monkeypatch, clip):
++    support.write_config(get_hermes_home(), {'stt': {'provider': 'elevenlabs', 'cloud_trim_silence': False}})
++    (get_hermes_home() / '.env').write_text('ELEVENLABS_API_KEY=el-synthetic-key\n')
++    wire = support.RequestsWire([('ok', {})])
++    with support.requests_wire(monkeypatch, wire):
++        result = await seam(clip, support.Callbacks(), deadline_s=40)
++    assert (result.state, result.transcript, result.provider, wire.count) == ('transcribed', 'hello world', 'completed', 1)
++    assert wire.requests[0][1]['timeout'] == 40.0
++    wire = support.RequestsWire([(('status', 500) and ('status', 500))] * 3)
++    cb = support.Callbacks()
++    with support.requests_wire(monkeypatch, wire):
++        result = await seam(clip, cb)
++    assert (result.state, result.provider, wire.count) == ('failed', 'failed_after_send', 1)
++
++
++@pytest.mark.asyncio
++async def test_oauth_refresh_retry_is_not_a_second_send(monkeypatch, clip):
++    support.write_config(get_hermes_home(), {'stt': {'provider': 'xai', 'cloud_trim_silence': False}})
++    refreshed = []
++    creds = {'provider': 'xai-oauth', 'api_key': 'oauth-1', 'base_url': 'https://api.x.ai/v1'}
++
++    def resolve(force_refresh=False, api_key_hint=None, **kw):
++        if force_refresh:
++            refreshed.append(1)
++            return {**creds, 'api_key': 'oauth-2'}
++        return creds
++    monkeypatch.setattr('tools.xai_http.resolve_xai_http_credentials', resolve)
++    wire = support.RequestsWire([('status', 401)] * 3)
++    with support.requests_wire(monkeypatch, wire):
++        result = await seam(clip, support.Callbacks())
++    assert (result.state, wire.count, refreshed) == ('failed', 1, [])
++
++
++@pytest.mark.asyncio
++async def test_deepinfra_needs_a_pinned_model_so_no_catalog_request_precedes_the_send(monkeypatch, clip):
++    (get_hermes_home() / '.env').write_text('DEEPINFRA_API_KEY=di-synthetic-key\n')
++    catalog = []
++    monkeypatch.setattr('hermes_cli.models.deepinfra_model_ids', lambda tag, **kw: catalog.append(tag) or ['guess/model'])
++    support.write_config(get_hermes_home(), {'stt': {'provider': 'deepinfra', 'cloud_trim_silence': False}})
++    wire = support.Wire([words()])
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam(clip, support.Callbacks())
++    assert (result.state, result.provider, wire.count, catalog) == ('unavailable', 'not_started', 0, [])
++    support.write_config(get_hermes_home(), {'stt': {'provider': 'deepinfra', 'cloud_trim_silence': False,
++                                                     'deepinfra': {'model': 'openai/whisper-large-v3'}}})
++    wire = support.Wire([words()])
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam(clip, support.Callbacks())
++    assert (result.state, result.provider, wire.count, catalog) == ('transcribed', 'completed', 1, [])
++    assert wire.requests[0].url.host == 'api.deepinfra.com'
++
++
++@pytest.mark.asyncio
++async def test_a_failing_configured_local_backend_is_failed_not_unavailable_and_not_retried(monkeypatch, clip):
++    calls = []
++    monkeypatch.setattr('tools.transcription_tools._HAS_FASTER_WHISPER', True)
++    monkeypatch.setattr('tools.transcription_tools._transcribe_local',
++                        lambda path, model, **kw: calls.append(path) or {'success': False, 'transcript': '', 'error': 'x'})
++    support.write_config(get_hermes_home(), {'stt': {'provider': 'local'}})
++    cb = support.Callbacks()
++    result = await seam(clip, cb)
++    assert (result.state, result.transcript, result.source, result.provider) == ('failed', None, None, 'not_started')
++    assert len(calls) == 1 and cb.before_send_calls == 0
+diff --git a/tests/gateway/test_native_voice_tts.py b/tests/gateway/test_native_voice_tts.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..459e0df0a912e9a57c0de3140668422d31990326
+--- /dev/null
++++ b/tests/gateway/test_native_voice_tts.py
+@@ -0,0 +1,433 @@
++"""Native voice seam: configured text-to-speech, one request per chunk, stop at the first failed chunk.
++
++Real OpenAI SDK, real httpx client over a synthetic network transport; the profile's TTS
++configuration is the real ``config.yaml`` read at call time. ElevenLabs and Edge SDKs are not
++installed in the owned offline environment, so those two engines run behind labelled stand-ins that
++route their one request through the httpx client the seam hands them: they prove what the seam
++passes and what its transport guard refuses, never the real SDK's defaults (a recorded gate).
++"""
++import asyncio
++import logging
++import os
++import threading
++from pathlib import Path
++
++import httpx
++import pytest
++
++from gateway.session_native_voice import speakable_text, synthesize_native_once
++from hermes_constants import get_hermes_home
++from tests.gateway import native_voice_support as support
++
++KEY = 'sk-synthetic-native-tts'
++SENTENCES = ('The first sentence is deliberately rather long. ', 'The second sentence is also fairly long here. ',
++             'The third sentence closes out the whole text.')
++LONG_TEXT = ''.join(SENTENCES)
++
++
++def openai_config(max_text_length=None, **openai):
++    section = {'api_key': KEY, 'model': 'gpt-4o-mini-tts', 'voice': 'nova', **openai}
++    if max_text_length:
++        section['max_text_length'] = max_text_length
++    return {'tts': {'provider': 'openai', 'openai': section}}
++
++
++@pytest.fixture
++def out(tmp_path):
++    path = tmp_path / 'caller-output'
++    path.mkdir()
++    return str(path)
++
++
++@pytest.fixture
++def configured():
++    support.write_config(get_hermes_home(), openai_config())
++
++
++@pytest.fixture
++def joined(monkeypatch):
++    """Byte-wise MP3 join for the ffmpeg concat step (a subprocess the offline guard forbids)."""
++    def concat(paths, output, voice_compatible=False):
++        with open(output, 'wb') as joined_file:
++            for path in paths:
++                with open(path, 'rb') as part:
++                    joined_file.write(part.read())
++        return output
++    monkeypatch.setattr('tools.tts_tool_delivery._concat_audio_files', concat)
++
++
++async def seam(text, out, callbacks, deadline_s=60):
++    return await synthesize_native_once(text, output_dir=out, authorize=callbacks.authorize,
++                                        before_send=callbacks.before_send, deadline_s=deadline_s)
++
++
++def chunk_count(text, cap):
++    from tools.tts_tool_delivery import _split_text_for_tts
++    return len(_split_text_for_tts(speakable_text(text), cap))
++
++
++def audio(tag):
++    return ('ok', {'audio': f'ID3{tag}'.encode()})
++
++
++@pytest.mark.asyncio
++async def test_single_chunk_success_writes_one_file_in_the_caller_directory(monkeypatch, out, configured):
++    events = []
++    cb = support.Callbacks(events)
++    wire = support.Wire([audio('one')], tap=lambda request: events.append('request'))
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam('Hello there, friend.', out, cb)
++    assert (result.state, result.source, result.provider) == ('synthesized', 'configured', 'completed')
++    assert result.code_points == len('Hello there, friend.')
++    assert os.path.dirname(result.path) == out and Path(result.path).read_bytes() == b'ID3one'
++    assert os.listdir(out) == [os.path.basename(result.path)]
++    assert wire.count == 1
++    assert events == ['authorize', 'authorize', 'before_send', 'request', 'authorize']
++    body = wire.requests[0].read()
++    assert b'"voice":"nova"' in body.replace(b' ', b'') and b'gpt-4o-mini-tts' in body
++    assert not (get_hermes_home() / 'cache' / 'audio').exists() or not list((get_hermes_home() / 'cache' / 'audio').iterdir())
++
++
++@pytest.mark.asyncio
++async def test_provider_failure_is_not_resent_and_leaves_no_file(monkeypatch, out, configured):
++    cb = support.Callbacks()
++    wire = support.Wire([('status', 500)] * 8)
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam('Hello there, friend.', out, cb)
++    assert wire.count == 1  # the stock path sends 3 for the same failure (tests/tools stock transport)
++    assert (result.state, result.path, result.provider) == ('failed', None, 'failed_after_send')
++    assert os.listdir(out) == []
++    assert {t['read'] for t in wire.timeouts()} == {60.0}  # explicit policy, not the SDK's 600 s default
++
++
++@pytest.mark.asyncio
++async def test_request_timeout_never_exceeds_the_deadline(monkeypatch, out, configured):
++    wire = support.Wire([audio('x')])
++    with support.provider_wire(monkeypatch, wire):
++        await seam('Hello there, friend.', out, support.Callbacks(), deadline_s=25)
++    assert {t['read'] for t in wire.timeouts()} == {25.0}
++
++
++@pytest.mark.asyncio
++async def test_exactly_one_request_per_core_chunk_in_order(monkeypatch, out, joined):
++    support.write_config(get_hermes_home(), openai_config(max_text_length=60))
++    expected = chunk_count(LONG_TEXT, 60)
++    assert expected >= 3
++    cb = support.Callbacks()
++    wire = support.Wire([audio(f'c{i}') for i in range(expected)])
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam(LONG_TEXT, out, cb)
++    assert (result.state, result.provider) == ('synthesized', 'completed')
++    assert wire.count == expected and cb.before_send_calls == expected
++    assert Path(result.path).read_bytes() == b''.join(f'ID3c{i}'.encode() for i in range(expected))
++    assert os.listdir(out) == [os.path.basename(result.path)]
++
++
++@pytest.mark.asyncio
++async def test_first_failed_chunk_ends_the_call_without_further_requests(monkeypatch, out, joined):
++    support.write_config(get_hermes_home(), openai_config(max_text_length=60))
++    cb = support.Callbacks()
++    wire = support.Wire([audio('c0'), ('status', 500), audio('never'), audio('never')])
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam(LONG_TEXT, out, cb)
++    assert wire.count == 2 and cb.before_send_calls == 2
++    assert (result.state, result.path, result.provider) == ('failed', None, 'failed_after_send')
++    assert os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_before_send_refusal_on_a_later_chunk_stops_with_nothing_left(monkeypatch, out, joined):
++    support.write_config(get_hermes_home(), openai_config(max_text_length=60))
++    cb = support.Callbacks(refuse_before_send_at=2)
++    wire = support.Wire([audio('c0'), audio('never')])
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam(LONG_TEXT, out, cb)
++    assert wire.count == 1
++    assert (result.state, result.path, result.provider) == ('refused', None, 'completed')
++    assert os.listdir(out) == [] and support.SECRET not in repr(result)
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('call, sent, provider', [(1, 0, 'not_started'), (2, 0, 'not_started'), (3, 1, 'completed')],
++                         ids=['before-work', 'at-the-send-gate', 'after-the-await'])
++async def test_authorize_refusal_withholds_the_audio(monkeypatch, out, configured, call, sent, provider):
++    cb = support.Callbacks(refuse_authorize_at=call)
++    wire = support.Wire([audio('must-not-be-returned')])
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam('Hello there, friend.', out, cb)
++    assert (result.state, result.path, result.provider) == ('refused', None, provider)
++    assert wire.count == sent and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_deadline_fences_the_worker_so_no_later_chunk_or_file_appears(monkeypatch, out, joined):
++    support.write_config(get_hermes_home(), openai_config(max_text_length=60))
++    from gateway import session_native_voice_tts as tts_module
++    finished = threading.Event()
++    original = tts_module._synthesize
++
++    def watched(*args):
++        try:
++            return original(*args)
++        finally:
++            finished.set()
++    monkeypatch.setattr(tts_module, '_synthesize', watched)
++    release = threading.Event()
++    wire = support.Wire([audio('c0'), audio('never'), audio('never')], hold=release)
++    try:
++        with support.provider_wire(monkeypatch, wire):
++            result = await seam(LONG_TEXT, out, support.Callbacks(), deadline_s=0.5)
++    finally:
++        release.set()
++    assert (result.state, result.path, result.provider) == ('timeout', None, 'unknown')
++    assert await asyncio.to_thread(finished.wait, 10)
++    assert wire.count == 1 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_audio_over_the_output_bound_is_cut_off_and_removed(monkeypatch, out, configured):
++    monkeypatch.setattr('gateway.session_native_voice.MAX_CHUNK_AUDIO_BYTES', 1000)
++    wire = support.Wire([('ok', {'audio': b'A' * 5000})])
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam('Hello there, friend.', out, support.Callbacks())
++    assert (result.state, result.path) == ('too_long', None)
++    assert wire.count == 1 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_task_cancellation_propagates_and_leaves_no_file_or_second_chunk(monkeypatch, out, joined):
++    support.write_config(get_hermes_home(), openai_config(max_text_length=60))
++    from gateway import session_native_voice_tts as tts_module
++    finished = threading.Event()
++    original = tts_module._synthesize
++
++    def watched(*args):
++        try:
++            return original(*args)
++        finally:
++            finished.set()
++    monkeypatch.setattr(tts_module, '_synthesize', watched)
++    release = threading.Event()
++    wire = support.Wire([audio('c0'), audio('never'), audio('never')], hold=release)
++    task = asyncio.create_task(seam(LONG_TEXT, out, support.Callbacks()))
++    try:
++        with support.provider_wire(monkeypatch, wire):
++            assert await asyncio.to_thread(wire.entered.wait, 10)
++            task.cancel()
++            with pytest.raises(asyncio.CancelledError):
++                await task
++    finally:
++        release.set()
++    assert await asyncio.to_thread(finished.wait, 10)
++    assert wire.count == 1 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_empty_unspeakable_and_over_long_text_never_reach_the_provider(monkeypatch, out, configured):
++    cb = support.Callbacks()
++    wire = support.Wire([audio('x')])
++    with support.provider_wire(monkeypatch, wire):
++        for text, state in (('', 'empty'), ('   \n ', 'empty'), ('```code only```', 'empty'),
++                            ('x' * 4097, 'too_long'), ('😀' * 2049, 'too_long')):
++            result = await seam(text, out, cb)
++            assert (result.state, result.path, result.provider) == (state, None, 'not_started'), text[:12]
++    assert wire.count == 0 and cb.before_send_calls == 0
++
++
++@pytest.mark.asyncio
++async def test_output_directory_must_be_an_existing_absolute_directory(monkeypatch, tmp_path, configured):
++    cb = support.Callbacks()
++    wire = support.Wire([audio('x')])
++    plain_file = tmp_path / 'a-file'
++    plain_file.write_text('x')
++    with support.provider_wire(monkeypatch, wire):
++        for bad in ('relative/dir', str(tmp_path / 'missing'), str(plain_file), '', None):
++            result = await seam('Hello there, friend.', bad, cb)
++            assert (result.state, result.provider) == ('refused', 'not_started'), bad
++    assert wire.count == 0 and not (tmp_path / 'missing').exists()
++
++
++@pytest.mark.asyncio
++async def test_unusable_configured_voices_never_fall_back_to_another_provider(monkeypatch, out):
++    cb = support.Callbacks()
++    wire = support.Wire([audio('x')])
++    cases = {
++        'default-edge-not-installed': {},
++        'voice-off-or-unknown': {'tts': {'provider': 'none'}},
++        'unsupported-cloud': {'tts': {'provider': 'minimax', 'minimax': {'api_key': 'mm-key'}}},
++        'elevenlabs-without-key': {'tts': {'provider': 'elevenlabs'}},
++    }
++    with support.provider_wire(monkeypatch, wire):
++        for name, config in cases.items():
++            support.write_config(get_hermes_home(), config)
++            result = await seam('Hello there, friend.', out, cb)
++            assert (result.state, result.path, result.provider) == ('unavailable', None, 'not_started'), name
++    assert wire.count == 0 and cb.before_send_calls == 0 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_profile_voice_model_and_key_are_read_per_call_and_never_cross(monkeypatch, out, tmp_path):
++    seen = []
++    for name, voice, key in (('a', 'nova', 'sk-A'), ('b', 'onyx', 'sk-B'), ('a', 'nova', 'sk-A')):
++        home = tmp_path / f'profile-{name}'
++        support.write_config(home, openai_config(api_key=key, voice=voice))
++        monkeypatch.setenv('HERMES_HOME', str(home))
++        wire = support.Wire([audio(name)])
++        with support.provider_wire(monkeypatch, wire):
++            result = await seam('Hello there, friend.', out, support.Callbacks())
++        assert result.state == 'synthesized'
++        body = wire.requests[0].read().replace(b' ', b'')
++        seen.append((wire.requests[0].headers['authorization'], b'"voice":"' + voice.encode() in body))
++    assert seen == [('Bearer sk-A', True), ('Bearer sk-B', True), ('Bearer sk-A', True)]
++
++
++@pytest.mark.asyncio
++async def test_results_and_logs_carry_no_key_text_or_path(monkeypatch, out, configured, caplog):
++    caplog.set_level(logging.INFO)
++    for script, cb in (([audio('a')], support.Callbacks()), ([('status', 500)], support.Callbacks()),
++                       ([audio('a')], support.Callbacks(refuse_before_send=True))):
++        wire = support.Wire(script)
++        with support.provider_wire(monkeypatch, wire):
++            result = await seam('Private words to speak.', out, cb)
++        assert KEY not in repr(result) and support.SECRET not in repr(result)
++    leaks = [line for line in caplog.text.splitlines()
++             if KEY in line or out in line or support.SECRET in line or 'Private words' in line]
++    assert not leaks, leaks
++    caplog.set_level(logging.DEBUG)
++    caplog.clear()
++    with support.provider_wire(monkeypatch, support.Wire([audio('a')])):
++        await seam('Private words to speak.', out, support.Callbacks())
++    assert not [r for r in caplog.records if r.name.startswith(('gateway.session_native_voice', 'tools.native_send'))]
++
++
++class StandInElevenLabs:
++    """Stands in for the not-installed ``elevenlabs`` SDK: records what the seam passes and sends its
++    request through the httpx client it was given. ``honors_options`` False models an SDK that would
++    retry on its own whatever it is told."""
++    constructed = []
++    honors_options = True
++
++    def __init__(self, api_key=None, timeout=None, httpx_client=None, environment=None):
++        type(self).constructed.append({'api_key': api_key, 'timeout': timeout, 'httpx_client': httpx_client})
++        self.http = httpx_client or httpx.Client()
++        self.text_to_speech = self
++
++    def convert(self, voice_id, *, text, model_id=None, output_format=None, request_options=None):
++        self.options = request_options
++        retries = 0 if request_options and request_options.get('max_retries') == 0 and self.honors_options else 2
++        for _ in range(retries + 1):
++            response = self.http.post(f'https://api.elevenlabs.io/v1/text-to-speech/{voice_id}',
++                                      json={'text': text, 'model_id': model_id}, headers={'xi-api-key': 'k'})
++            if response.status_code < 500:
++                yield response.content
++                return
++        raise RuntimeError('provider failed')
++
++
++class StandInWithoutOptions(StandInElevenLabs):
++    def convert(self, voice_id, *, text, model_id=None, output_format=None):
++        yield b'ID3'
++
++
++@pytest.fixture
++def elevenlabs(monkeypatch):
++    StandInElevenLabs.constructed = []
++    StandInElevenLabs.honors_options = True
++    support.write_config(get_hermes_home(), {'tts': {'provider': 'elevenlabs',
++                                                     'elevenlabs': {'voice_id': 'voice-profile-1', 'model_id': 'eleven_flash_v2_5'}}})
++    (get_hermes_home() / '.env').write_text('ELEVENLABS_API_KEY=el-synthetic-key\n')
++    monkeypatch.setattr('tools.tts_tool._import_elevenlabs', lambda: StandInElevenLabs)
++    return StandInElevenLabs
++
++
++@pytest.mark.asyncio
++async def test_elevenlabs_client_is_built_with_an_explicit_timeout_zero_retries_and_the_send_hook(monkeypatch, out, elevenlabs):
++    wire = support.Wire([audio('el')])
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam('Hello there, friend.', out, support.Callbacks(), deadline_s=90)
++    assert (result.state, result.provider, wire.count) == ('synthesized', 'completed', 1)
++    built = elevenlabs.constructed[0]
++    assert built['timeout'] == 60.0 and built['httpx_client'] is not None
++    assert wire.requests[0].url.path.endswith('/voice-profile-1')
++    assert {t['read'] for t in wire.timeouts()} == {60.0}
++
++
++@pytest.mark.asyncio
++async def test_elevenlabs_options_are_told_no_retry_and_5xx_is_not_resent(monkeypatch, out, elevenlabs):
++    wire = support.Wire([('status', 500)] * 8)
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam('Hello there, friend.', out, support.Callbacks())
++    assert (result.state, result.provider, wire.count) == ('failed', 'failed_after_send', 1)
++
++
++@pytest.mark.asyncio
++async def test_transport_guard_stops_an_sdk_that_retries_whatever_it_is_told(monkeypatch, out, elevenlabs):
++    elevenlabs.honors_options = False
++    cb = support.Callbacks()
++    wire = support.Wire([('status', 500)] * 8)
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam('Hello there, friend.', out, cb)
++    assert (result.state, result.provider) == ('failed', 'failed_after_send')
++    assert wire.count == 1 and cb.before_send_calls == 1
++    assert os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_an_sdk_that_cannot_be_told_no_retry_is_refused_before_any_send(monkeypatch, out, elevenlabs):
++    monkeypatch.setattr('tools.tts_tool._import_elevenlabs', lambda: StandInWithoutOptions)
++    cb = support.Callbacks()
++    wire = support.Wire([audio('x')])
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam('Hello there, friend.', out, cb)
++    assert (result.state, result.provider) == ('unavailable', 'not_started')
++    assert wire.count == 0 and cb.before_send_calls == 0
++
++
++@pytest.mark.asyncio
++async def test_edge_default_voice_is_one_gated_send_per_chunk(monkeypatch, out, joined):
++    support.write_config(get_hermes_home(), {'tts': {'edge': {'max_text_length': 60}}})
++    sends = []
++
++    class Communicate:
++        def __init__(self, text, **kwargs):
++            self.text = text
++
++        async def save(self, path):
++            sends.append(self.text)
++            await asyncio.to_thread(Path(path).write_bytes, b'ID3edge')
++
++    class EdgeModule:
++        pass
++    EdgeModule.Communicate = Communicate
++    monkeypatch.setattr('tools.tts_tool._import_edge_tts', lambda: EdgeModule)
++    cb = support.Callbacks()
++    result = await seam(LONG_TEXT, out, cb)
++    assert (result.state, result.source) == ('synthesized', 'configured')
++    assert len(sends) == chunk_count(LONG_TEXT, 60) >= 3 and cb.before_send_calls == len(sends)
++    assert result.provider == 'completed' and os.listdir(out) == [os.path.basename(result.path)]
++
++
++def test_speakable_text_applies_the_reviewed_spoken_normalization():
++    spoken = speakable_text('# Title\n**Bold** words [a link](https://example.com/x) 😀 see https://example.org now.')
++    assert '*' not in spoken and '#' not in spoken and 'https' not in spoken and '😀' not in spoken
++    assert 'Bold words' in spoken and 'a link' in spoken
++    assert speakable_text('plain sentence.') == 'plain sentence.'
++    assert speakable_text('x' * 10000) == 'x' * 10000  # no length cap: callers own bounds
++
++
++@pytest.mark.asyncio
++async def test_deepinfra_voice_needs_a_pinned_model_so_no_catalog_request_precedes_the_send(monkeypatch, out):
++    (get_hermes_home() / '.env').write_text('DEEPINFRA_API_KEY=di-synthetic-key\n')
++    catalog = []
++    monkeypatch.setattr('hermes_cli.models.deepinfra_model_ids', lambda tag, **kw: catalog.append(tag) or ['guess/model'])
++    support.write_config(get_hermes_home(), {'tts': {'provider': 'deepinfra'}})
++    wire = support.Wire([audio('x')])
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam('Hello there, friend.', out, support.Callbacks())
++    assert (result.state, result.provider, wire.count, catalog) == ('unavailable', 'not_started', 0, [])
++    support.write_config(get_hermes_home(), {'tts': {'provider': 'deepinfra', 'deepinfra': {'model': 'hexgrad/Kokoro-82M', 'voice': 'af_bella'}}})
++    wire = support.Wire([audio('x')])
++    with support.provider_wire(monkeypatch, wire):
++        result = await seam('Hello there, friend.', out, support.Callbacks())
++    assert (result.state, result.provider, wire.count, catalog) == ('synthesized', 'completed', 1, [])
++    assert wire.requests[0].url.host == 'api.deepinfra.com'
+diff --git a/tests/tools/test_native_voice_stock_transport.py b/tests/tools/test_native_voice_stock_transport.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..cdac52f3b42f3f80d62038d688dc8a34498c32c6
+--- /dev/null
++++ b/tests/tools/test_native_voice_stock_transport.py
+@@ -0,0 +1,115 @@
++"""Stock STT/TTS provider transport behaviour that the native voice seam must not share.
++
++Measured on the real OpenAI SDK + httpx client with only the network transport replaced
++(``tests/gateway/native_voice_support.py``). The numbers are observations of the retained stock
++paths: the native seam (``gateway.session_native_voice``) is held to exactly one request, and
++these controls prove that its transport policy never leaks into the ordinary ``transcribe_audio``
++/ ``text_to_speech_tool`` paths when no native call is active.
++"""
++import json
++
++import httpx
++import pytest
++
++from hermes_constants import get_hermes_home
++from tests.gateway import native_voice_support as support
++
++STT_CONFIG = {'stt': {'provider': 'openai', 'cloud_trim_silence': False,
++                      'openai': {'api_key': 'sk-synthetic-stt', 'model': 'whisper-1'}}}
++TTS_CONFIG = {'tts': {'provider': 'openai', 'openai': {'api_key': 'sk-synthetic-tts'}}}
++
++
++def measured(label, **values):
++    print('NATIVE_VOICE_STOCK_MEASURE ' + json.dumps({'label': label, **values}, sort_keys=True))
++
++
++@pytest.fixture
++def stt(monkeypatch, tmp_path):
++    support.write_config(get_hermes_home(), STT_CONFIG)
++    monkeypatch.setattr('tools.transcription_cloud._transcode_audio_for_stt',
++                        lambda path, work: (None, 'transcode unavailable'))
++    return support.write_wav(tmp_path / 'clip.wav')
++
++
++def test_stock_stt_success_sends_one_request(monkeypatch, stt):
++    from tools.transcription_tools import transcribe_audio
++    wire = support.Wire([('ok', {'text': 'hello world', 'json': False})])
++    with support.provider_wire(monkeypatch, wire):
++        result = transcribe_audio(stt)
++    assert result['success'] and result['transcript'] == 'hello world'
++    assert wire.count == 1
++    measured('stock_stt_success', requests=wire.count, timeouts=[str(t) for t in wire.timeouts()])
++
++
++def test_stock_stt_resends_after_provider_5xx(monkeypatch, stt):
++    from tools.transcription_tools import transcribe_audio
++    wire = support.Wire([('status', 500)] * 8)
++    with support.provider_wire(monkeypatch, wire):
++        result = transcribe_audio(stt)
++    assert not result['success']
++    assert wire.count >= 2, 'the stock path re-sends a request the provider may already have accepted'
++    measured('stock_stt_5xx_without_transcode', requests=wire.count)
++
++
++def test_stock_stt_resends_after_5xx_and_a_successful_transcode(monkeypatch, tmp_path, stt):
++    import shutil
++    from tools.transcription_tools import transcribe_audio
++
++    def transcode(path, work):
++        out = f'{work}/clip.m4a'
++        shutil.copyfile(path, out)
++        return out, None
++    monkeypatch.setattr('tools.transcription_cloud._transcode_audio_for_stt', transcode)
++    wire = support.Wire([('status', 500)] * 8)
++    with support.provider_wire(monkeypatch, wire):
++        result = transcribe_audio(stt)
++    assert not result['success']
++    assert wire.count >= 2
++    measured('stock_stt_5xx_with_transcode_retry', requests=wire.count)
++
++
++def test_stock_stt_resends_after_connection_reset(monkeypatch, stt):
++    from tools.transcription_tools import transcribe_audio
++    wire = support.Wire([('raise', httpx.ReadError('synthetic reset'))] * 8)
++    with support.provider_wire(monkeypatch, wire):
++        result = transcribe_audio(stt)
++    assert not result['success']
++    assert wire.count >= 2
++    measured('stock_stt_connection_reset', requests=wire.count)
++
++
++def test_stock_stt_uses_the_configured_timeout_and_one_sdk_retry(monkeypatch, stt):
++    from tools.transcription_tools import transcribe_audio
++    wire = support.Wire([('status', 500)] * 8)
++    with support.provider_wire(monkeypatch, wire):
++        transcribe_audio(stt)
++    timeouts = {tuple(sorted((t or {}).items())) for t in wire.timeouts()}
++    measured('stock_stt_transport_settings', timeouts=sorted(str(t) for t in timeouts))
++    assert all(t and t['read'] == 60.0 for t in wire.timeouts())
++
++
++def test_stock_tts_resends_after_provider_5xx(monkeypatch):
++    from tools.tts_tool import text_to_speech_tool
++    support.write_config(get_hermes_home(), TTS_CONFIG)
++    wire = support.Wire([('status', 500)] * 8)
++    with support.provider_wire(monkeypatch, wire):
++        result = json.loads(text_to_speech_tool('hello world'))
++    assert not result['success']
++    assert wire.count >= 2
++    measured('stock_tts_openai_5xx', requests=wire.count,
++             timeouts=sorted({str(t) for t in wire.timeouts()}))
++
++
++def test_stock_elevenlabs_request_count_and_timeout_are_measured_not_assumed(monkeypatch):
++    """The ElevenLabs SDK client is built with no timeout/retry arguments, so its effective behaviour is
++    the installed SDK's own. Measured here when that SDK is installed; the owned offline environment
++    does not carry it, so this is reported as a skip there (a recorded gate, never a guessed number)."""
++    pytest.importorskip('elevenlabs')
++    from tools.tts_tool import text_to_speech_tool
++    support.write_config(get_hermes_home(), {'tts': {'provider': 'elevenlabs'}})
++    (get_hermes_home() / '.env').write_text('ELEVENLABS_API_KEY=el-synthetic-key\n')
++    wire = support.Wire([('status', 500)] * 8)
++    with support.provider_wire(monkeypatch, wire):
++        result = json.loads(text_to_speech_tool('hello world'))
++    assert not result['success'] and wire.count >= 1
++    measured('stock_tts_elevenlabs_5xx', requests=wire.count, timeouts=sorted({str(t) for t in wire.timeouts()}))
+diff --git a/tools/native_send_policy.py b/tools/native_send_policy.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..354e18c980afc3a8432a240d16beeb2817fc295b
+--- /dev/null
++++ b/tools/native_send_policy.py
+@@ -0,0 +1,186 @@
++"""One-send transport policy for a native (Relay) voice call.
++
++``gateway.session_native_voice`` activates a :class:`SendPolicy` around exactly one configured
++provider request (per STT call, per TTS chunk). The provider modules ask this module at their
++transport boundary, and only there, so an ordinary ``transcribe_audio`` / ``text_to_speech_tool``
++call, where no policy is active, keeps its SDK retries, timeouts and transcode retry untouched.
++
++The policy never trusts a client library to honour "no retry": ``begin()`` runs immediately before
++every transport send and refuses a second send in the same scope, so a hidden SDK or helper retry
++is stopped at the wire instead of assumed away. Refusals carry stable tokens, never provider text.
++"""
++from __future__ import annotations
++
++import contextlib
++import contextvars
++import threading
++from typing import Callable, Iterable, Iterator, Optional
++
++
++class NativeSendRefused(RuntimeError):
++    """A transport send the policy refused; ``reason`` is a stable token, never provider text."""
++
++    def __init__(self, reason: str):
++        super().__init__(reason)
++        self.reason = reason
++
++
++class SendPolicy:
++    """Counts and gates transport sends for one native call.
++
++    ``gate`` runs the caller's ``authorize`` + ``before_send`` (on the owning event loop) and must
++    raise to refuse. ``providers`` is the closed set of provider names the call may reach.
++    """
++
++    def __init__(self, *, timeout_s: float, gate: Callable[[], None], providers: frozenset[str],
++                 max_output_bytes: Optional[int] = None):
++        self.timeout_s = timeout_s
++        self.providers = providers
++        self.max_output_bytes = max_output_bytes
++        self._gate = gate
++        self._lock = threading.Lock()
++        self._scope_sends = 0
++        self._gate_pending = False
++        self.sends = 0
++        self.refusal: Optional[str] = None
++        self.closed = False
++
++    def refusal_for(self, reason: str) -> NativeSendRefused:
++        """The exception to raise for ``reason``, remembering the first reason for the caller's report."""
++        with self._lock:
++            self.refusal = self.refusal or reason
++        return NativeSendRefused(reason)
++
++    def arm(self) -> None:
++        """Open a fresh one-send scope (one TTS chunk); cumulative ``sends`` keeps counting."""
++        with self._lock:
++            self._scope_sends = 0
++
++    def begin(self) -> None:
++        """Called immediately before a transport send: refuse a closed policy or a second send,
++        then let the caller's gate authorize and durably record the send before it happens."""
++        with self._lock:
++            if self.closed:
++                raise self._refuse_locked('closed')
++            if self._scope_sends:
++                raise self._refuse_locked('second')
++            self._gate_pending = True
++        try:
++            self._gate()
++        except NativeSendRefused as exc:
++            with self._lock:
++                self._gate_pending = False
++            raise self.refusal_for(exc.reason) from None
++        with self._lock:
++            self._gate_pending = False
++            if self.closed:
++                raise self._refuse_locked('closed')
++            self._scope_sends = 1
++            self.sends += 1
++
++    def _refuse_locked(self, reason: str) -> NativeSendRefused:
++        self.refusal = self.refusal or reason
++        return NativeSendRefused(reason)
++
++    def on_request(self, _request) -> None:
++        """httpx ``request`` event hook: the actual transport boundary of SDK and httpx clients."""
++        self.begin()
++
++    def require_provider(self, provider: str) -> None:
++        if provider not in self.providers:
++            raise self.refusal_for('unsupported')
++
++    def close(self) -> bool:
++        """Stop admitting sends; True when a request may already have left (or be about to)."""
++        with self._lock:
++            self.closed = True
++            return self.sends > 0 or self._gate_pending
++
++
++_current: contextvars.ContextVar[Optional[SendPolicy]] = contextvars.ContextVar('native_send_policy', default=None)
++
++
++def current() -> Optional[SendPolicy]:
++    return _current.get()
++
++
++@contextlib.contextmanager
++def activate(policy: SendPolicy) -> Iterator[SendPolicy]:
++    token = _current.set(policy)
++    try:
++        yield policy
++    finally:
++        _current.reset(token)
++
++
++def installs_allowed() -> bool:
++    """False inside a native call: it uses only what is already installed, never a lazy SDK install."""
++    return _current.get() is None
++
++
++def no_resend() -> bool:
++    """True inside a native call: no post-send retry of any kind (transcode retry, OAuth refresh)."""
++    return _current.get() is not None
++
++
++def refuse(reason: str) -> NativeSendRefused:
++    """The refusal to raise for ``reason``, recorded on the active policy so the caller can report it."""
++    policy = _current.get()
++    return policy.refusal_for(reason) if policy is not None else NativeSendRefused(reason)
++
++
++def begin_send() -> None:
++    """Transport-boundary hook for providers that do not go through an httpx client."""
++    policy = _current.get()
++    if policy is not None:
++        policy.begin()
++
++
++def require_provider(provider: str) -> None:
++    policy = _current.get()
++    if policy is not None:
++        policy.require_provider(provider)
++
++
++def request_timeout(default: float) -> float:
++    policy = _current.get()
++    return default if policy is None else min(default, policy.timeout_s)
++
++
++def bounded_stream(chunks: Iterable[bytes]) -> Iterator[bytes]:
++    """Pass audio chunks through; inside a native call, refuse a body over the policy's byte cap."""
++    policy = _current.get()
++    limit = None if policy is None else policy.max_output_bytes
++    written = 0
++    for chunk in chunks:
++        written += len(chunk)
++        if limit is not None and written > limit:
++            raise refuse('too_long')
++        yield chunk
++
++
++def openai_client_kwargs(configured_timeout: Optional[float] = None) -> dict:
++    """Extra ``OpenAI(...)`` kwargs: explicit timeout, zero SDK retries, the send hook on the real client."""
++    policy = _current.get()
++    if policy is None:
++        return {}
++    from openai import DefaultHttpxClient
++    timeout = policy.timeout_s if configured_timeout is None else min(configured_timeout, policy.timeout_s)
++    return {'timeout': timeout, 'max_retries': 0,
++            'http_client': DefaultHttpxClient(timeout=timeout, event_hooks={'request': [policy.on_request]})}
++
++
++def elevenlabs_client_kwargs() -> dict:
++    """Extra ``ElevenLabs(...)`` kwargs: explicit timeout and the send hook on the httpx client it uses."""
++    policy = _current.get()
++    if policy is None:
++        return {}
++    import httpx
++    return {'timeout': policy.timeout_s,
++            'httpx_client': httpx.Client(timeout=policy.timeout_s, follow_redirects=True,
++                                         event_hooks={'request': [policy.on_request]})}
++
++
++def elevenlabs_request_options() -> Optional[dict]:
++    policy = _current.get()
++    return None if policy is None else {'max_retries': 0, 'timeout_in_seconds': policy.timeout_s}
+diff --git a/tools/transcription_cloud.py b/tools/transcription_cloud.py
+index b54514ae29fc3e63a2c46dc783411f7ddc586daa..50f33d0bc7ae0b0f644a35b67b679cf173105371 100644
+--- a/tools/transcription_cloud.py
++++ b/tools/transcription_cloud.py
+@@ -17,6 +17,7 @@ from typing import Any, Callable, Dict, Optional
+ from urllib.parse import urljoin
+ 
+ from utils import is_truthy_value
++from tools import native_send_policy
+ from tools.transcription_audio import _transcode_audio_for_stt
+ from tools.transcription_common import (
+     DEFAULT_GROQ_STT_MODEL, DEFAULT_STT_MODEL, ELEVENLABS_STT_BASE_URL,
+@@ -50,12 +51,16 @@ def _with_openai_client(api_key: str, base_url: Optional[str], file_path: str, l
+         from tools.transcription_common import DEFAULT_STT_TIMEOUT, _config_number
+         from tools.transcription_tools import _load_stt_config
+         openai_config = _get_stt_section(_load_stt_config(), "openai")
+-        client = OpenAI(
+-            api_key=api_key,
+-            base_url=base_url,
+-            timeout=_config_number(openai_config, "timeout", DEFAULT_STT_TIMEOUT),
+-            max_retries=_config_number(openai_config, "max_retries", 1, cast=int),
+-        )
++        timeout = _config_number(openai_config, "timeout", DEFAULT_STT_TIMEOUT)
++        client_kwargs = {
++            "api_key": api_key,
++            "base_url": base_url,
++            "timeout": timeout,
++            "max_retries": _config_number(openai_config, "max_retries", 1, cast=int),
++        }
++        # Inside a native voice call: explicit timeout, zero retries, the send hook on the client.
++        client_kwargs.update(native_send_policy.openai_client_kwargs(timeout))
++        client = OpenAI(**client_kwargs)
+         try:
+             return body(client)
+         finally:
+@@ -169,6 +174,8 @@ def _transcribe_openai(
+             try:
+                 transcription = _create_transcription(file_path)
+             except APIStatusError as exc:
++                if native_send_policy.no_resend():
++                    raise  # a native call transcodes before its one send, never after a provider answer
+                 # 400 + container hint is the documented rejection; some OpenAI-compatible endpoints
+                 # reject a container with a bare 5xx instead (#81644). A 5xx is ambiguous, so it earns
+                 # the same single transcode retry and, when no transcode is possible, its own error.
+@@ -220,8 +227,9 @@ def _transcribe_mistral(
+ def _post_audio_multipart(url: str, headers: dict[str, str], file_path: str, data: dict[str, str]):
+     import requests
+     with open(file_path, "rb") as audio_file:
++        native_send_policy.begin_send()
+         return requests.post(url, headers=headers, files={"file": (Path(file_path).name, audio_file)},
+-                             data=data, timeout=120)
++                             data=data, timeout=native_send_policy.request_timeout(120))
+ 
+ 
+ def _rest_provider(
+@@ -299,7 +307,8 @@ def _transcribe_xai(
+             return _post_audio_multipart(f"{endpoint_base_url}/stt", headers, file_path, data)
+ 
+         response = _post_transcription(api_key, _resolve_base_url(creds))
+-        if response.status_code in {401, 403} and creds.get("provider") == "xai-oauth":
++        if (response.status_code in {401, 403} and creds.get("provider") == "xai-oauth"
++                and not native_send_policy.no_resend()):
+             logger.info("xAI STT got HTTP %d; refreshing OAuth credentials and retrying once", response.status_code)
+             try:
+                 refreshed_creds = resolve_xai_http_credentials(force_refresh=True, api_key_hint=api_key)
+@@ -372,6 +381,8 @@ def _transcribe_deepinfra(
+     from hermes_cli.models import deepinfra_base_url, deepinfra_model_ids
+     # ``stt.deepinfra: null`` in YAML yields None, not {} — coalesce.
+     base_url = deepinfra_base_url(_get_stt_section(_load_stt_config(), "deepinfra"))
++    if not model_name and native_send_policy.no_resend():
++        raise native_send_policy.refuse("unsupported")  # a native call makes no live catalog request of its own
+     model_name = model_name or next(iter(deepinfra_model_ids("stt")), None)
+     if not model_name:
+         return _error_result(
+diff --git a/tools/transcription_tools.py b/tools/transcription_tools.py
+index 072eed5f03a0ea2eba2deec36fbf4e13526144d2..e5a9d3c31862f9558e6630289e49e0c3ed4d1bcd 100644
+--- a/tools/transcription_tools.py
++++ b/tools/transcription_tools.py
+@@ -22,6 +22,7 @@ from tempfile import TemporaryDirectory
+ from typing import Optional, Dict, Any
+ 
+ from utils import is_truthy_value
++from tools import native_send_policy
+ from tools.transcription_common import (
+     BUILTIN_STT_PROVIDERS, CLOUD_STT_PROVIDERS, DEFAULT_ELEVENLABS_STT_MODEL,
+     DEFAULT_GROQ_STT_MODEL, DEFAULT_LOCAL_MODEL, DEFAULT_MISTRAL_STT_MODEL, DEFAULT_PROVIDER,
+@@ -522,6 +523,7 @@ def _dispatch_stt_provider(
+ def _route_stt_provider(
+     file_path: str, provider: str, stt_config: dict[str, Any], model: Optional[str],
+     language: Optional[str], prompt: Optional[str]) -> dict[str, Any]:
++    native_send_policy.require_provider(provider)  # a native call reaches only providers it can hold to one send
+     if provider in BUILTIN_STT_PROVIDERS:
+         # Looked up in this module at call time so tests may patch ``_transcribe_*``.
+         handler = globals()[f"_transcribe_{provider}"]
+diff --git a/tools/tts_tool.py b/tools/tts_tool.py
+index b60cdf372f35761b70ea6ed686579335f4d013b1..dd53821dfd466858edd24d2bc84dfb078e9a9aa4 100644
+--- a/tools/tts_tool.py
++++ b/tools/tts_tool.py
+@@ -9,6 +9,7 @@ here (config, provider resolution, lazy SDK importers) through ``_origin()`` at
+ """
+ 
+ from pm import install_hint
++from tools import native_send_policy
+ import asyncio
+ import contextlib
+ import datetime
+@@ -62,7 +63,7 @@ def _sdk_importer(module: str, attr: Optional[str] = None, feature: Optional[str
+     a provider in config.yaml never ran the post-setup hook); any failure there falls through so
+     the raw import still raises cleanly. sounddevice also raises OSError without PortAudio."""
+     def _import():
+-        if feature:
++        if feature and native_send_policy.installs_allowed():
+             with contextlib.suppress(Exception):
+                 from pm import ensure_import as _pm_ensure
+                 _pm_ensure(_PM_FEATURE_ALIASES.get(feature, feature))
+diff --git a/tools/tts_tool_openai.py b/tools/tts_tool_openai.py
+index aa10ff3607bcf460f3585c9e5e0e11d7bc55348f..29d745e7b670b6acba01bf4dc5d652d2ac08f02c 100644
+--- a/tools/tts_tool_openai.py
++++ b/tools/tts_tool_openai.py
+@@ -13,6 +13,7 @@ import uuid
+ from typing import Any, Dict, Optional
+ from urllib.parse import urljoin
+ 
++from tools import native_send_policy
+ from tools.managed_tool_gateway import resolve_managed_tool_gateway
+ from tools.tool_backend_helpers import (
+     NOUS_MANAGED_PROVIDER, managed_nous_tools_enabled, nous_tool_gateway_unavailable_message,
+@@ -91,6 +92,16 @@ def _openai_extra_body(oai_config: dict[str, Any]) -> dict[str, Any]:
+     return extra_body
+ 
+ 
++def _write_speech(client: Any, create_kwargs: dict[str, Any], output_path: str) -> None:
++    """Stock buffered write; inside a native voice call the body streams to the file under the byte cap."""
++    if not native_send_policy.no_resend():
++        client.audio.speech.create(**create_kwargs).stream_to_file(output_path)
++        return
++    with client.audio.speech.with_streaming_response.create(**create_kwargs) as response:
++        with open(output_path, "wb") as out:
++            out.writelines(native_send_policy.bounded_stream(response.iter_bytes()))
++
++
+ def _generate_openai_tts(
+     text: str, output_path: str, tts_config: dict[str, Any], *, api_key: Optional[str] = None,
+     base_url: Optional[str] = None, model: Optional[str] = None, voice: Optional[str] = None,
+@@ -136,9 +147,10 @@ def _generate_openai_tts(
+         create_kwargs["instructions"] = instructions
+     if extra_body := _openai_extra_body(oai_config):
+         create_kwargs["extra_body"] = extra_body
+-    client = _origin()._import_openai_client()(api_key=api_key, base_url=base_url)
++    client = _origin()._import_openai_client()(
++        api_key=api_key, base_url=base_url, **native_send_policy.openai_client_kwargs())
+     try:
+-        client.audio.speech.create(**create_kwargs).stream_to_file(output_path)
++        _write_speech(client, create_kwargs, output_path)
+         return output_path
+     finally:
+         close = getattr(client, "close", None)
+@@ -156,6 +168,8 @@ def _generate_deepinfra_tts(text: str, output_path: str, tts_config: dict[str, A
+     from hermes_cli.models import deepinfra_base_url, deepinfra_model_ids
+     model = di_config.get("model")
+     if not isinstance(model, str) or not model.strip():
++        if native_send_policy.no_resend():
++            raise native_send_policy.refuse("unsupported")  # a native call makes no live catalog request of its own
+         candidates = deepinfra_model_ids("tts")
+         if not candidates:
+             raise ValueError(
+diff --git a/tools/tts_tool_providers.py b/tools/tts_tool_providers.py
+index 15b0ad8ea39cbcad7166a86a235827eb78901d40..b1ef2829dc4837e2765f5bb17921e0d0a9417412 100644
+--- a/tools/tts_tool_providers.py
++++ b/tools/tts_tool_providers.py
+@@ -11,6 +11,7 @@ from __future__ import annotations
+ 
+ import base64
+ import contextlib
++import inspect
+ import json
+ import logging
+ import os
+@@ -20,6 +21,7 @@ from pathlib import Path
+ from typing import Any, Dict, Optional
+ from urllib.parse import urlparse
+ 
++from tools import native_send_policy
+ from tools.tts_tool_delivery import _origin, _section, _wrap_pcm_as_wav, _write_wav_bytes_as
+ from tools.xai_http import hermes_xai_user_agent
+ 
+@@ -216,16 +218,31 @@ def _elevenlabs_environment_kwargs(el_config: dict[str, Any]) -> dict[str, Any]:
+     return {"environment": ElevenLabsEnvironment(base=base_url, wss=wss_url)}
+ 
+ 
++def _elevenlabs_native_request_options(client: Any) -> dict[str, Any]:
++    """``request_options`` (zero retries, explicit timeout) inside a native voice call, else nothing.
++
++    The installed SDK must accept them: a client that cannot be told "no retry" is refused rather
++    than assumed to behave."""
++    options = native_send_policy.elevenlabs_request_options()
++    if options is None:
++        return {}
++    if "request_options" not in inspect.signature(client.text_to_speech.convert).parameters:
++        raise native_send_policy.refuse("unsupported")
++    return {"request_options": options}
++
++
+ def _generate_elevenlabs(text: str, output_path: str, tts_config: dict[str, Any]) -> str:
+     api_key = _require_key("ELEVENLABS_API_KEY", "elevenlabs", "Get one at https://elevenlabs.io/")
+     el_config = tts_config.get("elevenlabs") or {}
+-    client = _origin()._import_elevenlabs()(api_key=api_key, **_elevenlabs_environment_kwargs(el_config))
++    client = _origin()._import_elevenlabs()(
++        api_key=api_key, **_elevenlabs_environment_kwargs(el_config), **native_send_policy.elevenlabs_client_kwargs())
+     audio_generator = client.text_to_speech.convert(
+         text=text, voice_id=el_config.get("voice_id", DEFAULT_ELEVENLABS_VOICE_ID),
+         model_id=el_config.get("model_id", DEFAULT_ELEVENLABS_MODEL_ID),
+-        output_format="opus_48000_64" if output_path.endswith(".ogg") else "mp3_44100_128")
++        output_format="opus_48000_64" if output_path.endswith(".ogg") else "mp3_44100_128",
++        **_elevenlabs_native_request_options(client))
+     with open(output_path, "wb") as f:
+-        f.writelines(audio_generator)
++        f.writelines(native_send_policy.bounded_stream(audio_generator))
+     return output_path
+ 
+ 
