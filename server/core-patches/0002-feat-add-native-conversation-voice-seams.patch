@@ -1,3 +1,149 @@
+diff --git a/agent/native_once.py b/agent/native_once.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..1473f216dcc5229fcb1f25864d2e86897e22d780
+--- /dev/null
++++ b/agent/native_once.py
+@@ -0,0 +1,87 @@
++"""Native-once v1: the opt-in contract between the native (Relay) voice seam and a plugin STT/TTS provider.
++
++A plugin opts in by overriding :meth:`agent.transcription_provider.TranscriptionProvider.transcribe_native_once_v1`
++or :meth:`agent.tts_provider.TTSProvider.synthesize_native_once_v1`. The override is checked statically
++(:func:`overrides_native_once`) before ANY plugin code runs, ``is_available`` included; plugins that keep only the
++legacy ``transcribe``/``synthesize`` are refused unsent by a native call and behave exactly as before everywhere else.
++
++Trust boundary, stated plainly: an installed plugin is trusted code running with this process's privileges. The
++override is the plugin author's opt-in to trusted execution under this contract; it is NOT proof of one send, of no
++network and of no download, and nothing here contains hostile code. What the seam does prove is limited to the one
++boundary it owns: every request sent through ``NativeTransport.client`` passes the native send gate immediately
++before it leaves (the consumer's ``authorize``/``before_send`` run first, the send is counted, a second one is refused
++before the wire). A provider must send its single request through that client and nowhere else; a result that comes
++back without exactly one gated send is accounted ``unknown``, never ``not_started``. The response hook bounds what is
++kept per decoded chunk; it is not a strict heap bound.
++"""
++from __future__ import annotations
++
++import inspect
++from dataclasses import dataclass
++from typing import TYPE_CHECKING, Any, Callable, Literal, Optional
++
++if TYPE_CHECKING:
++    import httpx
++
++NATIVE_ONCE_API = 1  # documentation constant; dispatch keys on the method NAME, never on this value
++
++
++@dataclass(frozen=True, slots=True)
++class NativeOnceLimits:
++    deadline_monotonic: float  # the native call's absolute ``time.monotonic()`` deadline in this process
++    request_timeout_s: float  # the call's per-request bound (min of the seam's request timeout and the deadline)
++    max_output_bytes: int  # the seam's existing answer cap (STT response / TTS chunk audio)
++
++
++@dataclass(frozen=True, slots=True)
++class NativeSttRequest:
++    file_path: str  # the validated, stock-prepared audio; read-only, owned and cleaned up by the caller
++    model: Optional[str]
++    language: Optional[str]
++    prompt: Optional[str]
++    limits: NativeOnceLimits
++    cancelled: Callable[[], bool]  # True once Stop/deadline closed the call; cooperative only
++
++
++@dataclass(frozen=True, slots=True)
++class NativeSttAnswer:
++    status: Literal['ok', 'no_speech', 'failed']
++    transcript: str = ''
++
++
++@dataclass(frozen=True, slots=True)
++class NativeTtsRequest:
++    text: str  # one seam chunk, already normalized and split
++    output_path: str  # the seam-owned chunk path; write the audio here and nowhere else
++    voice: Optional[str]
++    model: Optional[str]
++    speed: Optional[float]
++    format: Literal['mp3']
++    limits: NativeOnceLimits
++    cancelled: Callable[[], bool]
++
++
++@dataclass(frozen=True, slots=True)
++class NativeTtsAnswer:
++    status: Literal['ok', 'failed']
++
++
++@dataclass(frozen=True, slots=True)
++class NativeTransport:
++    """Constructed only by the seam (``tools.native_send_policy.native_transport``), which owns and closes ``client``:
++    zero automatic retries, redirects disabled, the call's timeout, and the policy's request (send gate) and response
++    (decoded-size bound) hooks."""
++    client: httpx.Client
++
++
++def overrides_native_once(provider: Any, base: type, method: str) -> bool:
++    """Static opt-in check that runs no plugin code: ``inspect.getattr_static`` on the instance's real type resolves
++    no descriptor, ``__getattr__`` or ``__getattribute__``. Only a plain function that differs from the ABC default
++    counts; anything else (property, staticmethod, callable object) is not an opt-in."""
++    impl = inspect.getattr_static(type(provider), method, None)
++    return inspect.isfunction(impl) and impl is not base.__dict__.get(method)
++
++
++def native_once_impl(provider: Any, method: str) -> Callable[..., Any]:
++    """The statically resolved override, called as ``impl(provider, request, transport)`` (no attribute hook runs)."""
++    return inspect.getattr_static(type(provider), method)
+diff --git a/agent/transcription_provider.py b/agent/transcription_provider.py
+index 2935b19fc0e238263dfb96a31a5e72cf0e3d13e2..a56676dc44eec282563a86bea40de3163ce274d9 100644
+--- a/agent/transcription_provider.py
++++ b/agent/transcription_provider.py
+@@ -13,6 +13,7 @@ from __future__ import annotations
+ import abc
+ from typing import Any, Dict, Optional
+ 
++from agent.native_once import NativeSttAnswer, NativeSttRequest, NativeTransport
+ from agent.provider_base import CatalogProviderBase
+ 
+ 
+@@ -35,6 +36,13 @@ class TranscriptionProvider(CatalogProviderBase):
+         unknown keys must be ignored.
+         """
+ 
++    def transcribe_native_once_v1(self, request: NativeSttRequest, transport: NativeTransport) -> NativeSttAnswer:
++        """Opt-in native (Relay) transcription, sending at most ONE request through ``transport.client``.
++
++        Not abstract: a provider that does not override it keeps working everywhere except a native call, which
++        refuses it unsent. See :mod:`agent.native_once` for the contract and its trust boundary."""
++        raise NotImplementedError(f"{self.name} does not implement native-once transcription")
++
+     @property
+     def streaming_capable(self) -> bool:
+         """True when :meth:`open_stream_session` can transcribe live 16 kHz mono s16le PCM
+diff --git a/agent/tts_provider.py b/agent/tts_provider.py
+index ae4a30e6e0d0904bd1aa873e832243afc757905d..9041db42880f5f1be90a298fb975f7026d24e495 100644
+--- a/agent/tts_provider.py
++++ b/agent/tts_provider.py
+@@ -14,6 +14,7 @@ import abc
+ import logging
+ from typing import Any, Dict, Iterator, List, Optional
+ 
++from agent.native_once import NativeTransport, NativeTtsAnswer, NativeTtsRequest
+ from agent.provider_base import CatalogProviderBase
+ 
+ logger = logging.getLogger(__name__)
+@@ -68,6 +69,14 @@ class TTSProvider(CatalogProviderBase):
+         extension. Unknown ``extra`` keys must be ignored. Raise on failure.
+         """
+ 
++    def synthesize_native_once_v1(self, request: NativeTtsRequest, transport: NativeTransport) -> NativeTtsAnswer:
++        """Opt-in native (Relay) synthesis of ONE chunk into ``request.output_path``, sending at most one request
++        through ``transport.client``.
++
++        Not abstract: a provider that does not override it keeps working everywhere except a native call, which
++        refuses it unsent. See :mod:`agent.native_once` for the contract and its trust boundary."""
++        raise NotImplementedError(f"TTS provider {self.name!r} does not implement native-once synthesis")
++
+     def stream(
+         self, text: str, *, voice: Optional[str] = None, model: Optional[str] = None,
+         format: str = "opus", **extra: Any,
 diff --git a/gateway/session_authority.py b/gateway/session_authority.py
 index 14703329aef89b5516dc67f6379d3f284627d99c..7741eb05aacf82bdf9b232d4e2c9b06ecef052a3 100644
 --- a/gateway/session_authority.py
@@ -45,10 +191,10 @@ index 14703329aef89b5516dc67f6379d3f284627d99c..7741eb05aacf82bdf9b232d4e2c9b06e
          return await read_native_admissions(self, actor, ref, adapter=adapter, source=source,
 diff --git a/gateway/session_native_voice.py b/gateway/session_native_voice.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..ec23a3b0423825a87237af2b409ca4460aed9243
+index 0000000000000000000000000000000000000000..f562acda216cfd31759050c18b8d22ab6d9bec13
 --- /dev/null
 +++ b/gateway/session_native_voice.py
-@@ -0,0 +1,112 @@
+@@ -0,0 +1,113 @@
 +"""Generic native voice seam: one configured STT request, one TTS request per chunk, canonical display reads.
 +
 +An in-process extension seam for a consumer that owns its own registry, grants and accounting (the
@@ -70,8 +216,9 @@ index 0000000000000000000000000000000000000000..ec23a3b0423825a87237af2b409ca446
 +comes back without exactly one gated send is ``failed`` with ``provider='unknown'``, never ``not_started``;
 +so is an invocation that, once entered, raises or answers a failure with zero gated sends (no STT fallback).
 +
-+Coverage is a closed provider set (see ``session_native_voice_stt`` / ``_tts``); any other configured
-+provider is refused UNSENT until its own gate passes.
++Coverage is a closed set of built-in providers (see ``session_native_voice_stt`` / ``_tts``) plus a configured plugin
++provider that opted in to native-once v1 (``agent.native_once``), whose one request must pass the same gate on the
++transport the seam hands it; any other configured provider is refused UNSENT until its own gate passes.
 +
 +The display functions live on ``SessionAuthority`` (``locate_native_display`` and friends), beside the
 +other native readers; the implementation is ``session_native_voice_display``.
@@ -463,10 +610,10 @@ index 0000000000000000000000000000000000000000..0ebcf76957838ebc56837a23b80f50d0
 +    return fragment
 diff --git a/gateway/session_native_voice_gate.py b/gateway/session_native_voice_gate.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..f1eb90948e87aded5bbe5b89a1e924627768a06e
+index 0000000000000000000000000000000000000000..1d9a4f836cd82c074049f69b078922905ff5e006
 --- /dev/null
 +++ b/gateway/session_native_voice_gate.py
-@@ -0,0 +1,150 @@
+@@ -0,0 +1,151 @@
 +"""Shared plumbing of the native voice seam: the send gate, bounded waiting and provider evidence.
 +
 +The consumer's ``authorize`` / ``before_send`` callables belong to the consumer's event loop (they
@@ -581,7 +728,8 @@ index 0000000000000000000000000000000000000000..f1eb90948e87aded5bbe5b89a1e92462
 +def new_policy(loop, authorize, before_send, deadline, *, timeout_s, providers, max_output_bytes=None):
 +    """A send policy whose gate runs the consumer's callbacks on ``loop`` under the close fence; its credential phase
 +    asks the consumer's ``authorize`` alone, on the same loop, under the same fence."""
-+    policy = native_send_policy.SendPolicy(timeout_s=timeout_s, providers=providers, max_output_bytes=max_output_bytes)
++    policy = native_send_policy.SendPolicy(timeout_s=timeout_s, providers=providers, max_output_bytes=max_output_bytes,
++                                           deadline=deadline)
 +    policy.set_gate(loop_gate(loop, policy, authorize, before_send, deadline))
 +    policy.set_credential_probe(loop_probe(loop, policy, authorize, deadline))
 +    return policy
@@ -619,10 +767,10 @@ index 0000000000000000000000000000000000000000..f1eb90948e87aded5bbe5b89a1e92462
 +    return PROVIDER_COMPLETED if answered else PROVIDER_FAILED
 diff --git a/gateway/session_native_voice_stt.py b/gateway/session_native_voice_stt.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..e936b8a98b045a810c3d5492a03cd7cd00f0e53b
+index 0000000000000000000000000000000000000000..1477c84f0e85b51a9fb0030b8de05704c31df0fb
 --- /dev/null
 +++ b/gateway/session_native_voice_stt.py
-@@ -0,0 +1,179 @@
+@@ -0,0 +1,195 @@
 +"""Configured-once speech-to-text for the native voice seam (see ``session_native_voice``).
 +
 +The profile's own STT configuration is read at call time through the stock resolvers, the audio is
@@ -642,11 +790,16 @@ index 0000000000000000000000000000000000000000..e936b8a98b045a810c3d5492a03cd7cd
 +from gateway import session_native_voice_gate as gate
 +from tools import native_send_policy
 +
-+# Providers whose transport the seam can hold to one request. Anything else - user command (including the
-+# ``local_command`` template) and plugin providers - is refused UNSENT, never replaced by another provider.
++# Built-in providers whose transport the seam can hold to one request. A plugin provider is reached only when it opted
++# in to native-once v1 (``agent.native_once``) and then only through the gated transport; user commands (including the
++# ``local_command`` template) and plugins that did not opt in are refused UNSENT, never replaced by another provider.
 +STT_PROVIDERS = frozenset({'local', 'openai', 'groq', 'deepinfra', 'xai', 'elevenlabs', 'mistral'})
 +LOCAL_PROVIDERS = frozenset({'local', 'local_command'})  # no remote request: never a fallback to themselves
 +SOURCE_LABEL = 'relay'
++# A recorded refusal that ends the call: never followed by the local fallback or any re-selection. ``unsupported_hook``:
++# the served profile has an ordinary ``pre_transcription`` callback, which has no native-once contract; the whole call
++# is refused unsent instead of running it or silently dropping it (and the local fallback would bypass it too).
++TERMINAL_REFUSALS = frozenset({'closed', 'timeout', 'refused', 'cancelled', 'unsupported_hook'})
 +
 +
 +@dataclass
@@ -660,10 +813,14 @@ index 0000000000000000000000000000000000000000..e936b8a98b045a810c3d5492a03cd7cd
 +def _configured(path, policy):
 +    """Worker thread: the stock pipeline under the one-send policy."""
 +    from tools import transcription_tools as stt
++    from tools.transcription_command import _native_pre_transcription_hooks_registered
 +    try:
 +        with native_send_policy.activate(policy):
 +            config = stt._load_stt_config()
 +            enabled = stt.is_stt_enabled(config)
++            if enabled and _native_pre_transcription_hooks_registered():
++                policy.refusal_for('unsupported_hook')  # before provider selection, credentials or any callback
++                return _Attempt(None, 'unresolved', True)
 +            try:
 +                provider = stt._get_provider(config) if enabled else 'none'
 +            except native_send_policy.NativeSendRefused:
@@ -709,9 +866,11 @@ index 0000000000000000000000000000000000000000..e936b8a98b045a810c3d5492a03cd7cd
 +
 +
 +def _failure_state(attempt, policy):
-+    if policy.refusal in ('refused', 'cancelled'):
++    if policy.refusal in ('refused', 'cancelled', 'timeout'):
 +        return policy.refusal
-+    if policy.refusal == 'unsupported':
++    if policy.refusal == 'closed':  # closed by the deadline fence, else by Stop/cancellation
++        return 'timeout' if policy.deadline is not None and time.monotonic() >= policy.deadline else 'cancelled'
++    if policy.refusal in ('unsupported', 'unsupported_hook'):
 +        return 'unavailable'
 +    local_attempt = attempt.provider in LOCAL_PROVIDERS and attempt.result is not None
 +    return 'failed' if policy.sends or local_attempt else 'unavailable'  # nothing was tried otherwise
@@ -739,9 +898,14 @@ index 0000000000000000000000000000000000000000..e936b8a98b045a810c3d5492a03cd7cd
 +    return NativeTranscription(state, transcript, source, provider)
 +
 +
-+def _may_fall_back(attempt, state):
++def _may_fall_back(attempt, state, policy):
++    """The installed-only local fallback keeps its existing built-in semantics, but never runs after a terminal
++    refusal, nor after a configured custom (plugin or command) provider, which no other provider replaces. ``none``
++    (an explicit built-in that resolved unusable) and ``unresolved`` (selection refused) are not custom names."""
++    from tools.transcription_common import BUILTIN_STT_PROVIDERS
++    custom = attempt.provider not in BUILTIN_STT_PROVIDERS and attempt.provider not in ('none', 'unresolved')
 +    return (attempt.enabled and state in ('unavailable', 'failed')
-+            and attempt.provider not in LOCAL_PROVIDERS)
++            and attempt.provider not in LOCAL_PROVIDERS and policy.refusal not in TERMINAL_REFUSALS and not custom)
 +
 +
 +async def transcribe_once(path, *, authorize, before_send, deadline_s):
@@ -770,7 +934,7 @@ index 0000000000000000000000000000000000000000..e936b8a98b045a810c3d5492a03cd7cd
 +        return _make(refusal, None, None, provider)
 +    if state in ('transcribed', 'empty', 'too_long'):
 +        return _make(state, transcript, 'configured', provider)
-+    if unaccounted or not _may_fall_back(attempt, state):
++    if unaccounted or not _may_fall_back(attempt, state, policy):
 +        return _make(state, None, None, provider)
 +    return await _recover(path, state, provider, authorize, deadline)
 +
@@ -804,10 +968,10 @@ index 0000000000000000000000000000000000000000..e936b8a98b045a810c3d5492a03cd7cd
 +    return _make(configured_state, None, None, provider)
 diff --git a/gateway/session_native_voice_tts.py b/gateway/session_native_voice_tts.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..771bd16be35283e47e24afbe927dcd64a0a313c9
+index 0000000000000000000000000000000000000000..cd1aaad491d8a2e65ad42da0e3a41f5ea77f57a6
 --- /dev/null
 +++ b/gateway/session_native_voice_tts.py
-@@ -0,0 +1,249 @@
+@@ -0,0 +1,259 @@
 +"""Configured one-request-per-chunk text-to-speech for the native voice seam (``session_native_voice``).
 +
 +The profile's own TTS configuration (provider, voice, model) is read at call time through the stock
@@ -827,8 +991,9 @@ index 0000000000000000000000000000000000000000..771bd16be35283e47e24afbe927dcd64
 +from gateway import session_native_voice_gate as gate
 +from tools import native_send_policy
 +
-+# Voices whose transport the seam can hold to one request per chunk. Others - local engines, command and plugin
-+# providers - are refused UNSENT, never replaced by another provider.
++# Built-in voices whose transport the seam can hold to one request per chunk. A plugin provider is reached only when it
++# opted in to native-once v1 (``agent.native_once``) and then only through the gated transport; local engines, command
++# providers and plugins that did not opt in are refused UNSENT, never replaced by another provider.
 +TTS_PROVIDERS = frozenset({'edge', 'elevenlabs', 'openai', 'deepinfra', 'mistral', 'xai', 'minimax', 'gemini'})
 +# Every covered SDK engine sends through a client the seam hooks (httpx for the SDKs, the aiohttp connector for
 +# Edge): its identity is proven before the call and exactly one gated send is required after it. xAI, MiniMax and
@@ -891,7 +1056,11 @@ index 0000000000000000000000000000000000000000..771bd16be35283e47e24afbe927dcd64
 +    from tools import tts_tool as tts
 +    run.policy.arm()
 +    try:
-+        tts._synthesize_builtin(engine, chunk, path, config, None)
++        if isinstance(engine, tuple):  # (key, held instance): an opted-in plugin route
++            from tools.tts_tool_plugins import _synthesize_native_plugin
++            _synthesize_native_plugin(engine, chunk, path, config)
++        else:
++            tts._synthesize_builtin(engine, chunk, path, config, None)
 +    except native_send_policy.NativeSendRefused:
 +        raise  # a gate or policy refusal: the policy knows exactly what was and was not sent
 +    except Exception:
@@ -944,16 +1113,21 @@ index 0000000000000000000000000000000000000000..771bd16be35283e47e24afbe927dcd64
 +
 +
 +def _plan(text, config):
-+    """``(engine, chunks)``; ``engine`` is None when the configured voice cannot be used."""
++    """``(engine, chunks)``; ``engine`` is None when the configured voice cannot be used, a built-in engine name, or
++    ``(key, held instance)`` for an opted-in plugin route (stock precedence: built-in > command > plugin)."""
 +    from gateway.session_native_voice import speakable_text
 +    from tools import tts_tool as tts
 +    from tools.tts_tool_delivery import _resolve_max_text_length, _split_text_for_tts
 +    provider = tts._get_provider(config)
-+    if provider not in TTS_PROVIDERS:
-+        return None, []
-+    engine, unavailable = tts._select_builtin_engine(provider)
-+    if unavailable or engine != provider:
-+        return None, []  # never the stock fallback to another engine
++    if provider in TTS_PROVIDERS:
++        engine, unavailable = tts._select_builtin_engine(provider)
++        if unavailable or engine != provider:
++            return None, []  # never the stock fallback to another engine
++    else:
++        from tools.tts_tool_plugins import _native_plugin_route
++        engine = _native_plugin_route(provider, config)  # refuses a plugin that did not opt in (unsent)
++        if engine is None:
++            return None, []  # local engine or command provider: not admitted
 +    spoken = speakable_text(text)
 +    cap = _resolve_max_text_length(provider, config)
 +    if provider == 'edge':
@@ -1900,6 +2074,588 @@ index 0000000000000000000000000000000000000000..1f184b31bd1cecf70673a66bcf008dbc
 +    def before_send(self):
 +        self.threads.append(threading.get_ident())
 +        super().before_send()
+diff --git a/tests/gateway/test_native_voice_custom.py b/tests/gateway/test_native_voice_custom.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..8131691ae064d978a130e848edb4a77544b78491
+--- /dev/null
++++ b/tests/gateway/test_native_voice_custom.py
+@@ -0,0 +1,576 @@
++"""Native voice seam: configured custom (plugin) STT/TTS providers, and terminal credential refusals.
++
++The plugins below are ordinary registered ``TranscriptionProvider``/``TTSProvider`` subclasses. A plugin that
++overrides ``*_native_once_v1`` sends its one request through the ``NativeTransport`` the seam hands it: a real httpx
++client whose network bytes are replaced by ``native_voice_support.Wire`` (the same synthetic transport the built-in
++provider tests use), so ``wire.count`` is the number of requests that would have left the process. No provider,
++network or plugin discovery is involved; the profile configuration is the real ``config.yaml`` read at call time.
++
++Also: O1, a credential-phase refusal recorded as ``closed``/``timeout`` while the deadline has NOT expired is terminal
++(no local fallback, no re-selection), so the deadline fence cannot mask the result.
++"""
++import asyncio
++import os
++import threading
++import time
++from pathlib import Path
++
++import pytest
++
++from agent.transcription_provider import TranscriptionProvider
++from agent.tts_provider import TTSProvider
++from gateway.session_native_voice import synthesize_native_once, transcribe_native_once
++from hermes_constants import get_hermes_home
++from tests.gateway import native_voice_support as support
++from tools import native_send_policy
++
++NAME = 'relay-custom'
++
++
++@pytest.fixture
++def clip(tmp_path):
++    return support.write_wav(tmp_path / 'clip.wav')
++
++
++@pytest.fixture
++def out(tmp_path):
++    path = tmp_path / 'caller-output'
++    path.mkdir()
++    return str(path)
++
++
++class Discovery:
++    """Counting spies in place of the two discovery entries only (provider lookup ``_ensure_plugins_discovered`` and
++    hook delivery ``PluginManager.discover_and_load``); the real resolvers, manager snapshot and routes still run."""
++
++    def __init__(self):
++        self.ensure, self.delivery = [], []
++
++    @property
++    def none(self):
++        return self.ensure == [] and self.delivery == []
++
++
++@pytest.fixture(autouse=True)
++def registries(monkeypatch):
++    """Clean provider registries and discovery spies, so no real plugin code is ever loaded in this file."""
++    from agent import transcription_registry, tts_registry
++    transcription_registry._reset_for_tests()
++    tts_registry._reset_for_tests()
++    seen = Discovery()
++    from hermes_cli import plugins
++    monkeypatch.setattr(plugins, '_ensure_plugins_discovered', lambda force=False: seen.ensure.append(force))
++    monkeypatch.setattr(plugins.PluginManager, 'discover_and_load', lambda self, force=False: seen.delivery.append(force))
++    yield seen
++    transcription_registry._reset_for_tests()
++    tts_registry._reset_for_tests()
++
++
++def stt_config(**extra):
++    return {'stt': {'provider': NAME, NAME: {'model': 'custom-model-1', 'language': 'fr'}, **extra}}
++
++
++def tts_config(**extra):
++    return {'tts': {'provider': NAME, 'voice': 'custom-voice', 'model': 'custom-tts-1', 'speed': 1.25, **extra}}
++
++
++async def hear(clip, callbacks, deadline_s=30):
++    return await transcribe_native_once(clip, authorize=callbacks.authorize, before_send=callbacks.before_send,
++                                        deadline_s=deadline_s)
++
++
++async def speak(out, callbacks, text='Hello there, friend.', deadline_s=30):
++    return await synthesize_native_once(text, output_dir=out, authorize=callbacks.authorize,
++                                        before_send=callbacks.before_send, deadline_s=deadline_s)
++
++
++class Recorder:
++    def __init__(self):
++        self.available = 0
++        self.legacy = []
++        self.native = []
++        self.refusals = []
++
++
++class LegacySTT(TranscriptionProvider):
++    """A plugin with only the legacy ABC surface (no native-once opt-in)."""
++
++    def __init__(self, plan='one', label='A'):
++        self.plan, self.label, self.rec = plan, label, Recorder()
++        self.entered, self.finished = threading.Event(), threading.Event()
++
++    @property
++    def name(self):
++        return NAME
++
++    def is_available(self):
++        self.rec.available += 1
++        return True
++
++    def transcribe(self, file_path, *, model=None, language=None, **extra):
++        self.rec.legacy.append((file_path, model, language, extra))
++        return {'success': True, 'transcript': 'legacy words', 'provider': NAME}
++
++    def _post(self, transport, request):
++        try:
++            return transport.client.post('https://stt.custom.invalid/v1/transcribe', content=b'audio',
++                                         headers={'x-model': str(request.model), 'x-label': self.label})
++        except native_send_policy.NativeSendRefused as exc:
++            self.rec.refusals.append(exc.reason)
++            return None
++
++
++
++class CustomSTT(LegacySTT):
++    """Opted in. ``plan``: 'one' (one send), 'two' (tries a second send), 'none' (no send), 'raise' (raises with no
++    send), 'fail' (one send, then answers failed), 'wait' (waits for Stop/deadline, then tries to send)."""
++
++    def transcribe_native_once_v1(self, request, transport):
++        from agent.native_once import NativeSttAnswer
++        self.rec.native.append(request)
++        assert os.path.isfile(request.file_path)
++        self.entered.set()
++        try:
++            if self.plan == 'none':
++                return NativeSttAnswer('ok', 'words from nowhere')
++            if self.plan == 'raise':
++                raise RuntimeError('SECRET plugin failure text')
++            if self.plan == 'wait':
++                for _ in range(2000):  # bounded poll: waits for Stop or the deadline to close the call
++                    if request.cancelled():
++                        break
++                    time.sleep(0.01)
++                self._post(transport, request)
++                return NativeSttAnswer('failed')
++            answer = self._post(transport, request)
++            if self.plan == 'two':
++                self._post(transport, request)
++            if self.plan == 'fail' or answer is None or answer.status_code != 200:
++                return NativeSttAnswer('failed')
++            return NativeSttAnswer('ok', answer.json()['text'])
++        finally:
++            self.finished.set()
++
++
++class LegacyTTS(TTSProvider):
++    """A TTS plugin with only the legacy ABC surface (no native-once opt-in)."""
++
++    def __init__(self, plan='one'):
++        self.plan, self.rec = plan, Recorder()
++
++    @property
++    def name(self):
++        return NAME
++
++    def is_available(self):
++        self.rec.available += 1
++        return True
++
++    def synthesize(self, text, output_path, *, voice=None, model=None, speed=None, format='mp3', **extra):
++        self.rec.legacy.append((text, voice, model, speed, format))
++        with open(output_path, 'wb') as handle:
++            handle.write(b'ID3legacy-audio')
++        return output_path
++
++
++
++class CustomTTS(LegacyTTS):
++    def synthesize_native_once_v1(self, request, transport):
++        from agent.native_once import NativeTtsAnswer
++        self.rec.native.append(request)
++        if self.plan == 'none':
++            with open(request.output_path, 'wb') as handle:
++                handle.write(b'ID3unsent-audio')
++            return NativeTtsAnswer('ok')
++        response = transport.client.post('https://tts.custom.invalid/v1/speech', json={'text': request.text})
++        if self.plan == 'two':
++            try:
++                transport.client.post('https://tts.custom.invalid/v1/speech', json={'text': request.text})
++            except native_send_policy.NativeSendRefused as exc:
++                self.rec.refusals.append(exc.reason)
++        with open(request.output_path, 'wb') as handle:
++            handle.write(response.content)
++        return NativeTtsAnswer('ok')
++
++
++def register_stt(plugin, scope=None):
++    from agent.transcription_registry import register_provider
++    register_provider(plugin, scope=scope)
++    return plugin
++
++
++def register_tts(plugin, scope=None):
++    from agent.tts_registry import register_provider
++    register_provider(plugin, scope=scope)
++    return plugin
++
++
++@pytest.fixture
++def no_fallback(monkeypatch):
++    calls = []
++    monkeypatch.setattr('tools.transcription_tools.transcribe_audio_local_fallback',
++                        lambda path, model=None: calls.append(path) or {'success': True, 'transcript': 'LOCAL'})
++    return calls
++
++
++# --- STT -----------------------------------------------------------------------------------------------------------
++
++@pytest.mark.asyncio
++async def test_an_opted_in_plugin_sends_once_through_the_gate(monkeypatch, clip, registries, no_fallback):
++    support.write_config(get_hermes_home(), stt_config())
++    plugin = register_stt(CustomSTT('one'))
++    events = []
++    cb = support.Callbacks(events)
++    wire = support.Wire([('ok', {'text': 'custom words'})], tap=lambda request: events.append('request'))
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, cb)
++    assert (result.state, result.transcript, result.source, result.provider) == (
++        'transcribed', 'custom words', 'configured', 'completed')
++    assert wire.count == 1 and events == ['authorize', 'authorize', 'before_send', 'request', 'authorize']
++    assert wire.requests[0].headers['x-model'] == 'custom-model-1'
++    request = plugin.rec.native[0]
++    assert (request.model, request.language, request.prompt) == ('custom-model-1', 'fr', None)
++    assert request.limits.max_output_bytes == 1024 * 1024 and 0 < request.limits.request_timeout_s <= 30
++    assert request.cancelled() is False  # only Stop or the deadline close the call; neither happened
++    assert plugin.rec.available == 0 and plugin.rec.legacy == [] and registries.none and no_fallback == []
++
++
++@pytest.mark.asyncio
++async def test_a_second_send_is_refused_before_the_wire(monkeypatch, clip, no_fallback):
++    support.write_config(get_hermes_home(), stt_config())
++    plugin = register_stt(CustomSTT('two'))
++    cb = support.Callbacks()
++    wire = support.Wire([('ok', {'text': 'first answer'})] * 2)
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, cb)
++    assert wire.count == 1 and cb.before_send_calls == 1 and plugin.rec.refusals == ['second']
++    assert (result.state, result.transcript, result.provider) == ('transcribed', 'first answer', 'completed')
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('plan', ['none', 'raise'])
++async def test_an_entered_plugin_with_no_gated_send_is_unknown_never_unsent(monkeypatch, clip, plan, no_fallback):
++    support.write_config(get_hermes_home(), stt_config())
++    register_stt(CustomSTT(plan))
++    cb = support.Callbacks()
++    wire = support.Wire()
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, cb)
++    assert (result.state, result.transcript, result.source, result.provider) == ('failed', None, None, 'unknown')
++    assert wire.count == 0 and cb.before_send_calls == 0 and no_fallback == []
++    assert 'SECRET' not in repr(result)
++
++
++@pytest.mark.asyncio
++async def test_a_failed_answer_after_one_send_is_failed_after_send_and_never_substituted(monkeypatch, clip, no_fallback):
++    support.write_config(get_hermes_home(), stt_config())
++    register_stt(CustomSTT('fail'))
++    wire = support.Wire([('status', 500)])
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, support.Callbacks())
++    assert (result.state, result.provider) == ('failed', 'failed_after_send')
++    assert wire.count == 1 and no_fallback == []  # Q3: no local or other provider replaces a configured plugin
++
++
++@pytest.mark.asyncio
++async def test_a_plugin_that_did_not_opt_in_is_refused_unsent_without_running_any_of_its_code(
++        monkeypatch, clip, registries, no_fallback):
++    support.write_config(get_hermes_home(), stt_config())
++    plugin = register_stt(LegacySTT())
++    cb = support.Callbacks()
++    wire = support.Wire()
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, cb)
++    assert (result.state, result.transcript, result.provider) == ('unavailable', None, 'not_started')
++    assert plugin.rec.available == 0 and plugin.rec.legacy == [] and plugin.rec.native == []
++    assert wire.count == 0 and cb.before_send_calls == 0 and registries.none and no_fallback == []
++
++
++@pytest.mark.asyncio
++async def test_an_unregistered_plugin_name_is_refused_unsent_without_discovery(monkeypatch, clip, registries, no_fallback):
++    support.write_config(get_hermes_home(), stt_config())
++    result = await hear(clip, support.Callbacks())
++    assert (result.state, result.provider) == ('unavailable', 'not_started')
++    assert registries.none and no_fallback == []
++
++
++@pytest.mark.asyncio
++async def test_a_same_named_command_provider_still_wins_and_stays_refused(monkeypatch, clip, no_fallback):
++    config = stt_config(providers={NAME: {'type': 'command', 'command': 'never-run {input_path}'}})
++    support.write_config(get_hermes_home(), config)
++    plugin = register_stt(CustomSTT('one'))
++    ran = []
++    monkeypatch.setattr('tools.transcription_tools._transcribe_command_stt', lambda *a, **k: ran.append(1))
++    cb = support.Callbacks()
++    result = await hear(clip, cb)
++    assert (result.state, result.provider) == ('unavailable', 'not_started')
++    assert ran == [] and plugin.rec.native == [] and cb.before_send_calls == 0 and no_fallback == []
++
++
++@pytest.mark.asyncio
++async def test_each_served_profile_reaches_only_its_own_plugin_instance_and_options(monkeypatch, clip, tmp_path):
++    homes = {label: tmp_path / f'profile-{label}' for label in 'AB'}
++    plugins = {}
++    for label, home in homes.items():
++        support.write_config(home, {'stt': {'provider': NAME, NAME: {'model': f'model-{label}'}}})
++        plugins[label] = register_stt(CustomSTT('one', label=label), scope=str(home))
++    seen = []
++    for label in 'ABA':
++        monkeypatch.setenv('HERMES_HOME', str(homes[label]))
++        wire = support.Wire([('ok', {'text': f'words {label}'})])
++        with support.provider_wire(monkeypatch, wire):
++            result = await hear(clip, support.Callbacks())
++        assert (result.state, result.transcript) == ('transcribed', f'words {label}')
++        seen.append((wire.requests[0].headers['x-label'], wire.requests[0].headers['x-model']))
++    assert seen == [('A', 'model-A'), ('B', 'model-B'), ('A', 'model-A')]
++    assert (len(plugins['A'].rec.native), len(plugins['B'].rec.native)) == (2, 1)
++
++
++@pytest.mark.asyncio
++async def test_stop_while_the_plugin_runs_leaves_nothing_sent(monkeypatch, clip, no_fallback):
++    support.write_config(get_hermes_home(), stt_config())
++    plugin = register_stt(CustomSTT('wait'))
++    cb = support.Callbacks()
++    wire = support.Wire()
++    with support.provider_wire(monkeypatch, wire):
++        task = asyncio.create_task(hear(clip, cb))
++        assert await asyncio.to_thread(plugin.entered.wait, 10)
++        task.cancel()
++        with pytest.raises(asyncio.CancelledError):
++            await task
++        assert await asyncio.to_thread(plugin.finished.wait, 10)
++    assert plugin.rec.refusals == ['closed'] and wire.count == 0 and cb.before_send_calls == 0
++    assert no_fallback == []
++
++
++@pytest.mark.asyncio
++async def test_the_deadline_while_the_plugin_runs_is_timeout_with_nothing_sent(monkeypatch, clip, no_fallback):
++    support.write_config(get_hermes_home(), stt_config())
++    plugin = register_stt(CustomSTT('wait'))
++    cb = support.Callbacks()
++    wire = support.Wire()
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, cb, deadline_s=0.5)
++        assert await asyncio.to_thread(plugin.finished.wait, 10)
++    assert (result.state, result.transcript, result.provider) == ('timeout', None, 'not_started')
++    assert plugin.rec.refusals == ['closed'] and wire.count == 0 and cb.before_send_calls == 0 and no_fallback == []
++
++
++def test_stock_dispatch_outside_a_native_call_keeps_the_legacy_plugin_call(monkeypatch, clip, registries):
++    from tools.transcription_tools import transcribe_audio
++    plugin = register_stt(CustomSTT('one'))
++    monkeypatch.setattr('tools.transcription_tools._load_stt_config', lambda: stt_config()['stt'])
++    result = transcribe_audio(clip)
++    assert (result['success'], result['transcript'], result['provider']) == (True, 'legacy words', NAME)
++    assert plugin.rec.native == [] and plugin.rec.available == 1 and registries.ensure == [False]
++    assert plugin.rec.legacy == [(clip, 'custom-model-1', 'fr', {})]
++
++
++# --- O1: terminal credential-phase refusals ------------------------------------------------------------------------
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('swallowed', [False, True], ids=['raised', 'swallowed-by-auto-detect'])
++@pytest.mark.parametrize('reason,state', [('timeout', 'timeout'), ('closed', 'cancelled')])
++async def test_a_terminal_credential_refusal_before_the_deadline_never_falls_back(
++        monkeypatch, clip, no_fallback, reason, state, swallowed):
++    """The real ``SendPolicy.probe_credentials`` records the refusal and closes the policy while the 30 s deadline is
++    still far away; ``swallowed`` is the stock quiet availability probe that absorbs the exception and selects on."""
++    support.write_config(get_hermes_home(), {'stt': {'provider': 'xai'}})
++
++    def select(_config):
++        policy = native_send_policy.current()
++        policy.set_credential_probe(lambda: (_ for _ in ()).throw(native_send_policy.NativeSendRefused(reason)))
++        try:
++            policy.probe_credentials()
++        except native_send_policy.NativeSendRefused:
++            if not swallowed:
++                raise
++        return 'groq'
++    monkeypatch.setattr('tools.transcription_tools._get_provider', select)
++    cb = support.Callbacks()
++    wire = support.Wire()
++    started = time.monotonic()
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, cb, deadline_s=30)
++    assert time.monotonic() - started < 10  # the deadline did not decide this
++    assert (result.state, result.transcript, result.source, result.provider) == (state, None, None, 'not_started')
++    assert no_fallback == [] and wire.count == 0 and cb.before_send_calls == 0
++
++
++# --- TTS -----------------------------------------------------------------------------------------------------------
++
++@pytest.mark.asyncio
++async def test_an_opted_in_tts_plugin_sends_once_per_chunk_through_the_gate(monkeypatch, out, registries):
++    support.write_config(get_hermes_home(), tts_config())
++    plugin = register_tts(CustomTTS('one'))
++    cb = support.Callbacks()
++    wire = support.Wire([('ok', {'audio': b'ID3custom-audio'})])
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.source, result.provider) == ('synthesized', 'configured', 'completed')
++    assert Path(result.path).read_bytes() == b'ID3custom-audio' and os.listdir(out) == [os.path.basename(result.path)]
++    request = plugin.rec.native[0]
++    assert (request.voice, request.model, request.speed, request.format) == ('custom-voice', 'custom-tts-1', 1.25, 'mp3')
++    assert request.limits.max_output_bytes == 16 * 1024 * 1024
++    assert wire.count == 1 and cb.before_send_calls == 1 and plugin.rec.available == 0 and plugin.rec.legacy == []
++    assert registries.none
++
++
++@pytest.mark.asyncio
++async def test_a_second_tts_send_is_refused_before_the_wire(monkeypatch, out):
++    support.write_config(get_hermes_home(), tts_config())
++    plugin = register_tts(CustomTTS('two'))
++    wire = support.Wire([('ok', {'audio': b'ID3first'})] * 2)
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, support.Callbacks())
++    assert wire.count == 1 and plugin.rec.refusals == ['second'] and result.provider == 'completed'
++
++
++@pytest.mark.asyncio
++async def test_tts_audio_without_a_gated_send_is_unknown_and_removed(monkeypatch, out):
++    support.write_config(get_hermes_home(), tts_config())
++    register_tts(CustomTTS('none'))
++    cb = support.Callbacks()
++    wire = support.Wire()
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.path, result.provider) == ('failed', None, 'unknown')
++    assert wire.count == 0 and cb.before_send_calls == 0 and os.listdir(out) == []
++
++
++@pytest.mark.asyncio
++async def test_a_tts_plugin_that_did_not_opt_in_is_refused_unsent(monkeypatch, out, registries):
++    support.write_config(get_hermes_home(), tts_config())
++    plugin = register_tts(LegacyTTS())
++    cb = support.Callbacks()
++    wire = support.Wire()
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.path, result.provider) == ('unavailable', None, 'not_started')
++    assert plugin.rec.available == 0 and plugin.rec.legacy == [] and plugin.rec.native == []
++    assert wire.count == 0 and cb.before_send_calls == 0 and os.listdir(out) == [] and registries.none
++
++
++@pytest.mark.asyncio
++async def test_a_same_named_tts_command_provider_still_wins_and_stays_refused(monkeypatch, out):
++    support.write_config(get_hermes_home(), tts_config(providers={NAME: {'type': 'command', 'command': 'never-run'}}))
++    plugin = register_tts(CustomTTS('one'))
++    result = await speak(out, support.Callbacks())
++    assert (result.state, result.provider) == ('unavailable', 'not_started') and plugin.rec.native == []
++
++
++def test_stock_tts_outside_a_native_call_keeps_the_legacy_plugin_call(monkeypatch, tmp_path, registries):
++    import json
++    from tools.tts_tool import text_to_speech_tool
++    plugin = register_tts(CustomTTS('one'))
++    monkeypatch.setattr('tools.tts_tool._load_tts_config', lambda: tts_config()['tts'])
++    data = json.loads(text_to_speech_tool(text='hi', output_path=str(tmp_path / 'clip.mp3')))
++    assert data['success'] is True and data['provider'] == NAME
++    assert plugin.rec.native == [] and plugin.rec.legacy == [('hi', 'custom-voice', 'custom-tts-1', 1.25, 'mp3')]
++    assert registries.ensure == [False]
++
++
++# --- pre_transcription hooks: no discovery, and a registered ordinary hook is an unsupported native combination ------
++
++def register_hook(callback):
++    """Register an ordinary ``pre_transcription`` callback on the SERVED profile's plugin manager through the real
++    ``PluginContext.register_hook`` (no discovery involved). Returns the manager."""
++    from hermes_cli import plugins
++    from hermes_cli.plugins_manifest import PluginManifest
++    manager = plugins.get_plugin_manager()
++    plugins.PluginContext(PluginManifest(name='relay-hook-fixture'), manager).register_hook('pre_transcription', callback)
++    return manager
++
++
++@pytest.fixture
++def hook_calls(monkeypatch):
++    """``hook_calls(home=None)`` registers one ordinary callback (prompt/language/model overrides) for that profile."""
++    from hermes_cli import plugins
++    calls = []
++
++    def add(home=None):
++        if home is not None:
++            monkeypatch.setenv('HERMES_HOME', str(home))
++        monkeypatch.setattr(plugins.get_plugin_manager(), '_hooks', {})
++        return register_hook(lambda **kw: calls.append(kw) or {'prompt': 'HOOKED', 'language': 'de',
++                                                               'model': 'hook-model'})
++    add.calls = calls
++    return add
++
++
++def openai_stt():
++    return {'stt': {'provider': 'openai', 'cloud_trim_silence': False,
++                    'openai': {'api_key': 'sk-synthetic', 'model': 'whisper-1'}}}
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('route', ['custom-plugin', 'builtin-openai'])
++async def test_a_cold_plugin_registry_is_never_discovered_by_a_native_call(monkeypatch, clip, registries, no_fallback,
++                                                                          route):
++    from hermes_cli import plugins
++    assert plugins.get_plugin_manager()._discovered is False  # cold: a stock call would discover it now
++    if route == 'custom-plugin':
++        support.write_config(get_hermes_home(), stt_config())
++        register_stt(CustomSTT('one'))
++        script = [('ok', {'text': 'custom words'})]
++    else:
++        support.write_config(get_hermes_home(), openai_stt())
++        script = [('ok', {'text': 'custom words', 'json': False})]
++    wire = support.Wire(script)
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, support.Callbacks())
++    assert (result.state, result.transcript, result.provider) == ('transcribed', 'custom words', 'completed')
++    assert registries.none and wire.count == 1 and no_fallback == []
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('route', ['custom-plugin', 'builtin-openai'])
++async def test_a_registered_ordinary_hook_refuses_the_whole_native_call_unsent(monkeypatch, clip, registries,
++                                                                              no_fallback, hook_calls, route):
++    if route == 'custom-plugin':
++        support.write_config(get_hermes_home(), stt_config())
++        plugin = register_stt(CustomSTT('one'))
++    else:  # a built-in remote failure would normally reach the installed-only local fallback: not here
++        support.write_config(get_hermes_home(), openai_stt())
++        plugin = None
++    hook_calls()
++    cb = support.Callbacks()
++    wire = support.Wire()
++    with support.provider_wire(monkeypatch, wire):
++        result = await hear(clip, cb)
++    assert (result.state, result.transcript, result.source, result.provider) == ('unavailable', None, None, 'not_started')
++    assert hook_calls.calls == [] and wire.count == 0 and cb.before_send_calls == 0 and no_fallback == []
++    assert registries.none
++    if plugin is not None:
++        assert plugin.rec.native == [] and plugin.rec.legacy == [] and plugin.rec.available == 0
++
++
++@pytest.mark.asyncio
++async def test_a_hook_registered_for_one_profile_neither_runs_nor_refuses_for_another(monkeypatch, clip, tmp_path,
++                                                                                     registries, hook_calls):
++    homes = {label: tmp_path / f'profile-{label}' for label in 'AB'}
++    for label, home in homes.items():
++        support.write_config(home, {'stt': {'provider': NAME, NAME: {'model': f'model-{label}'}}})
++        register_stt(CustomSTT('one', label=label), scope=str(home))
++    hook_calls(homes['A'])
++    results = {}
++    for label in 'BA':
++        monkeypatch.setenv('HERMES_HOME', str(homes[label]))
++        wire = support.Wire([('ok', {'text': f'words {label}'})])
++        with support.provider_wire(monkeypatch, wire):
++            results[label] = ((await hear(clip, support.Callbacks())), wire.count)
++    assert (results['B'][0].state, results['B'][0].transcript, results['B'][1]) == ('transcribed', 'words B', 1)
++    assert (results['A'][0].state, results['A'][0].provider, results['A'][1]) == ('unavailable', 'not_started', 0)
++    assert hook_calls.calls == [] and registries.none
++
++
++def test_stock_dispatch_keeps_hook_discovery_invocation_and_overrides(monkeypatch, clip, registries, hook_calls):
++    from tools.transcription_tools import transcribe_audio
++    plugin = register_stt(CustomSTT('one'))
++    hook_calls()
++    monkeypatch.setattr('tools.transcription_tools._load_stt_config', lambda: stt_config()['stt'])
++    result = transcribe_audio(clip, None, 'gateway')
++    assert (result['success'], result['transcript']) == (True, 'legacy words')
++    assert plugin.rec.legacy == [(clip, 'hook-model', 'de', {'prompt': 'HOOKED'})] and plugin.rec.native == []
++    assert len(hook_calls.calls) == 1 and hook_calls.calls[0]['provider'] == NAME
++    assert registries.delivery and registries.ensure == [False]  # stock lazy discovery still runs, unchanged
 diff --git a/tests/gateway/test_native_voice_display.py b/tests/gateway/test_native_voice_display.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..885ebcba74591c415366feb8d6b2db5916538161
@@ -6449,6 +7205,85 @@ index 0000000000000000000000000000000000000000..9cd4424a272052020bcc6782b9b0baac
 +    with rest.oauth_wire(monkeypatch, oauth):
 +        credentials = resolve_xai_http_credentials(prefer_api_key=True)
 +    assert credentials['api_key'] == '' and 'synthetic oauth failure' in caplog.text  # stock still logs it
+diff --git a/tests/tools/native_command_fixtures/big_transcript.py b/tests/tools/native_command_fixtures/big_transcript.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..c9511ccadf1b2408be717f53521eb2d0c41bf79a
+--- /dev/null
++++ b/tests/tools/native_command_fixtures/big_transcript.py
+@@ -0,0 +1,7 @@
++"""Native runner fixture: writes COUNT (<= 1,000,000) bytes of 'x' to the transcript file OUT, then exits 0.
++Network-free; the only file written is OUT; no child process."""
++import sys
++
++out, count = sys.argv[1], min(int(sys.argv[2]), 1_000_000)
++with open(out, 'w', encoding='utf-8') as handle:
++    handle.write('x' * count)
+diff --git a/tests/tools/native_command_fixtures/flood.py b/tests/tools/native_command_fixtures/flood.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..43fecdc53f953cdf5507671e96fa2429908b27e4
+--- /dev/null
++++ b/tests/tools/native_command_fixtures/flood.py
+@@ -0,0 +1,11 @@
++"""Native runner fixture: writes COUNT (<= 1,000,000) bytes of 'x' to STREAM (stdout|stderr) in 8 KiB pieces, then
++exits 0. Network-free; no file writes; no child process."""
++import sys
++
++stream = {'stdout': sys.stdout, 'stderr': sys.stderr}[sys.argv[1]]
++count = min(int(sys.argv[2]), 1_000_000)
++while count > 0:
++    piece = min(count, 8192)
++    stream.write('x' * piece)
++    count -= piece
++stream.flush()
+diff --git a/tests/tools/native_command_fixtures/progress.py b/tests/tools/native_command_fixtures/progress.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..99b15d742fd55d1103e49fbccfd620ba8aa1b362
+--- /dev/null
++++ b/tests/tools/native_command_fixtures/progress.py
+@@ -0,0 +1,9 @@
++"""Native runner fixture: never idle. Prints a progress line to stderr every 0.1 s for at most SECONDS (<= 20) s, then
++exits 0 without output. Network-free; no file writes; no child process."""
++import sys
++import time
++
++seconds = min(int(sys.argv[1]), 20)
++for _ in range(seconds * 10):  # bounded: at most SECONDS s of output, one line per 0.1 s
++    print('progress', file=sys.stderr, flush=True)
++    time.sleep(0.1)  # health: allow HX013 -- the steady, never-idle output IS the behaviour under test
+diff --git a/tests/tools/native_command_fixtures/tree.py b/tests/tools/native_command_fixtures/tree.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..bb735af425875c59a4c57f7efd16bc9f94c9917b
+--- /dev/null
++++ b/tests/tools/native_command_fixtures/tree.py
+@@ -0,0 +1,28 @@
++"""Native runner fixture: a same-session process tree. ``tree.py PIDFILE stay|orphan``: starts one child copy of this
++interpreter in the SAME session and process group (no setsid), writes "PARENT CHILD" pids to PIDFILE, then either
++stays alive printing progress (stay) or exits at once leaving the child as an orphan that still holds the output
++pipe (orphan). The child prints progress for at most 20 s. Network-free; the only file written is PIDFILE."""
++import os
++import subprocess
++import sys
++import time
++
++
++def progress(seconds):
++    for _ in range(seconds * 10):  # bounded: at most SECONDS s of output, one line per 0.1 s
++        print('progress', flush=True)
++        time.sleep(0.1)  # health: allow HX013 -- the steady, never-idle output IS the behaviour under test
++
++
++if sys.argv[1] == '--child':
++    progress(20)
++    raise SystemExit(0)
++pidfile, mode = sys.argv[1], sys.argv[2]
++assert mode in ('stay', 'orphan')
++child = subprocess.Popen([sys.executable, os.path.abspath(__file__), '--child'], stdin=subprocess.DEVNULL)
++tmp = pidfile + '.tmp'
++with open(tmp, 'w', encoding='utf-8') as handle:
++    handle.write(f'{os.getpid()} {child.pid}')
++os.replace(tmp, pidfile)
++if mode == 'stay':
++    progress(20)
 diff --git a/tests/tools/test_mistral_stock_transport.py b/tests/tools/test_mistral_stock_transport.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..d71fd2d793a816adf175fd6c226b941427dd54b5
@@ -6547,6 +7382,138 @@ index 0000000000000000000000000000000000000000..d71fd2d793a816adf175fd6c226b9414
 +    assert not failed['success'] and wire.count == 1
 +    assert [r for r in caplog.records if r.name == 'tools.tts_tool' and r.levelno >= logging.ERROR]
 +    measured('stock_mistral_tts_redirect_and_5xx', followed_requests=2, failed_requests=wire.count)
+diff --git a/tests/tools/test_native_command_runner.py b/tests/tools/test_native_command_runner.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..473a2e0a4b0ec6e8700aea9aab4056d0d8db50f0
+--- /dev/null
++++ b/tests/tools/test_native_command_runner.py
+@@ -0,0 +1,126 @@
++"""Native-only bounds of the shared command runner, through the REAL ``run_command_provider`` (real ``/bin/sh``, real
++child interpreter, real pipes and process-tree cleanup).
++
++The children are the fixed, network-free fixture scripts in ``native_command_fixtures/`` (each with a hard maximum
++lifetime and bounded arguments). Inside a native call the absolute deadline and Stop end a run whatever its output,
++each stream and a transcript file are capped, and the whole same-session tree is gone afterwards. Outside one the
++stock runner is unchanged (the existing idle-timeout tests in ``test_transcription_tools.py`` keep covering it).
++
++Not covered, and not claimed: a descendant that calls ``setsid`` leaves the process group and is NOT reached by the
++group kill; containment of hostile commands needs the OS-level launcher that is not admitted yet.
++"""
++import os
++import shlex
++import sys
++import threading
++import time
++from pathlib import Path
++
++import pytest
++
++from tools import native_send_policy
++from tools.native_send_policy import NativeSendRefused, SendPolicy
++from tools.tts_command_provider import run_command_provider
++
++FIXTURES = Path(__file__).resolve().parent / 'native_command_fixtures'
++pytestmark = pytest.mark.skipif(os.name == 'nt', reason='POSIX process-group behaviour; Windows is a separate gate')
++
++
++def command(script, *args):
++    return shlex.join([sys.executable, str(FIXTURES / script), *map(str, args)])
++
++
++def native(deadline_s=30.0, cap=65536):
++    return SendPolicy(timeout_s=deadline_s, providers=frozenset(), max_output_bytes=cap,
++                      deadline=time.monotonic() + deadline_s)
++
++
++def gone(pid, within=5.0):
++    import psutil
++    end = time.monotonic() + within
++    while time.monotonic() < end:
++        try:
++            if psutil.Process(pid).status() == psutil.STATUS_ZOMBIE:
++                return True
++        except psutil.NoSuchProcess:
++            return True
++        time.sleep(0.05)
++    return False
++
++
++def pids(pidfile, within=10.0):
++    end = time.monotonic() + within
++    while time.monotonic() < end:
++        if pidfile.exists():
++            return [int(p) for p in pidfile.read_text().split()]
++        time.sleep(0.05)
++    raise AssertionError('the fixture never wrote its pids')
++
++
++def test_the_absolute_deadline_ends_a_never_idle_run():
++    policy = native(deadline_s=1.0)
++    started = time.monotonic()
++    with native_send_policy.activate(policy), pytest.raises(NativeSendRefused) as refused:
++        run_command_provider(command('progress.py', 20), timeout=5)  # never idle: the stock timeout cannot fire
++    assert refused.value.reason == 'timeout' and policy.refusal == 'timeout'
++    assert time.monotonic() - started < 6
++
++
++@pytest.mark.parametrize('mode', ['stay', 'orphan'])
++def test_stop_kills_the_whole_same_session_tree(tmp_path, mode):
++    """``orphan``: the fixture's own process exits at once, so the stock tree walk from the shell no longer sees the
++    child that still holds the pipe; the group kill does."""
++    policy, pidfile = native(), tmp_path / 'pids'
++    result = {}
++
++    def run():
++        try:
++            with native_send_policy.activate(policy):
++                run_command_provider(command('tree.py', pidfile, mode), timeout=10)
++        except NativeSendRefused as exc:
++            result['reason'] = exc.reason
++    worker = threading.Thread(target=run)
++    worker.start()
++    parent, child = pids(pidfile)
++    assert gone(child, within=0.3) is False  # it is really running before Stop
++    policy.close()
++    worker.join(10)
++    assert not worker.is_alive() and result == {'reason': 'closed'}
++    assert gone(parent) and gone(child)
++
++
++@pytest.mark.parametrize('stream', ['stdout', 'stderr'])
++def test_each_stream_is_capped_and_the_run_is_refused(stream):
++    policy = native(cap=65536)
++    with native_send_policy.activate(policy), pytest.raises(NativeSendRefused) as refused:
++        run_command_provider(command('flood.py', stream, 300000), timeout=10)
++    assert refused.value.reason == 'too_long' and policy.refusal == 'too_long'
++
++
++def test_stock_runner_keeps_uncapped_output_outside_a_native_call():
++    result = run_command_provider(command('flood.py', 'stdout', 300000), timeout=10)
++    assert result.returncode == 0 and len(result.stdout) == 300000
++
++
++def test_a_transcript_file_over_the_cap_is_refused_before_it_is_read(tmp_path, monkeypatch):
++    from tools.transcription_command import _transcribe_command_stt
++    audio = tmp_path / 'clip.wav'
++    audio.write_bytes(b'fixture audio')
++    reads = []
++    original = Path.read_text
++    monkeypatch.setattr(Path, 'read_text', lambda self, *a, **k: reads.append(self.name) or original(self, *a, **k))
++    policy = native(cap=65536)
++    config = {'command': command('big_transcript.py') + ' {output_path} 200000'}
++    with native_send_policy.activate(policy), pytest.raises(NativeSendRefused) as refused:
++        _transcribe_command_stt(str(audio), 'fixture-cli', config, {})
++    assert refused.value.reason == 'too_long' and 'transcript.txt' not in reads
++
++
++def test_a_transcript_file_within_the_cap_is_read_inside_a_native_call(tmp_path):
++    from tools.transcription_command import _transcribe_command_stt
++    audio = tmp_path / 'clip.wav'
++    audio.write_bytes(b'fixture audio')
++    config = {'command': command('big_transcript.py') + ' {output_path} 1000'}
++    with native_send_policy.activate(native(cap=65536)):
++        result = _transcribe_command_stt(str(audio), 'fixture-cli', config, {})
++    assert result == {'success': True, 'transcript': 'x' * 1000, 'provider': 'fixture-cli'}
 diff --git a/tests/tools/test_native_rest_stock_transport.py b/tests/tools/test_native_rest_stock_transport.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..a88d835f28eb1dd5f336628a2514963eda3334f8
@@ -6661,6 +7628,95 @@ index 0000000000000000000000000000000000000000..a88d835f28eb1dd5f336628a2514963e
 +    with rest.rest_wire(monkeypatch, wire), pytest.raises(RuntimeError, match=r'Gemini TTS API error \(HTTP 429\): quota'):
 +        generate('gemini', tmp_path)
 +    assert wire.count == 1 and not [name for name in os.listdir(tmp_path) if name.endswith('.mp3')]
+diff --git a/tests/tools/test_native_send_policy_unit.py b/tests/tools/test_native_send_policy_unit.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..32d4685aac0932c8598b7b4c007e8f7f6f50fdcf
+--- /dev/null
++++ b/tests/tools/test_native_send_policy_unit.py
+@@ -0,0 +1,83 @@
++"""Direct ``SendPolicy`` pins, with no consumer, seam or provider in between.
++
++N2: a credential-phase refusal CLOSES the policy, and that close is sticky on its own: a later ``begin()`` and a later
++probe are refused ``closed`` without asking the gate or the probe again, whatever the consumer would now answer.
++Also pins the per-call custom-route admission and the command bounds a native call imposes.
++"""
++import time
++
++import pytest
++
++from tools import native_send_policy
++from tools.native_send_policy import NativeSendRefused, SendPolicy
++
++
++def _policy(**kw):
++    return SendPolicy(timeout_s=5.0, providers=frozenset({'openai'}), **kw)
++
++
++@pytest.mark.parametrize('reason', ['refused', 'cancelled', 'timeout', 'closed'])
++def test_a_probe_refusal_closes_the_policy_and_every_later_send_or_probe_is_refused_closed(reason):
++    policy = _policy()
++    gate_calls, probe_calls = [], []
++
++    def probe():
++        probe_calls.append(1)
++        if len(probe_calls) == 1:
++            raise NativeSendRefused(reason)
++    policy.set_gate(lambda: gate_calls.append(1))
++    policy.set_credential_probe(probe)
++
++    with pytest.raises(NativeSendRefused) as first:
++        policy.probe_credentials()
++    assert first.value.reason == reason
++    assert policy.closed is True and policy.refusal == reason
++
++    with pytest.raises(NativeSendRefused) as send:
++        policy.begin()
++    with pytest.raises(NativeSendRefused) as again:
++        policy.probe_credentials()
++    assert (send.value.reason, again.value.reason) == ('closed', 'closed')
++    assert gate_calls == [] and probe_calls == [1]  # the consumer is never asked again
++    assert policy.sends == 0 and policy.refusal == reason  # the first truthful reason is kept
++
++
++def test_the_credential_hook_converts_the_sticky_refusal_to_a_phase_stop():
++    policy = _policy()
++    policy.set_credential_probe(lambda: (_ for _ in ()).throw(NativeSendRefused('refused')))
++    with pytest.raises(native_send_policy.CredentialPhaseStopped):
++        policy.on_credential_request(None)
++    with pytest.raises(native_send_policy.CredentialPhaseStopped) as later:
++        policy.on_credential_request(None)
++    assert later.value.reason == 'closed'
++
++
++def test_admit_custom_adds_exactly_one_route_for_this_call_only():
++    policy, other = _policy(), _policy()
++    with pytest.raises(NativeSendRefused):
++        policy.require_provider('my-plugin')
++    policy.admit_custom('my-plugin')
++    policy.require_provider('my-plugin')
++    policy.require_provider('openai')
++    assert policy.custom == 'my-plugin' and policy.providers == frozenset({'openai'})
++    with pytest.raises(NativeSendRefused) as second:
++        policy.admit_custom('another-plugin')
++    assert second.value.reason == 'unsupported'
++    with pytest.raises(NativeSendRefused):
++        other.require_provider('my-plugin')  # never a global admission
++
++
++def test_command_bounds_exist_only_inside_a_native_call_with_a_deadline_and_a_cap():
++    assert native_send_policy.command_bounds() is None
++    deadline = time.monotonic() + 3
++    policy = _policy(max_output_bytes=4096, deadline=deadline)
++    with native_send_policy.activate(policy):
++        bounds = native_send_policy.command_bounds()
++    assert (bounds.deadline_monotonic, bounds.max_stream_bytes, bounds.argv_prefix) == (deadline, 4096, ())
++    assert bounds.closed() is False
++    policy.close()
++    assert bounds.closed() is True
++    for missing in (dict(max_output_bytes=4096), dict(deadline=deadline)):
++        with native_send_policy.activate(_policy(**missing)), pytest.raises(NativeSendRefused) as refused:
++            native_send_policy.command_bounds()
++        assert refused.value.reason == 'unsupported'
 diff --git a/tests/tools/test_native_voice_stock_transport.py b/tests/tools/test_native_voice_stock_transport.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..5ff5c62f947ca0aba0872f5934717bef0a40443c
@@ -6826,10 +7882,10 @@ index 0000000000000000000000000000000000000000..5ff5c62f947ca0aba0872f5934717bef
 +    measured('stock_tts_edge_403_then_ok', handshakes=boundary.handshakes)
 diff --git a/tools/native_send_policy.py b/tools/native_send_policy.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..728f1fc1ad33bf9cab78569e85e61f6104b8c1b1
+index 0000000000000000000000000000000000000000..cbb292af7c459f53d03107708cb9f57ce24d02bf
 --- /dev/null
 +++ b/tools/native_send_policy.py
-@@ -0,0 +1,470 @@
+@@ -0,0 +1,538 @@
 +"""One-send transport policy for a native (Relay) voice call.
 +
 +``gateway.session_native_voice`` activates a :class:`SendPolicy` around exactly one configured
@@ -6849,6 +7905,7 @@ index 0000000000000000000000000000000000000000..728f1fc1ad33bf9cab78569e85e61f61
 +
 +import contextlib
 +import contextvars
++from dataclasses import dataclass
 +import inspect
 +import logging
 +import threading
@@ -6882,14 +7939,18 @@ index 0000000000000000000000000000000000000000..728f1fc1ad33bf9cab78569e85e61f61
 +
 +    ``gate`` (set once, before the worker starts) runs the caller's ``authorize`` + ``before_send`` on the
 +    owning event loop and raises :class:`NativeSendRefused` to refuse; it calls :meth:`commit` once the
-+    consumer's ``before_send`` returned. ``providers`` is the closed set of provider names the call may reach.
++    consumer's ``before_send`` returned. ``providers`` is the closed set of provider names the call may reach; one held
++    custom route may be added for this call only (:meth:`admit_custom`). ``deadline`` is the call's absolute
++    ``time.monotonic()`` bound when the caller has one.
 +    """
 +
 +    def __init__(self, *, timeout_s: float, providers: frozenset[str], gate: Optional[Callable[[], None]] = None,
-+                 max_output_bytes: Optional[int] = None):
++                 max_output_bytes: Optional[int] = None, deadline: Optional[float] = None):
 +        self.timeout_s = timeout_s
 +        self.providers = providers
 +        self.max_output_bytes = max_output_bytes
++        self.deadline = deadline
++        self._custom: Optional[str] = None
 +        self._gate = gate
 +        self._credential_probe: Optional[Callable[[], None]] = None
 +        self._lock = threading.Lock()
@@ -7008,8 +8069,22 @@ index 0000000000000000000000000000000000000000..728f1fc1ad33bf9cab78569e85e61f61
 +        except NativeSendRefused as exc:
 +            raise CredentialPhaseStopped(exc.reason) from None
 +
++    def admit_custom(self, name: str) -> None:
++        """Admit exactly one custom route, already selected through the stock precedence and checked capable on the
++        held instance, into THIS call's provider set. It certifies nothing by itself (the send gate still counts and
++        refuses at the transport); it never touches a registry and a second, different name is refused."""
++        with self._lock:
++            if self._custom is not None and self._custom != name:
++                raise self._refusal_locked('unsupported')
++            self._custom = name
++
++    @property
++    def custom(self) -> Optional[str]:
++        """The custom route admitted for this call, or None."""
++        return self._custom
++
 +    def require_provider(self, provider: str) -> None:
-+        if provider not in self.providers:
++        if provider not in self.providers and (self._custom is None or provider != self._custom):
 +            raise self.refusal_for('unsupported')
 +
 +    def track(self, client: Any) -> Any:
@@ -7046,11 +8121,13 @@ index 0000000000000000000000000000000000000000..728f1fc1ad33bf9cab78569e85e61f61
 +        return _current.get() is None
 +
 +
-+# Python applies a logger's filters only to records created on THAT logger, so the loggers below are named exactly and
-+# these are the ones covered by tests: the stock STT/TTS helpers, the credential pool (an OAuth refresh failure logs the
-+# authority's response body) and three Mistral SDK hook loggers (the deprecation WARNING carries a provider-supplied date).
-+# NOT covered: the pinned SDK's other loggers, e.g. ``mistralai.extra.observability.otel``/``.telemetry`` (WARNINGs with
-+# tracebacks when SDK tracing and a global tracer are active); that belongs to the global-OpenTelemetry condition (M1/CV2).
++# Python applies a logger's filters only to records created on THAT logger, so the loggers below are named exactly.
++# Behaviourally tested: the stock STT/TTS helpers (``tools.transcription_tools``, ``tools.tts_tool``), the credential pool
++# (an OAuth refresh failure logs the authority's response body) and ``mistralai.client._hooks.deprecation_warning`` (its
++# WARNING carries a provider-supplied date). Installed but NOT exercised by any test: ``mistralai.client``,
++# ``mistralai.client._hooks.tracing`` and ``mistralai.client._hooks.workflow_encoding_hook``. Not filtered at all: the
++# pinned SDK's other loggers, e.g. ``mistralai.extra.observability.otel``/``.telemetry`` (WARNINGs with tracebacks when SDK
++# tracing and a global tracer are active); that belongs to the global-OpenTelemetry condition (M1/CV2).
 +_QUIET_LOGGERS = (
 +    'tools.transcription_tools', 'tools.tts_tool', 'agent.credential_pool', 'mistralai.client',
 +    'mistralai.client._hooks.deprecation_warning', 'mistralai.client._hooks.tracing',
@@ -7144,6 +8221,37 @@ index 0000000000000000000000000000000000000000..728f1fc1ad33bf9cab78569e85e61f61
 +        policy.require_provider(provider)
 +
 +
++def admit_custom(name: str) -> None:
++    """Inside a native call: admit the one held custom route (see :meth:`SendPolicy.admit_custom`)."""
++    policy = _current.get()
++    if policy is not None:
++        policy.admit_custom(name)
++
++
++@dataclass(frozen=True, slots=True)
++class CommandBounds:
++    """What a native call imposes on a command child it spawns, on top of the stock idle timeout.
++
++    ``argv_prefix`` is reserved for a verified OS network-deny launcher; none is admitted yet, so it is always empty
++    and the runner refuses a non-empty one. Bounds are NOT containment: the child is the operator's own code."""
++    deadline_monotonic: float  # absolute; whichever of this and the stock idle timeout comes first ends the run
++    max_stream_bytes: int  # per stream (stdout, stderr) and for a transcript file; chunk-granular (64 KiB reads)
++    closed: Callable[[], bool]  # cancellation: Stop or the deadline closed the policy
++    argv_prefix: tuple[str, ...] = ()
++
++
++def command_bounds() -> Optional[CommandBounds]:
++    """Inside a native call: the bounds for a command child (refused UNSENT when the call has no deadline or output
++    cap to impose). Outside one: None, and the stock runner is byte-for-byte unchanged."""
++    policy = _current.get()
++    if policy is None:
++        return None
++    if policy.deadline is None or policy.max_output_bytes is None:
++        raise policy.refusal_for('unsupported')
++    return CommandBounds(deadline_monotonic=policy.deadline, max_stream_bytes=policy.max_output_bytes,
++                         closed=policy.is_closed)
++
++
 +def request_timeout(default: float) -> float:
 +    policy = _current.get()
 +    return default if policy is None else min(default, policy.timeout_s)
@@ -7208,6 +8316,22 @@ index 0000000000000000000000000000000000000000..728f1fc1ad33bf9cab78569e85e61f61
 +    http_client = policy.track(httpx.Client(timeout=policy.timeout_s, follow_redirects=False,
 +                                            event_hooks={'request': [policy.on_request]}))
 +    return {'timeout': policy.timeout_s, 'httpx_client': http_client}
++
++
++def native_transport():
++    """The :class:`agent.native_once.NativeTransport` handed to an opted-in plugin: a plain httpx client (httpx's
++    default transport makes no automatic retry) with redirects disabled, the call's timeout, the send gate on every
++    request and the decoded-size bound on every answer. Tracked, so the seam closes it whatever the plugin did."""
++    policy = _current.get()
++    if policy is None or policy.max_output_bytes is None:
++        raise refuse('unsupported')
++    import httpx
++    from agent.native_once import NativeTransport
++    client = policy.track(httpx.Client(timeout=policy.timeout_s, follow_redirects=False,
++                                       event_hooks={'request': [policy.on_request],
++                                                    'response': [_bounded_answer(policy.max_output_bytes)]},
++                                       headers={'Accept-Encoding': 'identity'}))
++    return NativeTransport(client=client)
 +
 +
 +def elevenlabs_request_options() -> Optional[dict]:
@@ -7427,6 +8551,140 @@ index b54514ae29fc3e63a2c46dc783411f7ddc586daa..c3adaf1db23f4d59a62ff55387bfe2b0
      model_name = model_name or next(iter(deepinfra_model_ids("stt")), None)
      if not model_name:
          return _error_result(
+diff --git a/tools/transcription_command.py b/tools/transcription_command.py
+index 868d8ac833c4269123b7cea07f5241687fdd04b6..901f77dc269d712bc28bd99253f1d4e28ba75059 100644
+--- a/tools/transcription_command.py
++++ b/tools/transcription_command.py
+@@ -9,6 +9,8 @@ is read lazily from ``tools.transcription_tools``.
+ from __future__ import annotations
+ 
+ import logging
++import os
++import stat
+ import subprocess
+ import tempfile
+ from functools import partial
+@@ -16,6 +18,7 @@ from pathlib import Path
+ from typing import Any, Dict, Optional
+ 
+ from agent.model_metadata import CHARS_PER_TOKEN
++from tools import native_send_policy
+ from tools.tts_command_provider import (
+     _command_output_format, _command_timeout, _is_command_provider_config as _is_command_stt_provider_config,
+     _named_provider_config, _resolve_command_config, command_env_passthrough as _command_stt_env_passthrough,
+@@ -59,7 +62,15 @@ _get_command_stt_output_format = partial(_command_output_format, formats=COMMAND
+ 
+ 
+ def _read_command_stt_output(output_path: Path, stdout: str, fmt: str) -> str:
+-    """Transcript: non-empty output file > non-empty stdout (curl one-liners) > RuntimeError. JSON is returned raw."""
++    """Transcript: non-empty output file > non-empty stdout (curl one-liners) > RuntimeError. JSON is returned raw.
++    Inside a native call the file must be a regular file within the call's output cap BEFORE it is read."""
++    bounds = native_send_policy.command_bounds()
++    if bounds is not None and output_path.exists():
++        info = os.lstat(output_path)
++        if not stat.S_ISREG(info.st_mode):
++            raise RuntimeError(f"Command STT provider output at {output_path} is not a regular file")
++        if info.st_size > bounds.max_stream_bytes:
++            raise native_send_policy.refuse('too_long')
+     content = (output_path.read_text(encoding="utf-8-sig", errors="replace").strip()
+                if output_path.exists() else "")
+     if content or (stdout or "").strip():
+@@ -125,6 +136,8 @@ def _transcribe_command_stt(
+             logger.info("Transcribing %s via command STT provider '%s'...", audio.name, provider_name)
+             result = _run_command_stt(command, timeout, env_passthrough=_command_stt_env_passthrough(config))
+             transcript_text = _read_command_stt_output(output_path, result.stdout or "", output_format)
++    except native_send_policy.NativeSendRefused:
++        raise  # a native bound or Stop: the policy recorded why; never flattened into a provider error
+     except subprocess.TimeoutExpired:
+         return fail(f"STT command provider '{provider_name}' timed out after {timeout:g}s")
+     except subprocess.CalledProcessError as exc:
+@@ -211,6 +224,52 @@ def _dispatch_to_plugin_provider(
+     return result
+ 
+ 
++def _dispatch_native_plugin_provider(
++    file_path: str, provider: str, *, model: Optional[str], language: Optional[str], prompt: Optional[str],
++) -> dict[str, Any]:
++    """Native (Relay) call only: the plugin route, reached after the stock precedence (built-in > command) chose it.
++
++    ONE scoped registry lookup, no plugin discovery or forced reload; the held instance is checked statically for the
++    ``transcribe_native_once_v1`` opt-in BEFORE any of its code runs (``is_available`` is never called) and the same
++    instance is called. Not opted in, or not registered for the served profile: refused unsent (``unsupported``).
++    The single request must leave through the seam's gated ``NativeTransport``; the seam accounts the result from the
++    gate's count, never from what the plugin says. Returns the stock envelope (no provider text)."""
++    from agent.native_once import (NativeOnceLimits, NativeSttAnswer, NativeSttRequest, native_once_impl,
++                                   overrides_native_once)
++    from agent.transcription_provider import TranscriptionProvider
++    from agent.transcription_registry import get_provider
++    key = (provider or "").lower().strip()
++    policy = native_send_policy.current()
++    if policy is None or policy.deadline is None or policy.max_output_bytes is None:
++        raise native_send_policy.refuse('unsupported')
++    plugin = get_provider(key)
++    if plugin is None or not overrides_native_once(plugin, TranscriptionProvider, 'transcribe_native_once_v1'):
++        raise native_send_policy.refuse('unsupported')
++    native_send_policy.admit_custom(key)
++    native_send_policy.require_provider(key)
++    transport = native_send_policy.native_transport()
++    request = NativeSttRequest(
++        file_path=file_path, model=model, language=language, prompt=prompt,
++        limits=NativeOnceLimits(deadline_monotonic=policy.deadline, request_timeout_s=policy.timeout_s,
++                                max_output_bytes=policy.max_output_bytes),
++        cancelled=policy.is_closed)
++    native_send_policy.mark_entered()
++    try:
++        answer = native_once_impl(plugin, 'transcribe_native_once_v1')(plugin, request, transport)
++    except native_send_policy.NativeSendRefused:
++        raise
++    except Exception:  # health: allow BLE001 -- third-party plugin; its text must not leave, the gate count decides
++        return _error_result('failed', provider=key)
++    finally:
++        transport.client.close()
++    status = answer.status if isinstance(answer, NativeSttAnswer) else None
++    if status == 'ok' and isinstance(answer.transcript, str):
++        return _ok_result(answer.transcript, key)
++    if status == 'no_speech':
++        return {"success": False, "transcript": "", "no_speech": True, "provider": key}
++    return _error_result('failed', provider=key)
++
++
+ # Fields a pre_transcription hook may mutate; ``file_path`` is read-only (logged and dropped).
+ # --------------------------------------------------------------------------- pre_transcription plugin hook
+ # (issue #64168 — STT prompt/vocab threading)
+@@ -238,6 +297,17 @@ def _enforce_prompt_length_limit(prompt: Optional[str], provider: str) -> Option
+     return prompt[-max_chars:]
+ 
+ 
++def _native_pre_transcription_hooks_registered() -> bool:
++    """Native call only: whether ordinary ``pre_transcription`` callbacks are registered for the served profile, read
++    from the existing scoped snapshot (``hermes_cli.plugins.iter_hook_callbacks``) WITHOUT discovery, so cold plugins
++    stay unloaded. Such callbacks have no native-once capability contract. Any failure to read it fails closed."""
++    try:
++        from hermes_cli.plugins import iter_hook_callbacks
++        return bool(iter_hook_callbacks("pre_transcription"))
++    except Exception:  # health: allow BLE001 -- fail closed: an unreadable snapshot is treated as a registered hook
++        return True
++
++
+ def _apply_pre_transcription_hook(
+     *, file_path: str, provider: str, model: Optional[str], language: Optional[str],
+     prompt: Optional[str], source: Optional[str],
+@@ -246,7 +316,14 @@ def _apply_pre_transcription_hook(
+     Gated on ``has_hook`` (the no-hook path never builds kwargs) and fail-open: any plumbing error
+     leaves the dispatch untouched. Results apply field-by-field in registration order (last hook
+     wins). ``language_override`` is None unless a hook explicitly set ``language``, so backends keep
+-    their own config/env resolution."""
++    their own config/env resolution.
++
++    Inside a native call: no discovery and no callback. With no registered callback the static resolution is used
++    unchanged; a registered one refuses the whole call unsent (``unsupported_hook``) rather than being skipped."""
++    if native_send_policy.current() is not None:
++        if _native_pre_transcription_hooks_registered():
++            raise native_send_policy.refuse('unsupported_hook')
++        return model, None, prompt
+     try:
+         from hermes_cli.plugins import has_hook, invoke_hook
+         if not has_hook("pre_transcription"):
 diff --git a/tools/transcription_local.py b/tools/transcription_local.py
 index 3a4a7610fdc392af6c0b6ebfbeedd56d10ed6cf6..d25fedb38c5ed283adf8341027a9a9b0c4e69408 100644
 --- a/tools/transcription_local.py
@@ -7450,7 +8708,7 @@ index 3a4a7610fdc392af6c0b6ebfbeedd56d10ed6cf6..d25fedb38c5ed283adf8341027a9a9b0
  
      # huggingface_hub surfaces every Hub/network failure as an OSError subclass
 diff --git a/tools/transcription_tools.py b/tools/transcription_tools.py
-index 072eed5f03a0ea2eba2deec36fbf4e13526144d2..46e62e5e6b481dfc136799d2200f0b7361fedba1 100644
+index 072eed5f03a0ea2eba2deec36fbf4e13526144d2..ea7aa363f470e00ac2d4f6cb8cf76ab4cc80ca96 100644
 --- a/tools/transcription_tools.py
 +++ b/tools/transcription_tools.py
 @@ -22,6 +22,7 @@ from tempfile import TemporaryDirectory
@@ -7461,15 +8719,34 @@ index 072eed5f03a0ea2eba2deec36fbf4e13526144d2..46e62e5e6b481dfc136799d2200f0b73
  from tools.transcription_common import (
      BUILTIN_STT_PROVIDERS, CLOUD_STT_PROVIDERS, DEFAULT_ELEVENLABS_STT_MODEL,
      DEFAULT_GROQ_STT_MODEL, DEFAULT_LOCAL_MODEL, DEFAULT_MISTRAL_STT_MODEL, DEFAULT_PROVIDER,
-@@ -522,6 +523,7 @@ def _dispatch_stt_provider(
+@@ -42,8 +43,9 @@ from tools.transcription_cloud import (
+     _transcribe_elevenlabs, _transcribe_groq, _transcribe_mistral, _transcribe_openai,
+     _transcribe_xai)
+ from tools.transcription_command import (
+-    _apply_pre_transcription_hook, _dispatch_to_plugin_provider, _enforce_prompt_length_limit,
+-    _resolve_command_stt_provider_config, _transcribe_command_stt, _unregistered_stt_provider_error)
++    _apply_pre_transcription_hook, _dispatch_native_plugin_provider, _dispatch_to_plugin_provider,
++    _enforce_prompt_length_limit, _resolve_command_stt_provider_config, _transcribe_command_stt,
++    _unregistered_stt_provider_error)
+ 
+ logger = logging.getLogger(__name__)
+ 
+@@ -522,6 +524,14 @@ def _dispatch_stt_provider(
  def _route_stt_provider(
      file_path: str, provider: str, stt_config: dict[str, Any], model: Optional[str],
      language: Optional[str], prompt: Optional[str]) -> dict[str, Any]:
++    if (native_send_policy.current() is not None and provider not in BUILTIN_STT_PROVIDERS and provider != "none"
++            and _resolve_command_stt_provider_config(provider, stt_config) is None):
++        # Native call, plugin route (the stock precedence already passed built-ins and commands): only an opted-in,
++        # held plugin instance, through the gated transport; anything else is refused unsent.
++        return _dispatch_native_plugin_provider(
++            file_path, provider, model=model or _get_stt_section(stt_config, provider).get("model"),
++            language=language or _resolve_stt_language(provider, stt_config), prompt=prompt)
 +    native_send_policy.require_provider(provider)  # a native call reaches only providers it can hold to one send
      if provider in BUILTIN_STT_PROVIDERS:
          # Looked up in this module at call time so tests may patch ``_transcribe_*``.
          handler = globals()[f"_transcribe_{provider}"]
-@@ -597,6 +599,6 @@ def transcribe_audio_local_fallback(file_path: str, model: Optional[str] = None)
+@@ -597,6 +607,6 @@ def transcribe_audio_local_fallback(file_path: str, model: Optional[str] = None)
      local_model = model or (_load_stt_config().get("local") or {}).get("model", DEFAULT_LOCAL_MODEL)
      if _HAS_FASTER_WHISPER:
          return _transcribe_local(file_path, _normalize_local_model(local_model))
@@ -7477,6 +8754,186 @@ index 072eed5f03a0ea2eba2deec36fbf4e13526144d2..46e62e5e6b481dfc136799d2200f0b73
 +    if _has_local_command() and native_send_policy.installs_allowed():  # a native call never runs a user command
          return _transcribe_local_command(file_path, _normalize_local_model(local_model))
      return _error_result("No installed local STT backend is available.", provider="local")
+diff --git a/tools/tts_command_provider.py b/tools/tts_command_provider.py
+index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..be7db332482aac20ca37d86e5215933745bd26ca 100644
+--- a/tools/tts_command_provider.py
++++ b/tools/tts_command_provider.py
+@@ -11,10 +11,12 @@ process runner and the generic ``<section>.providers.<name>`` readers, re-import
+ 
+ from __future__ import annotations
+ 
++import contextlib
+ import os
+ import queue
+ import re
+ import shlex
++import signal
+ import subprocess
+ import tempfile
+ import threading
+@@ -23,6 +25,7 @@ from functools import partial
+ from pathlib import Path
+ from typing import Any, Dict, FrozenSet, Optional
+ 
++from tools import native_send_policy
+ from utils import is_truthy_value
+ 
+ 
+@@ -155,13 +158,100 @@ def provider_popen_group_kwargs(os_name: str) -> dict[str, Any]:
+     return {"start_new_session": True}
+ 
+ 
++def _native_stop(bounds: native_send_policy.CommandBounds) -> Optional[str]:
++    """The refusal that ends a native run now (Stop/close, or the absolute deadline), else None."""
++    if bounds.closed():
++        return 'closed'
++    return 'timeout' if time.monotonic() >= bounds.deadline_monotonic else None
++
++
++def _end_native_run(proc: subprocess.Popen) -> None:
++    """Stop a native run: the stock tree termination, then (POSIX) SIGKILL to the child's whole process group so a
++    same-session descendant whose parent already exited is not left running. A descendant that called ``setsid``
++    left the group and is NOT reached by this."""
++    terminate_command_process_tree(proc)
++    if os.name != "nt":
++        with contextlib.suppress(ProcessLookupError, PermissionError):
++            os.killpg(proc.pid, signal.SIGKILL)
++    with contextlib.suppress(subprocess.TimeoutExpired):
++        proc.wait(timeout=2)
++
++
++def _close_command_pipes(proc: subprocess.Popen, readers: list) -> None:
++    """Close the child's stdout/stderr pipe objects once their reader threads are done (never under a live
++    reader). Without this every run leaked two open file objects (``ResourceWarning: unclosed file``)."""
++    for reader in readers:
++        reader.join(timeout=2)
++    for reader, stream in zip(readers, (proc.stdout, proc.stderr)):
++        close = getattr(stream, "close", None)
++        if callable(close) and not reader.is_alive():
++            with contextlib.suppress(OSError, ValueError):
++                close()
++
++
++def _pump_command_output(output_queue: queue.Queue, chunks: dict[str, list[str]], timeout: float,
++                         bounds: Optional[native_send_policy.CommandBounds]) -> tuple[float, bool, Optional[str]]:
++    """Collect both streams until they close, the IDLE ``timeout`` passes (reset by output) or, inside a native call
++    only, Stop/the absolute deadline/a stream cap ends the run. Returns ``(idle deadline, timed_out, refusal)``."""
++    open_streams = {"stdout", "stderr"}
++    kept = {"stdout": 0, "stderr": 0}
++    deadline = time.monotonic() + timeout
++    while open_streams:
++        if bounds is not None and (refusal := _native_stop(bounds)):
++            return deadline, False, refusal
++        remaining = deadline - time.monotonic()
++        if remaining <= 0:
++            return deadline, True, None
++        try:
++            name, chunk = output_queue.get(timeout=min(0.05, remaining))
++        except queue.Empty:
++            continue
++        if chunk is None:
++            open_streams.discard(name)
++            continue
++        if bounds is not None:
++            kept[name] += len(chunk.encode("utf-8", errors="surrogatepass"))
++            if kept[name] > bounds.max_stream_bytes:
++                return deadline, False, 'too_long'
++        chunks[name].append(chunk)
++        deadline = time.monotonic() + timeout
++    return deadline, False, None
++
++
++def _await_command_exit(proc: subprocess.Popen, deadline: float,
++                        bounds: Optional[native_send_policy.CommandBounds]) -> tuple[bool, Optional[str]]:
++    """Wait for the child to exit after its streams closed: ``(timed_out, refusal)``. Stock: one ``wait`` up to the
++    idle deadline. Native: polled so Stop and the absolute deadline still end it."""
++    if bounds is None:
++        try:
++            proc.wait(timeout=max(0.0, deadline - time.monotonic()))
++        except subprocess.TimeoutExpired:
++            return True, None
++        return False, None
++    while proc.poll() is None:
++        if refusal := _native_stop(bounds):
++            return False, refusal
++        if time.monotonic() >= deadline:
++            return True, None
++        time.sleep(0.05)
++    return False, None
++
++
+ def run_command_provider(
+     command: str, timeout: float, env_passthrough: Optional[list] = None,
+ ) -> subprocess.CompletedProcess:
+     """Run a command-provider shell command with process-tree idle cleanup.
+     ``timeout`` is an IDLE timeout, reset whenever the command emits output — a slow-but-alive
+     provider survives, a silently stalled one is killed. Child env is scrubbed of Hermes secrets
+-    while propagating delegated-child lineage markers."""
++    while propagating delegated-child lineage markers.
++
++    Inside a native call (only) the run is additionally bounded by :func:`native_send_policy.command_bounds`: the
++    absolute deadline and Stop end it whatever the output, each stream is capped, and any of these kills the tree and
++    raises :class:`native_send_policy.NativeSendRefused` (``timeout``/``closed``/``too_long``). Outside one, nothing
++    here changes."""
++    bounds = native_send_policy.command_bounds()
++    if bounds is not None and bounds.argv_prefix:
++        raise native_send_policy.refuse('unsupported')  # no OS network-deny launcher is admitted yet
+     from agent.delegation_context import delegated_child_subprocess_env
+     from tools.env_passthrough import resolve_passthrough_value
+     from tools.environments.local import hermes_subprocess_env
+@@ -182,7 +272,6 @@ def run_command_provider(
+                             stdin=subprocess.DEVNULL, **group)
+     output_queue: queue.Queue[tuple[str, Optional[str]]] = queue.Queue()
+     chunks: dict[str, list[str]] = {"stdout": [], "stderr": []}
+-    open_streams = {"stdout", "stderr"}
+ 
+     def read_stream(name: str, stream: Any) -> None:
+         encoding = getattr(stream, "encoding", None) or "utf-8"
+@@ -200,27 +289,15 @@ def run_command_provider(
+                for name, stream in (("stdout", proc.stdout), ("stderr", proc.stderr))]
+     for reader in readers:
+         reader.start()
+-    deadline = time.monotonic() + timeout
+-    timed_out = False
+-    while open_streams:
+-        remaining = deadline - time.monotonic()
+-        if remaining <= 0:
+-            timed_out = True
+-            break
+-        try:
+-            name, chunk = output_queue.get(timeout=min(0.05, remaining))
+-        except queue.Empty:
+-            continue
+-        if chunk is None:
+-            open_streams.discard(name)
+-            continue
+-        chunks[name].append(chunk)
+-        deadline = time.monotonic() + timeout
+-    if not timed_out:
+-        try:
+-            proc.wait(timeout=max(0.0, deadline - time.monotonic()))
+-        except subprocess.TimeoutExpired:
+-            timed_out = True
++    deadline, timed_out, refusal = _pump_command_output(output_queue, chunks, timeout, bounds)
++    if refusal is None and not timed_out:
++        timed_out, refusal = _await_command_exit(proc, deadline, bounds)
++    if refusal is not None:
++        _end_native_run(proc)
++        _close_command_pipes(proc, readers)
++        raise native_send_policy.refuse(refusal)
++    if bounds is not None and timed_out:
++        _end_native_run(proc)  # the stock idle timeout inside a native call also reaches the whole group
+     if timed_out:
+         terminate_command_process_tree(proc)
+         for reader in readers:
+@@ -230,6 +307,7 @@ def run_command_provider(
+             if chunk:
+                 chunks[name].append(chunk)
+     stdout, stderr = "".join(chunks["stdout"]), "".join(chunks["stderr"])
++    _close_command_pipes(proc, readers)
+     if timed_out:
+         raise subprocess.TimeoutExpired(command, timeout, output=stdout, stderr=stderr) from (
+             subprocess.TimeoutExpired(command, timeout))
 diff --git a/tools/tts_tool.py b/tools/tts_tool.py
 index b60cdf372f35761b70ea6ed686579335f4d013b1..42622a269a8777b80840d342ca4571d704d6cd3a 100644
 --- a/tools/tts_tool.py
@@ -7567,6 +9024,60 @@ index aa10ff3607bcf460f3585c9e5e0e11d7bc55348f..407445daecc1dd237bd360b57ba7953f
          candidates = deepinfra_model_ids("tts")
          if not candidates:
              raise ValueError(
+diff --git a/tools/tts_tool_plugins.py b/tools/tts_tool_plugins.py
+index 8dee4a9d8ad03e80c5eba6310003d552c3eed0f7..93c39a19e8dd67c2824e1361eaa7bfa1c466f1bd 100644
+--- a/tools/tts_tool_plugins.py
++++ b/tools/tts_tool_plugins.py
+@@ -130,3 +130,49 @@ def _plugin_provider_is_available(provider: str) -> bool:
+         return bool(plugin and plugin.is_available())
+     except Exception:
+         return False
++
++
++def _native_plugin_route(provider: str, tts_config: dict[str, Any]) -> Optional[tuple[str, Any]]:
++    """Native (Relay) call only: ``(key, held instance)`` when the configured name is a plugin route, else None.
++
++    Same precedence as :func:`_dispatch_to_plugin_provider` (built-ins, ``nous`` and a same-named ``type: command``
++    entry never reach the registry), but ONE scoped lookup with no discovery or forced reload, and the instance is
++    checked statically for the ``synthesize_native_once_v1`` opt-in before any of its code runs. A plugin route that
++    is not registered or not opted in raises the policy's ``unsupported`` refusal (unsent)."""
++    from agent.native_once import overrides_native_once
++    from agent.tts_provider import TTSProvider
++    from agent.tts_registry import get_provider
++    from tools import native_send_policy
++    key = _plugin_route_key(provider, tts_config)
++    if key is None:
++        return None
++    plugin = get_provider(key)
++    if plugin is None or not overrides_native_once(plugin, TTSProvider, 'synthesize_native_once_v1'):
++        raise native_send_policy.refuse('unsupported')
++    native_send_policy.admit_custom(key)
++    return key, plugin
++
++
++def _synthesize_native_plugin(route: tuple[str, Any], text: str, output_path: str, tts_config: dict[str, Any]) -> None:
++    """Native call only: one chunk through the held, opted-in instance and the seam's gated transport. Raises on any
++    non-``ok`` answer; the seam accounts the outcome from the gate's count, never from the plugin's word."""
++    from agent.native_once import NativeOnceLimits, NativeTtsAnswer, NativeTtsRequest, native_once_impl
++    from tools import native_send_policy
++    key, plugin = route
++    policy = native_send_policy.current()
++    if policy is None or policy.deadline is None or policy.max_output_bytes is None:
++        raise native_send_policy.refuse('unsupported')
++    native_send_policy.require_provider(key)
++    transport = native_send_policy.native_transport()
++    request = NativeTtsRequest(
++        text=text, output_path=output_path, format='mp3',
++        limits=NativeOnceLimits(deadline_monotonic=policy.deadline, request_timeout_s=policy.timeout_s,
++                                max_output_bytes=policy.max_output_bytes),
++        cancelled=policy.is_closed, **_plugin_voice_kwargs(tts_config))
++    native_send_policy.mark_entered()
++    try:
++        answer = native_once_impl(plugin, 'synthesize_native_once_v1')(plugin, request, transport)
++    finally:
++        transport.client.close()
++    if not (isinstance(answer, NativeTtsAnswer) and answer.status == 'ok'):
++        raise RuntimeError("native plugin synthesis failed")
 diff --git a/tools/tts_tool_providers.py b/tools/tts_tool_providers.py
 index 15b0ad8ea39cbcad7166a86a235827eb78901d40..876d7bd9da881b2d789638b4876a11b682074770 100644
 --- a/tools/tts_tool_providers.py

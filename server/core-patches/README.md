@@ -34,7 +34,7 @@ agreement or live deployment is claimed.
 Runtime baseline: the maintainer's Hermes runtime core `7c17e6d72a3b9ec2974b3566f02dab1ed4b94eae`
 (tree `680abe7642528e1b5d85a9bf1ba9f3d1d6f5c5a9`), **not** upstream `e6f57427…`. The
 [patch](0002-feat-add-native-conversation-voice-seams.patch) is the complete `7c17e6d..HEAD`
-delta of the series' core commits (the V1 seams, two corrections, the Mistral enablement and its option assertions, and the REST TTS / xAI freshness enablement, all below); it depends on everything already in that runtime baseline (the Relay
+delta of the series' core commits (the V1 seams, two corrections, the Mistral enablement and its option assertions, the REST TTS / xAI freshness enablement, and the Task3 Phase1A native-once plugin route, bounded command runner and terminal STT refusals, all below); it depends on everything already in that runtime baseline (the Relay
 native session seams and their prior core changes), none of which this stage exports. Patch 0001
 plus patch 0002 alone do **not** apply to a clean upstream `e6f57427`; the full clean-series
 export and a clean-core compatibility check are a later stage. Apply only to a fresh isolated
@@ -86,9 +86,26 @@ display token proves membership, physical row and content revision, not universa
 **Stage coverage (explicit amendment).** This stage covers a prerequisite provider set: STT `openai`, `groq`,
 `deepinfra` (pinned model), `xai`, `elevenlabs`, `mistral` and the cached local fallback; TTS `edge`, `elevenlabs`,
 `openai`, `deepinfra` (pinned model), `mistral`, `minimax`, `xai`, `gemini`. Every other configured provider — STT user
-command (including the `local_command` template) and plugin providers; TTS NeuTTS/Kitten/Piper, command and
-plugin providers — is refused UNSENT (`unavailable`). They are the remaining mandatory V1-P provider-parity gates of
-the plan, which must all pass before V2; no category's source is configured-provider acceptance by itself.
+command (including the `local_command` template) and plugin providers that did not opt in; TTS NeuTTS/Kitten/Piper,
+command providers and plugin providers that did not opt in — is refused UNSENT (`unavailable`). They are the remaining
+mandatory V1-P provider-parity gates of the plan, which must all pass before V2; no category's source is
+configured-provider acceptance by itself.
+
+**Native-once v1 plugin route (V1-P Task3 Phase1A, source only).** A registered plugin STT/TTS provider is reachable
+from a native call only when it overrides the non-abstract `transcribe_native_once_v1` / `synthesize_native_once_v1`
+(`agent.native_once`), checked statically before any of its code runs. One scoped registry lookup, no plugin
+discovery, and the held instance sends its one request through the seam's `NativeTransport` (an httpx client with the
+send gate and the answer bound). The override is the plugin author's opt-in to trusted execution, not proof of one
+send, no network or no download, and nothing contains hostile code: installed plugins are trusted code; the seam
+accounts only the gated sends (a result without exactly one is `unknown`). Built-in > command > plugin precedence,
+served-profile options and every stock path are unchanged; a configured custom provider is never replaced by another
+or by the local fallback. A native STT call never runs plugin discovery (provider lookup or hook delivery); a profile
+with an ordinary registered `pre_transcription` callback is refused UNSENT (`unavailable`) as an explicitly unsupported
+native combination until a bounded hook contract exists. A recorded `closed`/`timeout` credential refusal is terminal
+(`timeout`, or `cancelled` before the deadline; no fallback). Inside a native call only, the shared command runner is
+bounded by the call's absolute deadline, Stop and per-stream/transcript-file caps, killing the same-session process
+group (a `setsid` descendant is not reached); command providers themselves stay refused until an OS network-deny
+launcher is admitted. The runner also now closes the child's pipes after every run (a stock file-object leak).
 
 **Disclosures that bind this stage (carried review findings).** (1) *Process-global telemetry (M1):* the pinned Mistral
 SDK's own key-carrying trace exporter is switched off for a native call, but a process-global OpenTelemetry tracer
