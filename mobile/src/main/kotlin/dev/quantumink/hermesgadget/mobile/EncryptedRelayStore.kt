@@ -13,6 +13,7 @@ import dev.quantumink.hermesgadget.protocol.relay.session.StoreBounds
 import dev.quantumink.hermesgadget.protocol.relay.session.StoreCommit
 import dev.quantumink.hermesgadget.protocol.relay.session.StoreLoad
 import dev.quantumink.hermesgadget.protocol.relay.session.StoreProblem
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -232,7 +233,7 @@ internal class EncryptedRelayStore(
         if (size > StoreBounds.MAX_FILE_BYTES) return StoreLoad.Unreadable(StoreProblem.TOO_LARGE)
         if (size < HEADER + TAG_BYTES) return StoreLoad.Unreadable(StoreProblem.CORRUPT)
         val raw = try {
-            FileInputStream(record).use { it.readNBytes(size.toInt()) }
+            FileInputStream(record).use { it.readCompatBytes(size.toInt()) }
         } catch (_: Exception) {
             return StoreLoad.Unreadable(StoreProblem.STORAGE_UNAVAILABLE)
         }
@@ -270,7 +271,7 @@ internal class EncryptedRelayStore(
     }
 
     private fun verifies(file: File, secret: SecretKey, sequence: Long): Boolean {
-        val raw = FileInputStream(file).use { it.readNBytes(StoreBounds.MAX_FILE_BYTES + 1) }
+        val raw = FileInputStream(file).use { it.readCompatBytes(StoreBounds.MAX_FILE_BYTES + 1) }
         if (raw.size > StoreBounds.MAX_FILE_BYTES) return false
         val plaintext = try {
             open(secret, raw, sequence)
@@ -357,5 +358,21 @@ internal class EncryptedRelayStore(
                 )
             }.generateKey()
         }
+    }
+}
+
+/** Bounded read using APIs available at minSdk29; InputStream.readNBytes requires API33. */
+private fun FileInputStream.readCompatBytes(limit: Int): ByteArray {
+    require(limit >= 0)
+    val buffer = ByteArray(minOf(limit, 8192))
+    return ByteArrayOutputStream(buffer.size).use { output ->
+        var remaining = limit
+        while (remaining > 0) {
+            val count = read(buffer, 0, minOf(buffer.size, remaining))
+            if (count <= 0) break
+            output.write(buffer, 0, count)
+            remaining -= count
+        }
+        output.toByteArray()
     }
 }
