@@ -323,11 +323,15 @@ internal class EncryptedRelayStore(
         private val locks = ConcurrentHashMap<String, Any>()
 
         /** The production store: private no-backup directory, its own AndroidKeyStore key. Construction touches nothing. */
-        fun android(context: Context, directory: File? = null): EncryptedRelayStore =
-            EncryptedRelayStore(
-                directory ?: File(context.applicationContext.noBackupFilesDir, DIRECTORY),
-                { create -> androidKey(ALIAS, create) }
-            )
+        fun android(
+            context: Context,
+            directory: File? = null,
+            alias: String = ALIAS
+        ): EncryptedRelayStore = EncryptedRelayStore(
+            directory ?: File(context.applicationContext.noBackupFilesDir, DIRECTORY),
+            { create -> androidKey(alias, create) },
+            alias
+        )
 
         private fun androidKey(alias: String, create: Boolean): SecretKey {
             val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }

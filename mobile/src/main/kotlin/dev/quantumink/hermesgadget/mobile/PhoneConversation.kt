@@ -20,6 +20,9 @@ import dev.quantumink.hermesgadget.protocol.DirectConnection
 import dev.quantumink.hermesgadget.protocol.EndpointProfile
 import dev.quantumink.hermesgadget.protocol.Protocol
 import dev.quantumink.hermesgadget.protocol.RecordingFeedback
+import dev.quantumink.hermesgadget.protocol.relay.session.EnrollmentIdentity
+import dev.quantumink.hermesgadget.protocol.relay.session.RelayController
+import dev.quantumink.hermesgadget.protocol.relay.session.RelayUiState
 import dev.quantumink.hermesgadget.protocol.SpeechRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,7 +49,11 @@ data class PhoneConversationState(
     val recordingEndVersion: Long = 0,
     val mediaMuted: Boolean = false,
     val visible: Boolean = false,
-    val error: String = ""
+    val error: String = "",
+    /** Relay mode (off by default): the typed controller's view. Stock chat is unchanged while it is off. */
+    val relay: RelayUiState = RelayUiState(),
+    /** The user asked for Relay before this phone had an identity: it starts at the next connect. */
+    val relayRequested: Boolean = false
 ) {
     override fun toString(): String = "PhoneConversationState(content=redacted)"
 }
@@ -72,7 +79,9 @@ class PhoneConversation @JvmOverloads constructor(
         },
     private val opusProbe: () -> Boolean = OpusSupport::probe,
     private val selectedSpeech: (String) -> SpeechSettings = { TtsVault(application).selected(it) },
-    private val speechApi: () -> ElevenLabsApi = { ElevenLabsApi() }
+    private val speechApi: () -> ElevenLabsApi = { ElevenLabsApi() },
+    private val relayFactory: (Application, (RelayUiState) -> Unit) -> RelayController =
+        PhoneRelay::controller
 ) : AndroidViewModel(application) {
     private class Saved(var draft: String = "", var reply: String = "")
     private val saved = LinkedHashMap<String, Saved>()
@@ -98,6 +107,18 @@ class PhoneConversation @JvmOverloads constructor(
     private var recordingRequested = false
     private val cues = RecordingCues(application)
 
+    /** Built on first use: construction opens no key, store or socket. */
+    private val relayHolder = lazy {
+        relayFactory(application) { ui ->
+            mutable.update { if (it.visible) it.copy(relay = ui) else it }
+        }
+    }
+    private val relay: RelayController get() = relayHolder.value
+    private val relayPrepare = java.util.concurrent.Executors.newSingleThreadExecutor {
+        Thread(it, "phone-relay-prepare").apply { isDaemon = true }
+    }
+    private var relayWanted = false
+
     @Synchronized fun open(
         profile: EndpointProfile,
         page: dev.quantumink.hermesgadget.protocol.CatalogPage? = null
@@ -112,9 +133,24 @@ class PhoneConversation @JvmOverloads constructor(
             draft = previous.draft,
             visible = true,
             mediaMuted = mediaMuted(),
-            connection = ConnectionState(conversation = ConversationState(reply = previous.reply))
+            connection = ConnectionState(conversation = ConversationState(reply = previous.reply)),
+            relayRequested = relayWanted
         )
+        // An enrolled phone shows its saved Relay setting right away. Nothing is enrolled, created or connected here.
+        if (PhoneRelay.hasState(getApplication())) {
+            val version = epoch
+            relayPrepare.execute {
+                val known = runCatching { vault.identity(profile.endpoint, create = false) }.getOrNull()
+                if (known != null && profile.endpoint.isTls) {
+                    synchronized(this) { if (!active(version)) return@execute }
+                    relay.prepare(relayIdentity(profile, known))
+                }
+            }
+        }
     }
+
+    private fun relayIdentity(profile: EndpointProfile, identity: DeviceIdentity) =
+        EnrollmentIdentity(profile.endpoint.url, "phone:" + identity.deviceId)
 
     @Synchronized fun draft(value: String) {
         val profile = mutable.value.profile ?: return
@@ -169,10 +205,12 @@ class PhoneConversation @JvmOverloads constructor(
                 if (!active(version) || mutable.value.profile != profile) return@submit
             }
             val identity = runCatching { vault.identity(profile.endpoint, create = true) }
+            // Relay is a deliberate, per-profile opt-in: it is advertised on this socket only when the saved setting is on.
+            val relayOn = identity.getOrNull()?.let { prepareRelay(profile, it) } ?: false
             synchronized(this) {
                 if (!active(version) || mutable.value.profile != profile) return@submit
                 identity.fold({
-                    startConnection(profile, version, it, opus, clientSpeech, notice)
+                    startConnection(profile, version, it, opus, clientSpeech, notice, relayOn)
                 }, {
                     mutable.update { current ->
                         current.copy(
@@ -185,13 +223,23 @@ class PhoneConversation @JvmOverloads constructor(
         }
     }
 
+    /** Off the main thread and outside the lock: loads the saved setting and applies a pending request. */
+    private fun prepareRelay(profile: EndpointProfile, identity: DeviceIdentity): Boolean {
+        if (!profile.endpoint.isTls) return false
+        relay.prepare(relayIdentity(profile, identity))
+        val wanted = synchronized(this) { relayWanted.also { relayWanted = false } }
+        if (wanted) relay.setEnabled(true)
+        return relay.enabledBlocking()
+    }
+
     private fun startConnection(
         profile: EndpointProfile,
         version: Long,
         identity: DeviceIdentity,
         opus: Boolean,
         clientSpeech: Boolean,
-        notice: String
+        notice: String,
+        relayOn: Boolean = false
     ) {
         val microphone = PcmCapture(getApplication())
         capture = microphone
@@ -423,9 +471,11 @@ class PhoneConversation @JvmOverloads constructor(
                 }
             ),
             httpClient = httpClient,
-            previousReply = saved.getValue(profile.endpoint.url).reply
+            previousReply = saved.getValue(profile.endpoint.url).reply,
+            relay = PhoneRelay.optIn(relayOn) { state, generation -> relay.onChannel(state, generation) }
         )
-        mutable.update { it.copy(error = notice, sessionVersion = version) }
+        relay.attachTransport(connection?.relayTransport)
+        mutable.update { it.copy(error = notice, sessionVersion = version, relayRequested = false) }
         connection?.connect()
     }
 
@@ -524,6 +574,7 @@ class PhoneConversation @JvmOverloads constructor(
 
     @Synchronized fun send() {
         val current = mutable.value
+        if (PhoneRelay.typedRoute(current.relay) == InputRoute.RELAY) return sendRelay(current)
         val socket = connection ?: return
         if (!current.visible || current.sending || current.draft.isBlank() ||
             current.connection.status != ConnectionStatus.PAIRED ||
@@ -559,8 +610,35 @@ class PhoneConversation @JvmOverloads constructor(
         }
     }
 
+    /** A typed message into the SELECTED Relay conversation: stored first, then written; never the stock chat. */
+    private fun sendRelay(current: PhoneConversationState) {
+        if (!current.visible || current.sending || current.draft.isBlank() || !current.relay.canSend) return
+        val version = epoch
+        val text = current.draft
+        mutable.update { it.copy(sending = true, error = "") }
+        relay.send(text) { accepted ->
+            synchronized(this) {
+                if (active(version)) {
+                    if (accepted && mutable.value.draft == text) draft("")
+                    mutable.update {
+                        it.copy(
+                            sending = false,
+                            error = if (accepted) "" else "Message was not sent. Draft retained."
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     @Synchronized fun startRecording() {
         val current = mutable.value
+        if (PhoneRelay.voiceRoute(current.relay) == InputRoute.UNAVAILABLE) {
+            // Never routed to the physical-device stock chat; canonical voice is a later, separately reviewed stage.
+            endRecordingAttempt()
+            notice("Voice is not available in a Relay conversation yet. You can type.")
+            return
+        }
         if (recordingRequested) return
         if (current.visible && !current.sending &&
             current.connection.status == ConnectionStatus.PAIRED &&
@@ -643,6 +721,7 @@ class PhoneConversation @JvmOverloads constructor(
         stopPlayback()
         speech?.close()
         speech = null
+        if (relayHolder.isInitialized()) relay.hide()
         connection?.close()
         capture = null
         playback = null
@@ -659,6 +738,40 @@ class PhoneConversation @JvmOverloads constructor(
             connection = ConnectionState(conversation = ConversationState(reply = reply))
         )
     }
+    // -- Relay mode (explicit, per profile; every control below is a deliberate user action) --------------------------
+
+    /** Turns Relay on or off for this profile. The capability is negotiated per socket, so a live connection restarts. */
+    @Synchronized fun relayEnable(on: Boolean) {
+        val current = mutable.value
+        val profile = current.profile ?: return
+        if (on && !profile.endpoint.isTls) {
+            notice("Relay conversations require a wss endpoint.")
+            return
+        }
+        relayWanted = on
+        relay.setEnabled(on)
+        val live = connection != null
+        mutable.update { it.copy(relayRequested = on && !live) }
+        if (live) {
+            open(profile, current.page)
+            connect()
+        }
+    }
+
+    fun relayRefresh() = relay.refreshConversations()
+    fun relayMore() = relay.loadMoreConversations()
+    fun relayCreate(title: String) = relay.create(title.ifBlank { null })
+    fun relayDiscardCreate() = relay.discardCreate()
+    fun relaySelect(conversationId: String) = relay.select(conversationId)
+    fun relayLeave() = relay.leave()
+    fun relayCheck(requestId: String) = relay.check(requestId)
+    fun relayResend(requestId: String) = relay.resend(requestId)
+    fun relayAbandon(requestId: String) = relay.abandon(requestId)
+    fun relayClearSettled() = relay.clearSettled()
+    fun relayAcceptReview() = relay.acceptReview()
+    fun relayReauthorize() = relay.reauthorize()
+    fun relayRetryStorage() = relay.retryStorage()
+
     fun refreshMediaVolume() {
         val muted = mediaMuted()
         mutable.update { if (it.visible) it.copy(mediaMuted = muted) else it }
@@ -676,6 +789,7 @@ class PhoneConversation @JvmOverloads constructor(
     override fun onCleared() {
         hide()
         preparation.shutdownNow()
+        relayPrepare.shutdownNow()
         super.onCleared()
     }
 }

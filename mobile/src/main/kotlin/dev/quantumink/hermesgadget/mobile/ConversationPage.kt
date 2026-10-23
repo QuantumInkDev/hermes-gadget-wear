@@ -58,7 +58,8 @@ fun ConversationPage(
     ConversationContent(
         state, page, connect, record, back, model::draft, model::send,
         model::finishRecording, model::cancelRecording, model::stopPlayback,
-        { model.cancel() }, { model.cancel(true) }, model::answer, modifier
+        { model.cancel() }, { model.cancel(true) }, model::answer, modifier,
+        RelayActions.of(model)
     )
 }
 
@@ -77,7 +78,8 @@ internal fun ConversationContent(
     cancelTurn: () -> Unit,
     newSession: () -> Unit,
     answer: (String, Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    relayActions: RelayActions = RelayActions.NONE
 ) {
     val conversation = state.connection.conversation
     val listening = conversation.mode == ConversationMode.LISTENING
@@ -230,7 +232,11 @@ internal fun ConversationContent(
                             }
                         }
 
-                        if (paired && conversation.reply.isBlank() &&
+                        if (state.profile?.endpoint?.isTls == true) {
+                            RelaySection(state.relay, state.relayRequested, relayActions)
+                        }
+
+                        if (!state.relay.relayOwnsComposer && paired && conversation.reply.isBlank() &&
                             conversation.transcript.isBlank() &&
                             !conversation.busy && !listening
                         ) {
@@ -248,13 +254,22 @@ internal fun ConversationContent(
                         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                         color = MaterialTheme.colorScheme.surface
                     ) {
-                        ConversationControls(
-                            state, draft, send, record, finish, cancelRecording,
-                            stopVoice, cancelTurn, keyboard,
-                            Modifier.heightIn(
-                                max = controlsHeight
-                            ).verticalScroll(rememberScrollState())
-                        )
+                        if (state.relay.relayOwnsComposer) {
+                            RelayComposer(
+                                state,
+                                draft,
+                                send,
+                                Modifier.heightIn(max = controlsHeight).verticalScroll(rememberScrollState())
+                            )
+                        } else {
+                            ConversationControls(
+                                state, draft, send, record, finish, cancelRecording,
+                                stopVoice, cancelTurn, keyboard,
+                                Modifier.heightIn(
+                                    max = controlsHeight
+                                ).verticalScroll(rememberScrollState())
+                            )
+                        }
                     }
                 }
             }
