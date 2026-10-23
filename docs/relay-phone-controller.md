@@ -247,7 +247,19 @@ events carry one): `relay.info` is read again, the session attaches again and hi
 resume points — **stays owed in memory and on disk until the eviction itself is stored**; downstream history caches are Task4
 (Task3 populates none). `profile_changed`: durable `REVIEW_REQUIRED`.
 
-### 5.7 Screen, microphone, lifecycle
+### 5.7 Reconnect request ordering
+
+A same-connection reconnect withdraws the previous attachment scope before queueing the profile-list refresh and the fresh
+attach. Those two requests share the replacement transport scope; attach must not withdraw its own sibling refresh. Explicit
+selection and attach retries keep their existing withdrawal and exact-selection guards. No binding or authority fence is
+removed, and no recording or server permission is changed to accommodate timing.
+
+`RelayReconnectOrderingTest` holds the actual connection owner at the reconnect Ready notification after posting to the real
+controller's manual owner. Both requests queue before the socket owner resumes. The unchanged registered recording verifies
+list then attach then receipt, and its default-grant denial still stops without a history probe or another submit. This is a
+controlled production-controller/connection replay, not Android/native or live producer execution.
+
+### 5.8 Screen, microphone, lifecycle
 
 The existing phone screen gains one "Relay conversations" section (off by default) and, inside a selected Relay conversation, a
 typed composer in place of the stock controls. **The microphone is unavailable there** (`InputRoute.UNAVAILABLE`): audio is never

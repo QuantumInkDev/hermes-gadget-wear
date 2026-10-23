@@ -728,11 +728,12 @@ class RelayController(
     private fun continueAfterReady(record: EnrollmentRecord) {
         val intent = record.createIntent
         val selected = record.selectedConversationId
-        refreshList()
-        when {
-            intent != null -> sendCreate(intent)
-            selected != null && attachedOnce -> attach(selected)
+        if (intent == null && selected != null && attachedOnce) {
+            attach(selected, refreshListBeforeAttach = true)
+            return
         }
+        refreshList()
+        if (intent != null) sendCreate(intent)
     }
 
     private fun supports(method: RelayMethod): Boolean = method in (info?.supported ?: emptySet())
@@ -1232,7 +1233,11 @@ class RelayController(
         publish()
     }
 
-    private fun attach(id: ConversationId, attempt: Int = 0) {
+    private fun attach(
+        id: ConversationId,
+        attempt: Int = 0,
+        refreshListBeforeAttach: Boolean = false
+    ) {
         if (record()?.selectedConversationId != id || !isReady()) return
         transport?.invalidatePending()
         flow++
@@ -1245,6 +1250,8 @@ class RelayController(
         tasksComplete = false
         tasks.clear()
         pollTimer?.cancel()
+        // Both fresh requests must be queued after withdrawal, in the replacement transport scope.
+        if (refreshListBeforeAttach) refreshList()
         request(RelayCalls.attach(id)) { result ->
             if (mine != flow) return@request
             when (result) {
