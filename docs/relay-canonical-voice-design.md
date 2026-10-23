@@ -17,6 +17,9 @@ Revision 2 (V2 input stage): adds the explicit activation-scope amendment (§12.
 implementation had to choose, §18 quotes the original text, states why a choice was unavoidable, and names the boundary tests. No stage
 is accepted by this revision: the INPUT half is a private source implementation, both flags default false, nothing is activated.
 
+Revision 3 (V3 output stage): adds the V3 OUTPUT interpretation register (§19). The INPUT register (§18) and every frozen requirement keep their wording. The
+OUTPUT half is a private source implementation; both flags default false and nothing is activated.
+
 Labels used throughout:
 
 | Label | Meaning |
@@ -1348,3 +1351,35 @@ Fix round 2 (scoped review `b7243868…` of fix round 1: I-A/I-B closed, I-C clo
 * **Quota/rows.** No SDK storage was added for N-2: the voice database stays schema 2 and the logical capture identity limits stay the original 256 per
   device / 4,096 in the store (a logical limit; physical SQL rows can be up to twice that: rows plus reservations, ≤ 8,192 in the store) inside the unchanged
   128 MiB page ceiling. No higher quota is claimed or approved by anyone. The 7-day hold still allows about 36 `capture.start` a day on average.
+
+## 19. V3 output interpretation register (private source implementation; reviewed with the V3 task)
+
+Same rules as §18: each entry quotes the original wording (unchanged above), the choice, why it was unavoidable, the cost if wrong and the boundary tests (SDK `tests/test_relay_voice_v3_*.py`).
+No entry adds a wire member, enum value, permission or limit, and none is acceptance of any provider, profile, host, device or native stage.
+
+**Stage A (mandatory prerequisite, done first).** §9.2.3: "extend the token with the `display_kind` (<= 128 bytes) and compressed-summary scalars". `NativeDisplayToken` is now
+`(identity, physical_id, revision, display_kind_bytes, display_kind, compressed_summary)`, the scalars the sibling `_fingerprint` selects, read in the same snapshot as the revision;
+`NATIVE_VOICE_VERSION` stays 1 and the SDK validates the exact field tuple (old weak token = `unsupported`, no fallback). Old behaviour reproduced on the exact FCC source by the frozen
+core test `test_native_voice_display_visibility.py` (6 behavioural failures, 5 controls pass) and green after the fix. Cost if wrong: a mixed core/SDK pair loses voice (both directions), never a silent downgrade.
+
+| # | Original wording | Choice | Why unavoidable | Cost if wrong | Boundary tests |
+| --- | --- | --- | --- | --- | --- |
+| R3-1 | §10.2 "TTS row `preparing` ... `failed(interrupted)`, `not_started`" vs §6.4 `failed` reasons `tts_unavailable`, `provider_failed` | restart of `preparing` = `aborted(disconnected)` / `not_started`; `in_flight` = `unknown`; `streaming` = `aborted(disconnected)` keeping the provider; a Stop that raced the provider keeps `stopped`, provider `unknown` | the closed speech reason list has no `interrupted`; adding it would break strict native decoding | a client reading §10.2 literally sees another reason token for the same truth | `test_a_restart_classifies_preparing...`, `..._in_flight_is_unknown...`, `..._frames_flow...`, `..._stop_that_raced...` |
+| R3-2 | §6.4 states "not recorded" | the `preparing` row is deleted, the `speech` identity reservation is KEPT (V2 I-7) | the reservation is the distinct-kind namespace; the row was the only record | a retry loop burns identity quota (`busy` for that device) | `test_speech_ids_share_the_reviewed_identity_quota...`, deliberate `unavailable`/`not_speakable` cases |
+| R3-3 | §6.4 `source.total_cp` | `total_cp` = code points of the speakable text = `speakable_end_cp`; `limited` says more exists | only <= 32 reads may be made | no exact length of the unread tail | `test_a_source_above_262144_bytes_is_limited...` |
+| R3-4 | §9.4 "move forward past continuations instead" vs "never exceed the caps" | literal rule, clamped by the hard 4,096-UTF-16 ceiling and the end of the text; beyond it the cut is inside the cluster at the style cap (never inside a code point); `cut_inside_unit` is true. A cut after a ZWJ is allowed (the code point after a ZWJ is not in the quoted set) | the two requirements cannot both hold for a cluster longer than the cap | a concise range can exceed 600 code points for pathological clusters; ZWJ sequences can be cut after the joiner | `test_a_combining_run_longer_than_the_cap...`, `test_zwj_sequences...` |
+| R3-5 | §6.4 `not_speakable`: "text has no speakable code points" | the core normalization of the RANGE decides: the whole message empty = `not_speakable` (not recorded); a middle range with nothing to say is issued as silence (`completed`, END 0, no send) so More advances | otherwise a code block mid-message would stop continuation forever | a silent range | `test_a_message_with_nothing_to_say...`, `test_a_range_the_seam_finds_nothing...` |
+| R3-6 | §10.3 "Receipt reads must re-authorize" for client chunks | a `text` receipt recomputes the exact chunks from the re-authorized current canonical source; `conflict` when `source.sha256` changed, `not_found` when unreadable or purged | no plaintext may be stored | a receipt can fail after the text changed | `test_a_receipt_read_re_authorizes...` |
+| R3-7 | §4.1 layer 4 | server mode needs a socket that completed `relay.voice.info` (`unsupported` otherwise, no accounting); client mode does not | frames a client dropped would be paid for | a client must call info first | `test_a_speak_before_the_info...` |
+| R3-8 | §5.2 P1L order | authorization, binding/epoch, authorship, policy (`off`), mode gate, capacity/budget, reservation + row, lookup/read, window, range, provenance, in-flight | the table lists checkpoints, not an order | none beyond the order itself | live and deliberate suites |
+| R3-9 | `history_page_bytes: 65536` advertised; dispatcher bound 8,192 | `relay.existing.history.page` has the same response bound as `relay.history.page` (65,536), pinned by the controller's registered probe (RED 3/5 on the exact BASE, green after) | existing playback needs the existing history to be readable | existing pages above 8,192 B stay refused | `test_native_existing_history_bound_probe.py` (frozen bytes) |
+| R3-10 | §6.2 `modes` | `server` iff output enabled; `client` additionally needs the existing client-speech gate as it is | the gate has one meaning | with `speak_replies:false` client mode is not offered | `test_the_existing_client_speech_gates...` |
+| R3-11 | §6.4 `stopped`, §10.2 "Stop races provider completion" | Stop writes `stopped` durably at once; a later provider outcome updates only `provider`; ABORT (0x14) is a 1-byte terminator written after a failing check and is not an audio batch | Stop must not wait for the provider | a client sees an ABORT after revoke | stream and accounting suites |
+| R3-12 | §5.2 P1L "equals `message_id` when given" | a different expected id is `conflict` | no code is given | none | `test_the_expected_message_id_must_be_...` |
+| R3-13 | §13 schema | `relay-voice.sqlite3` schema 3 (`speech_rows`, scalar provenance only; every V2 row and reservation preserved, schema 1 and 2 migrate in place); an older SDK refuses it (no journal schema change) | speech accounting needs a table | rollback needs the file removed after a backup | `test_a_schema_2_database_migrates...`, `test_the_speech_table_is_held_to_the_same_strict_schema_check` |
+| R3-14 | §7.3 M4 "pre-approved per-generation cached grant snapshot (still checked per batch)" | after the FIRST measurement of the gate missed (full-check p99 41.4 ms), the snapshot is implemented for the batch fence only (`Grants.authorize_snapshot`, `Conversations.batch_check`): invalidated by any byte change of the grant document or the enrollment registry, core epoch and binding per batch, SQLite membership per batch, expiry and the device verdict per call, a cached refusal is never served | the specified fallback | none beyond the stated design | `test_relay_voice_v3_snapshot.py`, `test_relay_voice_v3_fence_perf.py` |
+
+**Availability cost of speech identities (stated explicitly).** Speech ids share the existing distinct-kind reservations (256 per device, 4,096 in the store, 7-day hold, `busy` before any row, nothing
+evicted early); with captures included a device averages about 36 voice operations per day. Physical rows stay at most 8,192 (identities <= 4,096 plus rows <= 4,096). No bucket was widened.
+
+Not claimed anywhere above: that any provider, voice, codec, ffmpeg installation, host or device works; the current-profile runtime proof (M1), other-box, native or physical acceptance; Windows beyond API-double tests.
