@@ -258,10 +258,10 @@ index f4ccdbbffa57523e3f00a06fdfdb00bdf886c51a..76e8f6ba23d0ceb2462235c1f351c36c
 +    return found
 diff --git a/gateway/session_native_voice.py b/gateway/session_native_voice.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..92c77b8d8950909ff6579df78044ea40f2ee3cbd
+index 0000000000000000000000000000000000000000..1dcf3659439b476989bf28b1c9ebaaafe5afe2e3
 --- /dev/null
 +++ b/gateway/session_native_voice.py
-@@ -0,0 +1,121 @@
+@@ -0,0 +1,129 @@
 +"""Generic native voice seam: one configured STT request, one TTS request per chunk, canonical display reads.
 +
 +An in-process extension seam for a consumer that owns its own registry, grants and accounting (the
@@ -353,10 +353,18 @@ index 0000000000000000000000000000000000000000..92c77b8d8950909ff6579df78044ea40
 +@dataclass(frozen=True)
 +class NativeDisplayToken:
 +    """Scalar fence value of one visible display row: equal tokens mean the same physical row with the same
-+    content revision, so text read between two equal tokens is the text now. Carries no content."""
++    content revision AND the same presentation, so text read between two equal tokens is the text now.
++
++    The presentation scalars are exactly the ones the sibling history ``_fingerprint`` selects. A row the canonical
++    normalizer hides (``display_kind`` hidden / compression_summary / context_summary, a compressed-summary carrier)
++    stays in the visible-row projection, and an in-place writer can stamp a read row hidden with no content change; the
++    revision stamp alone would then stay equal (design 9.2.3, round-2 N1). Carries no content."""
 +    identity: str
 +    physical_id: int
 +    revision: int  # the row's content-revision stamp; 0 = never revised
++    display_kind_bytes: int | None  # UTF-8 length of ``display_kind``; None when the column is NULL
++    display_kind: str | None  # the value when it is at most 128 bytes, else None (the length still fences it)
++    compressed_summary: bool  # the row is a compressed-summary carrier
 +
 +
 +async def transcribe_native_once(path, *, authorize, before_send, deadline_s):
@@ -385,10 +393,10 @@ index 0000000000000000000000000000000000000000..92c77b8d8950909ff6579df78044ea40
 +    return prepare_spoken_text(text, max_chars=None)
 diff --git a/gateway/session_native_voice_display.py b/gateway/session_native_voice_display.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..0ebcf76957838ebc56837a23b80f50d0d9c2ab97
+index 0000000000000000000000000000000000000000..a4218b091a91367696bf5e288246868fd6340066
 --- /dev/null
 +++ b/gateway/session_native_voice_display.py
-@@ -0,0 +1,294 @@
+@@ -0,0 +1,308 @@
 +"""Identity-addressed canonical display reads for the native voice seam (``session_native_voice``).
 +
 +Playback of a message the consumer can only name by its public id needs the exact canonical text of
@@ -457,6 +465,19 @@ index 0000000000000000000000000000000000000000..0ebcf76957838ebc56837a23b80f50d0
 +                            or not 0 < int(revision) <= MAX_INT64 or str(int(revision)) != revision):
 +        raise RuntimeStoreError('temporarily_unavailable')
 +    return int(revision)
++
++
++def _presentation(conn, physical):
++    """``(display_kind_bytes, display_kind, compressed_summary)`` of one row: the presentation scalars of the sibling
++    history fingerprint. The kind is returned only when it is a text value of at most 128 bytes (its length fences
++    longer ones); any other stored type fails closed exactly as a malformed revision stamp does. No content column."""
++    row = conn.execute(
++        "SELECT typeof(display_kind),length(CAST(display_kind AS BLOB)),"
++        "CASE WHEN typeof(display_kind)='text' AND length(CAST(display_kind AS BLOB))<=128 THEN display_kind END,"
++        "COALESCE(_compressed_summary,0)<>0 FROM messages WHERE id=?", (physical,)).fetchone()
++    if row is None or row[0] not in ('null', 'text'):
++        raise RuntimeStoreError('temporarily_unavailable')
++    return row[1], row[2], bool(row[3])
 +
 +
 +def _created_ms(row):
@@ -613,8 +634,9 @@ index 0000000000000000000000000000000000000000..0ebcf76957838ebc56837a23b80f50d0
 +
 +
 +def read_token(db, root, identity, budget):
-+    """Worker/caller thread: ``(identity, physical_id, revision)`` of ONE visible display row from the
-+    projection's scalars and the row's revision stamp only. No content column is read."""
++    """Worker/caller thread: the scalar token of ONE visible display row, read in ONE snapshot from the projection's
++    scalars, the row's revision stamp and its presentation scalars (``display_kind`` and the compressed-summary flag,
++    as the sibling history fingerprint selects them). No content column is read."""
 +    from gateway.session_native_voice import NativeDisplayToken
 +
 +    def work(conn):
@@ -622,13 +644,13 @@ index 0000000000000000000000000000000000000000..0ebcf76957838ebc56837a23b80f50d0
 +        selected = _selected(conn, lineage, identity)
 +        if selected is None:
 +            raise RuntimeStoreError('not_found')
-+        return NativeDisplayToken(identity, selected[0], _revision(conn, selected[0]))
++        return NativeDisplayToken(identity, selected[0], _revision(conn, selected[0]), *_presentation(conn, selected[0]))
 +    return _guarded(db, budget, work, on_stop=_read_stop)
 +
 +
 +def check_display(authority, actor, ref, *, authorize, identity):
 +    """Scalar fence for the synchronous socket output-lock boundary (design P2): the identity is still a visible
-+    display row of this lineage; the returned token changes whenever its physical row or content revision does.
++    display row of this lineage; the returned token changes whenever its physical row, content revision or presentation (display kind, compressed-summary flag) does.
 +    The consumer takes one token before the first segment read, one after the last, and one at P2, and refuses
 +    unless they are equal."""
 +    authorize()
@@ -3259,10 +3281,10 @@ index 0000000000000000000000000000000000000000..5eae2a7976a4a12de4d5fb1cfcf62442
 +    assert registries.delivery and registries.ensure == [False]  # stock lazy discovery still runs, unchanged
 diff --git a/tests/gateway/test_native_voice_display.py b/tests/gateway/test_native_voice_display.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..885ebcba74591c415366feb8d6b2db5916538161
+index 0000000000000000000000000000000000000000..86c7a0bf63b5be0460e87a22a4b6f98ea6ff9853
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_display.py
-@@ -0,0 +1,461 @@
+@@ -0,0 +1,462 @@
 +"""Native display seam on the registered core owner: identity-addressed read, locate and check.
 +
 +Real ``GatewayRunner`` / ``SessionAuthority`` / registered Gadget adapter / ``SessionDB`` (the
@@ -3294,7 +3316,8 @@ index 0000000000000000000000000000000000000000..885ebcba74591c415366feb8d6b2db59
 +
 +def test_the_seam_contract_the_consumer_validates():
 +    assert voice.NATIVE_VOICE_VERSION == 1 and SessionAuthority.NATIVE_VOICE_VERSION == 1
-+    assert [f.name for f in fields(voice.NativeDisplayToken)] == ['identity', 'physical_id', 'revision']
++    assert [f.name for f in fields(voice.NativeDisplayToken)] == [
++        'identity', 'physical_id', 'revision', 'display_kind_bytes', 'display_kind', 'compressed_summary']
 +    assert [f.name for f in fields(voice.NativeTranscription)] == ['state', 'transcript', 'source', 'provider']
 +    assert [f.name for f in fields(voice.NativeSpeech)] == ['state', 'path', 'code_points', 'source', 'provider']
 +    assert [f.name for f in fields(voice.NativeDisplayLocation)] == [
@@ -3724,6 +3747,178 @@ index 0000000000000000000000000000000000000000..885ebcba74591c415366feb8d6b2db59
 +    assert settled_start == settled_end and settled == 'v' * 20000
 +    db.set_user_message_content(ref.session_id, row_id, 'w' * 20000)  # after the read, before P2
 +    assert fence(rig, ref, identity) != settled_end
+diff --git a/tests/gateway/test_native_voice_display_visibility.py b/tests/gateway/test_native_voice_display_visibility.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..c4ec32b65a0414fd0a460c5dd09b6d9b5dc673e3
+--- /dev/null
++++ b/tests/gateway/test_native_voice_display_visibility.py
+@@ -0,0 +1,166 @@
++"""V3 mandatory core prerequisite (design 9.2.3, round-2 N1): the scalar display fence must prove VISIBILITY, not only
++projection membership, physical row and content revision.
++
++A row the canonical normalizer hides (``display_kind`` hidden / compression_summary / context_summary, a compressed-summary
++carrier) stays in the visible-row projection, and the in-place writer ``set_latest_matching_message_display_kind`` can stamp a
++row hidden AFTER a consumer read it, with no content change, the same physical row and the same content-revision stamp. A
++token made only of (identity, physical_id, revision) then stays equal and the consumer would speak a row that is no longer
++displayable. These tests drive the REAL registered rig (GatewayRunner, SessionAuthority, SessionDB, the existing position
++reader as oracle) and use only API that exists on the unmodified source: the failures on the pre-fix source are BEHAVIOURAL
++(an equal token), never an absent attribute.
++
++The file is frozen: it is run unchanged against the exact BASE core and again on the fixed source.
++"""
++import pytest
++
++from hermes_state_runtime import RuntimeStoreError
++from tests.gateway import native_display_support as support
++from tests.gateway import relay_native_support
++
++rig = relay_native_support.rig
++reader = support.reader
++
++
++async def route(rig_, chat='relay-synthetic', user='phone'):
++    return await rig_.authority.register_native_route(rig_.event(user=user, chat=chat).source)
++
++
++def fence(rig_, ref, identity):
++    return rig_.authority.check_native_display(reader(), ref, authorize=lambda: None, identity=identity)
++
++
++def stamped(db, session_id, content, kind, role='assistant'):
++    assert db.set_latest_matching_message_display_kind(session_id, role=role, content=content, display_kind=kind) is True
++
++
++async def read_text(rig_, ref, identity):
++    return (await rig_.authority.read_native_display(reader(), ref, authorize=lambda: None, identity=identity)).text
++
++
++def refused_or_different(rig_, ref, identity, before):
++    """The consumer's P2 rule: after the change the identity is either refused (``not_found``) or its token differs."""
++    try:
++        after = fence(rig_, ref, identity)
++    except RuntimeStoreError as error:
++        assert error.reason == 'not_found'
++        return True
++    return after != before
++
++
++async def visible_assistant(rig_, text='A visible assistant answer.'):
++    ref = await route(rig_)
++    db = rig_.authority.db
++    db.append_message(ref.session_id, 'assistant', text)
++    (frag,) = await support.fragments(rig_.authority, reader(), ref)
++    assert frag.text == text
++    return ref, db, frag.row_id
++
++
++@pytest.mark.asyncio
++async def test_a_visible_assistant_row_stamped_hidden_in_place_after_the_read_changes_the_token(rig):
++    """THE OLD DEFECT: read the visible row, stamp it hidden in place, and the token must no longer match (or the row is refused)."""
++    ref, db, identity = await visible_assistant(rig)
++    before = fence(rig, ref, identity)
++    assert await read_text(rig, ref, identity) == 'A visible assistant answer.'
++    stamped(db, ref.session_id, 'A visible assistant answer.', 'hidden')
++    with pytest.raises(RuntimeStoreError) as hidden:  # the stamp really did make the row undisplayable
++        await read_text(rig, ref, identity)
++    assert hidden.value.reason == 'not_found'
++    assert refused_or_different(rig, ref, identity, before), 'the fence still says "same visible row" for a row that is now hidden'
++
++
++@pytest.mark.asyncio
++@pytest.mark.parametrize('kind', ['compression_summary', 'context_summary'])
++async def test_every_hidden_display_kind_the_normalizer_knows_changes_the_token(rig, kind):
++    ref, db, identity = await visible_assistant(rig)
++    before = fence(rig, ref, identity)
++    stamped(db, ref.session_id, 'A visible assistant answer.', kind)
++    with pytest.raises(RuntimeStoreError) as hidden:
++        await read_text(rig, ref, identity)
++    assert hidden.value.reason == 'not_found'
++    assert refused_or_different(rig, ref, identity, before)
++
++
++@pytest.mark.asyncio
++async def test_a_compressed_summary_flag_flipped_in_place_changes_the_token(rig):
++    ref, db, identity = await visible_assistant(rig)
++    before = fence(rig, ref, identity)
++    db._execute_write(lambda conn: conn.execute(
++        'UPDATE messages SET _compressed_summary=1 WHERE session_id=? AND message_uid=?', (ref.session_id, identity)))
++    assert refused_or_different(rig, ref, identity, before)
++
++
++@pytest.mark.asyncio
++async def test_any_display_kind_change_even_to_a_visible_kind_changes_the_token(rig):
++    """Fail closed: the fence promises 'same presentation', not only 'still visible'."""
++    ref, db, identity = await visible_assistant(rig)
++    before = fence(rig, ref, identity)
++    stamped(db, ref.session_id, 'A visible assistant answer.', 'note')
++    assert await read_text(rig, ref, identity) == 'A visible assistant answer.'  # still a displayable row
++    assert refused_or_different(rig, ref, identity, before)
++
++
++@pytest.mark.asyncio
++async def test_a_display_kind_beyond_128_bytes_still_changes_the_token(rig):
++    ref, db, identity = await visible_assistant(rig)
++    stamped(db, ref.session_id, 'A visible assistant answer.', 'k' * 200)
++    first = fence(rig, ref, identity)
++    db._execute_write(lambda conn: conn.execute(
++        'UPDATE messages SET display_kind=? WHERE session_id=? AND message_uid=?', ('k' * 201, ref.session_id, identity)))
++    assert refused_or_different(rig, ref, identity, first)
++
++
++@pytest.mark.asyncio
++async def test_control_an_untouched_row_keeps_its_token_and_reading_never_changes_it(rig):
++    ref, db, identity = await visible_assistant(rig)
++    token = fence(rig, ref, identity)
++    assert fence(rig, ref, identity) == token
++    await read_text(rig, ref, identity)
++    assert fence(rig, ref, identity) == token
++
++
++@pytest.mark.asyncio
++async def test_control_an_ordinary_content_revision_still_changes_the_token(rig):
++    ref = await route(rig)
++    db = rig.authority.db
++    row_id = db.append_message(ref.session_id, 'user', 'old prompt')
++    (frag,) = await support.fragments(rig.authority, reader(), ref)
++    token = fence(rig, ref, frag.row_id)
++    assert db.set_user_message_content(ref.session_id, row_id, 'new prompt') == 1
++    assert fence(rig, ref, frag.row_id) != token
++
++
++@pytest.mark.asyncio
++async def test_control_a_malformed_revision_stamp_still_fails_closed(rig):
++    from hermes_state_common import DISPLAY_CONTENT_REVISION_PREFIX
++    ref, db, identity = await visible_assistant(rig)
++    physical = rig.authority.check_native_display(reader(), ref, authorize=lambda: None, identity=identity).physical_id
++    db._execute_write(lambda conn: conn.execute(
++        'INSERT OR REPLACE INTO state_meta(key,value) VALUES (?,?)', (DISPLAY_CONTENT_REVISION_PREFIX + str(physical), 'not-a-number')))
++    with pytest.raises(RuntimeStoreError) as error:
++        fence(rig, ref, identity)
++    assert error.value.reason == 'temporarily_unavailable'
++
++
++@pytest.mark.asyncio
++async def test_control_a_row_that_is_already_hidden_is_not_found_and_a_foreign_identity_is_not_found(rig):
++    ref = await route(rig)
++    db = rig.authority.db
++    db.append_message(ref.session_id, 'assistant', 'hidden at birth', display_kind='hidden')
++    db.append_message(ref.session_id, 'assistant', 'plain')
++    (frag,) = await support.fragments(rig.authority, reader(), ref)  # the reader skips the hidden carrier
++    assert frag.text == 'plain'
++    with pytest.raises(RuntimeStoreError) as error:
++        fence(rig, ref, 'no-such-identity')
++    assert error.value.reason == 'not_found'
++
++
++@pytest.mark.asyncio
++async def test_the_fence_still_reads_no_content_and_no_other_row_content(rig):
++    ref, db, identity = await visible_assistant(rig)
++    db.append_message(ref.session_id, 'assistant', 'x' * 70000)
++    statements = []
++    with support.traced_reads(db, statements):
++        fence(rig, ref, identity)
++    assert support.hydrated_ids(statements) == set()
++    assert not [s for s in statements if 'substr(CAST(content' in s or 'SELECT role,content' in s]
 diff --git a/tests/gateway/test_native_voice_exception_accounting.py b/tests/gateway/test_native_voice_exception_accounting.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..525a159e9f258a7bfb32bbef1c7b26fca7404dd8

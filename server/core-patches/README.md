@@ -354,3 +354,8 @@ real OpenAI SDK, the real lock-pinned ElevenLabs 1.59.0, Edge 7.2.7 and Mistral 
 xAI resolver, credential pool and token store (OAuth HTTP transport replaced) with only the network transport (for Edge, the socket) replaced, the real ffmpeg on local synthetic audio, the registered core
 owner for display reads, and stock-off controls. No provider, SDK-in-production, native, live or physical acceptance
 is claimed.
+
+V3 prerequisite (display-token visibility): `NativeDisplayToken` now also carries `display_kind_bytes`, `display_kind` and `compressed_summary` (the scalars
+the sibling history fingerprint selects), so a visible assistant row stamped hidden in place can no longer leave the fence token equal. The seam's version
+stays 1; a consumer validating the old three-field token refuses this core and the reverse. The regression is `tests/gateway/test_native_voice_display_visibility.py`
+(frozen: 6 behavioural failures on the unmodified `fccfbeb3`, green after). This is source evidence only; it activates nothing.
