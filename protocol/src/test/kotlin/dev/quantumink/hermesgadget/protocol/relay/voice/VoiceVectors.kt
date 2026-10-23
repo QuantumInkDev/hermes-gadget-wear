@@ -65,6 +65,13 @@ internal object VoiceVectors {
         }.map { it["file"]!!.jsonPrimitive.content }
     }
 
+    /** Fix round 1: the single focused `audio_decode` capture (its own generation; the 24 v4 files and the five F1 files are unchanged). */
+    val fix1Files: List<String> by lazy {
+        files.filter {
+            it["generation"]!!.jsonPrimitive.content == "f1-fix-capture"
+        }.map { it["file"]!!.jsonPrimitive.content }
+    }
+
     val f1Files: List<String> by lazy {
         files.filter {
             it["generation"]!!.jsonPrimitive.content == "f1-output"

@@ -542,6 +542,29 @@
    "not_captured": [],
    "origin": "registered-capture",
    "sha256": "9e121bd38be395851a6e3afde7a6a2825a10cea7fc4db415302e70b26821d6cf"
+  },
+  {
+   "binary_groups": 42,
+   "bytes": 27216,
+   "cases": 9,
+   "file": "v4-input-opus-decode-failure.json",
+   "generation": "f1-fix-capture",
+   "label": "F1 focused audio_decode capture attempt: synthetic socket+provider boundary only, zero real provider requests",
+   "methods": {
+    "relay.voice.capture.finish": {
+     "ok": 3
+    },
+    "relay.voice.capture.result": {
+     "ok": 3
+    },
+    "relay.voice.capture.start": {
+     "ok": 3
+    }
+   },
+   "not_captured": [],
+   "note": "three fixed corrupt Opus bodies with valid TOC through the REAL ffmpeg decoder; all three answered failed(audio_decode)",
+   "origin": "registered-capture",
+   "sha256": "2209865a4a1c503dbacfe046be7bd5361b59ec58c6839e939c8b731631c5fc48"
   }
  ],
  "foundation_sha256": "69b5ae59dac9d3a545e8b7387a17ec4a5a229df3967b14622214deb0520fab39",
@@ -550,6 +573,7 @@
   "fix2_boundary": "c6ee3068..d880ee47 changes admission (speech/store) only; every wire/stream/text/source/capture plugin file is byte-identical (evidence/f1-boundary.json)",
   "sdk_admitted_head": "d880ee47a38fcfaf072afbd38090d9cb0667f6a8",
   "sdk_capture_test_commit": "c7537d361eba913e60ba4c254bd39fb4360c44b2",
+  "sdk_f1_audio_decode_capture_commit": "820db74bf084701e9d04b715ff3d935593ac484a",
   "sdk_head_of_f1_files": "c6ee3068af90c674357f1912a8d567d17253694d"
  },
  "purpose": "Relay canonical-voice v1 protocol vectors for the Android-free native codec (V4). Synthetic content, zero REAL provider requests.",
@@ -560,6 +584,19 @@
   "native tests label their own constructed negatives; none is stored here"
  ],
  "runs": {
+  "f1-capture-audio-decode": {
+   "argv_shape": "scripts/run_tests.sh -j 1 --file-retries 0 -W error -q -rA <one test file>",
+   "automatic_retries": 0,
+   "command_json_sha256": "3ed665dcc42a4c66173a2f40cca177f40a7dd40e5a52196d7f2328d52c6f6b84",
+   "core_head": "babda6d96ae64bea18747f87b17273db40849ebf",
+   "core_tree": "1490dfcffaa7f6ee1bfae7e075b82cc56727a43b",
+   "exit": 0,
+   "guard_sha256": "13713c1161146c317db2993effb7ce2bdb3c9bf7f1d74bdca805a5e339a586c7",
+   "junit_sha256": "3c89797ebc8a4b3674d838444e0f3a5296b4e4e72f715a1cc30b3f616fb87ead",
+   "sdk_dirty": [],
+   "sdk_head": "820db74bf084701e9d04b715ff3d935593ac484a",
+   "sdk_tree": "a4edb4e0d8a010bc3503c8a0f553621a0eaea33a"
+  },
   "v4-capture-input": {
    "argv_shape": "scripts/run_tests.sh -j 1 --file-retries 0 -W error -q -rA <one test file>",
    "automatic_retries": 0,
