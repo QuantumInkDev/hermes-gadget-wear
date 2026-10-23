@@ -1339,9 +1339,12 @@ Fix round 2 (scoped review `b7243868…` of fix round 1: I-A/I-B closed, I-C clo
   is tied to the current conversation, so neither can see an earlier id after a rebind; the new read-only core seam `read_delegated_request_use`
   (`NATIVE_DELEGATED_REQUEST_USE_VERSION = 1`, delegation ABI 3 untouched) answers for the caller's OWN principal across every conversation, including a
   deleted conversation's retained tombstone, as a content-free boolean. With existing conversations enabled and the seam absent, voice is not opened
-  (fixed log text); existing conversations and text are unaffected. A failing proof refuses only that `capture.start`. Residual: core's principal does not
-  carry the key generation, so an id spent under an earlier key of the same device is also refused for a later key within the retention window (stricter,
-  never weaker).
+  (fixed log text); existing conversations and text are unaffected. A failing proof refuses only that `capture.start`. Key generation (corrected in fix round 3; the earlier
+  blanket "stricter, never weaker" was wrong): the SDK identity includes the authenticated key generation and the core principal does not, so the rule is asymmetric.
+  Existing turn -> capture: the UUID stays spent for a rekeyed session of the same core principal (conservative `conflict`, no admission, no content). Capture -> existing
+  turn: an earlier key's capture is its own SDK identity and not a turn admission, so the new key's existing turn may use the UUID once under its current grant, delegation and
+  core receipt-first admission, with no right over the old capture (accepted fix1 namespace rule; cost if wrong: an explicit conflict on a deliberately reused fresh UUID,
+  never a second execution). Another profile shares nothing in either direction. Covered by `test_relay_voice_fix3_isolation.py` (real key replacement and two real profiles).
 * **Quota/rows.** No SDK storage was added for N-2: the voice database stays schema 2 and the logical capture identity limits stay the original 256 per
   device / 4,096 in the store (a logical limit; physical SQL rows can be up to twice that: rows plus reservations, ≤ 8,192 in the store) inside the unchanged
   128 MiB page ceiling. No higher quota is claimed or approved by anyone. The 7-day hold still allows about 36 `capture.start` a day on average.
