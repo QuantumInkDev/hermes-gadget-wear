@@ -459,6 +459,87 @@ class VoiceCombinationTest {
         for ((name, value) in refused) assertTrue(name, value == null)
     }
 
+    private fun checkSpeech(
+        state: SpeechState,
+        reason: SpeechReason?,
+        provider: VoiceProvider,
+        stream: Int?,
+        withSource: Boolean,
+        chunks: List<SpeechChunk>?,
+        voice: String?
+    ): Boolean {
+        val value =
+            speech(state, reason, provider, stream, withSource, chunks, voice) ?: return false
+        val describe = value.toString()
+        val reasonStates = setOf(SpeechState.ABORTED, SpeechState.FAILED, SpeechState.UNAVAILABLE)
+        assertEquals(describe, state in reasonStates, reason != null)
+        if (reason != null) assertEquals(describe, reason.state, state)
+        assertEquals(describe, state == SpeechState.TEXT, chunks != null)
+        if (voice != null) assertEquals(describe, SpeechState.TEXT, state)
+        if (state.unrecorded) {
+            assertTrue(describe, stream == null && !withSource && chunks == null)
+            assertEquals(describe, VoiceProvider.NOT_STARTED, provider)
+        }
+        if (state == SpeechState.TEXT) {
+            assertTrue(describe, withSource && stream == null)
+            assertEquals(describe, VoiceProvider.NOT_STARTED, provider)
+        }
+        if (state == SpeechState.UNKNOWN) assertEquals(VoiceProvider.UNKNOWN, provider)
+        if (state == SpeechState.STREAMING) assertTrue(describe, stream != null)
+        val audio = state == SpeechState.STREAMING || state == SpeechState.COMPLETED
+        if (audio) {
+            assertTrue(
+                describe,
+                provider == VoiceProvider.COMPLETED || provider == VoiceProvider.NOT_STARTED
+            )
+        }
+        if (provider == VoiceProvider.IN_FLIGHT) {
+            assertTrue(describe, state == SpeechState.PREPARING || state == SpeechState.STOPPED)
+        }
+        if (reason == SpeechReason.TTS_UNAVAILABLE) {
+            assertEquals(VoiceProvider.NOT_STARTED, provider)
+        }
+        return true
+    }
+
+    @Test fun theWholeSpeechProductSpaceOnlyAcceptsWhatTheRulesAllow() {
+        var accepted = 0
+        var total = 0
+        val reasons = listOf<SpeechReason?>(null) + SpeechReason.entries
+        val streams = listOf<Int?>(null, 1)
+        val chunkOptions = listOf<List<SpeechChunk>?>(null, chunk)
+        val voices = listOf<String?>(null, "v")
+        for (state in SpeechState.entries) {
+            for (reason in reasons) {
+                for (provider in VoiceProvider.entries) {
+                    for (stream in streams) {
+                        for (withSource in listOf(false, true)) {
+                            for (chunks in chunkOptions) {
+                                for (voice in voices) {
+                                    total++
+                                    if (checkSpeech(
+                                            state,
+                                            reason,
+                                            provider,
+                                            stream,
+                                            withSource,
+                                            chunks,
+                                            voice
+                                        )
+                                    ) {
+                                        accepted++
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assertEquals(13 * 10 * 5 * 2 * 2 * 2 * 2, total)
+        assertTrue("accepted $accepted of $total", accepted in 60..1_200)
+    }
+
     @Test fun sourceAndRangeComeTogetherAndStayInsideTheProcessedPrefix() {
         assertTrue(speech(SpeechState.PREPARING, withSource = true) != null)
         // range inside the speakable end, done exactly at it
