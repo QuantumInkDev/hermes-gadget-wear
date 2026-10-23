@@ -364,9 +364,10 @@ class RelayStateSnapshotTest {
                 emptyList()
             )
         assertEquals(RestoreRefusal.DUPLICATE, refusal(restore(dup)).reason)
+        // Version 2 is the current aggregate (it adds the capture section); only an unknown version is refused.
         val wrongVersion =
             RelayStateSnapshot(
-                2,
+                3,
                 TurnLedgerSnapshot(listOf(valid), emptyList()),
                 emptyList(),
                 emptyList()

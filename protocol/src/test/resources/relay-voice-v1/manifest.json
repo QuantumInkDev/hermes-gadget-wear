@@ -1,0 +1,590 @@
+{
+ "files": [
+  {
+   "bytes": 1187,
+   "cases": null,
+   "file": "v3-downlink-abort-frame.json",
+   "generation": "f1-output",
+   "label": "f1-final-vectors",
+   "origin": "registered-capture",
+   "producer": "F1 SDK c6ee3068; reused unchanged",
+   "sha256": "6de2262381d309d4218cd910399e2d71473d494318d1c00b7a989a2b1829123b"
+  },
+  {
+   "bytes": 2291,
+   "cases": null,
+   "file": "v3-downlink-opus-frames.json",
+   "generation": "f1-output",
+   "label": "f1-final-vectors",
+   "origin": "registered-capture",
+   "producer": "F1 SDK c6ee3068; reused unchanged",
+   "sha256": "d51a926da50421f3685bb052c42b4aabb13831811c9735d64085b46b87431cd8"
+  },
+  {
+   "bytes": 14413,
+   "cases": null,
+   "file": "v3-downlink-pcm-frames.json",
+   "generation": "f1-output",
+   "label": "f1-final-vectors",
+   "origin": "registered-capture",
+   "producer": "F1 SDK c6ee3068; reused unchanged",
+   "sha256": "8b0a1cbd2173b42e9561a91fa7e11931b7fd6db3ac32a3174e9628caeca9356d"
+  },
+  {
+   "bytes": 220577,
+   "cases": 28,
+   "file": "v3-range-vectors.json",
+   "generation": "f1-output",
+   "label": "f1-final-vectors",
+   "origin": "pure-engine-derivation-with-constructed-negatives",
+   "producer": "F1 SDK c6ee3068; reused unchanged",
+   "sha256": "6a7ded1b1d9ea974d68c5c69c3b4ea0b3b2f57d5e7f06b0e36a0fe3fb159de3a"
+  },
+  {
+   "bytes": 11137,
+   "cases": 12,
+   "file": "v3-speak-responses.json",
+   "generation": "f1-output",
+   "label": "f1-final-vectors",
+   "origin": "registered-capture",
+   "producer": "F1 SDK c6ee3068; reused unchanged",
+   "sha256": "69cf54732ea6a1d3d7e7f04692fafee7c7074b52dd2b21b9a2f4a6cf0520ec95"
+  },
+  {
+   "binary_groups": 0,
+   "bytes": 33195,
+   "cases": 22,
+   "file": "v4-input-discard.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.capture.discard": {
+     "error:invalid_request": 4,
+     "error:not_found": 2,
+     "ok": 6
+    },
+    "relay.voice.capture.finish": {
+     "ok": 4
+    },
+    "relay.voice.capture.result": {
+     "ok": 1
+    },
+    "relay.voice.capture.start": {
+     "ok": 5
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "0315c1d35ab3db00695fdb713e00a678d1780f26b871956f4fdc70a1b24ffb21"
+  },
+  {
+   "binary_groups": 0,
+   "bytes": 61789,
+   "cases": 40,
+   "file": "v4-input-finish-failures.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.capture.discard": {
+     "ok": 1
+    },
+    "relay.voice.capture.finish": {
+     "error:invalid_request": 6,
+     "error:not_found": 2,
+     "ok": 15
+    },
+    "relay.voice.capture.start": {
+     "ok": 16
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "0d8ccb0eca65e79ec142451953d124cd5fa4712d9b5baabef471d185082b5afd"
+  },
+  {
+   "binary_groups": 0,
+   "bytes": 11165,
+   "cases": 5,
+   "file": "v4-input-info.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.info": {
+     "error:invalid_request": 1,
+     "error:permission_denied": 1,
+     "ok": 3
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "62473b995a511505016d40933f1927eafa84253f62c669a7d4296137d2d15897"
+  },
+  {
+   "binary_groups": 0,
+   "bytes": 11880,
+   "cases": 5,
+   "file": "v4-input-long-poll.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.capture.finish": {
+     "ok": 1
+    },
+    "relay.voice.capture.result": {
+     "ok": 1
+    },
+    "relay.voice.capture.start": {
+     "ok": 1
+    },
+    "relay.voice.info": {
+     "ok": 2
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "47aab110b8fccb89567b03735c02442ef32db9da295e926df2cea27bf75930e5"
+  },
+  {
+   "binary_groups": 0,
+   "bytes": 21453,
+   "cases": 12,
+   "file": "v4-input-restart.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.capture.finish": {
+     "ok": 4
+    },
+    "relay.voice.capture.result": {
+     "ok": 4
+    },
+    "relay.voice.capture.start": {
+     "ok": 4
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "27652088a195891c4d9ed2c678932cd3bea8481fe4e1a2400d0185233e27cca0"
+  },
+  {
+   "binary_groups": 0,
+   "bytes": 22360,
+   "cases": 12,
+   "file": "v4-input-result-progress.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.capture.finish": {
+     "ok": 3
+    },
+    "relay.voice.capture.result": {
+     "ok": 6
+    },
+    "relay.voice.capture.start": {
+     "ok": 3
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "9f4439ae3142753c10b7ba4006d576446b65fc913477692e9082b47f71bedf1f"
+  },
+  {
+   "binary_groups": 0,
+   "bytes": 62212,
+   "cases": 40,
+   "file": "v4-input-result-terminal.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.capture.finish": {
+     "ok": 10
+    },
+    "relay.voice.capture.result": {
+     "error:invalid_request": 6,
+     "error:not_found": 2,
+     "error:permission_denied": 1,
+     "ok": 11
+    },
+    "relay.voice.capture.start": {
+     "ok": 10
+    }
+   },
+   "not_captured": [
+    {
+     "reason": "see v4-input-uplink-opus",
+     "what": "failed(audio_decode)"
+    },
+    {
+     "reason": "captured in v4-input-restart",
+     "what": "failed(interrupted)/unknown after restart"
+    }
+   ],
+   "origin": "registered-capture",
+   "sha256": "8a3f76243d5f4bdffcd6bef08b784247d2f1c67c49f9ab9c7694a85813526173"
+  },
+  {
+   "binary_groups": 0,
+   "bytes": 4208,
+   "cases": 2,
+   "file": "v4-input-seam-absent.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.capture.start": {
+     "error:unsupported": 1
+    },
+    "relay.voice.info": {
+     "error:unsupported": 1
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "d0287366d7f04aa53dc8b4eddd7f57c5c6671e031cc55e09048edc892f70c2e6"
+  },
+  {
+   "binary_groups": 0,
+   "bytes": 42720,
+   "cases": 30,
+   "file": "v4-input-start.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.capture.discard": {
+     "ok": 1
+    },
+    "relay.voice.capture.start": {
+     "error:busy": 1,
+     "error:conflict": 2,
+     "error:expired": 2,
+     "error:invalid_request": 19,
+     "error:permission_denied": 1,
+     "error:stale_binding": 1,
+     "error:stale_epoch": 1,
+     "ok": 2
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "c2b88427c498886e181d8c7613d2e24ef28fce502efb07d42fcf6a0bfeafc2a9"
+  },
+  {
+   "binary_groups": 33,
+   "bytes": 30831,
+   "cases": 12,
+   "file": "v4-input-uplink-opus.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.capture.finish": {
+     "ok": 6
+    },
+    "relay.voice.capture.start": {
+     "ok": 6
+    }
+   },
+   "not_captured": [
+    {
+     "reason": "unreachable on the rig without replacing the local decoder (the existing test monkeypatches it); a real packet stream decodes",
+     "what": "failed(audio_decode)"
+    }
+   ],
+   "origin": "registered-capture",
+   "sha256": "4ea45c3bcc09c03de1e034e144eb34eda2e6b5b80f5a738b9fb9b887bc8cd637"
+  },
+  {
+   "binary_groups": 28,
+   "bytes": 48742,
+   "cases": 6,
+   "file": "v4-input-uplink-pcm.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.capture.finish": {
+     "error:conflict": 1,
+     "ok": 3
+    },
+    "relay.voice.capture.start": {
+     "ok": 2
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "d01768e4eacb87b1cb463e7a36a134f16dd9df50697ee0828b38673571d018b6"
+  },
+  {
+   "binary_groups": 0,
+   "bytes": 7567,
+   "cases": 2,
+   "file": "v4-output-info-both.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.info": {
+     "ok": 2
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "91812401a9ef05052d55fe1a0ee7d2a6842bd0892900b76739d5f6b94c7db9a8"
+  },
+  {
+   "binary_groups": 0,
+   "bytes": 4567,
+   "cases": 1,
+   "file": "v4-output-info-opus.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.info": {
+     "ok": 1
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "a695174db29195458d88a2b54fa0173260e1d6169ae9db755ed92df0815de39f"
+  },
+  {
+   "binary_groups": 0,
+   "bytes": 4497,
+   "cases": 1,
+   "file": "v4-output-info-output-only.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.info": {
+     "ok": 1
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "ceb674ca702cccd441e04da8c850825490ee3214493ab031f44b35bc2d536a2a"
+  },
+  {
+   "binary_groups": 0,
+   "bytes": 14335,
+   "cases": 2,
+   "file": "v4-output-limited-refused.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.speak": {
+     "ok": 2
+    }
+   },
+   "not_captured": [
+    {
+     "reason": "needs a lineage above 65,536 visible rows or a shrunk locate bound; the existing test patches the bound, which is not a registered wire capture",
+     "what": "unavailable(beyond_index)"
+    }
+   ],
+   "origin": "registered-capture",
+   "sha256": "94e8863fbec78c8b45b39ab3932e3f779fb6d544fdf5e593e809111702ab59c8"
+  },
+  {
+   "binary_groups": 0,
+   "bytes": 12802,
+   "cases": 4,
+   "file": "v4-output-restart.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.speak": {
+     "ok": 4
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "91347f54d3bf0b9f91017737e8a8ac7c7b9717832bb5f90b6f12de67f61601e5"
+  },
+  {
+   "binary_groups": 1,
+   "bytes": 7892,
+   "cases": 2,
+   "file": "v4-output-speak-abort-revoked.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.speak": {
+     "ok": 2
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "6857b8c34fa550446e9869bf360e33191f503237e54354da915568dcb87c3fbb"
+  },
+  {
+   "binary_groups": 1,
+   "bytes": 7916,
+   "cases": 2,
+   "file": "v4-output-speak-abort-stale-epoch.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.speak": {
+     "ok": 2
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "8e13fe8b15628bdc3ba30f4c159f2d8b30723fbf3af1a3c2495c9e2c4e808740"
+  },
+  {
+   "binary_groups": 1,
+   "bytes": 5563,
+   "cases": 1,
+   "file": "v4-output-speak-abort-stale-rebind.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.speak": {
+     "ok": 1
+    }
+   },
+   "not_captured": [
+    {
+     "reason": "the request names the old binding: the same speak is answered stale_binding (captured in F1 replay_stale_binding)",
+     "what": "receipt read after a rebind"
+    }
+   ],
+   "origin": "registered-capture",
+   "sha256": "36af061240994c7be81bca26aaff3310087671887d88a078bc4f9dbc9b8bc500"
+  },
+  {
+   "binary_groups": 4,
+   "bytes": 25097,
+   "cases": 8,
+   "file": "v4-output-speak-failures.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.speak": {
+     "ok": 8
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "6802426dcaf11ef5c26f25db20fdd6834c3fbb2dfd885f8eab8c73fb3ea38d68"
+  },
+  {
+   "binary_groups": 1,
+   "bytes": 31544,
+   "cases": 8,
+   "file": "v4-output-speak-live.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.speak": {
+     "error:conflict": 1,
+     "error:expired": 1,
+     "error:permission_denied": 2,
+     "ok": 4
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "a04b3d5e57af945286bc3204ab3b0f9639b355d2b1c9f79d9312143f18499965"
+  },
+  {
+   "binary_groups": 1,
+   "bytes": 93027,
+   "cases": 37,
+   "file": "v4-output-speak-more.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.speak": {
+     "error:conflict": 2,
+     "error:invalid_request": 31,
+     "ok": 4
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "bf4a866a57e6fe21a09da62032ee6ddbfc8437382d00f9593e73255dd5b3ecc1"
+  },
+  {
+   "binary_groups": 1,
+   "bytes": 20632,
+   "cases": 12,
+   "file": "v4-output-stop.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.speak": {
+     "ok": 2
+    },
+    "relay.voice.speak.stop": {
+     "error:invalid_request": 4,
+     "error:not_found": 2,
+     "error:permission_denied": 1,
+     "ok": 3
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "3f55496358af96e82ffa9c23ae35871c5becd295c5443ba4e1350f37993ef491"
+  },
+  {
+   "binary_groups": 1,
+   "bytes": 131789,
+   "cases": 4,
+   "file": "v4-output-streaming-stop.json",
+   "generation": "v4-capture",
+   "label": "v4-input-output-capture-gen1",
+   "methods": {
+    "relay.voice.speak": {
+     "ok": 3
+    },
+    "relay.voice.speak.stop": {
+     "ok": 1
+    }
+   },
+   "not_captured": [],
+   "origin": "registered-capture",
+   "sha256": "9e121bd38be395851a6e3afde7a6a2825a10cea7fc4db415302e70b26821d6cf"
+  }
+ ],
+ "foundation_sha256": "69b5ae59dac9d3a545e8b7387a17ec4a5a229df3967b14622214deb0520fab39",
+ "producer": {
+  "core_head": "babda6d96ae64bea18747f87b17273db40849ebf",
+  "fix2_boundary": "c6ee3068..d880ee47 changes admission (speech/store) only; every wire/stream/text/source/capture plugin file is byte-identical (evidence/f1-boundary.json)",
+  "sdk_admitted_head": "d880ee47a38fcfaf072afbd38090d9cb0667f6a8",
+  "sdk_capture_test_commit": "c7537d361eba913e60ba4c254bd39fb4360c44b2",
+  "sdk_head_of_f1_files": "c6ee3068af90c674357f1912a8d567d17253694d"
+ },
+ "purpose": "Relay canonical-voice v1 protocol vectors for the Android-free native codec (V4). Synthetic content, zero REAL provider requests.",
+ "rules": [
+  "captured: request text and response text are the exact frames of the registered stack through DeviceHub._on_text / _on_binary",
+  "pure: range vectors are derived from the pure engine, NOT wire captures",
+  "constructed: only the two labelled negatives in v3-range-vectors.json",
+  "native tests label their own constructed negatives; none is stored here"
+ ],
+ "runs": {
+  "v4-capture-input": {
+   "argv_shape": "scripts/run_tests.sh -j 1 --file-retries 0 -W error -q -rA <one test file>",
+   "automatic_retries": 0,
+   "command_json_sha256": "51583dff9bf787d7c4f71b0f56a31f3446b0b4335691513aca5290fa1d6a2711",
+   "core_head": "babda6d96ae64bea18747f87b17273db40849ebf",
+   "core_tree": "1490dfcffaa7f6ee1bfae7e075b82cc56727a43b",
+   "exit": 0,
+   "guard_sha256": "84405155cd3696e777829bb0685d797c88140b506ef7da2524c0bfdc34a4476d",
+   "junit_sha256": "d91afe7cd26a98076246d401468d9b0bd9bb2e58b57a33afec526d397687c143",
+   "sdk_dirty": [],
+   "sdk_head": "c7537d361eba913e60ba4c254bd39fb4360c44b2",
+   "sdk_tree": "21aaf2f0bc9d21fa137992fc19b6383948ddf51b"
+  },
+  "v4-capture-output": {
+   "argv_shape": "scripts/run_tests.sh -j 1 --file-retries 0 -W error -q -rA <one test file>",
+   "automatic_retries": 0,
+   "command_json_sha256": "874a87a795ee609d34bbc5196d96b2ab2fa988e2431ace824eb158c6f0e09621",
+   "core_head": "babda6d96ae64bea18747f87b17273db40849ebf",
+   "core_tree": "1490dfcffaa7f6ee1bfae7e075b82cc56727a43b",
+   "exit": 0,
+   "guard_sha256": "84405155cd3696e777829bb0685d797c88140b506ef7da2524c0bfdc34a4476d",
+   "junit_sha256": "ea1bf82ee13a28e082f60bd1af74e290e308ef7e91bc4e1386a80eb4b669a358",
+   "sdk_dirty": [],
+   "sdk_head": "c7537d361eba913e60ba4c254bd39fb4360c44b2",
+   "sdk_tree": "21aaf2f0bc9d21fa137992fc19b6383948ddf51b"
+  }
+ }
+}

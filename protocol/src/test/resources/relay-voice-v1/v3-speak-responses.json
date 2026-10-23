@@ -1,0 +1,423 @@
+{
+ "cases": {
+  "live_unknown_request_not_found": {
+   "request": {
+    "authority_epoch": 1,
+    "binding_id": "88ac42d3-bf80-449b-b0d1-5593fd7ea50a",
+    "format": "pcm16",
+    "message_id": null,
+    "mode": "live",
+    "output": "server",
+    "request_id": "01a14d69-299f-7000-a21e-649318111330",
+    "source_sha256": null,
+    "speech_id": "01a14d67-a308-7000-bc22-688cd38d1372",
+    "start_cp": 0,
+    "style": "full"
+   },
+   "response": {
+    "error": {
+     "code": "not_found"
+    },
+    "type": "relay.response",
+    "v": 1
+   }
+  },
+  "more_exhausted": {
+   "request": {
+    "authority_epoch": 1,
+    "binding_id": "88ac42d3-bf80-449b-b0d1-5593fd7ea50a",
+    "format": "pcm16",
+    "message_id": "6e87dff2-3cf6-5fb9-91b4-11756446af6a",
+    "mode": "more",
+    "output": "server",
+    "request_id": null,
+    "source_sha256": "27ebf69b1ecb7a358d86a4d53133ede23d2f3b9debb89e2603b250830983dddb",
+    "speech_id": "01a14d67-a302-7000-aed0-6636d0465f8e",
+    "start_cp": 41,
+    "style": "full"
+   },
+   "response": {
+    "result": {
+     "chunks": null,
+     "message_id": "6e87dff2-3cf6-5fb9-91b4-11756446af6a",
+     "provider": "not_started",
+     "range": null,
+     "reason": null,
+     "source": null,
+     "speech_id": "01a14d67-a302-7000-aed0-6636d0465f8e",
+     "state": "exhausted",
+     "stream": null,
+     "voice": null
+    },
+    "type": "relay.response",
+    "v": 1
+   }
+  },
+  "replay_client_text": {
+   "request": {
+    "authority_epoch": 1,
+    "binding_id": "88ac42d3-bf80-449b-b0d1-5593fd7ea50a",
+    "format": null,
+    "message_id": "6e87dff2-3cf6-5fb9-91b4-11756446af6a",
+    "mode": "replay",
+    "output": "client",
+    "request_id": null,
+    "source_sha256": null,
+    "speech_id": "01a14d67-a301-7000-90fc-6187166b2ac5",
+    "start_cp": 0,
+    "style": "full"
+   },
+   "response": {
+    "result": {
+     "chunks": [
+      {
+       "end_cp": 41,
+       "start_cp": 0,
+       "text": "Vector sentence one. Vector sentence two."
+      }
+     ],
+     "message_id": "6e87dff2-3cf6-5fb9-91b4-11756446af6a",
+     "provider": "not_started",
+     "range": {
+      "cut_inside_unit": false,
+      "done": true,
+      "end_cp": 41,
+      "sentences": 2,
+      "start_cp": 0
+     },
+     "reason": null,
+     "source": {
+      "limited": false,
+      "sha256": "27ebf69b1ecb7a358d86a4d53133ede23d2f3b9debb89e2603b250830983dddb",
+      "speakable_end_cp": 41,
+      "total_cp": 41
+     },
+     "speech_id": "01a14d67-a301-7000-90fc-6187166b2ac5",
+     "state": "text",
+     "stream": null,
+     "voice": "pNInz6obpgDQGcFmaJgB"
+    },
+    "type": "relay.response",
+    "v": 1
+   }
+  },
+  "replay_conflict_other_params": {
+   "request": {
+    "authority_epoch": 1,
+    "binding_id": "88ac42d3-bf80-449b-b0d1-5593fd7ea50a",
+    "format": "pcm16",
+    "message_id": "6e87dff2-3cf6-5fb9-91b4-11756446af6a",
+    "mode": "replay",
+    "output": "server",
+    "request_id": null,
+    "source_sha256": null,
+    "speech_id": "01a14d67-a300-7000-bdbb-1b2c33245e9b",
+    "start_cp": 0,
+    "style": "concise"
+   },
+   "response": {
+    "error": {
+     "code": "conflict"
+    },
+    "type": "relay.response",
+    "v": 1
+   }
+  },
+  "replay_invalid_missing_format": {
+   "request": {
+    "authority_epoch": 1,
+    "binding_id": "88ac42d3-bf80-449b-b0d1-5593fd7ea50a",
+    "format": null,
+    "message_id": "6e87dff2-3cf6-5fb9-91b4-11756446af6a",
+    "mode": "replay",
+    "output": "server",
+    "request_id": null,
+    "source_sha256": null,
+    "speech_id": "01a14d67-a304-7000-832b-074e54d6c2a2",
+    "start_cp": 0,
+    "style": "full"
+   },
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "type": "relay.response",
+    "v": 1
+   }
+  },
+  "replay_provider_failed_receipt_after": {
+   "frames": [
+    {
+     "body_hex": "06",
+     "kind": 20,
+     "seq": 0,
+     "stream": 1
+    }
+   ],
+   "receipt": {
+    "result": {
+     "chunks": null,
+     "message_id": "6e87dff2-3cf6-5fb9-91b4-11756446af6a",
+     "provider": "failed_after_send",
+     "range": {
+      "cut_inside_unit": false,
+      "done": true,
+      "end_cp": 41,
+      "sentences": 2,
+      "start_cp": 0
+     },
+     "reason": "provider_failed",
+     "source": {
+      "limited": false,
+      "sha256": "27ebf69b1ecb7a358d86a4d53133ede23d2f3b9debb89e2603b250830983dddb",
+      "speakable_end_cp": 41,
+      "total_cp": 41
+     },
+     "speech_id": "01a14d67-a309-7000-9238-a440805bfb72",
+     "state": "failed",
+     "stream": 1,
+     "voice": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "request": {
+    "authority_epoch": 1,
+    "binding_id": "88ac42d3-bf80-449b-b0d1-5593fd7ea50a",
+    "format": "pcm16",
+    "message_id": "6e87dff2-3cf6-5fb9-91b4-11756446af6a",
+    "mode": "replay",
+    "output": "server",
+    "request_id": null,
+    "source_sha256": null,
+    "speech_id": "01a14d67-a309-7000-9238-a440805bfb72",
+    "start_cp": 0,
+    "style": "concise"
+   },
+   "response": {
+    "result": {
+     "chunks": null,
+     "message_id": "6e87dff2-3cf6-5fb9-91b4-11756446af6a",
+     "provider": "not_started",
+     "range": {
+      "cut_inside_unit": false,
+      "done": true,
+      "end_cp": 41,
+      "sentences": 2,
+      "start_cp": 0
+     },
+     "reason": null,
+     "source": {
+      "limited": false,
+      "sha256": "27ebf69b1ecb7a358d86a4d53133ede23d2f3b9debb89e2603b250830983dddb",
+      "speakable_end_cp": 41,
+      "total_cp": 41
+     },
+     "speech_id": "01a14d67-a309-7000-9238-a440805bfb72",
+     "state": "preparing",
+     "stream": 1,
+     "voice": null
+    },
+    "type": "relay.response",
+    "v": 1
+   }
+  },
+  "replay_receipt": {
+   "request": {
+    "authority_epoch": 1,
+    "binding_id": "88ac42d3-bf80-449b-b0d1-5593fd7ea50a",
+    "format": "pcm16",
+    "message_id": "6e87dff2-3cf6-5fb9-91b4-11756446af6a",
+    "mode": "replay",
+    "output": "server",
+    "request_id": null,
+    "source_sha256": null,
+    "speech_id": "01a14d67-a300-7000-bdbb-1b2c33245e9b",
+    "start_cp": 0,
+    "style": "full"
+   },
+   "response": {
+    "result": {
+     "chunks": null,
+     "message_id": "6e87dff2-3cf6-5fb9-91b4-11756446af6a",
+     "provider": "completed",
+     "range": {
+      "cut_inside_unit": false,
+      "done": true,
+      "end_cp": 41,
+      "sentences": 2,
+      "start_cp": 0
+     },
+     "reason": null,
+     "source": {
+      "limited": false,
+      "sha256": "27ebf69b1ecb7a358d86a4d53133ede23d2f3b9debb89e2603b250830983dddb",
+      "speakable_end_cp": 41,
+      "total_cp": 41
+     },
+     "speech_id": "01a14d67-a300-7000-bdbb-1b2c33245e9b",
+     "state": "completed",
+     "stream": 1,
+     "voice": null
+    },
+    "type": "relay.response",
+    "v": 1
+   }
+  },
+  "replay_server_pcm_success": {
+   "request": {
+    "authority_epoch": 1,
+    "binding_id": "88ac42d3-bf80-449b-b0d1-5593fd7ea50a",
+    "format": "pcm16",
+    "message_id": "6e87dff2-3cf6-5fb9-91b4-11756446af6a",
+    "mode": "replay",
+    "output": "server",
+    "request_id": null,
+    "source_sha256": null,
+    "speech_id": "01a14d67-a300-7000-bdbb-1b2c33245e9b",
+    "start_cp": 0,
+    "style": "full"
+   },
+   "response": {
+    "result": {
+     "chunks": null,
+     "message_id": "6e87dff2-3cf6-5fb9-91b4-11756446af6a",
+     "provider": "not_started",
+     "range": {
+      "cut_inside_unit": false,
+      "done": true,
+      "end_cp": 41,
+      "sentences": 2,
+      "start_cp": 0
+     },
+     "reason": null,
+     "source": {
+      "limited": false,
+      "sha256": "27ebf69b1ecb7a358d86a4d53133ede23d2f3b9debb89e2603b250830983dddb",
+      "speakable_end_cp": 41,
+      "total_cp": 41
+     },
+     "speech_id": "01a14d67-a300-7000-bdbb-1b2c33245e9b",
+     "state": "preparing",
+     "stream": 1,
+     "voice": null
+    },
+    "type": "relay.response",
+    "v": 1
+   }
+  },
+  "replay_stale_binding": {
+   "request": {
+    "authority_epoch": 1,
+    "binding_id": "e8ae3155-ac95-4e66-b23d-b7e738358536",
+    "format": "pcm16",
+    "message_id": "6e87dff2-3cf6-5fb9-91b4-11756446af6a",
+    "mode": "replay",
+    "output": "server",
+    "request_id": null,
+    "source_sha256": null,
+    "speech_id": "01a14d67-a305-7000-b622-c48fcb5f977d",
+    "start_cp": 0,
+    "style": "full"
+   },
+   "response": {
+    "error": {
+     "code": "stale_binding"
+    },
+    "type": "relay.response",
+    "v": 1
+   }
+  },
+  "replay_stale_epoch": {
+   "request": {
+    "authority_epoch": 12345,
+    "binding_id": "88ac42d3-bf80-449b-b0d1-5593fd7ea50a",
+    "format": "pcm16",
+    "message_id": "6e87dff2-3cf6-5fb9-91b4-11756446af6a",
+    "mode": "replay",
+    "output": "server",
+    "request_id": null,
+    "source_sha256": null,
+    "speech_id": "01a14d67-a306-7000-ac21-35c2cb5fbe0d",
+    "start_cp": 0,
+    "style": "full"
+   },
+   "response": {
+    "error": {
+     "code": "stale_epoch"
+    },
+    "type": "relay.response",
+    "v": 1
+   }
+  },
+  "replay_unknown_message_not_found": {
+   "request": {
+    "authority_epoch": 1,
+    "binding_id": "88ac42d3-bf80-449b-b0d1-5593fd7ea50a",
+    "format": "pcm16",
+    "message_id": "92293691-1a71-4969-8fc2-b971e1250d9b",
+    "mode": "replay",
+    "output": "server",
+    "request_id": null,
+    "source_sha256": null,
+    "speech_id": "01a14d67-a303-7000-a1f1-9de9dd786c6e",
+    "start_cp": 0,
+    "style": "full"
+   },
+   "response": {
+    "error": {
+     "code": "not_found"
+    },
+    "type": "relay.response",
+    "v": 1
+   }
+  },
+  "replay_user_role_not_speakable": {
+   "request": {
+    "authority_epoch": 1,
+    "binding_id": "88ac42d3-bf80-449b-b0d1-5593fd7ea50a",
+    "format": "pcm16",
+    "message_id": "f46cf010-a98d-5328-aee6-b764944dbbac",
+    "mode": "replay",
+    "output": "server",
+    "request_id": null,
+    "source_sha256": null,
+    "speech_id": "01a14d67-a307-7000-884b-63d6f20f636c",
+    "start_cp": 0,
+    "style": "full"
+   },
+   "response": {
+    "result": {
+     "chunks": null,
+     "message_id": "f46cf010-a98d-5328-aee6-b764944dbbac",
+     "provider": "not_started",
+     "range": null,
+     "reason": null,
+     "source": null,
+     "speech_id": "01a14d67-a307-7000-884b-63d6f20f636c",
+     "state": "not_speakable",
+     "stream": null,
+     "voice": null
+    },
+    "type": "relay.response",
+    "v": 1
+   }
+  }
+ },
+ "note": "captured from real registered requests",
+ "provenance": {
+  "captured_by": "test_relay_voice_v3_vectors.py",
+  "label": "f1-final-vectors",
+  "plugin_sha256": {
+   "relay_voice_source.py": "353f5dfc4f5f00e56618d25dd7d1475473604fc8f136e7cdfdf596e4091f0b98",
+   "relay_voice_speech.py": "316d007adf6ffd11b281ca1a83be1e811baa46be5eaf6b29cc80b57916211981",
+   "relay_voice_store.py": "4a7e1ce13a9e3447867f5962fde8327e52eaae610d5da4a637b893c763ea8faa",
+   "relay_voice_stream.py": "41155434f619b356a410c9c02572f002278d8e08f1691541c8693048cf9ec6c4",
+   "relay_voice_text.py": "88ddb2408175c5bce32813ebe1dc08c00a0c94493d5b4c558e093d4b79809a15",
+   "relay_voice_wire.py": "3ccda3f5b73896befcc7524e33d004b71d927bedbbcb17b1e854fb0e351ab0b3"
+  },
+  "rig": "registered GatewayRunner/SessionAuthority/GadgetAdapter/Relay bridge/journal/core history; only the socket and the TTS provider boundary are synthetic",
+  "test_sha256": "68023618788e3b422c0a1fa47f58086c1d85700701d29e44a3a3cc65657b8134"
+ },
+ "vector": "v3-speak-responses"
+}

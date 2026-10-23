@@ -33,10 +33,22 @@ enum class RelayMethod(
     EXISTING_TASKS_LIST("relay.existing.tasks.list"),
     EXISTING_PROMPT_GET("relay.existing.prompt.get"),
     OUTBOX_READ("relay.outbox.read", RelayLimits.OUTBOX_READ_BYTES, RelayLimits.DEPTH),
-    OUTBOX_ACK("relay.outbox.ack", RelayLimits.OUTBOX_READ_BYTES, RelayLimits.DEPTH);
+    OUTBOX_ACK("relay.outbox.ack", RelayLimits.OUTBOX_READ_BYTES, RelayLimits.DEPTH),
+
+    // Canonical conversation voice (`relay_voice_wire.BOUNDS`): info/start/discard/stop 8,192 bytes, finish/result/speak 32,768; depth is the shared 6.
+    VOICE_INFO("relay.voice.info"),
+    VOICE_CAPTURE_START("relay.voice.capture.start"),
+    VOICE_CAPTURE_FINISH("relay.voice.capture.finish", RelayLimits.VOICE_LARGE_BYTES),
+    VOICE_CAPTURE_RESULT("relay.voice.capture.result", RelayLimits.VOICE_LARGE_BYTES),
+    VOICE_CAPTURE_DISCARD("relay.voice.capture.discard"),
+    VOICE_SPEAK("relay.voice.speak", RelayLimits.VOICE_LARGE_BYTES),
+    VOICE_SPEAK_STOP("relay.voice.speak.stop");
 
     /** O5 methods answer with the first nine stable error codes only. */
     val isOutbox: Boolean get() = this == OUTBOX_READ || this == OUTBOX_ACK
+
+    /** The seven canonical-voice methods; a build that predates them keeps the name as an unknown method of `relay.info`. */
+    val isVoice: Boolean get() = wire.startsWith("relay.voice.")
 
     companion object {
         private val byWire: Map<String, RelayMethod> = entries.associateBy { it.wire }

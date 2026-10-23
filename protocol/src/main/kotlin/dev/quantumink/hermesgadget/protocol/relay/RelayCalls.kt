@@ -1,5 +1,6 @@
 package dev.quantumink.hermesgadget.protocol.relay
 
+import dev.quantumink.hermesgadget.protocol.relay.voice.VoiceCalls
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -348,6 +349,13 @@ object RelayCalls {
         RelayMethod.EXISTING_PROMPT_GET -> ExistingPrompt::decode
         RelayMethod.OUTBOX_READ -> OutboxPage::decode
         RelayMethod.OUTBOX_ACK -> Acknowledged::decode
+        RelayMethod.VOICE_INFO,
+        RelayMethod.VOICE_CAPTURE_START,
+        RelayMethod.VOICE_CAPTURE_FINISH,
+        RelayMethod.VOICE_CAPTURE_RESULT,
+        RelayMethod.VOICE_CAPTURE_DISCARD,
+        RelayMethod.VOICE_SPEAK,
+        RelayMethod.VOICE_SPEAK_STOP -> VoiceCalls.resultDecoder(method)
     }
 
     // -- shared validation ------------------------------------------------------------------------------
@@ -549,6 +557,14 @@ object RelayCalls {
             }
             RelayMethod.EXISTING_PROMPT_GET ->
                 existingPrompt(reader(setOf("binding_id")).id("binding_id", BindingId::of))
+            RelayMethod.VOICE_INFO,
+            RelayMethod.VOICE_CAPTURE_START,
+            RelayMethod.VOICE_CAPTURE_FINISH,
+            RelayMethod.VOICE_CAPTURE_RESULT,
+            RelayMethod.VOICE_CAPTURE_DISCARD,
+            RelayMethod.VOICE_SPEAK,
+            RelayMethod.VOICE_SPEAK_STOP -> VoiceCalls.fromWire(method, params)
+                ?: throw DecodeFailure("params")
             RelayMethod.OUTBOX_READ -> reader(emptySet(), setOf("limit")).let {
                 outboxRead(limit(it))
             }

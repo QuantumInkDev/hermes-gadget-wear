@@ -274,7 +274,10 @@ class RelayEnvelopeTest {
     }
 
     @Test fun methodNamesAndLimitsComeFromTheAcceptedSdk() {
-        assertEquals(22, RelayMethod.entries.size)
+        // The 22 Task1 methods are unchanged; the seven canonical-voice methods (V4) are the only additions.
+        assertEquals(22, RelayMethod.entries.count { !it.isVoice })
+        assertEquals(7, RelayMethod.entries.count { it.isVoice })
+        assertEquals(29, RelayMethod.entries.size)
         assertEquals(RelayMethod.OUTBOX_ACK, RelayMethod.fromWire("relay.outbox.ack"))
         assertNull(RelayMethod.fromWire("relay.bogus"))
         assertEquals(

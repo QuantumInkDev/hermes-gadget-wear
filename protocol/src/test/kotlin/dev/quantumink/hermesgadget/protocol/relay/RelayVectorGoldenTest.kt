@@ -283,25 +283,27 @@ class RelayVectorGoldenTest {
             "7c17e6d72a3b9ec2974b3566f02dab1ed4b94eae",
             manifest["core"]!!.jsonObject["head"]!!.jsonPrimitive.content
         )
-        val methods = RelayMethod.entries.filter { m ->
+        // Task1 vectors cover the 22 Relay methods; the seven voice methods have their own vectors (relay-voice-v1).
+        val relayMethods = RelayMethod.entries.filter { !it.isVoice }
+        val methods = relayMethods.filter { m ->
             cases.any {
                 it.method == m.wire &&
                     it.isSuccess
             }
         }
         assertEquals(
-            "success vector missing for ${RelayMethod.entries - methods.toSet()}",
-            RelayMethod.entries.toSet(),
+            "success vector missing for ${relayMethods - methods.toSet()}",
+            relayMethods.toSet(),
             methods.toSet()
         )
         // Methods with no real captured error vector are named; every other one has at least one.
-        val withError = RelayMethod.entries.filter { m ->
+        val withError = relayMethods.filter { m ->
             cases.any {
                 it.method == m.wire &&
                     !it.isSuccess
             }
         }.toSet()
-        assertEquals(NO_CAPTURED_ERROR, RelayMethod.entries.toSet() - withError)
+        assertEquals(NO_CAPTURED_ERROR, relayMethods.toSet() - withError)
         // Per-file digests in the manifest are the files as they are now (nothing edited after the capture).
         for (entry in manifest["coverage"]!!.jsonArray.map { it.jsonObject }) {
             val file = entry["file"]!!.jsonPrimitive.content

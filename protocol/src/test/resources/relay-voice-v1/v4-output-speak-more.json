@@ -1,0 +1,1789 @@
+{
+ "binary": [
+  {
+   "case": "speak/ok-more-server-pcm-preparing",
+   "device": "phone",
+   "direction": "downlink",
+   "frames": [
+    {
+     "kind": 18,
+     "raw_hex": "0501000012e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803",
+     "seq": 0,
+     "stream": 1
+    },
+    {
+     "kind": 18,
+     "raw_hex": "0501010012e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803",
+     "seq": 1,
+     "stream": 1
+    },
+    {
+     "kind": 18,
+     "raw_hex": "0501020012e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803",
+     "seq": 2,
+     "stream": 1
+    },
+    {
+     "kind": 18,
+     "raw_hex": "0501030012e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803",
+     "seq": 3,
+     "stream": 1
+    },
+    {
+     "kind": 18,
+     "raw_hex": "0501040012e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803e803",
+     "seq": 4,
+     "stream": 1
+    },
+    {
+     "kind": 19,
+     "raw_hex": "050105001300000005",
+     "seq": 5,
+     "stream": 1
+    }
+   ],
+   "stream": 1
+  }
+ ],
+ "case_counts": {
+  "relay.voice.speak": 37
+ },
+ "cases": [
+  {
+   "device": "phone",
+   "id": "speak/ok-replay-client-first-range-not-done",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "ok",
+   "request": {
+    "id": "v4q001",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": null,
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "client",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a300-7000-98fc-e7653d9b1c09",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q001\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a300-7000-98fc-e7653d9b1c09\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"client\",\"format\":null}}",
+   "response": {
+    "id": "v4q001",
+    "result": {
+     "chunks": [
+      {
+       "end_cp": 448,
+       "start_cp": 0,
+       "text": "Sentence number 0 is part of a synthetic walking reply. Sentence number 1 is part of a synthetic walking reply. Sentence number 2 is part of a synthetic walking reply. Sentence number 3 is part of a synthetic walking reply. Sentence number 4 is part of a synthetic walking reply. Sentence number 5 is part of a synthetic walking reply. Sentence number 6 is part of a synthetic walking reply. Sentence number 7 is part of a synthetic walking reply. "
+      },
+      {
+       "end_cp": 845,
+       "start_cp": 448,
+       "text": "Sentence number 8 is part of a synthetic walking reply. Sentence number 9 is part of a synthetic walking reply. Sentence number 10 is part of a synthetic walking reply. Sentence number 11 is part of a synthetic walking reply. Sentence number 12 is part of a synthetic walking reply. Sentence number 13 is part of a synthetic walking reply. Sentence number 14 is part of a synthetic walking reply. "
+      },
+      {
+       "end_cp": 1244,
+       "start_cp": 845,
+       "text": "Sentence number 15 is part of a synthetic walking reply. Sentence number 16 is part of a synthetic walking reply. Sentence number 17 is part of a synthetic walking reply. Sentence number 18 is part of a synthetic walking reply. Sentence number 19 is part of a synthetic walking reply. Sentence number 20 is part of a synthetic walking reply. Sentence number 21 is part of a synthetic walking reply. "
+      },
+      {
+       "end_cp": 1643,
+       "start_cp": 1244,
+       "text": "Sentence number 22 is part of a synthetic walking reply. Sentence number 23 is part of a synthetic walking reply. Sentence number 24 is part of a synthetic walking reply. Sentence number 25 is part of a synthetic walking reply. Sentence number 26 is part of a synthetic walking reply. Sentence number 27 is part of a synthetic walking reply. Sentence number 28 is part of a synthetic walking reply. "
+      },
+      {
+       "end_cp": 2042,
+       "start_cp": 1643,
+       "text": "Sentence number 29 is part of a synthetic walking reply. Sentence number 30 is part of a synthetic walking reply. Sentence number 31 is part of a synthetic walking reply. Sentence number 32 is part of a synthetic walking reply. Sentence number 33 is part of a synthetic walking reply. Sentence number 34 is part of a synthetic walking reply. Sentence number 35 is part of a synthetic walking reply. "
+      },
+      {
+       "end_cp": 2441,
+       "start_cp": 2042,
+       "text": "Sentence number 36 is part of a synthetic walking reply. Sentence number 37 is part of a synthetic walking reply. Sentence number 38 is part of a synthetic walking reply. Sentence number 39 is part of a synthetic walking reply. Sentence number 40 is part of a synthetic walking reply. Sentence number 41 is part of a synthetic walking reply. Sentence number 42 is part of a synthetic walking reply. "
+      },
+      {
+       "end_cp": 2840,
+       "start_cp": 2441,
+       "text": "Sentence number 43 is part of a synthetic walking reply. Sentence number 44 is part of a synthetic walking reply. Sentence number 45 is part of a synthetic walking reply. Sentence number 46 is part of a synthetic walking reply. Sentence number 47 is part of a synthetic walking reply. Sentence number 48 is part of a synthetic walking reply. Sentence number 49 is part of a synthetic walking reply. "
+      },
+      {
+       "end_cp": 2954,
+       "start_cp": 2840,
+       "text": "Sentence number 50 is part of a synthetic walking reply. Sentence number 51 is part of a synthetic walking reply. "
+      }
+     ],
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "provider": "not_started",
+     "range": {
+      "cut_inside_unit": false,
+      "done": false,
+      "end_cp": 2954,
+      "sentences": 52,
+      "start_cp": 0
+     },
+     "reason": null,
+     "source": {
+      "limited": false,
+      "sha256": "22ba32f060ca6b03084f34f99a0bd7a72ab60a21e448655328c617e78cd9a9e6",
+      "speakable_end_cp": 11489,
+      "total_cp": 11489
+     },
+     "speech_id": "01a14d67-a300-7000-98fc-e7653d9b1c09",
+     "state": "text",
+     "stream": null,
+     "voice": "pNInz6obpgDQGcFmaJgB"
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q001\",\"result\":{\"speech_id\":\"01a14d67-a300-7000-98fc-e7653d9b1c09\",\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"state\":\"text\",\"reason\":null,\"stream\":null,\"source\":{\"sha256\":\"22ba32f060ca6b03084f34f99a0bd7a72ab60a21e448655328c617e78cd9a9e6\",\"total_cp\":11489,\"speakable_end_cp\":11489,\"limited\":false},\"range\":{\"start_cp\":0,\"end_cp\":2954,\"sentences\":52,\"cut_inside_unit\":false,\"done\":false},\"chunks\":[{\"start_cp\":0,\"end_cp\":448,\"text\":\"Sentence number 0 is part of a synthetic walking reply. Sentence number 1 is part of a synthetic walking reply. Sentence number 2 is part of a synthetic walking reply. Sentence number 3 is part of a synthetic walking reply. Sentence number 4 is part of a synthetic walking reply. Sentence number 5 is part of a synthetic walking reply. Sentence number 6 is part of a synthetic walking reply. Sentence number 7 is part of a synthetic walking reply. \"},{\"start_cp\":448,\"end_cp\":845,\"text\":\"Sentence number 8 is part of a synthetic walking reply. Sentence number 9 is part of a synthetic walking reply. Sentence number 10 is part of a synthetic walking reply. Sentence number 11 is part of a synthetic walking reply. Sentence number 12 is part of a synthetic walking reply. Sentence number 13 is part of a synthetic walking reply. Sentence number 14 is part of a synthetic walking reply. \"},{\"start_cp\":845,\"end_cp\":1244,\"text\":\"Sentence number 15 is part of a synthetic walking reply. Sentence number 16 is part of a synthetic walking reply. Sentence number 17 is part of a synthetic walking reply. Sentence number 18 is part of a synthetic walking reply. Sentence number 19 is part of a synthetic walking reply. Sentence number 20 is part of a synthetic walking reply. Sentence number 21 is part of a synthetic walking reply. \"},{\"start_cp\":1244,\"end_cp\":1643,\"text\":\"Sentence number 22 is part of a synthetic walking reply. Sentence number 23 is part of a synthetic walking reply. Sentence number 24 is part of a synthetic walking reply. Sentence number 25 is part of a synthetic walking reply. Sentence number 26 is part of a synthetic walking reply. Sentence number 27 is part of a synthetic walking reply. Sentence number 28 is part of a synthetic walking reply. \"},{\"start_cp\":1643,\"end_cp\":2042,\"text\":\"Sentence number 29 is part of a synthetic walking reply. Sentence number 30 is part of a synthetic walking reply. Sentence number 31 is part of a synthetic walking reply. Sentence number 32 is part of a synthetic walking reply. Sentence number 33 is part of a synthetic walking reply. Sentence number 34 is part of a synthetic walking reply. Sentence number 35 is part of a synthetic walking reply. \"},{\"start_cp\":2042,\"end_cp\":2441,\"text\":\"Sentence number 36 is part of a synthetic walking reply. Sentence number 37 is part of a synthetic walking reply. Sentence number 38 is part of a synthetic walking reply. Sentence number 39 is part of a synthetic walking reply. Sentence number 40 is part of a synthetic walking reply. Sentence number 41 is part of a synthetic walking reply. Sentence number 42 is part of a synthetic walking reply. \"},{\"start_cp\":2441,\"end_cp\":2840,\"text\":\"Sentence number 43 is part of a synthetic walking reply. Sentence number 44 is part of a synthetic walking reply. Sentence number 45 is part of a synthetic walking reply. Sentence number 46 is part of a synthetic walking reply. Sentence number 47 is part of a synthetic walking reply. Sentence number 48 is part of a synthetic walking reply. Sentence number 49 is part of a synthetic walking reply. \"},{\"start_cp\":2840,\"end_cp\":2954,\"text\":\"Sentence number 50 is part of a synthetic walking reply. Sentence number 51 is part of a synthetic walking reply. \"}],\"voice\":\"pNInz6obpgDQGcFmaJgB\",\"provider\":\"not_started\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "synthetic_provider": {
+    "real_provider_requests": 0,
+    "tts_calls": 0,
+    "tts_sends": 0
+   },
+   "wire_bytes": 3786
+  },
+  {
+   "device": "phone",
+   "id": "speak/ok-more-client-second-range",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "ok",
+   "request": {
+    "id": "v4q002",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": null,
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "more",
+     "output": "client",
+     "request_id": null,
+     "source_sha256": "22ba32f060ca6b03084f34f99a0bd7a72ab60a21e448655328c617e78cd9a9e6",
+     "speech_id": "01a14d67-a301-7000-b9d2-67559b342d5c",
+     "start_cp": 2954,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q002\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a301-7000-b9d2-67559b342d5c\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"more\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":\"22ba32f060ca6b03084f34f99a0bd7a72ab60a21e448655328c617e78cd9a9e6\",\"start_cp\":2954,\"style\":\"full\",\"output\":\"client\",\"format\":null}}",
+   "response": {
+    "id": "v4q002",
+    "result": {
+     "chunks": [
+      {
+       "end_cp": 3353,
+       "start_cp": 2954,
+       "text": "Sentence number 52 is part of a synthetic walking reply. Sentence number 53 is part of a synthetic walking reply. Sentence number 54 is part of a synthetic walking reply. Sentence number 55 is part of a synthetic walking reply. Sentence number 56 is part of a synthetic walking reply. Sentence number 57 is part of a synthetic walking reply. Sentence number 58 is part of a synthetic walking reply. "
+      },
+      {
+       "end_cp": 3752,
+       "start_cp": 3353,
+       "text": "Sentence number 59 is part of a synthetic walking reply. Sentence number 60 is part of a synthetic walking reply. Sentence number 61 is part of a synthetic walking reply. Sentence number 62 is part of a synthetic walking reply. Sentence number 63 is part of a synthetic walking reply. Sentence number 64 is part of a synthetic walking reply. Sentence number 65 is part of a synthetic walking reply. "
+      },
+      {
+       "end_cp": 4151,
+       "start_cp": 3752,
+       "text": "Sentence number 66 is part of a synthetic walking reply. Sentence number 67 is part of a synthetic walking reply. Sentence number 68 is part of a synthetic walking reply. Sentence number 69 is part of a synthetic walking reply. Sentence number 70 is part of a synthetic walking reply. Sentence number 71 is part of a synthetic walking reply. Sentence number 72 is part of a synthetic walking reply. "
+      },
+      {
+       "end_cp": 4550,
+       "start_cp": 4151,
+       "text": "Sentence number 73 is part of a synthetic walking reply. Sentence number 74 is part of a synthetic walking reply. Sentence number 75 is part of a synthetic walking reply. Sentence number 76 is part of a synthetic walking reply. Sentence number 77 is part of a synthetic walking reply. Sentence number 78 is part of a synthetic walking reply. Sentence number 79 is part of a synthetic walking reply. "
+      },
+      {
+       "end_cp": 4949,
+       "start_cp": 4550,
+       "text": "Sentence number 80 is part of a synthetic walking reply. Sentence number 81 is part of a synthetic walking reply. Sentence number 82 is part of a synthetic walking reply. Sentence number 83 is part of a synthetic walking reply. Sentence number 84 is part of a synthetic walking reply. Sentence number 85 is part of a synthetic walking reply. Sentence number 86 is part of a synthetic walking reply. "
+      },
+      {
+       "end_cp": 5348,
+       "start_cp": 4949,
+       "text": "Sentence number 87 is part of a synthetic walking reply. Sentence number 88 is part of a synthetic walking reply. Sentence number 89 is part of a synthetic walking reply. Sentence number 90 is part of a synthetic walking reply. Sentence number 91 is part of a synthetic walking reply. Sentence number 92 is part of a synthetic walking reply. Sentence number 93 is part of a synthetic walking reply. "
+      },
+      {
+       "end_cp": 5748,
+       "start_cp": 5348,
+       "text": "Sentence number 94 is part of a synthetic walking reply. Sentence number 95 is part of a synthetic walking reply. Sentence number 96 is part of a synthetic walking reply. Sentence number 97 is part of a synthetic walking reply. Sentence number 98 is part of a synthetic walking reply. Sentence number 99 is part of a synthetic walking reply. Sentence number 100 is part of a synthetic walking reply. "
+      },
+      {
+       "end_cp": 5922,
+       "start_cp": 5748,
+       "text": "Sentence number 101 is part of a synthetic walking reply. Sentence number 102 is part of a synthetic walking reply. Sentence number 103 is part of a synthetic walking reply. "
+      }
+     ],
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "provider": "not_started",
+     "range": {
+      "cut_inside_unit": false,
+      "done": false,
+      "end_cp": 5922,
+      "sentences": 52,
+      "start_cp": 2954
+     },
+     "reason": null,
+     "source": {
+      "limited": false,
+      "sha256": "22ba32f060ca6b03084f34f99a0bd7a72ab60a21e448655328c617e78cd9a9e6",
+      "speakable_end_cp": 11489,
+      "total_cp": 11489
+     },
+     "speech_id": "01a14d67-a301-7000-b9d2-67559b342d5c",
+     "state": "text",
+     "stream": null,
+     "voice": "pNInz6obpgDQGcFmaJgB"
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q002\",\"result\":{\"speech_id\":\"01a14d67-a301-7000-b9d2-67559b342d5c\",\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"state\":\"text\",\"reason\":null,\"stream\":null,\"source\":{\"sha256\":\"22ba32f060ca6b03084f34f99a0bd7a72ab60a21e448655328c617e78cd9a9e6\",\"total_cp\":11489,\"speakable_end_cp\":11489,\"limited\":false},\"range\":{\"start_cp\":2954,\"end_cp\":5922,\"sentences\":52,\"cut_inside_unit\":false,\"done\":false},\"chunks\":[{\"start_cp\":2954,\"end_cp\":3353,\"text\":\"Sentence number 52 is part of a synthetic walking reply. Sentence number 53 is part of a synthetic walking reply. Sentence number 54 is part of a synthetic walking reply. Sentence number 55 is part of a synthetic walking reply. Sentence number 56 is part of a synthetic walking reply. Sentence number 57 is part of a synthetic walking reply. Sentence number 58 is part of a synthetic walking reply. \"},{\"start_cp\":3353,\"end_cp\":3752,\"text\":\"Sentence number 59 is part of a synthetic walking reply. Sentence number 60 is part of a synthetic walking reply. Sentence number 61 is part of a synthetic walking reply. Sentence number 62 is part of a synthetic walking reply. Sentence number 63 is part of a synthetic walking reply. Sentence number 64 is part of a synthetic walking reply. Sentence number 65 is part of a synthetic walking reply. \"},{\"start_cp\":3752,\"end_cp\":4151,\"text\":\"Sentence number 66 is part of a synthetic walking reply. Sentence number 67 is part of a synthetic walking reply. Sentence number 68 is part of a synthetic walking reply. Sentence number 69 is part of a synthetic walking reply. Sentence number 70 is part of a synthetic walking reply. Sentence number 71 is part of a synthetic walking reply. Sentence number 72 is part of a synthetic walking reply. \"},{\"start_cp\":4151,\"end_cp\":4550,\"text\":\"Sentence number 73 is part of a synthetic walking reply. Sentence number 74 is part of a synthetic walking reply. Sentence number 75 is part of a synthetic walking reply. Sentence number 76 is part of a synthetic walking reply. Sentence number 77 is part of a synthetic walking reply. Sentence number 78 is part of a synthetic walking reply. Sentence number 79 is part of a synthetic walking reply. \"},{\"start_cp\":4550,\"end_cp\":4949,\"text\":\"Sentence number 80 is part of a synthetic walking reply. Sentence number 81 is part of a synthetic walking reply. Sentence number 82 is part of a synthetic walking reply. Sentence number 83 is part of a synthetic walking reply. Sentence number 84 is part of a synthetic walking reply. Sentence number 85 is part of a synthetic walking reply. Sentence number 86 is part of a synthetic walking reply. \"},{\"start_cp\":4949,\"end_cp\":5348,\"text\":\"Sentence number 87 is part of a synthetic walking reply. Sentence number 88 is part of a synthetic walking reply. Sentence number 89 is part of a synthetic walking reply. Sentence number 90 is part of a synthetic walking reply. Sentence number 91 is part of a synthetic walking reply. Sentence number 92 is part of a synthetic walking reply. Sentence number 93 is part of a synthetic walking reply. \"},{\"start_cp\":5348,\"end_cp\":5748,\"text\":\"Sentence number 94 is part of a synthetic walking reply. Sentence number 95 is part of a synthetic walking reply. Sentence number 96 is part of a synthetic walking reply. Sentence number 97 is part of a synthetic walking reply. Sentence number 98 is part of a synthetic walking reply. Sentence number 99 is part of a synthetic walking reply. Sentence number 100 is part of a synthetic walking reply. \"},{\"start_cp\":5748,\"end_cp\":5922,\"text\":\"Sentence number 101 is part of a synthetic walking reply. Sentence number 102 is part of a synthetic walking reply. Sentence number 103 is part of a synthetic walking reply. \"}],\"voice\":\"pNInz6obpgDQGcFmaJgB\",\"provider\":\"not_started\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "synthetic_provider": {
+    "real_provider_requests": 0,
+    "tts_calls": 0,
+    "tts_sends": 0
+   },
+   "wire_bytes": 3810
+  },
+  {
+   "device": "phone",
+   "id": "speak/ok-more-server-pcm-preparing",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "ok",
+   "request": {
+    "id": "v4q003",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "more",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": "22ba32f060ca6b03084f34f99a0bd7a72ab60a21e448655328c617e78cd9a9e6",
+     "speech_id": "01a14d67-a302-7000-9d52-24337b61ebbd",
+     "start_cp": 2954,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q003\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a302-7000-9d52-24337b61ebbd\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"more\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":\"22ba32f060ca6b03084f34f99a0bd7a72ab60a21e448655328c617e78cd9a9e6\",\"start_cp\":2954,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "id": "v4q003",
+    "result": {
+     "chunks": null,
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "provider": "not_started",
+     "range": {
+      "cut_inside_unit": false,
+      "done": false,
+      "end_cp": 5922,
+      "sentences": 52,
+      "start_cp": 2954
+     },
+     "reason": null,
+     "source": {
+      "limited": false,
+      "sha256": "22ba32f060ca6b03084f34f99a0bd7a72ab60a21e448655328c617e78cd9a9e6",
+      "speakable_end_cp": 11489,
+      "total_cp": 11489
+     },
+     "speech_id": "01a14d67-a302-7000-9d52-24337b61ebbd",
+     "state": "preparing",
+     "stream": 1,
+     "voice": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q003\",\"result\":{\"speech_id\":\"01a14d67-a302-7000-9d52-24337b61ebbd\",\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"state\":\"preparing\",\"reason\":null,\"stream\":1,\"source\":{\"sha256\":\"22ba32f060ca6b03084f34f99a0bd7a72ab60a21e448655328c617e78cd9a9e6\",\"total_cp\":11489,\"speakable_end_cp\":11489,\"limited\":false},\"range\":{\"start_cp\":2954,\"end_cp\":5922,\"sentences\":52,\"cut_inside_unit\":false,\"done\":false},\"chunks\":null,\"voice\":null,\"provider\":\"not_started\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "synthetic_provider": {
+    "real_provider_requests": 0,
+    "tts_calls": 0,
+    "tts_sends": 0
+   },
+   "wire_bytes": 493
+  },
+  {
+   "device": "phone",
+   "id": "speak/ok-replay-concise-client",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "ok",
+   "request": {
+    "id": "v4q004",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": null,
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "client",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a303-7000-a7ac-ad2b0348e8f0",
+     "start_cp": 0,
+     "style": "concise"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q004\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a303-7000-a7ac-ad2b0348e8f0\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"concise\",\"output\":\"client\",\"format\":null}}",
+   "response": {
+    "id": "v4q004",
+    "result": {
+     "chunks": [
+      {
+       "end_cp": 168,
+       "start_cp": 0,
+       "text": "Sentence number 0 is part of a synthetic walking reply. Sentence number 1 is part of a synthetic walking reply. Sentence number 2 is part of a synthetic walking reply. "
+      }
+     ],
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "provider": "not_started",
+     "range": {
+      "cut_inside_unit": false,
+      "done": false,
+      "end_cp": 168,
+      "sentences": 3,
+      "start_cp": 0
+     },
+     "reason": null,
+     "source": {
+      "limited": false,
+      "sha256": "22ba32f060ca6b03084f34f99a0bd7a72ab60a21e448655328c617e78cd9a9e6",
+      "speakable_end_cp": 11489,
+      "total_cp": 11489
+     },
+     "speech_id": "01a14d67-a303-7000-a7ac-ad2b0348e8f0",
+     "state": "text",
+     "stream": null,
+     "voice": "pNInz6obpgDQGcFmaJgB"
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q004\",\"result\":{\"speech_id\":\"01a14d67-a303-7000-a7ac-ad2b0348e8f0\",\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"state\":\"text\",\"reason\":null,\"stream\":null,\"source\":{\"sha256\":\"22ba32f060ca6b03084f34f99a0bd7a72ab60a21e448655328c617e78cd9a9e6\",\"total_cp\":11489,\"speakable_end_cp\":11489,\"limited\":false},\"range\":{\"start_cp\":0,\"end_cp\":168,\"sentences\":3,\"cut_inside_unit\":false,\"done\":false},\"chunks\":[{\"start_cp\":0,\"end_cp\":168,\"text\":\"Sentence number 0 is part of a synthetic walking reply. Sentence number 1 is part of a synthetic walking reply. Sentence number 2 is part of a synthetic walking reply. \"}],\"voice\":\"pNInz6obpgDQGcFmaJgB\",\"provider\":\"not_started\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "synthetic_provider": {
+    "real_provider_requests": 0,
+    "tts_calls": 1,
+    "tts_sends": 1
+   },
+   "wire_bytes": 707
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-conflict-more-start-not-an-issued-boundary",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:conflict",
+   "request": {
+    "id": "v4q005",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": null,
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "more",
+     "output": "client",
+     "request_id": null,
+     "source_sha256": "22ba32f060ca6b03084f34f99a0bd7a72ab60a21e448655328c617e78cd9a9e6",
+     "speech_id": "01a14d67-a304-7000-8f30-0e6b05d01c11",
+     "start_cp": 7,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q005\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a304-7000-8f30-0e6b05d01c11\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"more\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":\"22ba32f060ca6b03084f34f99a0bd7a72ab60a21e448655328c617e78cd9a9e6\",\"start_cp\":7,\"style\":\"full\",\"output\":\"client\",\"format\":null}}",
+   "response": {
+    "error": {
+     "code": "conflict"
+    },
+    "id": "v4q005",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q005\",\"error\":{\"code\":\"conflict\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "synthetic_provider": {
+    "real_provider_requests": 0,
+    "tts_calls": 1,
+    "tts_sends": 1
+   },
+   "wire_bytes": 73
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-conflict-more-other-source-digest",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:conflict",
+   "request": {
+    "id": "v4q006",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": null,
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "more",
+     "output": "client",
+     "request_id": null,
+     "source_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "speech_id": "01a14d67-a305-7000-979f-94ada27304fa",
+     "start_cp": 2954,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q006\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a305-7000-979f-94ada27304fa\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"more\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"start_cp\":2954,\"style\":\"full\",\"output\":\"client\",\"format\":null}}",
+   "response": {
+    "error": {
+     "code": "conflict"
+    },
+    "id": "v4q006",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q006\",\"error\":{\"code\":\"conflict\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "synthetic_provider": {
+    "real_provider_requests": 0,
+    "tts_calls": 1,
+    "tts_sends": 1
+   },
+   "wire_bytes": 73
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-live-without-request-id",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q007",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": null,
+     "mode": "live",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a306-7000-b101-a7a78da365ca",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q007\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a306-7000-b101-a7a78da365ca\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"live\",\"request_id\":null,\"message_id\":null,\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q007",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q007\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-live-with-start-cp",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q008",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": null,
+     "mode": "live",
+     "output": "server",
+     "request_id": "01a14d67-a31f-7000-891a-553efb60b14b",
+     "source_sha256": null,
+     "speech_id": "01a14d67-a307-7000-8a20-713c9d1d826b",
+     "start_cp": 5,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q008\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a307-7000-8a20-713c9d1d826b\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"live\",\"request_id\":\"01a14d67-a31f-7000-891a-553efb60b14b\",\"message_id\":null,\"source_sha256\":null,\"start_cp\":5,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q008",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q008\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-live-with-digest",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q009",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": null,
+     "mode": "live",
+     "output": "server",
+     "request_id": "01a14d67-a320-7000-b42d-c810a2429dec",
+     "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "speech_id": "01a14d67-a308-7000-a816-7164457e1f20",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q009\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a308-7000-a816-7164457e1f20\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"live\",\"request_id\":\"01a14d67-a320-7000-b42d-c810a2429dec\",\"message_id\":null,\"source_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q009",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q009\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-replay-with-request-id",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q010",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": "01a14d67-a321-7000-a006-2f385f50b8ce",
+     "source_sha256": null,
+     "speech_id": "01a14d67-a309-7000-b71b-c3235cc614f3",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q010\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a309-7000-b71b-c3235cc614f3\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":\"01a14d67-a321-7000-a006-2f385f50b8ce\",\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q010",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q010\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-replay-without-message-id",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q011",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": null,
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a30a-7000-a534-f906422a93f6",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q011\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a30a-7000-a534-f906422a93f6\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":null,\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q011",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q011\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-replay-with-digest",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q012",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "speech_id": "01a14d67-a30b-7000-ba2a-3902e99a3025",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q012\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a30b-7000-ba2a-3902e99a3025\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q012",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q012\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-replay-with-start-cp",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q013",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a30c-7000-b135-8187ec42653a",
+     "start_cp": 3,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q013\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a30c-7000-b135-8187ec42653a\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":3,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q013",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q013\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-more-without-digest",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q014",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "more",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a30d-7000-8984-b4532980c60f",
+     "start_cp": 5,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q014\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a30d-7000-8984-b4532980c60f\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"more\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":5,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q014",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q014\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-more-digest-not-hex64",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q015",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "more",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": "xyz",
+     "speech_id": "01a14d67-a30e-7000-8e52-870cd1d6225d",
+     "start_cp": 5,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q015\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a30e-7000-8e52-870cd1d6225d\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"more\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":\"xyz\",\"start_cp\":5,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q015",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q015\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-mode-unknown",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q016",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "skip",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a30f-7000-a982-461b4634255c",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q016\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a30f-7000-a982-461b4634255c\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"skip\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q016",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q016\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-style-unknown",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q017",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a310-7000-b3df-af53ee94c700",
+     "start_cp": 0,
+     "style": "loud"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q017\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a310-7000-b3df-af53ee94c700\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"loud\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q017",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q017\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-output-unknown",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q018",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "wire",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a311-7000-89b3-074faaf9a298",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q018\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a311-7000-89b3-074faaf9a298\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"wire\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q018",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q018\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-server-without-format",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q019",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": null,
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a312-7000-b070-6103283fcb65",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q019\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a312-7000-b070-6103283fcb65\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":null}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q019",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q019\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-server-format-unknown",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q020",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "wav",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a313-7000-813a-134b2ea667f2",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q020\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a313-7000-813a-134b2ea667f2\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"wav\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q020",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q020\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-client-with-format",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q021",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "client",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a314-7000-ae49-30f15b607ae4",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q021\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a314-7000-ae49-30f15b607ae4\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"client\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q021",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q021\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-start-cp-negative",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q022",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "more",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+     "speech_id": "01a14d67-a315-7000-a86a-cf18bba61b40",
+     "start_cp": -1,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q022\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a315-7000-a86a-cf18bba61b40\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"more\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"start_cp\":-1,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q022",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q022\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-speech-id-not-uuid",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q023",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "nope",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q023\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"nope\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q023",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q023\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-message-id-not-uuid",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q024",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "nope",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a317-7000-aaf5-13d104f0d405",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q024\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a317-7000-aaf5-13d104f0d405\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"nope\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q024",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q024\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-epoch-bool",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q025",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": true,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a318-7000-a106-4d39fb8d7b1f",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q025\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a318-7000-a106-4d39fb8d7b1f\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":true,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q025",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q025\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-missing-speech_id",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q026",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q026\",\"method\":\"relay.voice.speak\",\"params\":{\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q026",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q026\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-missing-binding_id",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q027",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a319-7000-ab92-a45c2145f3f0",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q027\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a319-7000-ab92-a45c2145f3f0\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q027",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q027\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-missing-authority_epoch",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q028",
+    "method": "relay.voice.speak",
+    "params": {
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a319-7000-ab92-a45c2145f3f0",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q028\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a319-7000-ab92-a45c2145f3f0\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q028",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q028\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-missing-mode",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q029",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a319-7000-ab92-a45c2145f3f0",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q029\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a319-7000-ab92-a45c2145f3f0\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q029",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q029\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-missing-request_id",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q030",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "source_sha256": null,
+     "speech_id": "01a14d67-a319-7000-ab92-a45c2145f3f0",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q030\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a319-7000-ab92-a45c2145f3f0\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q030",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q030\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-missing-message_id",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q031",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a319-7000-ab92-a45c2145f3f0",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q031\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a319-7000-ab92-a45c2145f3f0\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q031",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q031\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-missing-source_sha256",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q032",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "speech_id": "01a14d67-a319-7000-ab92-a45c2145f3f0",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q032\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a319-7000-ab92-a45c2145f3f0\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q032",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q032\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-missing-start_cp",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q033",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a319-7000-ab92-a45c2145f3f0",
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q033\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a319-7000-ab92-a45c2145f3f0\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q033",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q033\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-missing-style",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q034",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a319-7000-ab92-a45c2145f3f0",
+     "start_cp": 0
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q034\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a319-7000-ab92-a45c2145f3f0\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q034",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q034\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-missing-output",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q035",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a319-7000-ab92-a45c2145f3f0",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q035\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a319-7000-ab92-a45c2145f3f0\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"format\":\"pcm16\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q035",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q035\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-missing-format",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q036",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a319-7000-ab92-a45c2145f3f0",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q036\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a319-7000-ab92-a45c2145f3f0\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\"}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q036",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q036\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  },
+  {
+   "device": "phone",
+   "id": "speak/error-invalid-unknown-member",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "error:invalid_request",
+   "request": {
+    "id": "v4q037",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "304bc2a0-2234-403a-a8c5-f768e5f7e8a2",
+     "extra": 1,
+     "format": "pcm16",
+     "message_id": "2ac35a67-d33e-5e3e-94f2-7335a5231ce1",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a319-7000-ab92-a45c2145f3f0",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q037\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a319-7000-ab92-a45c2145f3f0\",\"binding_id\":\"304bc2a0-2234-403a-a8c5-f768e5f7e8a2\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"2ac35a67-d33e-5e3e-94f2-7335a5231ce1\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\",\"extra\":1}}",
+   "response": {
+    "error": {
+     "code": "invalid_request"
+    },
+    "id": "v4q037",
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q037\",\"error\":{\"code\":\"invalid_request\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_more_and_invalid"
+   },
+   "wire_bytes": 80
+  }
+ ],
+ "not_captured": [],
+ "note": "registered more/replay ranges, issued-boundary and digest conflicts, and every \u00a76.4 combination refusal",
+ "provenance": {
+  "captured_by": "test_relay_voice_v4_output_vectors.py",
+  "guard_sha256": "84405155cd3696e777829bb0685d797c88140b506ef7da2524c0bfdc34a4476d",
+  "label": "v4-input-output-capture-gen1",
+  "plugin_sha256": {
+   "hub.py": "5ab0b507b4d0791d10a61282d5da38c426aa9bbbf5473b206eedcfd591faa736",
+   "opus.py": "ab1a281a9aba7ca01d1e8637e420b51275db0fa38a9deac1540f6a242cdb28dc",
+   "protocol.py": "40d878a31926948c9e28fbc160f92a2c0c90fdf4acd756d0f63e847059188552",
+   "relay_voice.py": "45c9ab4fc89f4352588f47cd1469deb63b92c2091c5a51b8041fe2873b871552",
+   "relay_voice_capture.py": "60f78701729479a3dc2462db3de5cd2fbd7a4252dd9ede6ef076684a8bae2a00",
+   "relay_voice_media.py": "12bcdaf9984fc2a80e4f4df0b020132e8f9a3399dbc8d9586cb268bf7446ad56",
+   "relay_voice_source.py": "353f5dfc4f5f00e56618d25dd7d1475473604fc8f136e7cdfdf596e4091f0b98",
+   "relay_voice_speech.py": "76ec39cc93414392356062d880799d0be444506e2cd9240b1f0e4a853697737e",
+   "relay_voice_store.py": "daa7a75aeb56c8bc42cb03257b7a781f94acceb5e88ad7ea30d2603e651484f7",
+   "relay_voice_stream.py": "41155434f619b356a410c9c02572f002278d8e08f1691541c8693048cf9ec6c4",
+   "relay_voice_text.py": "88ddb2408175c5bce32813ebe1dc08c00a0c94493d5b4c558e093d4b79809a15",
+   "relay_voice_wire.py": "3ccda3f5b73896befcc7524e33d004b71d927bedbbcb17b1e854fb0e351ab0b3"
+  },
+  "rig": "registered GatewayRunner/SessionAuthority/GadgetAdapter/grants v2/journal/RelayService/Conversations/VoiceBridge/VoiceStore/Speech and a REAL DeviceHub (never started; _on_text/_on_binary driven); ONLY the socket and the core provider execution boundary are synthetic",
+  "rig_support_sha256": {
+   "relay_bridge_support.py": "9080a8e1e42e2e8281ab944c8bdb3f7da165416f2a4289f6e28c5d77989b3c2f",
+   "relay_voice_support.py": "09d911634554e8160b002a6e4241bd3fc20282284eaaac164fb3c282502aa1d6",
+   "relay_voice_v3_support.py": "6c29dae5f42f273ec6bd92c1a248074316f6ef110f1f5184186c1a6eb5b487c3"
+  },
+  "support_sha256": "cc4c1e0f9be78551c653d33c6b2b65a38015a0470293df7ca7ed9e41ca643ed4",
+  "synthetic_content": "owned fixture identities and generated text/tones only; zero REAL provider requests, no network, no credentials",
+  "test_sha256": "0d8403a954a1a18ccf05b1a9236ffae35010f65fb6dea09578fdf8d05712664c"
+ },
+ "vector": "v4-output-speak-more"
+}

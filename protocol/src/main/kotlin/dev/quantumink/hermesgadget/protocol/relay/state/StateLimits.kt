@@ -105,5 +105,12 @@ object StateLimits {
 
     // -- snapshots ---------------------------------------------------------------------------------------
 
-    const val SNAPSHOT_VERSION = 1
+    /**
+     * The aggregate snapshot version. Version 2 adds the canonical-voice capture section (V4); a version 1 snapshot (no section) is still restored, so
+     * every saved turn, including UNCERTAIN and EXPIRED_REPORTED ones, survives the bump unchanged. This is NOT the Relay wire version, which stays 1.
+     */
+    const val SNAPSHOT_VERSION = 2
+
+    /** The previous aggregate version: turns, histories and deliveries only. Restore accepts it with an empty capture section. */
+    const val LEGACY_SNAPSHOT_VERSION = 1
 }

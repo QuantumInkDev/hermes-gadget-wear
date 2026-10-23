@@ -2,6 +2,9 @@ package dev.quantumink.hermesgadget.protocol.relay.state
 
 import dev.quantumink.hermesgadget.protocol.relay.ProfileId
 import dev.quantumink.hermesgadget.protocol.relay.RelayScope
+import dev.quantumink.hermesgadget.protocol.relay.voice.CaptureLedgerSnapshot
+import dev.quantumink.hermesgadget.protocol.relay.voice.VoiceCaptureLedger
+import dev.quantumink.hermesgadget.protocol.relay.voice.VoiceLimits
 import java.util.Collections
 
 /*
@@ -42,6 +45,12 @@ sealed interface RestoreResult<out T> {
 enum class RestoreNotice {
     /** Turns that may have reached the server are unresolved and past their deadline: still unknown. */
     UNRESOLVED_TURNS_PAST_DEADLINE,
+
+    /** `RECORDING` captures were restored: their audio died with the process. Reconcile them (they become `LOST`); nothing is sent for them. */
+    CAPTURE_RECORDINGS_LOST,
+
+    /** An `ADMITTING` capture names a turn the restored ledger does not hold. Reconcile with the ledger; nothing is prepared again. */
+    CAPTURE_LINK_WITHOUT_TURN,
 
     /** A turn was prepared later than the fresh server time: the server clock is behind the saved state. */
     SERVER_CLOCK_BEHIND_SNAPSHOT,
@@ -200,12 +209,16 @@ class DeliverySnapshot(
     }
 }
 
-/** Everything the pure state keeps durably, in one versioned value. */
+/**
+ * Everything the pure state keeps durably, in one versioned value. [captures] is the canonical-voice capture section (version 1) added by aggregate
+ * version 2; a version 1 value has none.
+ */
 class RelayStateSnapshot(
     val version: Int,
     val ledger: TurnLedgerSnapshot,
     histories: List<HistorySnapshot>,
-    deliveries: List<DeliverySnapshot>
+    deliveries: List<DeliverySnapshot>,
+    val captures: CaptureLedgerSnapshot = CaptureLedgerSnapshot.EMPTY
 ) {
     val histories: List<HistorySnapshot> = ownedBoundedForSnapshot(
         histories,
@@ -218,10 +231,11 @@ class RelayStateSnapshot(
 
     override fun toString(): String =
         "RelayStateSnapshot(v$version, turns=${ledger.turns.size}, histories=${histories.size}, " +
-            "deliveries=${deliveries.size})"
+            "deliveries=${deliveries.size}, captures=${captures.records.size})"
 
     companion object {
         const val VERSION = StateLimits.SNAPSHOT_VERSION
+        const val LEGACY_VERSION = StateLimits.LEGACY_SNAPSHOT_VERSION
 
         /**
          * Builds the aggregate snapshot, or refuses with [SnapshotBuild.TooMany] when a component exceeds its policy
@@ -232,35 +246,79 @@ class RelayStateSnapshot(
         fun of(
             ledger: TurnLedger,
             histories: List<HistoryAssembly>,
-            deliveries: List<EnrollmentDelivery>
+            deliveries: List<EnrollmentDelivery>,
+            captures: VoiceCaptureLedger = VoiceCaptureLedger.empty()
         ): SnapshotBuild {
             val ownedHistories = ownedBoundedForSnapshot(
                 histories,
                 StateLimits.MAX_HISTORY_SCOPES + 1
             )
-            if (ownedHistories.size > StateLimits.MAX_HISTORY_SCOPES) {
-                return SnapshotBuild.TooMany("histories", StateLimits.MAX_HISTORY_SCOPES)
-            }
             val ownedDeliveries = ownedBoundedForSnapshot(
                 deliveries,
                 StateLimits.MAX_ENROLLMENTS + 1
             )
-            if (ownedDeliveries.size > StateLimits.MAX_ENROLLMENTS) {
-                return SnapshotBuild.TooMany("deliveries", StateLimits.MAX_ENROLLMENTS)
-            }
-            if (ledger.scopeDecisionCount > StateLimits.MAX_SCOPE_DECISIONS) {
-                return SnapshotBuild.TooMany("ledger.scopes", StateLimits.MAX_SCOPE_DECISIONS)
+            aggregateTooMany(
+                ledger,
+                AggregateShape(ownedHistories.size, ownedDeliveries.size),
+                captures
+            )?.let {
+                return it
             }
             return SnapshotBuild.Built(
                 RelayStateSnapshot(
                     VERSION,
                     ledger.snapshot(),
                     ownedHistories.map { it.snapshot() },
-                    ownedDeliveries.map { it.snapshot() }
+                    ownedDeliveries.map { it.snapshot() },
+                    captures.snapshot()
                 )
             )
         }
     }
+}
+
+/**
+ * The sizes of the aggregate components a capture transition cannot see (histories and deliveries are other layers' state). It lets a capture
+ * transition prove, BEFORE it hands out an effect, that the combined snapshot can still be built.
+ */
+class AggregateShape(val histories: Int, val deliveries: Int) {
+    init {
+        require(histories >= 0 && deliveries >= 0)
+    }
+
+    override fun toString(): String = "AggregateShape(histories=$histories, deliveries=$deliveries)"
+
+    companion object {
+        val EMPTY = AggregateShape(0, 0)
+    }
+}
+
+/**
+ * The one definition of "this aggregate cannot be built": the first component over its policy limit, in the order the snapshot checks them. Nothing is
+ * dropped, truncated or built; the caller must refuse the action that needed the snapshot (persist-before-send), never send.
+ */
+internal fun aggregateTooMany(
+    ledger: TurnLedger,
+    shape: AggregateShape,
+    captures: VoiceCaptureLedger
+): SnapshotBuild.TooMany? = when {
+    shape.histories > StateLimits.MAX_HISTORY_SCOPES -> SnapshotBuild.TooMany(
+        "histories",
+        StateLimits.MAX_HISTORY_SCOPES
+    )
+    shape.deliveries > StateLimits.MAX_ENROLLMENTS -> SnapshotBuild.TooMany(
+        "deliveries",
+        StateLimits.MAX_ENROLLMENTS
+    )
+    ledger.scopeDecisionCount > StateLimits.MAX_SCOPE_DECISIONS ->
+        SnapshotBuild.TooMany("ledger.scopes", StateLimits.MAX_SCOPE_DECISIONS)
+    captures.size > VoiceLimits.CAPTURES_TOTAL -> SnapshotBuild.TooMany(
+        "captures",
+        VoiceLimits.CAPTURES_TOTAL
+    )
+    captures.maxPerEnrollment() > VoiceLimits.CAPTURES_PER_ENROLLMENT ->
+        SnapshotBuild.TooMany("captures.enrollment", VoiceLimits.CAPTURES_PER_ENROLLMENT)
+    else -> null
 }
 
 /** The result of building an aggregate snapshot: the value, or a typed refusal naming the component and its limit. */
@@ -279,10 +337,11 @@ sealed interface SnapshotBuild {
 class RestoredState internal constructor(
     val ledger: TurnLedger,
     val histories: List<HistoryAssembly>,
-    val deliveries: List<EnrollmentDelivery>
+    val deliveries: List<EnrollmentDelivery>,
+    val captures: VoiceCaptureLedger = VoiceCaptureLedger.empty()
 ) {
     override fun toString(): String =
-        "RestoredState(turns=${ledger.size}, histories=${histories.size}, deliveries=${deliveries.size})"
+        "RestoredState(turns=${ledger.size}, histories=${histories.size}, deliveries=${deliveries.size}, captures=${captures.size})"
 }
 
 object RelayStateRestore {
@@ -296,10 +355,16 @@ object RelayStateRestore {
         now: ServerInstant,
         authority: RelayAuthority
     ): RestoreResult<RestoredState> {
-        if (snapshot.version !=
-            RelayStateSnapshot.VERSION
+        // Version 2 is the current aggregate; version 1 (no capture section) is restored unchanged with no captures: a preserving migration
+        if (snapshot.version != RelayStateSnapshot.VERSION &&
+            snapshot.version != RelayStateSnapshot.LEGACY_VERSION
         ) {
             return RestoreResult.Refused(RestoreRefusal.VERSION, "version")
+        }
+        if (snapshot.version == RelayStateSnapshot.LEGACY_VERSION &&
+            snapshot.captures.records.isNotEmpty()
+        ) {
+            return RestoreResult.Refused(RestoreRefusal.INCONSISTENT, "captures")
         }
         if (!authority.isEmpty) {
             return RestoreResult.Refused(
@@ -353,11 +418,28 @@ object RelayStateRestore {
                     return RestoreResult.Refused(result.reason, "deliveries[$index].${result.path}")
             }
         }
+        val captures = when (
+            val result = VoiceCaptureLedger.restore(
+                snapshot.captures,
+                ledger,
+                now
+            )
+        ) {
+            is RestoreResult.Restored -> {
+                notices.addAll(result.notices)
+                result.value
+            }
+            is RestoreResult.Refused -> return RestoreResult.Refused(
+                result.reason,
+                "captures.${result.path}"
+            )
+        }
         return RestoreResult.Restored(
             RestoredState(
                 ledger,
                 Collections.unmodifiableList(histories),
-                Collections.unmodifiableList(deliveries)
+                Collections.unmodifiableList(deliveries),
+                captures
             ),
             notices.toList()
         )

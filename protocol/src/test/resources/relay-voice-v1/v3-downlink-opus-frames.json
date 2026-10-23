@@ -1,0 +1,98 @@
+{
+ "frames": [
+  {
+   "body_hex": "4f7075734865616401013801803e0000000000",
+   "kind": 17,
+   "seq": 0,
+   "stream": 1
+  },
+  {
+   "body_hex": "4805bba5f615cb9505312ad18067065d7c40",
+   "kind": 18,
+   "seq": 1,
+   "stream": 1
+  },
+  {
+   "body_hex": "4828c0c1588bae390a8dd7",
+   "kind": 18,
+   "seq": 2,
+   "stream": 1
+  },
+  {
+   "body_hex": "4807c97227e144ea50",
+   "kind": 18,
+   "seq": 3,
+   "stream": 1
+  },
+  {
+   "body_hex": "4807c979c8c957c0",
+   "kind": 18,
+   "seq": 4,
+   "stream": 1
+  },
+  {
+   "body_hex": "4807c979c8c957c0",
+   "kind": 18,
+   "seq": 5,
+   "stream": 1
+  },
+  {
+   "body_hex": "4807c979c8c957c0",
+   "kind": 18,
+   "seq": 6,
+   "stream": 1
+  },
+  {
+   "body_hex": "4807c979c8c957c0",
+   "kind": 18,
+   "seq": 7,
+   "stream": 1
+  },
+  {
+   "body_hex": "4807c979c8c957c0",
+   "kind": 18,
+   "seq": 8,
+   "stream": 1
+  },
+  {
+   "body_hex": "4807c979c8c957c0",
+   "kind": 18,
+   "seq": 9,
+   "stream": 1
+  },
+  {
+   "body_hex": "4807c979c8c957c0",
+   "kind": 18,
+   "seq": 10,
+   "stream": 1
+  },
+  {
+   "body_hex": "4805bba5f2650e7eaaf14b4da89fc9676b7bcf60",
+   "kind": 18,
+   "seq": 11,
+   "stream": 1
+  },
+  {
+   "body_hex": "0000000b",
+   "kind": 19,
+   "seq": 12,
+   "stream": 1
+  }
+ ],
+ "note": "captured: OpusHead (0x11, seq 0), 20 ms packets (0x12, seq 1..N), END (0x13)",
+ "provenance": {
+  "captured_by": "test_relay_voice_v3_vectors.py",
+  "label": "f1-final-vectors",
+  "plugin_sha256": {
+   "relay_voice_source.py": "353f5dfc4f5f00e56618d25dd7d1475473604fc8f136e7cdfdf596e4091f0b98",
+   "relay_voice_speech.py": "316d007adf6ffd11b281ca1a83be1e811baa46be5eaf6b29cc80b57916211981",
+   "relay_voice_store.py": "4a7e1ce13a9e3447867f5962fde8327e52eaae610d5da4a637b893c763ea8faa",
+   "relay_voice_stream.py": "41155434f619b356a410c9c02572f002278d8e08f1691541c8693048cf9ec6c4",
+   "relay_voice_text.py": "88ddb2408175c5bce32813ebe1dc08c00a0c94493d5b4c558e093d4b79809a15",
+   "relay_voice_wire.py": "3ccda3f5b73896befcc7524e33d004b71d927bedbbcb17b1e854fb0e351ab0b3"
+  },
+  "rig": "registered GatewayRunner/SessionAuthority/GadgetAdapter/Relay bridge/journal/core history; only the socket and the TTS provider boundary are synthetic",
+  "test_sha256": "68023618788e3b422c0a1fa47f58086c1d85700701d29e44a3a3cc65657b8134"
+ },
+ "vector": "v3-downlink-opus-frames"
+}

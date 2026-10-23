@@ -1,0 +1,655 @@
+{
+ "binary": [
+  {
+   "case": "speak/ok-tts-unavailable-first-answer",
+   "device": "phone",
+   "direction": "downlink",
+   "frames": [
+    {
+     "kind": 20,
+     "raw_hex": "050100001406",
+     "seq": 0,
+     "stream": 1
+    }
+   ],
+   "stream": 1
+  },
+  {
+   "case": "speak/ok-timeout-unknown-first-answer",
+   "device": "phone",
+   "direction": "downlink",
+   "frames": [
+    {
+     "kind": 20,
+     "raw_hex": "050100001406",
+     "seq": 0,
+     "stream": 1
+    },
+    {
+     "kind": 20,
+     "raw_hex": "050100001406",
+     "seq": 0,
+     "stream": 1
+    }
+   ],
+   "stream": 1
+  },
+  {
+   "case": "speak/ok-too-long-aborted-first-answer",
+   "device": "phone",
+   "direction": "downlink",
+   "frames": [
+    {
+     "kind": 20,
+     "raw_hex": "050100001406",
+     "seq": 0,
+     "stream": 1
+    },
+    {
+     "kind": 20,
+     "raw_hex": "050100001406",
+     "seq": 0,
+     "stream": 1
+    },
+    {
+     "kind": 20,
+     "raw_hex": "050100001404",
+     "seq": 0,
+     "stream": 1
+    }
+   ],
+   "stream": 1
+  },
+  {
+   "case": "speak/ok-encode-failed-first-answer",
+   "device": "phone",
+   "direction": "downlink",
+   "frames": [
+    {
+     "kind": 20,
+     "raw_hex": "050100001406",
+     "seq": 0,
+     "stream": 1
+    },
+    {
+     "kind": 20,
+     "raw_hex": "050100001406",
+     "seq": 0,
+     "stream": 1
+    },
+    {
+     "kind": 20,
+     "raw_hex": "050100001404",
+     "seq": 0,
+     "stream": 1
+    },
+    {
+     "kind": 20,
+     "raw_hex": "050100001405",
+     "seq": 0,
+     "stream": 1
+    }
+   ],
+   "stream": 1
+  }
+ ],
+ "case_counts": {
+  "relay.voice.speak": 8
+ },
+ "cases": [
+  {
+   "device": "phone",
+   "id": "speak/ok-tts-unavailable-first-answer",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "ok",
+   "request": {
+    "id": "v4q001",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "7eef06fd-ed0a-4a78-82ec-5e0a52c58f94",
+     "format": "pcm16",
+     "message_id": "e1068545-24bd-571d-b946-d19133c60de7",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a300-7000-b3db-daa2720f932e",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q001\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a300-7000-b3db-daa2720f932e\",\"binding_id\":\"7eef06fd-ed0a-4a78-82ec-5e0a52c58f94\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"e1068545-24bd-571d-b946-d19133c60de7\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "id": "v4q001",
+    "result": {
+     "chunks": null,
+     "message_id": "e1068545-24bd-571d-b946-d19133c60de7",
+     "provider": "not_started",
+     "range": {
+      "cut_inside_unit": false,
+      "done": true,
+      "end_cp": 39,
+      "sentences": 1,
+      "start_cp": 0
+     },
+     "reason": null,
+     "source": {
+      "limited": false,
+      "sha256": "0eaf09737c33c8c367b58c7f78cb1c82dcf4a12c294c86816a1b530c9f2fb5ac",
+      "speakable_end_cp": 39,
+      "total_cp": 39
+     },
+     "speech_id": "01a14d67-a300-7000-b3db-daa2720f932e",
+     "state": "preparing",
+     "stream": 1,
+     "voice": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q001\",\"result\":{\"speech_id\":\"01a14d67-a300-7000-b3db-daa2720f932e\",\"message_id\":\"e1068545-24bd-571d-b946-d19133c60de7\",\"state\":\"preparing\",\"reason\":null,\"stream\":1,\"source\":{\"sha256\":\"0eaf09737c33c8c367b58c7f78cb1c82dcf4a12c294c86816a1b530c9f2fb5ac\",\"total_cp\":39,\"speakable_end_cp\":39,\"limited\":false},\"range\":{\"start_cp\":0,\"end_cp\":39,\"sentences\":1,\"cut_inside_unit\":false,\"done\":true},\"chunks\":null,\"voice\":null,\"provider\":\"not_started\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_failure_states"
+   },
+   "synthetic_provider": {
+    "real_provider_requests": 0,
+    "tts_calls": 0,
+    "tts_sends": 0
+   },
+   "wire_bytes": 480
+  },
+  {
+   "device": "phone",
+   "id": "speak/ok-tts-unavailable-receipt",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "ok",
+   "request": {
+    "id": "v4q002",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "7eef06fd-ed0a-4a78-82ec-5e0a52c58f94",
+     "format": "pcm16",
+     "message_id": "e1068545-24bd-571d-b946-d19133c60de7",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a300-7000-b3db-daa2720f932e",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q002\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a300-7000-b3db-daa2720f932e\",\"binding_id\":\"7eef06fd-ed0a-4a78-82ec-5e0a52c58f94\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"e1068545-24bd-571d-b946-d19133c60de7\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "id": "v4q002",
+    "result": {
+     "chunks": null,
+     "message_id": "e1068545-24bd-571d-b946-d19133c60de7",
+     "provider": "not_started",
+     "range": {
+      "cut_inside_unit": false,
+      "done": true,
+      "end_cp": 39,
+      "sentences": 1,
+      "start_cp": 0
+     },
+     "reason": "tts_unavailable",
+     "source": {
+      "limited": false,
+      "sha256": "0eaf09737c33c8c367b58c7f78cb1c82dcf4a12c294c86816a1b530c9f2fb5ac",
+      "speakable_end_cp": 39,
+      "total_cp": 39
+     },
+     "speech_id": "01a14d67-a300-7000-b3db-daa2720f932e",
+     "state": "failed",
+     "stream": 1,
+     "voice": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q002\",\"result\":{\"speech_id\":\"01a14d67-a300-7000-b3db-daa2720f932e\",\"message_id\":\"e1068545-24bd-571d-b946-d19133c60de7\",\"state\":\"failed\",\"reason\":\"tts_unavailable\",\"stream\":1,\"source\":{\"sha256\":\"0eaf09737c33c8c367b58c7f78cb1c82dcf4a12c294c86816a1b530c9f2fb5ac\",\"total_cp\":39,\"speakable_end_cp\":39,\"limited\":false},\"range\":{\"start_cp\":0,\"end_cp\":39,\"sentences\":1,\"cut_inside_unit\":false,\"done\":true},\"chunks\":null,\"voice\":null,\"provider\":\"not_started\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_failure_states"
+   },
+   "synthetic_provider": {
+    "real_provider_requests": 0,
+    "tts_calls": 1,
+    "tts_sends": 0
+   },
+   "wire_bytes": 490
+  },
+  {
+   "device": "phone",
+   "id": "speak/ok-timeout-unknown-first-answer",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "ok",
+   "request": {
+    "id": "v4q003",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "7eef06fd-ed0a-4a78-82ec-5e0a52c58f94",
+     "format": "pcm16",
+     "message_id": "f9f0440d-135f-527c-987f-0929e1fbdf40",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a301-7000-89dc-1ca65ca9d491",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q003\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a301-7000-89dc-1ca65ca9d491\",\"binding_id\":\"7eef06fd-ed0a-4a78-82ec-5e0a52c58f94\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"f9f0440d-135f-527c-987f-0929e1fbdf40\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "id": "v4q003",
+    "result": {
+     "chunks": null,
+     "message_id": "f9f0440d-135f-527c-987f-0929e1fbdf40",
+     "provider": "not_started",
+     "range": {
+      "cut_inside_unit": false,
+      "done": true,
+      "end_cp": 39,
+      "sentences": 1,
+      "start_cp": 0
+     },
+     "reason": null,
+     "source": {
+      "limited": false,
+      "sha256": "82168517a7e949af68aff9762d43188550623edd32241ec27a8b75deac65168d",
+      "speakable_end_cp": 39,
+      "total_cp": 39
+     },
+     "speech_id": "01a14d67-a301-7000-89dc-1ca65ca9d491",
+     "state": "preparing",
+     "stream": 1,
+     "voice": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q003\",\"result\":{\"speech_id\":\"01a14d67-a301-7000-89dc-1ca65ca9d491\",\"message_id\":\"f9f0440d-135f-527c-987f-0929e1fbdf40\",\"state\":\"preparing\",\"reason\":null,\"stream\":1,\"source\":{\"sha256\":\"82168517a7e949af68aff9762d43188550623edd32241ec27a8b75deac65168d\",\"total_cp\":39,\"speakable_end_cp\":39,\"limited\":false},\"range\":{\"start_cp\":0,\"end_cp\":39,\"sentences\":1,\"cut_inside_unit\":false,\"done\":true},\"chunks\":null,\"voice\":null,\"provider\":\"not_started\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_failure_states"
+   },
+   "synthetic_provider": {
+    "real_provider_requests": 0,
+    "tts_calls": 1,
+    "tts_sends": 0
+   },
+   "wire_bytes": 480
+  },
+  {
+   "device": "phone",
+   "id": "speak/ok-timeout-unknown-receipt",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "ok",
+   "request": {
+    "id": "v4q004",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "7eef06fd-ed0a-4a78-82ec-5e0a52c58f94",
+     "format": "pcm16",
+     "message_id": "f9f0440d-135f-527c-987f-0929e1fbdf40",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a301-7000-89dc-1ca65ca9d491",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q004\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a301-7000-89dc-1ca65ca9d491\",\"binding_id\":\"7eef06fd-ed0a-4a78-82ec-5e0a52c58f94\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"f9f0440d-135f-527c-987f-0929e1fbdf40\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "id": "v4q004",
+    "result": {
+     "chunks": null,
+     "message_id": "f9f0440d-135f-527c-987f-0929e1fbdf40",
+     "provider": "unknown",
+     "range": {
+      "cut_inside_unit": false,
+      "done": true,
+      "end_cp": 39,
+      "sentences": 1,
+      "start_cp": 0
+     },
+     "reason": null,
+     "source": {
+      "limited": false,
+      "sha256": "82168517a7e949af68aff9762d43188550623edd32241ec27a8b75deac65168d",
+      "speakable_end_cp": 39,
+      "total_cp": 39
+     },
+     "speech_id": "01a14d67-a301-7000-89dc-1ca65ca9d491",
+     "state": "unknown",
+     "stream": 1,
+     "voice": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q004\",\"result\":{\"speech_id\":\"01a14d67-a301-7000-89dc-1ca65ca9d491\",\"message_id\":\"f9f0440d-135f-527c-987f-0929e1fbdf40\",\"state\":\"unknown\",\"reason\":null,\"stream\":1,\"source\":{\"sha256\":\"82168517a7e949af68aff9762d43188550623edd32241ec27a8b75deac65168d\",\"total_cp\":39,\"speakable_end_cp\":39,\"limited\":false},\"range\":{\"start_cp\":0,\"end_cp\":39,\"sentences\":1,\"cut_inside_unit\":false,\"done\":true},\"chunks\":null,\"voice\":null,\"provider\":\"unknown\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_failure_states"
+   },
+   "synthetic_provider": {
+    "real_provider_requests": 0,
+    "tts_calls": 2,
+    "tts_sends": 1
+   },
+   "wire_bytes": 474
+  },
+  {
+   "device": "phone",
+   "id": "speak/ok-too-long-aborted-first-answer",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "ok",
+   "request": {
+    "id": "v4q005",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "7eef06fd-ed0a-4a78-82ec-5e0a52c58f94",
+     "format": "pcm16",
+     "message_id": "1ac4e371-a66e-5d4d-93a2-32020cefaf5e",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a302-7000-8f8a-eb2dbf81fe21",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q005\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a302-7000-8f8a-eb2dbf81fe21\",\"binding_id\":\"7eef06fd-ed0a-4a78-82ec-5e0a52c58f94\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"1ac4e371-a66e-5d4d-93a2-32020cefaf5e\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "id": "v4q005",
+    "result": {
+     "chunks": null,
+     "message_id": "1ac4e371-a66e-5d4d-93a2-32020cefaf5e",
+     "provider": "not_started",
+     "range": {
+      "cut_inside_unit": false,
+      "done": true,
+      "end_cp": 40,
+      "sentences": 1,
+      "start_cp": 0
+     },
+     "reason": null,
+     "source": {
+      "limited": false,
+      "sha256": "9a47e98bb7555f14f756be63474928a47875e06464431f49772b178ad1d03693",
+      "speakable_end_cp": 40,
+      "total_cp": 40
+     },
+     "speech_id": "01a14d67-a302-7000-8f8a-eb2dbf81fe21",
+     "state": "preparing",
+     "stream": 1,
+     "voice": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q005\",\"result\":{\"speech_id\":\"01a14d67-a302-7000-8f8a-eb2dbf81fe21\",\"message_id\":\"1ac4e371-a66e-5d4d-93a2-32020cefaf5e\",\"state\":\"preparing\",\"reason\":null,\"stream\":1,\"source\":{\"sha256\":\"9a47e98bb7555f14f756be63474928a47875e06464431f49772b178ad1d03693\",\"total_cp\":40,\"speakable_end_cp\":40,\"limited\":false},\"range\":{\"start_cp\":0,\"end_cp\":40,\"sentences\":1,\"cut_inside_unit\":false,\"done\":true},\"chunks\":null,\"voice\":null,\"provider\":\"not_started\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_failure_states"
+   },
+   "synthetic_provider": {
+    "real_provider_requests": 0,
+    "tts_calls": 2,
+    "tts_sends": 1
+   },
+   "wire_bytes": 480
+  },
+  {
+   "device": "phone",
+   "id": "speak/ok-too-long-aborted-receipt",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "ok",
+   "request": {
+    "id": "v4q006",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "7eef06fd-ed0a-4a78-82ec-5e0a52c58f94",
+     "format": "pcm16",
+     "message_id": "1ac4e371-a66e-5d4d-93a2-32020cefaf5e",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a302-7000-8f8a-eb2dbf81fe21",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q006\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a302-7000-8f8a-eb2dbf81fe21\",\"binding_id\":\"7eef06fd-ed0a-4a78-82ec-5e0a52c58f94\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"1ac4e371-a66e-5d4d-93a2-32020cefaf5e\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "id": "v4q006",
+    "result": {
+     "chunks": null,
+     "message_id": "1ac4e371-a66e-5d4d-93a2-32020cefaf5e",
+     "provider": "not_started",
+     "range": {
+      "cut_inside_unit": false,
+      "done": true,
+      "end_cp": 40,
+      "sentences": 1,
+      "start_cp": 0
+     },
+     "reason": "too_long",
+     "source": {
+      "limited": false,
+      "sha256": "9a47e98bb7555f14f756be63474928a47875e06464431f49772b178ad1d03693",
+      "speakable_end_cp": 40,
+      "total_cp": 40
+     },
+     "speech_id": "01a14d67-a302-7000-8f8a-eb2dbf81fe21",
+     "state": "aborted",
+     "stream": 1,
+     "voice": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q006\",\"result\":{\"speech_id\":\"01a14d67-a302-7000-8f8a-eb2dbf81fe21\",\"message_id\":\"1ac4e371-a66e-5d4d-93a2-32020cefaf5e\",\"state\":\"aborted\",\"reason\":\"too_long\",\"stream\":1,\"source\":{\"sha256\":\"9a47e98bb7555f14f756be63474928a47875e06464431f49772b178ad1d03693\",\"total_cp\":40,\"speakable_end_cp\":40,\"limited\":false},\"range\":{\"start_cp\":0,\"end_cp\":40,\"sentences\":1,\"cut_inside_unit\":false,\"done\":true},\"chunks\":null,\"voice\":null,\"provider\":\"not_started\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_failure_states"
+   },
+   "synthetic_provider": {
+    "real_provider_requests": 0,
+    "tts_calls": 3,
+    "tts_sends": 1
+   },
+   "wire_bytes": 484
+  },
+  {
+   "device": "phone",
+   "id": "speak/ok-encode-failed-first-answer",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "ok",
+   "request": {
+    "id": "v4q007",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "7eef06fd-ed0a-4a78-82ec-5e0a52c58f94",
+     "format": "pcm16",
+     "message_id": "198a59a7-9c7d-5f55-b234-62b4d250317c",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a303-7000-8b86-5f207ad619a9",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q007\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a303-7000-8b86-5f207ad619a9\",\"binding_id\":\"7eef06fd-ed0a-4a78-82ec-5e0a52c58f94\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"198a59a7-9c7d-5f55-b234-62b4d250317c\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "id": "v4q007",
+    "result": {
+     "chunks": null,
+     "message_id": "198a59a7-9c7d-5f55-b234-62b4d250317c",
+     "provider": "not_started",
+     "range": {
+      "cut_inside_unit": false,
+      "done": true,
+      "end_cp": 42,
+      "sentences": 1,
+      "start_cp": 0
+     },
+     "reason": null,
+     "source": {
+      "limited": false,
+      "sha256": "8b9a1b4c789fb9ad1275edde92f7928d4703b2c295a451d7a16f0c41d49a7054",
+      "speakable_end_cp": 42,
+      "total_cp": 42
+     },
+     "speech_id": "01a14d67-a303-7000-8b86-5f207ad619a9",
+     "state": "preparing",
+     "stream": 1,
+     "voice": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q007\",\"result\":{\"speech_id\":\"01a14d67-a303-7000-8b86-5f207ad619a9\",\"message_id\":\"198a59a7-9c7d-5f55-b234-62b4d250317c\",\"state\":\"preparing\",\"reason\":null,\"stream\":1,\"source\":{\"sha256\":\"8b9a1b4c789fb9ad1275edde92f7928d4703b2c295a451d7a16f0c41d49a7054\",\"total_cp\":42,\"speakable_end_cp\":42,\"limited\":false},\"range\":{\"start_cp\":0,\"end_cp\":42,\"sentences\":1,\"cut_inside_unit\":false,\"done\":true},\"chunks\":null,\"voice\":null,\"provider\":\"not_started\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_failure_states"
+   },
+   "synthetic_provider": {
+    "real_provider_requests": 0,
+    "tts_calls": 3,
+    "tts_sends": 1
+   },
+   "wire_bytes": 480
+  },
+  {
+   "device": "phone",
+   "id": "speak/ok-encode-failed-receipt",
+   "kind": "captured",
+   "method": "relay.voice.speak",
+   "origin": "registered-hub-text",
+   "outcome": "ok",
+   "request": {
+    "id": "v4q008",
+    "method": "relay.voice.speak",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "7eef06fd-ed0a-4a78-82ec-5e0a52c58f94",
+     "format": "pcm16",
+     "message_id": "198a59a7-9c7d-5f55-b234-62b4d250317c",
+     "mode": "replay",
+     "output": "server",
+     "request_id": null,
+     "source_sha256": null,
+     "speech_id": "01a14d67-a303-7000-8b86-5f207ad619a9",
+     "start_cp": 0,
+     "style": "full"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "request_text": "{\"type\":\"relay.request\",\"v\":1,\"id\":\"v4q008\",\"method\":\"relay.voice.speak\",\"params\":{\"speech_id\":\"01a14d67-a303-7000-8b86-5f207ad619a9\",\"binding_id\":\"7eef06fd-ed0a-4a78-82ec-5e0a52c58f94\",\"authority_epoch\":1,\"mode\":\"replay\",\"request_id\":null,\"message_id\":\"198a59a7-9c7d-5f55-b234-62b4d250317c\",\"source_sha256\":null,\"start_cp\":0,\"style\":\"full\",\"output\":\"server\",\"format\":\"pcm16\"}}",
+   "response": {
+    "id": "v4q008",
+    "result": {
+     "chunks": null,
+     "message_id": "198a59a7-9c7d-5f55-b234-62b4d250317c",
+     "provider": "completed",
+     "range": {
+      "cut_inside_unit": false,
+      "done": true,
+      "end_cp": 42,
+      "sentences": 1,
+      "start_cp": 0
+     },
+     "reason": "encode_failed",
+     "source": {
+      "limited": false,
+      "sha256": "8b9a1b4c789fb9ad1275edde92f7928d4703b2c295a451d7a16f0c41d49a7054",
+      "speakable_end_cp": 42,
+      "total_cp": 42
+     },
+     "speech_id": "01a14d67-a303-7000-8b86-5f207ad619a9",
+     "state": "aborted",
+     "stream": 1,
+     "voice": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "response_text": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"v4q008\",\"result\":{\"speech_id\":\"01a14d67-a303-7000-8b86-5f207ad619a9\",\"message_id\":\"198a59a7-9c7d-5f55-b234-62b4d250317c\",\"state\":\"aborted\",\"reason\":\"encode_failed\",\"stream\":1,\"source\":{\"sha256\":\"8b9a1b4c789fb9ad1275edde92f7928d4703b2c295a451d7a16f0c41d49a7054\",\"total_cp\":42,\"speakable_end_cp\":42,\"limited\":false},\"range\":{\"start_cp\":0,\"end_cp\":42,\"sentences\":1,\"cut_inside_unit\":false,\"done\":true},\"chunks\":null,\"voice\":null,\"provider\":\"completed\"}}",
+   "source": {
+    "test": "tests/test_relay_voice_v4_output_vectors.py::test_output_speak_failure_states"
+   },
+   "wire_bytes": 487
+  }
+ ],
+ "not_captured": [],
+ "note": "registered failed(tts_unavailable) / unknown / aborted(too_long) / aborted(encode_failed) with their receipts and ABORT frames",
+ "provenance": {
+  "captured_by": "test_relay_voice_v4_output_vectors.py",
+  "guard_sha256": "84405155cd3696e777829bb0685d797c88140b506ef7da2524c0bfdc34a4476d",
+  "label": "v4-input-output-capture-gen1",
+  "plugin_sha256": {
+   "hub.py": "5ab0b507b4d0791d10a61282d5da38c426aa9bbbf5473b206eedcfd591faa736",
+   "opus.py": "ab1a281a9aba7ca01d1e8637e420b51275db0fa38a9deac1540f6a242cdb28dc",
+   "protocol.py": "40d878a31926948c9e28fbc160f92a2c0c90fdf4acd756d0f63e847059188552",
+   "relay_voice.py": "45c9ab4fc89f4352588f47cd1469deb63b92c2091c5a51b8041fe2873b871552",
+   "relay_voice_capture.py": "60f78701729479a3dc2462db3de5cd2fbd7a4252dd9ede6ef076684a8bae2a00",
+   "relay_voice_media.py": "12bcdaf9984fc2a80e4f4df0b020132e8f9a3399dbc8d9586cb268bf7446ad56",
+   "relay_voice_source.py": "353f5dfc4f5f00e56618d25dd7d1475473604fc8f136e7cdfdf596e4091f0b98",
+   "relay_voice_speech.py": "76ec39cc93414392356062d880799d0be444506e2cd9240b1f0e4a853697737e",
+   "relay_voice_store.py": "daa7a75aeb56c8bc42cb03257b7a781f94acceb5e88ad7ea30d2603e651484f7",
+   "relay_voice_stream.py": "41155434f619b356a410c9c02572f002278d8e08f1691541c8693048cf9ec6c4",
+   "relay_voice_text.py": "88ddb2408175c5bce32813ebe1dc08c00a0c94493d5b4c558e093d4b79809a15",
+   "relay_voice_wire.py": "3ccda3f5b73896befcc7524e33d004b71d927bedbbcb17b1e854fb0e351ab0b3"
+  },
+  "rig": "registered GatewayRunner/SessionAuthority/GadgetAdapter/grants v2/journal/RelayService/Conversations/VoiceBridge/VoiceStore/Speech and a REAL DeviceHub (never started; _on_text/_on_binary driven); ONLY the socket and the core provider execution boundary are synthetic",
+  "rig_support_sha256": {
+   "relay_bridge_support.py": "9080a8e1e42e2e8281ab944c8bdb3f7da165416f2a4289f6e28c5d77989b3c2f",
+   "relay_voice_support.py": "09d911634554e8160b002a6e4241bd3fc20282284eaaac164fb3c282502aa1d6",
+   "relay_voice_v3_support.py": "6c29dae5f42f273ec6bd92c1a248074316f6ef110f1f5184186c1a6eb5b487c3"
+  },
+  "support_sha256": "cc4c1e0f9be78551c653d33c6b2b65a38015a0470293df7ca7ed9e41ca643ed4",
+  "synthetic_content": "owned fixture identities and generated text/tones only; zero REAL provider requests, no network, no credentials",
+  "test_sha256": "0d8403a954a1a18ccf05b1a9236ffae35010f65fb6dea09578fdf8d05712664c"
+ },
+ "vector": "v4-output-speak-failures"
+}

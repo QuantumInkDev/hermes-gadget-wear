@@ -18,6 +18,9 @@ object RelayLimits {
     const val HISTORY_PAGE_BYTES = 65_536
     const val OUTBOX_READ_BYTES = 65_536
 
+    /** `relay_voice_wire.BOUNDS` for `capture.finish`, `capture.result` and `speak` (the other voice methods keep [DTO_BYTES]). */
+    const val VOICE_LARGE_BYTES = 32_768
+
     const val PAGE_ITEMS = 50
 
     /**
