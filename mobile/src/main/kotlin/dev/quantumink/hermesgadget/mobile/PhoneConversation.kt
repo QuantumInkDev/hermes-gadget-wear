@@ -450,6 +450,18 @@ class PhoneConversation @JvmOverloads constructor(
                     }
                 }
         }
+        val foreground = relayForeground
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val relayHandoff = PhoneRelayChannelHandoff(
+            this,
+            { handler.post(it) },
+            { active(version) && relayForeground == foreground },
+            { state, generation ->
+                relaySession.perform(profile.endpoint.url, foreground) {
+                    it.onChannel(state, generation)
+                }
+            }
+        )
         connection = DirectConnection(
             profile.endpoint,
             identity,
@@ -483,13 +495,7 @@ class PhoneConversation @JvmOverloads constructor(
             httpClient = httpClient,
             previousReply = saved.getValue(profile.endpoint.url).reply,
             relay = PhoneRelay.optIn(relayOn) { state, generation ->
-                synchronized(this) {
-                    if (active(version)) {
-                        relaySession.perform(profile.endpoint.url, relayForeground) {
-                            it.onChannel(state, generation)
-                        }
-                    }
-                }
+                relayHandoff.relayState(state, generation)
             }
         )
         relaySession.perform(profile.endpoint.url, relayForeground) {

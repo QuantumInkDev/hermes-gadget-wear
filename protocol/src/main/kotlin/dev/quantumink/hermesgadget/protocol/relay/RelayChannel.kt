@@ -173,6 +173,9 @@ class RelayChannel internal constructor(
     private class Waiting(val id: String, val text: String, val send: (String) -> Boolean)
     private val waiting = ArrayDeque<Waiting>()
     private var infoSerial = 0L
+
+    /** Every assignment, including same-generation/equal-state replacement, supersedes older continuations. */
+    private var transition = 0L
     private var tokens = RATE_CAPACITY
     private var tokensAtMs = 0L
 
@@ -197,12 +200,10 @@ class RelayChannel internal constructor(
     /** A new socket generation: nothing of an older one survives. */
     @Synchronized
     fun open(generation: Long) {
-        state = RelayChannelState.AwaitingWelcome
         this.generation = generation
-        endAll(RelayCallResult.Closed)
         tokens = RATE_CAPACITY
         tokensAtMs = 0L
-        setState(RelayChannelState.AwaitingWelcome)
+        setState(RelayChannelState.AwaitingWelcome) { endAll(RelayCallResult.Closed) }
     }
 
     @Synchronized
@@ -215,8 +216,7 @@ class RelayChannel internal constructor(
             RelayWelcome.NEGOTIATED -> if (!paired) {
                 setState(RelayChannelState.Invalid(RelayInvalid.NEGOTIATED_WITHOUT_PAIRING))
             } else {
-                setState(RelayChannelState.LoadingInfo)
-                requestInfo(nowMs, send, null)
+                if (setState(RelayChannelState.LoadingInfo)) requestInfo(nowMs, send, null)
             }
         }
     }
@@ -423,18 +423,14 @@ class RelayChannel internal constructor(
      */
     @Synchronized
     fun close(next: Long) {
-        state = RelayChannelState.Closed
         generation = next
-        endAll(RelayCallResult.Closed)
-        setState(RelayChannelState.Closed)
+        setState(RelayChannelState.Closed) { endAll(RelayCallResult.Closed) }
     }
 
     val outstanding: Int @Synchronized get() = pending.size
 
     private fun fail(reason: RelayFailure) {
-        state = RelayChannelState.Failed(reason)
-        endAll(RelayCallResult.Closed)
-        setState(state)
+        setState(RelayChannelState.Failed(reason)) { endAll(RelayCallResult.Closed) }
     }
 
     private fun endAll(result: RelayCallResult<Nothing>) {
@@ -453,10 +449,17 @@ class RelayChannel internal constructor(
         for (call in obsolete.values) call.end(RelayCallResult.Refused(RelayRefusal.SCOPE_REPLACED))
     }
 
-    private fun setState(next: RelayChannelState) {
+    private fun setState(next: RelayChannelState, complete: () -> Unit = {}): Boolean {
+        val revision = ++transition
+        val socket = generation
         state = next
+        complete()
+        if (transition != revision || generation != socket) return false
         refuseObsolete()
-        guarded { listener.relayState(next, generation) }
+        if (transition != revision || generation != socket) return false
+        guarded { listener.relayState(next, socket) }
+        // A listener may itself close/replace: welcome must not continue into an obsolete info request.
+        return transition == revision && generation == socket
     }
 
     private inline fun guarded(block: () -> Unit) {

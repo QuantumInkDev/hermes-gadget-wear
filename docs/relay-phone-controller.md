@@ -52,6 +52,26 @@ info view or failed info ends obsolete calls with `Refused(SCOPE_REPLACED)` exac
 before callbacks (including reentrant callbacks). DirectConnection also checks scope under the send lock, so select/leave/
 discard/stop/review/hide/replacement can withdraw queued effects before release. Deadline and FIFO pacing remain bounded.
 
+**Foreground handoff (fix2 R1).** `PhoneConversation` uses `PhoneRelayChannelHandoff` for the actual opt-in listener.
+The channel thread only CAS-enqueues and posts to the Android main Handler; it never enters the foreground monitor.
+The posted drain enters that same monitor and checks the captured connection epoch AND foreground lease before the
+endpoint/enrollment-qualified `PhoneRelaySession.perform`. Hide/replacement invalidates before closing. Old queued Ready,
+failure and close notifications cannot affect a new lease; rendered-action and enrollment checks remain in the adapter.
+One owner drain is outstanding, with at most 16 queued plus 16 draining events. Ordinary notifications retain order.
+Overflow seals normal input and fails closed as unavailable; queued authority verdicts remain, and only stronger terminal
+review/permission-denial verdicts may upgrade it (at most two). A fresh connection gets a new bridge. This is transient only.
+The post function must enqueue rather than run inline. Production uses the main Handler, not a shared transport lock.
+
+**Transition ordering (fix2 R2).** Every channel state assignment gets a distinct revision, including open/close/failure
+and same-generation/equal-state ABA replacement. Completion callbacks run after assignment; the revision and captured
+socket generation are rechecked before obsolete-call processing and notification. A superseded transition is not announced
+with a replacement generation. A listener that closes/replaces during LoadingInfo also withdraws welcome's info continuation.
+The existing exactly-once pending-set removal and queued authority/method/scope/SEND fences are unchanged.
+JVM interleavings use the actual DirectConnection/channel, production foreground bridge and owned monitor over in-memory
+WebSocket callbacks plus existing recorded info replay. They establish nonblocking callback return, teardown/drain termination,
+epoch/lease suppression, ordered reentrant notifications and no obsolete SEND. AndroidViewModel/Compose/main-Looper scheduling,
+native lifecycle, AndroidKeyStore and device/power-loss behaviour remain unexecuted; compilation is not their acceptance.
+
 **Correlations** are generation-tagged (`r<generation>-<n>`), never reused (a 256-entry memory plus the pending set), bounded to
 four calls in flight (queued or waiting), and every call ends exactly once: the typed outcome, `TimedOut`, `Closed` (socket
 generation ended: close, failure, disconnect, cancel) or `Refused` (not ready, not advertised, frame refusal, stale
