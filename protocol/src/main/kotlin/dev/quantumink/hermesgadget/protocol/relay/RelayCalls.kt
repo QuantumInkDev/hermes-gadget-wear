@@ -84,6 +84,17 @@ object RelayCalls {
             Receipt::decode
         )
 
+    /** Optional own-namespace observation, usable only when the current connection advertises it. */
+    fun ownReceipt(conversationId: ConversationId, requestId: RequestId): RelayCall<Receipt> =
+        RelayCall(
+            RelayMethod.TURN_RECEIPT_OWN,
+            wireObject(
+                "conversation_id" to JsonPrimitive(conversationId.value),
+                "request_id" to JsonPrimitive(requestId.value)
+            ),
+            Receipt::decode
+        )
+
     fun history(
         conversationId: ConversationId,
         cursor: String? = null,
@@ -334,6 +345,7 @@ object RelayCalls {
         RelayMethod.CONVERSATION_DETACH -> Detached::decode
         RelayMethod.TURN_SUBMIT,
         RelayMethod.TURN_RECEIPT,
+        RelayMethod.TURN_RECEIPT_OWN,
         RelayMethod.TURN_CANCEL -> Receipt::decode
         RelayMethod.HISTORY_PAGE, RelayMethod.EXISTING_HISTORY_PAGE -> HistoryPage::decode
         RelayMethod.EVENTS_READ -> EventsPage::decode
@@ -435,6 +447,12 @@ object RelayCalls {
             }
             RelayMethod.TURN_RECEIPT -> reader(setOf("conversation_id", "request_id")).let {
                 receipt(
+                    it.id("conversation_id", ConversationId::of),
+                    it.id("request_id", RequestId::of)
+                )
+            }
+            RelayMethod.TURN_RECEIPT_OWN -> reader(setOf("conversation_id", "request_id")).let {
+                ownReceipt(
                     it.id("conversation_id", ConversationId::of),
                     it.id("request_id", RequestId::of)
                 )

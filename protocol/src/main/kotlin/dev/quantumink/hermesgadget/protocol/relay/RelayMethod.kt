@@ -18,6 +18,7 @@ enum class RelayMethod(
     CONVERSATION_DETACH("relay.conversation.detach"),
     TURN_SUBMIT("relay.turn.submit"),
     TURN_RECEIPT("relay.turn.receipt"),
+    TURN_RECEIPT_OWN("relay.turn.receipt.own"),
     HISTORY_PAGE("relay.history.page", RelayLimits.HISTORY_PAGE_BYTES),
     EVENTS_READ("relay.events.read"),
     TASKS_LIST("relay.tasks.list"),

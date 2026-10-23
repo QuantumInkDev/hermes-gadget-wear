@@ -1,0 +1,390 @@
+{
+  "scenario": "missing-sdk",
+  "server_time_ms": 1792300000000,
+  "mint_plan": [
+    "01a14d67-a300-7000-946d-db13e291dc13",
+    "01a14d67-a300-7000-8a30-88b4e9d31d0c"
+  ],
+  "conversation_id": "8fb0004c-316c-49fd-9cf8-fe471f55f1de",
+  "immutable_intent": {
+    "request_id": "01a14d67-a300-7000-8a30-88b4e9d31d0c",
+    "expires_at_ms": 1792300120000,
+    "text": "first question"
+  },
+  "welcomes": [
+    {
+      "relay": {
+        "version": 1
+      }
+    },
+    {
+      "relay": {
+        "version": 1
+      }
+    }
+  ],
+  "steps": [
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r0",
+        "method": "relay.info",
+        "params": {}
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r0",
+        "result": {
+          "profile_id": "9e8af651-47eb-411f-b28c-ed292bbfd305",
+          "grant_generation": 2,
+          "expires_at_ms": 1794892000000,
+          "server_time_ms": 1792300000000,
+          "methods": [
+            "relay.info",
+            "relay.conversation.create",
+            "relay.conversation.attach",
+            "relay.conversation.detach",
+            "relay.turn.submit",
+            "relay.turn.receipt",
+            "relay.turn.receipt.own",
+            "relay.history.page",
+            "relay.events.read",
+            "relay.conversations.list",
+            "relay.conversation.delete",
+            "relay.outbox.read",
+            "relay.outbox.ack"
+          ],
+          "limits": {
+            "outbox_cursor": false,
+            "page_items": 50,
+            "text_bytes": 16384,
+            "dto_bytes": 8192,
+            "dto_depth": 6,
+            "history_page_bytes": 65536,
+            "history_text_bytes": 32768
+          }
+        }
+      },
+      "note": "missing-sdk"
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r1",
+        "method": "relay.conversations.list",
+        "params": {
+          "limit": 25
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r1",
+        "result": {
+          "items": [],
+          "next_cursor": null
+        }
+      },
+      "note": "missing-sdk"
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r2",
+        "method": "relay.conversation.create",
+        "params": {
+          "request_id": "01a14d67-a300-7000-946d-db13e291dc13",
+          "title": "Planning"
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r2",
+        "result": {
+          "conversation_id": "8fb0004c-316c-49fd-9cf8-fe471f55f1de",
+          "title": "Planning",
+          "revision": 1,
+          "bookmarked": false,
+          "updated_at_ms": 1792300000000,
+          "can_continue": true
+        }
+      },
+      "note": "missing-sdk"
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r3",
+        "method": "relay.conversation.attach",
+        "params": {
+          "conversation_id": "8fb0004c-316c-49fd-9cf8-fe471f55f1de"
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r3",
+        "result": {
+          "binding_id": "39a1f035-5f6f-4699-aa9e-1d0cb7953516",
+          "conversation_id": "8fb0004c-316c-49fd-9cf8-fe471f55f1de",
+          "authority_epoch": 1,
+          "execution_generation": 0,
+          "revision": 1,
+          "replay_epoch": "5a18a259-ac8c-411b-bb17-e0b938cd47a2",
+          "last_sequence": 0,
+          "execution_state": "idle"
+        }
+      },
+      "note": "missing-sdk"
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r4",
+        "method": "relay.history.page",
+        "params": {
+          "conversation_id": "8fb0004c-316c-49fd-9cf8-fe471f55f1de",
+          "limit": 50
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r4",
+        "result": {
+          "items": [],
+          "next_cursor": null
+        }
+      },
+      "note": "missing-sdk"
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r5",
+        "method": "relay.turn.submit",
+        "params": {
+          "binding_id": "39a1f035-5f6f-4699-aa9e-1d0cb7953516",
+          "authority_epoch": 1,
+          "request_id": "01a14d67-a300-7000-8a30-88b4e9d31d0c",
+          "expires_at_ms": 1792300120000,
+          "text": "first question"
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r5",
+        "result": {
+          "request_id": "01a14d67-a300-7000-8a30-88b4e9d31d0c",
+          "admission_id": "73cf4106-dd4e-4ce3-9293-ac3d36effe7d",
+          "conversation_id": "8fb0004c-316c-49fd-9cf8-fe471f55f1de",
+          "status": "queued",
+          "outcome": null,
+          "authority_epoch": 1,
+          "execution_generation": null
+        }
+      },
+      "note": "missing-sdk"
+    },
+    {
+      "connection": 2,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r0",
+        "method": "relay.info",
+        "params": {}
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r0",
+        "result": {
+          "profile_id": "9e8af651-47eb-411f-b28c-ed292bbfd305",
+          "grant_generation": 2,
+          "expires_at_ms": 1794892000000,
+          "server_time_ms": 1792300000000,
+          "methods": [
+            "relay.info",
+            "relay.conversation.create",
+            "relay.conversation.attach",
+            "relay.conversation.detach",
+            "relay.turn.submit",
+            "relay.turn.receipt",
+            "relay.turn.receipt.own",
+            "relay.history.page",
+            "relay.events.read",
+            "relay.conversations.list",
+            "relay.conversation.delete",
+            "relay.outbox.read",
+            "relay.outbox.ack"
+          ],
+          "limits": {
+            "outbox_cursor": false,
+            "page_items": 50,
+            "text_bytes": 16384,
+            "dto_bytes": 8192,
+            "dto_depth": 6,
+            "history_page_bytes": 65536,
+            "history_text_bytes": 32768
+          }
+        }
+      },
+      "note": "missing-sdk"
+    },
+    {
+      "connection": 2,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r1",
+        "method": "relay.conversations.list",
+        "params": {
+          "limit": 25
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r1",
+        "result": {
+          "items": [
+            {
+              "conversation_id": "8fb0004c-316c-49fd-9cf8-fe471f55f1de",
+              "title": "Planning",
+              "revision": 2,
+              "bookmarked": false,
+              "updated_at_ms": 1792797164641,
+              "can_continue": true
+            }
+          ],
+          "next_cursor": null
+        }
+      },
+      "note": "missing-sdk"
+    },
+    {
+      "connection": 2,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r2",
+        "method": "relay.conversation.attach",
+        "params": {
+          "conversation_id": "8fb0004c-316c-49fd-9cf8-fe471f55f1de"
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r2",
+        "result": {
+          "binding_id": "91ee85a8-65a8-49ed-a73a-0edce83c9006",
+          "conversation_id": "8fb0004c-316c-49fd-9cf8-fe471f55f1de",
+          "authority_epoch": 1,
+          "execution_generation": 1,
+          "revision": 2,
+          "replay_epoch": "f2daef54-54a2-447c-a6a4-3d2bfd7c8fb0",
+          "last_sequence": 0,
+          "execution_state": "idle"
+        }
+      },
+      "note": "missing-sdk"
+    },
+    {
+      "connection": 2,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r3",
+        "method": "relay.turn.receipt.own",
+        "params": {
+          "conversation_id": "8fb0004c-316c-49fd-9cf8-fe471f55f1de",
+          "request_id": "01a14d67-a300-7000-8a30-88b4e9d31d0c"
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r3",
+        "error": {
+          "code": "temporarily_unavailable"
+        }
+      },
+      "note": "missing-sdk"
+    },
+    {
+      "connection": 2,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r4",
+        "method": "relay.history.page",
+        "params": {
+          "conversation_id": "8fb0004c-316c-49fd-9cf8-fe471f55f1de",
+          "limit": 50
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r4",
+        "result": {
+          "items": [
+            {
+              "message_id": "0b213794-3b29-5cd0-866a-beb424b16252",
+              "role": "user",
+              "text": "first question",
+              "created_at_ms": 1792797164641,
+              "attachment_ids": [],
+              "segment_index": 0,
+              "segment_count": 1
+            },
+            {
+              "message_id": "97ec3b5c-078a-5fff-9e6d-ae6660f73132",
+              "role": "assistant",
+              "text": "equal answer",
+              "created_at_ms": 1792797164641,
+              "attachment_ids": [],
+              "segment_index": 0,
+              "segment_count": 1
+            },
+            {
+              "message_id": "4c3129b4-f21d-5032-bd0c-9205a3d90573",
+              "role": "assistant",
+              "text": "equal answer",
+              "created_at_ms": 1792797164641,
+              "attachment_ids": [],
+              "segment_index": 0,
+              "segment_count": 1
+            }
+          ],
+          "next_cursor": null
+        }
+      },
+      "note": "missing-sdk"
+    }
+  ],
+  "admissions": 1,
+  "executions": 1,
+  "origins": {
+    "sdk": "/Users/quantumdev/.t3/worktrees/Hermes Watch Agent/t3-b1bc7090/.local/receipt-own-native/task4-imports/hermes_gadget_plugin/relay_conversations.py",
+    "core": "/Users/quantumdev/.t3/worktrees/Hermes Watch Agent/t3-b1bc7090/.local/receipt-own-native/upstream/continuity-core/gateway/session_authority.py"
+  },
+  "boundaries": "registered real authority/grants/SQLite; synthetic WebSocket/provider/pairing state"
+}

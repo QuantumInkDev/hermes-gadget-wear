@@ -112,6 +112,9 @@ sealed interface ReplyOutcome {
 
 enum class IntentMatch { SAME, CHANGED, UNKNOWN_TURN }
 
+/** Transient lookup choice from the controller's current Info; never restored as authority. */
+enum class ReceiptLookup { LEGACY, OWN }
+
 enum class DiscardMode {
     /** Only a turn the server cannot still be holding: never sent, settled or refused before any effect. */
     ONLY_IF_SETTLED,
@@ -329,7 +332,8 @@ class TurnLedger private constructor(
         authority: RelayAuthority,
         token: BindingToken,
         now: ServerInstant,
-        correlation: CorrelationId
+        correlation: CorrelationId,
+        lookup: ReceiptLookup = ReceiptLookup.LEGACY
     ): LedgerStep<PlanOutcome> {
         val entry = turns[key]
         val common = commonRefusal(key, authority, token, now, correlation)
@@ -344,7 +348,16 @@ class TurnLedger private constructor(
                 token.serial,
                 key.conversation.enrollment
             )
-        val call = RelayCalls.receipt(key.conversation.conversationId, key.requestId)
+        val call = when (lookup) {
+            ReceiptLookup.LEGACY -> RelayCalls.receipt(
+                key.conversation.conversationId,
+                key.requestId
+            )
+            ReceiptLookup.OWN -> RelayCalls.ownReceipt(
+                key.conversation.conversationId,
+                key.requestId
+            )
+        }
         val changed = turn.update(outstanding = ref)
         return LedgerStep(
             planned(changed, ref, now),

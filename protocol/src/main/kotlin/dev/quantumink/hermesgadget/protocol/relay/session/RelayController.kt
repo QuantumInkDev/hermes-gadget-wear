@@ -47,6 +47,7 @@ import dev.quantumink.hermesgadget.protocol.relay.state.PlanRefusal
 import dev.quantumink.hermesgadget.protocol.relay.state.PrepareOutcome
 import dev.quantumink.hermesgadget.protocol.relay.state.Reactivation
 import dev.quantumink.hermesgadget.protocol.relay.state.ReadPlanOutcome
+import dev.quantumink.hermesgadget.protocol.relay.state.ReceiptLookup
 import dev.quantumink.hermesgadget.protocol.relay.state.RefreshKind
 import dev.quantumink.hermesgadget.protocol.relay.state.RelayAuthority
 import dev.quantumink.hermesgadget.protocol.relay.state.RelayStateRestore
@@ -1466,7 +1467,15 @@ class RelayController(
         val link = transport
         if (rt == null || at == null || link == null) return then()
         val correlation = link.correlation()
-        val step = rt.ledger.planLookup(key, rt.authority, bound, at, correlation)
+        val lookup = if (supports(
+                RelayMethod.TURN_RECEIPT_OWN
+            )
+        ) {
+            ReceiptLookup.OWN
+        } else {
+            ReceiptLookup.LEGACY
+        }
+        val step = rt.ledger.planLookup(key, rt.authority, bound, at, correlation, lookup)
         val planned = step.result as? PlanOutcome.Planned
         if (planned == null) {
             // After uncertainty the ledger wants a binding made AFTER it: the user's "check" attaches again first.
@@ -1477,8 +1486,19 @@ class RelayController(
         runtime = rt.copy(ledger = step.ledger)
         val ref = planned.dispatch.ref
         request(planned.dispatch.call, correlation) { result ->
-            answerTurnCall(ref, key, result)
-            if (mine == flow && runtime?.ledger?.entry(key)?.phase == TurnPhase.ABSENT_SO_FAR) {
+            val applied = answerTurnCall(ref, key, result)
+            // A failed lookup retains historical absence. Only this applied negative can release a retry.
+            val negative = if (result is RelayCallResult.Outcome) {
+                result.outcome as? RelayOutcome.Failed
+            } else {
+                null
+            }
+            if (mine == flow && token === bound &&
+                negative?.error?.code == RelayErrorCode.NOT_FOUND &&
+                applied is ReplyOutcome.Applied && applied.key == key &&
+                applied.phase == TurnPhase.ABSENT_SO_FAR &&
+                runtime?.ledger?.entry(key)?.phase == TurnPhase.ABSENT_SO_FAR
+            ) {
                 resubmit(key, deliberate = false)
             }
             then()
@@ -1486,12 +1506,16 @@ class RelayController(
     }
 
     /** One turn call ended: the ledger decides what it means. A call that never left is treated as unanswered. */
-    private fun answerTurnCall(ref: CallRef, key: TurnKey, result: RelayCallResult<Receipt>) {
-        val rt = runtime ?: return
+    private fun answerTurnCall(
+        ref: CallRef,
+        key: TurnKey,
+        result: RelayCallResult<Receipt>
+    ): ReplyOutcome? {
+        val rt = runtime ?: return null
         val step = when (result) {
             is RelayCallResult.Outcome -> rt.ledger.onReply(ref, result.outcome)
             RelayCallResult.TimedOut, is RelayCallResult.Refused -> rt.ledger.onTimeout(ref)
-            RelayCallResult.Closed -> return
+            RelayCallResult.Closed -> return null
         }
         val before = token
         applyLedger(step)
@@ -1506,6 +1530,7 @@ class RelayController(
                 retryTimer = later(backoff(attempt)) { reattach() }
             }
         }
+        return step.result
     }
 
     private fun applyLedger(step: LedgerStep<ReplyOutcome>) {

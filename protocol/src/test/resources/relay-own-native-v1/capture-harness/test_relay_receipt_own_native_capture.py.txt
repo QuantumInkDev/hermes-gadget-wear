@@ -1,0 +1,170 @@
+"""Registered producer captures for the bounded native own-receipt consumer.
+
+Real enrollment, schema-2 grants, Gadget registration, GatewayRunner, SessionAuthority,
+output lock and SQLite. WebSocket/provider execution and pairing establishment are the
+inherited synthetic boundaries. No real handshake, TCP concurrency or provider claim.
+Every invocation writes a unique reporting-generation destination from its FIRST call.
+"""
+import copy
+import hashlib
+import inspect
+import json
+from pathlib import Path
+
+import pytest
+
+from relay_bridge_support import bridge as bridge, rig as rig, device_session  # noqa: F401
+from test_relay_registry import request_id
+from test_relay_receipt_own import admissions
+
+OWN = 'relay.turn.receipt.own'
+TEXT = 'first question'
+
+
+class Capture:
+    def __init__(self, f, monkeypatch, scenario):
+        import receipt_evidence
+        self.f, self.scenario = f, scenario
+        self.out = receipt_evidence._directory / 'captures' / scenario
+        self.out.mkdir(parents=True, exist_ok=False)
+        self.connection, self.steps, self.welcomes, self.mints = 0, [], [], []
+        self.at = f.clock[0]
+        self.methods = []
+        original = f.rig.adapter.on_relay_request
+
+        async def record(session, message):
+            request = copy.deepcopy(message)
+            with (self.out / 'requests.jsonl').open('a') as stream:
+                stream.write(json.dumps(dict(connection=self.connection, request=request), sort_keys=True)+'\n')
+            before = len(session._ws.frames)
+            await original(session, message)
+            frames = session._ws.frames[before:]
+            responses = [s for s in frames if json.loads(s).get('type') == 'relay.response'
+                         and json.loads(s).get('id') == request['id']]
+            assert len(responses) == 1, frames
+            raw = responses[0]
+            step = dict(connection=self.connection, request=request, response=json.loads(raw), note=scenario)
+            self.steps.append(step)
+            with (self.out / 'responses.jsonl').open('a') as stream:
+                stream.write(json.dumps(dict(connection=self.connection, raw=raw, sha256=hashlib.sha256(raw.encode()).hexdigest()), sort_keys=True)+'\n')
+            # Preserve original frames even if a later assertion or setup fails.
+            (self.out / 'steps-so-far.json').write_text(json.dumps(self.steps, indent=2)+'\n')
+        monkeypatch.setattr(f.rig.adapter, 'on_relay_request', record)
+
+    async def open(self):
+        f = self.f
+        old = f.sessions['phone']
+        binding = f.bridge.bindings.get(id(old))
+        if binding:
+            await f.bridge.retire(binding)
+        f.sessions['phone'] = device_session('phone', f.keys['phone'])
+        self.connection += 1
+        welcome = await f.rig.adapter.relay_welcome(f.sessions['phone'])
+        self.welcomes.append(dict(relay=welcome))
+        info = await f.call('relay.info')
+        self.methods = info.get('result', {}).get('methods', [])
+        return info
+
+    async def attach(self):
+        f = self.f
+        binding = await f.attach()
+        return binding
+
+    async def snapshots(self):
+        f = self.f
+        await f.call('relay.history.page', dict(conversation_id=f.conversation, limit=50))
+        if 'relay.tasks.list' in self.methods:
+            await f.call('relay.tasks.list', dict(limit=25))
+
+    async def start(self):
+        f = self.f
+        info = await self.open()
+        await f.call('relay.conversations.list', dict(limit=25))
+        creation = request_id(f.clock[0]); self.mints.append(creation)
+        result = await f.call('relay.conversation.create', dict(request_id=creation, title='Planning'))
+        assert 'result' in result, result
+        f.conversation = result['result']['conversation_id']
+        await self.attach()
+        f.row = f.bridge.store.registry.get(f.grants.authorize('phone', 'relay:read'), f.conversation)
+        f.ref = f.bridge.core.ref(f.row)
+        await self.snapshots()
+        rid = request_id(f.clock[0]); self.mints.append(rid)
+        self.intent = dict(request_id=rid, expires_at_ms=f.clock[0]+120000, text=TEXT)
+        return info
+
+    async def reconnect(self):
+        info = await self.open()
+        await self.f.call('relay.conversations.list', dict(limit=25))
+        await self.attach()
+        return info
+
+    async def submit(self):
+        binding = self.f.bridge.bindings[id(self.f.sessions['phone'])]
+        return await self.f.call('relay.turn.submit', dict(binding_id=binding.id,
+            authority_epoch=binding.authority_epoch, **self.intent))
+
+    async def lookup(self, method=OWN):
+        return await self.f.call(method, dict(conversation_id=self.f.conversation,
+                                               request_id=self.intent['request_id']))
+
+    def seal(self):
+        f = self.f
+        from hermes_gadget_plugin import relay_conversations
+        from gateway import session_authority
+        data = dict(scenario=self.scenario, server_time_ms=self.at, mint_plan=self.mints,
+                    conversation_id=f.conversation, immutable_intent=self.intent,
+                    welcomes=self.welcomes, steps=self.steps,
+                    admissions=len(admissions(f)), executions=len(f.rig.executions),
+                    origins=dict(sdk=inspect.getfile(relay_conversations), core=inspect.getfile(session_authority)),
+                    boundaries='registered real authority/grants/SQLite; synthetic WebSocket/provider/pairing state')
+        (self.out / 'session.json').write_text(json.dumps(data, indent=2)+'\n')
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('scenario', ['absent', 'found', 'missing-sdk', 'proof-unavailable',
+                                      'denied', 'old-id', 'expired-intent', 'incompatible'])
+async def test_registered_native_capture(bridge, monkeypatch, scenario):
+    f = bridge
+    c = Capture(f, monkeypatch, scenario)
+    if scenario == 'incompatible':
+        monkeypatch.setattr(f.rig.authority, 'NATIVE_OWN_RECEIPT_PROOF_VERSION', 2)
+    first = await c.start()
+    assert (OWN in first['result']['methods']) == (scenario != 'incompatible')
+    admitted = scenario in ('found', 'missing-sdk', 'incompatible')
+    if admitted:
+        assert 'result' in await c.submit()
+        await f.rig.settle(f.ref)
+        await f.bridge.maintain()
+    if scenario == 'missing-sdk':
+        # Real lost immutable SDK journal while its actual core admission remains.
+        identity = f.bridge.store.identity(f.grants.authorize('phone', 'relay:read'), c.intent['request_id'])
+        with f.service.outbox.tx() as db:
+            db.execute('DELETE FROM relay_requests WHERE id=?', (identity,))
+    if scenario == 'expired-intent':
+        f.bridge.store.reserve_turn(f.grants.authorize('phone', 'relay:submit'), c.intent['request_id'], f.conversation,
+            text=TEXT, expires_at_ms=c.intent['expires_at_ms'],
+            source=f.bridge.core.source('phone', f.row['logical_chat']).to_dict())
+        f.clock[0] += 120001
+    if scenario == 'old-id':
+        f.clock[0] += 300001
+    info = await c.reconnect()
+    assert (OWN in info['result']['methods']) == (scenario != 'incompatible')
+    if scenario == 'proof-unavailable':
+        monkeypatch.setattr(f.rig.authority, 'NATIVE_OWN_RECEIPT_PROOF_VERSION', 2)
+    if scenario == 'denied':
+        f.data['devices']['phone']['permissions'].remove('relay:read'); f.save()
+    reply = await c.lookup('relay.turn.receipt' if scenario == 'incompatible' else OWN)
+    expected = dict(absent='not_found', **{'missing-sdk':'temporarily_unavailable',
+        'proof-unavailable':'unsupported', 'denied':'permission_denied', 'old-id':'expired', 'expired-intent':'expired'})
+    if scenario in expected:
+        assert reply.get('error') == {'code': expected[scenario]}, reply
+    else:
+        assert reply['result']['outcome'] == 'completed', reply
+    if scenario == 'absent':
+        assert admissions(f) == f.rig.executions == []
+        assert 'result' in await c.submit()
+        await f.rig.settle(f.ref)
+    if scenario != 'denied':
+        await c.snapshots()
+    assert len(admissions(f)) == len(f.rig.executions) == int(admitted or scenario == 'absent')
+    c.seal()

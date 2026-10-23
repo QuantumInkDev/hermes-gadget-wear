@@ -315,3 +315,13 @@ watch. Original N6/N10 exact recovery stays REQUIRED, unrestored and unwaived (n
 4. A lookup `permission_denied` is passed unchanged to the ledger (§5.5); history reads never establish receipt absence.
 5. History resume points are kept per scope (newest 8); an over-limit one only means "read that listing from its top".
 6. The channel queues rather than refuses on its pacing bucket (a refusal would have failed a flow that merely had to wait).
+
+## Optional own-receipt observation
+
+The controller prefers `relay.turn.receipt.own` only when the current connection's fresh `relay.info.methods` advertises it. `TurnLedger.planLookup` receives a transient typed choice and builds the actual call with exactly `conversation_id` and `request_id`. Unchanged planner callers default to the legacy receipt method, which remains part of the required Relay baseline. SDK version and restored state confer no method authority; a new SDK with incompatible core proof support hides the optional method.
+
+Both operations use the existing bounded Receipt/error decoder, CallRef/outstanding correlation, enrollment/conversation/binding fences and final queued SEND capability checks. Reconnect obtains fresh Info and attaches before lookup. Withdrawal or scope replacement invalidates queued work. A failed own observation does not fall back to legacy/shared/history evidence or enlarge a grant. The ordinary attach history/task snapshot remains separate and never establishes absence.
+
+Only the current applied, correlated `not_found` lookup may release an automatic retry through the existing ledger and per-process attempt, current binding, clock, expiry and persist-before-SEND gates. Historical ABSENT_SO_FAR can survive a failed lookup, but that retained bit alone does not release new work. The tested old-production schedules with exhausted retry budget were already safe controls, not a reproduced stale-absence SEND defect. Original request ID, text and expiry never change; found admission never submits again, and denial still stops and evicts. Absence does not establish a final outcome, no charge, purged execution or permission to replay STT. Canonical microphone remains OFF.
+
+The separately captured `relay-own-native-v1` sessions exercise the actual registered producer and production controller/DirectConnection replay seams. Their socket/provider boundaries are synthetic; Android tests are compiled separately from JVM execution, and native/live/physical/battery acceptance remains open.
