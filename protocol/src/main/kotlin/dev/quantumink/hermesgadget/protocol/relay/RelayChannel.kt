@@ -13,6 +13,9 @@ enum class RelayRefusal {
     /** `relay.info` did not advertise the method: nothing but `relay.info` is callable before it, and only listed methods after. */
     NOT_ADVERTISED,
 
+    /** The authority or foreground scope that queued this call was replaced before dispatch. */
+    SCOPE_REPLACED,
+
     /** The request frame could not be encoded within the wire bounds. */
     FRAME_REFUSED,
 
@@ -128,6 +131,9 @@ interface RelayTransport {
      * passed to [handler] exactly once on the connection's event thread.
      */
     fun refreshInfo(handler: (RelayCallResult<Info>) -> Unit)
+
+    /** Invalidate delayed frames of the previous controller scope before selection, leave, hide or replacement. */
+    fun invalidatePending() = Unit
 }
 
 /**
@@ -152,6 +158,7 @@ class RelayChannel internal constructor(
 ) {
     private class Pending(
         val deadlineMs: Long,
+        val valid: () -> Boolean,
         val deliver: (RelayFrame) -> Unit,
         val end: (RelayCallResult<Nothing>) -> Unit
     )
@@ -163,7 +170,7 @@ class RelayChannel internal constructor(
     private val usedSet = HashSet<String>()
 
     /** Encoded requests waiting for a pacing token (oldest first); each has its `pending` entry and deadline. */
-    private class Waiting(val id: String, val text: String)
+    private class Waiting(val id: String, val text: String, val send: (String) -> Boolean)
     private val waiting = ArrayDeque<Waiting>()
     private var infoSerial = 0L
     private var tokens = RATE_CAPACITY
@@ -190,8 +197,9 @@ class RelayChannel internal constructor(
     /** A new socket generation: nothing of an older one survives. */
     @Synchronized
     fun open(generation: Long) {
-        endAll(RelayCallResult.Closed)
+        state = RelayChannelState.AwaitingWelcome
         this.generation = generation
+        endAll(RelayCallResult.Closed)
         tokens = RATE_CAPACITY
         tokensAtMs = 0L
         setState(RelayChannelState.AwaitingWelcome)
@@ -281,9 +289,23 @@ class RelayChannel internal constructor(
         send: (String) -> Boolean,
         handler: (RelayCallResult<R>) -> Unit
     ) {
+        callScoped(correlation, call, timeoutMs, nowMs, send, { true }, handler)
+    }
+
+    @Synchronized
+    fun <R : Any> callScoped(
+        correlation: CorrelationId,
+        call: RelayCall<R>,
+        timeoutMs: Long,
+        nowMs: Long,
+        send: (String) -> Boolean,
+        scopeCurrent: () -> Boolean,
+        handler: (RelayCallResult<R>) -> Unit
+    ) {
         fun refuse(reason: RelayRefusal, encoding: RelayRejection? = null) =
             guarded { handler(RelayCallResult.Refused(reason, encoding)) }
         val current = state
+        if (!scopeCurrent()) return refuse(RelayRefusal.SCOPE_REPLACED)
         val allowed = when {
             call.method == RelayMethod.INFO ->
                 current is RelayChannelState.LoadingInfo || current is RelayChannelState.Ready
@@ -304,8 +326,18 @@ class RelayChannel internal constructor(
             is RelayEncoded.Frame -> encoded
         }
         remember(correlation.value)
+        val socket = generation
+        val authority = (current as? RelayChannelState.Ready)?.serial
         pending[correlation.value] = Pending(
             nowMs + timeoutMs,
+            {
+                val ready = state as? RelayChannelState.Ready
+                scopeCurrent() && socket == generation && if (call.method == RelayMethod.INFO) {
+                    state is RelayChannelState.LoadingInfo || ready != null
+                } else {
+                    ready != null && ready.serial == authority && ready.info.advertises(call.method)
+                }
+            },
             { reply ->
                 guarded { handler(RelayCallResult.Outcome(call.interpret(correlation, reply))) }
             },
@@ -313,7 +345,7 @@ class RelayChannel internal constructor(
         )
         // Pacing: with no token the request WAITS (in order, under its own deadline); it is never refused for the rate.
         if (waiting.isNotEmpty() || !takeToken(nowMs)) {
-            waiting.addLast(Waiting(correlation.value, frame.text))
+            waiting.addLast(Waiting(correlation.value, frame.text, send))
             return
         }
         if (!send(frame.text)) {
@@ -361,7 +393,7 @@ class RelayChannel internal constructor(
     }
 
     @Synchronized
-    fun tick(nowMs: Long, send: (String) -> Boolean) {
+    fun tick(nowMs: Long, @Suppress("UNUSED_PARAMETER") send: (String) -> Boolean) {
         if (pending.isEmpty()) return
         val expired = pending.filterValues { nowMs >= it.deadlineMs }
         for (id in expired.keys) {
@@ -369,9 +401,15 @@ class RelayChannel internal constructor(
             waiting.removeAll { it.id == id }
         }
         for (call in expired.values) call.end(RelayCallResult.TimedOut)
+        refuseObsolete()
         while (waiting.isNotEmpty() && takeToken(nowMs)) {
             val next = waiting.removeFirst()
-            if (next.id in pending && !send(next.text)) {
+            val call = pending[next.id] ?: continue
+            if (!call.valid()) {
+                pending.remove(next.id)?.end(RelayCallResult.Refused(RelayRefusal.SCOPE_REPLACED))
+                continue
+            }
+            if (!next.send(next.text)) {
                 pending.remove(
                     next.id
                 )?.end(RelayCallResult.Refused(RelayRefusal.SOCKET_BACKPRESSURE))
@@ -385,16 +423,18 @@ class RelayChannel internal constructor(
      */
     @Synchronized
     fun close(next: Long) {
-        endAll(RelayCallResult.Closed)
+        state = RelayChannelState.Closed
         generation = next
+        endAll(RelayCallResult.Closed)
         setState(RelayChannelState.Closed)
     }
 
     val outstanding: Int @Synchronized get() = pending.size
 
     private fun fail(reason: RelayFailure) {
+        state = RelayChannelState.Failed(reason)
         endAll(RelayCallResult.Closed)
-        setState(RelayChannelState.Failed(reason))
+        setState(state)
     }
 
     private fun endAll(result: RelayCallResult<Nothing>) {
@@ -404,8 +444,18 @@ class RelayChannel internal constructor(
         for (call in all) call.end(result)
     }
 
+    /** Remove the entire obsolete set before completions: a handler may reenter tick/call/close. */
+    @Synchronized
+    fun refuseObsolete() {
+        val obsolete = pending.filterValues { !it.valid() }
+        for (id in obsolete.keys) pending.remove(id)
+        waiting.removeAll { it.id in obsolete }
+        for (call in obsolete.values) call.end(RelayCallResult.Refused(RelayRefusal.SCOPE_REPLACED))
+    }
+
     private fun setState(next: RelayChannelState) {
         state = next
+        refuseObsolete()
         guarded { listener.relayState(next, generation) }
     }
 

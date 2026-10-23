@@ -194,6 +194,54 @@ class EncryptedRelayStoreTest {
         assertEquals(before, digest(record))
     }
 
+    @Test fun normalCommitCannotReplaceATagDamagedAfterSuccessfulLoad() {
+        val store = store()
+        assertTrue(store.commit(document(), 0) is StoreCommit.Committed)
+        assertTrue(store.load() is StoreLoad.Loaded)
+        val damaged = record.readBytes().also {
+            it[it.lastIndex] =
+                (it.last().toInt() xor 1).toByte()
+        }
+        record.writeBytes(damaged)
+        val result = store.commit(document("replacement"), 1)
+        assertTrue(result is StoreCommit.Failed)
+        assertEquals(StoreProblem.CORRUPT, (result as StoreCommit.Failed).problem)
+        assertArrayEquals(damaged, record.readBytes())
+    }
+
+    @Test fun aUsableWrongKeyCannotAuthorizeReplacement() {
+        assertTrue(store().commit(document(), 0) is StoreCommit.Committed)
+        val before = record.readBytes()
+        val wrongKey = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+        val creates = ArrayList<Boolean>()
+        val wrong = store(key = {
+            creates.add(it)
+            wrongKey
+        })
+        val result = wrong.commit(document("replacement"), 1)
+        assertTrue(result is StoreCommit.Failed)
+        assertEquals(StoreProblem.CORRUPT, (result as StoreCommit.Failed).problem)
+        assertTrue(creates.none { it })
+        assertArrayEquals(before, record.readBytes())
+    }
+
+    @Test fun normalCommitPreservesEveryUnsupportedOrOversizeExistingRecord() {
+        val store = store()
+        store.commit(document(), 0)
+        val original = record.readBytes()
+        for ((bytes, problem) in listOf(
+            original.copyOf().also { it[0] = 2 } to StoreProblem.UNSUPPORTED_VERSION,
+            original.copyOf(StoreBounds.MAX_FILE_BYTES + 1) to StoreProblem.TOO_LARGE,
+            original.copyOf(10) to StoreProblem.CORRUPT
+        )) {
+            record.writeBytes(bytes)
+            val result = store.commit(document("replacement"), 1) as StoreCommit.Failed
+            assertEquals(problem, result.problem)
+            assertFalse(result.uncertain)
+            assertArrayEquals(bytes, record.readBytes())
+        }
+    }
+
     @Test fun aFirstCommitMayCreateTheKeyButOnlyOnAStoreThatNeverHeldAByte() {
         val creates = ArrayList<Boolean>()
         val first = store(key = { create ->

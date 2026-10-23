@@ -23,7 +23,7 @@ enum class RelayPhase {
     /** The profile or server identity changed: nothing is sent until the user reviews it. */
     REVIEW_REQUIRED,
 
-    /** `permission_denied`: sending stopped; cached content is evicted. */
+    /** `permission_denied`: sending stopped; content eviction may still be pending. */
     STOPPED,
 
     /** Negotiated and ready: conversations can be listed, created and selected. */
@@ -56,6 +56,8 @@ enum class RelayNotice {
     STORAGE_FULL_PENDING_ITEMS,
     STORAGE_WRITE_FAILED,
     STORAGE_UNCERTAIN,
+    OBSERVATION_UNSAVED,
+    OBSERVATION_UNCERTAIN,
     SEND_REFUSED_STORAGE,
     CLOCK_UNAVAILABLE,
     LEDGER_FULL,
@@ -69,6 +71,7 @@ enum class RelayNotice {
     BUSY_TRY_AGAIN,
     RECONNECTING,
     HISTORY_INCOMPLETE,
+    SNAPSHOT_INCOMPLETE,
     PROMPT_ELSEWHERE,
     PERMISSION_DENIED,
     PROFILE_CHANGED,
@@ -120,6 +123,8 @@ data class PendingCreate(val title: String?) {
 }
 
 data class RelayUiState(
+    val identity: EnrollmentIdentity? = null,
+    val foregroundSession: Long = 0,
     val phase: RelayPhase = RelayPhase.OFF,
     val reason: RelayReason = RelayReason.NONE,
     val enabled: Boolean = false,
@@ -142,6 +147,8 @@ data class RelayUiState(
     val notice: RelayNotice = RelayNotice.NONE,
     /** In-memory changes exist that are not stored yet; sending is refused until the store recovers. */
     val unsaved: Boolean = false,
+    /** Saved scope content still needs a confirmed eviction commit. */
+    val contentEvictionPending: Boolean = false,
     val busy: Boolean = false,
     /** The typed composer may send into the selected conversation. */
     val canSend: Boolean = false,

@@ -108,16 +108,15 @@ class PhoneConversation @JvmOverloads constructor(
     private val cues = RecordingCues(application)
 
     /** Built on first use: construction opens no key, store or socket. */
-    private val relayHolder = lazy {
-        relayFactory(application) { ui ->
+    private val relaySession =
+        PhoneRelaySession({ listener -> relayFactory(application, listener) }) { ui ->
             mutable.update { if (it.visible) it.copy(relay = ui) else it }
         }
-    }
-    private val relay: RelayController get() = relayHolder.value
+    private var relayForeground = 0L
+    private val relay: RelayController get() = relaySession.controller
     private val relayPrepare = java.util.concurrent.Executors.newSingleThreadExecutor {
         Thread(it, "phone-relay-prepare").apply { isDaemon = true }
     }
-    private var relayWanted = false
 
     @Synchronized fun open(
         profile: EndpointProfile,
@@ -134,8 +133,10 @@ class PhoneConversation @JvmOverloads constructor(
             visible = true,
             mediaMuted = mediaMuted(),
             connection = ConnectionState(conversation = ConversationState(reply = previous.reply)),
-            relayRequested = relayWanted
+            relayRequested = false
         )
+        relayForeground = epoch
+        relaySession.open(profile.endpoint.url, relayForeground)
         // An enrolled phone shows its saved Relay setting right away. Nothing is enrolled, created or connected here.
         if (PhoneRelay.hasState(getApplication())) {
             val version = epoch
@@ -145,7 +146,11 @@ class PhoneConversation @JvmOverloads constructor(
                 }.getOrNull()
                 if (known != null && profile.endpoint.isTls) {
                     synchronized(this) { if (!active(version)) return@execute }
-                    relay.prepare(relayIdentity(profile, known))
+                    relaySession.prepare(
+                        profile.endpoint.url,
+                        version,
+                        relayIdentity(profile, known)
+                    )
                 }
             }
         }
@@ -178,6 +183,7 @@ class PhoneConversation @JvmOverloads constructor(
             mutable.value = current.copy(error = "Phone Talk/Chat requires TLS (wss).")
             return
         }
+        val relayVersion = relayForeground
         val version = ++epoch
         preparing?.cancel(true)
         preparation.queue.clear()
@@ -208,7 +214,8 @@ class PhoneConversation @JvmOverloads constructor(
             }
             val identity = runCatching { vault.identity(profile.endpoint, create = true) }
             // Relay is a deliberate, per-profile opt-in: it is advertised on this socket only when the saved setting is on.
-            val relayOn = identity.getOrNull()?.let { prepareRelay(profile, it) } ?: false
+            val relayOn =
+                identity.getOrNull()?.let { prepareRelay(profile, relayVersion, it) } ?: false
             synchronized(this) {
                 if (!active(version) || mutable.value.profile != profile) return@submit
                 identity.fold({
@@ -226,12 +233,13 @@ class PhoneConversation @JvmOverloads constructor(
     }
 
     /** Off the main thread and outside the lock: loads the saved setting and applies a pending request. */
-    private fun prepareRelay(profile: EndpointProfile, identity: DeviceIdentity): Boolean {
+    private fun prepareRelay(
+        profile: EndpointProfile,
+        version: Long,
+        identity: DeviceIdentity
+    ): Boolean {
         if (!profile.endpoint.isTls) return false
-        relay.prepare(relayIdentity(profile, identity))
-        val wanted = synchronized(this) { relayWanted.also { relayWanted = false } }
-        if (wanted) relay.setEnabled(true)
-        return relay.enabledBlocking()
+        return relaySession.prepare(profile.endpoint.url, version, relayIdentity(profile, identity))
     }
 
     private fun startConnection(
@@ -475,10 +483,18 @@ class PhoneConversation @JvmOverloads constructor(
             httpClient = httpClient,
             previousReply = saved.getValue(profile.endpoint.url).reply,
             relay = PhoneRelay.optIn(relayOn) { state, generation ->
-                relay.onChannel(state, generation)
+                synchronized(this) {
+                    if (active(version)) {
+                        relaySession.perform(profile.endpoint.url, relayForeground) {
+                            it.onChannel(state, generation)
+                        }
+                    }
+                }
             }
         )
-        relay.attachTransport(connection?.relayTransport)
+        relaySession.perform(profile.endpoint.url, relayForeground) {
+            it.attachTransport(connection?.relayTransport)
+        }
         mutable.update { it.copy(error = notice, sessionVersion = version, relayRequested = false) }
         connection?.connect()
     }
@@ -729,7 +745,7 @@ class PhoneConversation @JvmOverloads constructor(
         stopPlayback()
         speech?.close()
         speech = null
-        if (relayHolder.isInitialized()) relay.hide()
+        relaySession.hide()
         connection?.close()
         capture = null
         playback = null
@@ -756,29 +772,65 @@ class PhoneConversation @JvmOverloads constructor(
             notice("Relay conversations require a wss endpoint.")
             return
         }
-        relayWanted = on
-        relay.setEnabled(on)
+        if (!current.visible) return
+        val foreground = relayForeground
+        val version = epoch
+        relaySession.enable(on, profile.endpoint.url, foreground)
         val live = connection != null
         mutable.update { it.copy(relayRequested = on && !live) }
-        if (live) {
-            open(profile, current.page)
-            connect()
+        relayPrepare.execute {
+            val known = runCatching { vault.identity(profile.endpoint, create = false) }.getOrNull()
+            if (known != null) {
+                relaySession.prepare(
+                    profile.endpoint.url,
+                    foreground,
+                    relayIdentity(profile, known)
+                )
+            }
+            if (live) {
+                synchronized(this) {
+                    if (active(version) && relayForeground == foreground &&
+                        mutable.value.profile == profile
+                    ) {
+                        open(profile, current.page)
+                        connect()
+                    }
+                }
+            }
         }
     }
 
-    fun relayRefresh() = relay.refreshConversations()
-    fun relayMore() = relay.loadMoreConversations()
-    fun relayCreate(title: String) = relay.create(title.ifBlank { null })
-    fun relayDiscardCreate() = relay.discardCreate()
-    fun relaySelect(conversationId: String) = relay.select(conversationId)
-    fun relayLeave() = relay.leave()
-    fun relayCheck(requestId: String) = relay.check(requestId)
-    fun relayResend(requestId: String) = relay.resend(requestId)
-    fun relayAbandon(requestId: String) = relay.abandon(requestId)
-    fun relayClearSettled() = relay.clearSettled()
-    fun relayAcceptReview() = relay.acceptReview()
-    fun relayReauthorize() = relay.reauthorize()
-    fun relayRetryStorage() = relay.retryStorage()
+    /** Each rendered control captures its foreground lease; stale Compose callbacks cannot act on a replacement. */
+    @Synchronized internal fun relayActions(): RelayActions {
+        val endpoint = mutable.value.profile?.endpoint?.url ?: return RelayActions.NONE
+        val foreground = relayForeground
+        fun run(action: (RelayController) -> Unit) =
+            relaySession.perform(endpoint, foreground, action)
+        return RelayActions(
+            enable = { on ->
+                synchronized(this) {
+                    if (mutable.value.visible && relayForeground == foreground &&
+                        mutable.value.profile?.endpoint?.url == endpoint
+                    ) {
+                        relayEnable(on)
+                    }
+                }
+            },
+            refresh = { run { it.refreshConversations() } },
+            more = { run { it.loadMoreConversations() } },
+            create = { title -> run { it.create(title.ifBlank { null }) } },
+            discardCreate = { run { it.discardCreate() } },
+            select = { id -> run { it.select(id) } },
+            leave = { run { it.leave() } },
+            check = { id -> run { it.check(id) } },
+            resend = { id -> run { it.resend(id) } },
+            abandon = { id -> run { it.abandon(id) } },
+            clearSettled = { run { it.clearSettled() } },
+            review = { run { it.acceptReview() } },
+            reauthorize = { run { it.reauthorize() } },
+            retryStorage = { run { it.retryStorage() } }
+        )
+    }
 
     fun refreshMediaVolume() {
         val muted = mediaMuted()

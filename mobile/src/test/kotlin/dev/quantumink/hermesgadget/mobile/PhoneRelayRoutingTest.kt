@@ -158,4 +158,18 @@ class PhoneRelayRoutingTest {
         optIn.listener.relayState(RelayChannelState.Closed, 2)
         assertEquals(listOf(RelayChannelState.NotOffered, RelayChannelState.Closed), reported)
     }
+
+    @Test fun storageAndEvictionNoticesDoNotOverstateDurableOutcomes() {
+        assertFalse(relayNoticeText(RelayNotice.OBSERVATION_UNSAVED).contains("Nothing was sent"))
+        assertTrue(relayNoticeText(RelayNotice.OBSERVATION_UNSAVED).contains("server"))
+        val pending =
+            RelayUiState(phase = RelayPhase.STOPPED, contentEvictionPending = true, unsaved = true)
+        assertTrue(relayStoppedText(pending).contains("still needs removal"))
+        assertFalse(relayStoppedText(pending).contains("content was removed"))
+        assertTrue(
+            relayStoppedText(
+                pending.copy(contentEvictionPending = false, unsaved = false)
+            ).contains("ledger content was removed")
+        )
+    }
 }

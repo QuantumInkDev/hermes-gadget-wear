@@ -47,33 +47,26 @@ internal class RelayActions(
     companion object {
         val NONE = RelayActions()
 
-        fun of(model: PhoneConversation) = RelayActions(
-            model::relayEnable,
-            model::relayRefresh,
-            model::relayMore,
-            model::relayCreate,
-            model::relayDiscardCreate,
-            model::relaySelect,
-            model::relayLeave,
-            model::relayCheck,
-            model::relayResend,
-            model::relayAbandon,
-            model::relayClearSettled,
-            model::relayAcceptReview,
-            model::relayReauthorize,
-            model::relayRetryStorage
-        )
+        fun of(model: PhoneConversation) = model.relayActions()
     }
 }
 
 internal fun relayNoticeText(notice: RelayNotice): String = when (notice) {
     RelayNotice.NONE -> ""
     RelayNotice.STORAGE_FULL_PENDING_ITEMS ->
-        "Can't save more until pending or unconfirmed messages are reviewed. Nothing was sent."
-    RelayNotice.STORAGE_WRITE_FAILED -> "Relay could not save its state. Nothing was sent."
+        "Can't save more until pending or unconfirmed messages are reviewed."
+    RelayNotice.STORAGE_WRITE_FAILED ->
+        "Relay could not save its state. The requested change was refused."
     RelayNotice.STORAGE_UNCERTAIN ->
-        "Relay could not confirm that its state was saved. Nothing was sent."
-    RelayNotice.SEND_REFUSED_STORAGE -> "Relay state is not saved yet. Try again."
+        "Relay could not confirm that its state was saved. The requested change was refused."
+    RelayNotice.OBSERVATION_UNSAVED ->
+        "The server response is visible but could not be saved. " +
+            "Requests may already have reached the server."
+    RelayNotice.OBSERVATION_UNCERTAIN ->
+        "The server response is visible; saving is unconfirmed. " +
+            "Requests may already have reached the server."
+    RelayNotice.SEND_REFUSED_STORAGE ->
+        "This message was not sent because Relay state is not saved yet."
     RelayNotice.CLOCK_UNAVAILABLE -> "The server clock is not available yet."
     RelayNotice.LEDGER_FULL -> "Too many messages are tracked. Clear finished ones to continue."
     RelayNotice.TURN_REFUSED -> "That message cannot be sent."
@@ -89,16 +82,24 @@ internal fun relayNoticeText(notice: RelayNotice): String = when (notice) {
     RelayNotice.NAME_INVALID -> "That name is not valid."
     RelayNotice.BUSY_TRY_AGAIN -> "The server is busy. Retrying."
     RelayNotice.RECONNECTING -> "Reconnecting."
+    RelayNotice.SNAPSHOT_INCOMPLETE -> "The task snapshot is incomplete. Refresh to try again."
     RelayNotice.HISTORY_INCOMPLETE -> "Only part of this conversation's history is shown."
     RelayNotice.PROMPT_ELSEWHERE -> "Hermes is waiting for an answer on another device."
     RelayNotice.PERMISSION_DENIED ->
-        "This phone no longer has access. Cached Relay content was removed."
+        "This phone no longer has access. Sending is stopped; " +
+            "saved content removal is being checked."
     RelayNotice.PROFILE_CHANGED -> "The server or profile changed. Review it before continuing."
     RelayNotice.SERVER_ERROR -> "The server could not do that."
     RelayNotice.ANOMALY -> "The server answered something unexpected. Nothing was changed."
     RelayNotice.LINK_FAILED -> "The connection to Relay failed. Try again."
     RelayNotice.CONVERSATION_DELETED -> "This conversation no longer exists."
     RelayNotice.VOICE_UNAVAILABLE -> "Voice is not available in a Relay conversation yet."
+}
+
+internal fun relayStoppedText(relay: RelayUiState): String = if (relay.contentEvictionPending) {
+    "Relay access was removed. Sending is stopped. Saved Relay content still needs removal."
+} else {
+    "Relay access was removed. Sending is stopped. Saved Relay ledger content was removed."
 }
 
 internal fun relayReasonText(reason: RelayReason): String = when (reason) {
@@ -175,9 +176,7 @@ internal fun RelaySection(
             }
             RelayPhase.REVIEW_REQUIRED -> RelayReview(relay, actions)
             RelayPhase.STOPPED -> {
-                Text(
-                    "This phone's Relay access was removed by the server. Nothing is sent and cached content is gone."
-                )
+                Text(relayStoppedText(relay))
                 Button(actions.reauthorize) { Text("Allow Relay again") }
                 TextButton({ actions.enable(false) }) { Text("Turn off Relay") }
             }
@@ -283,6 +282,10 @@ private fun RelaySelected(relay: RelayUiState, actions: RelayActions) {
     relay.tasksWorking?.let { working ->
         val waiting = relay.tasksNeedInput ?: 0
         if (working > 0 || waiting > 0) Text("Working: $working, needs input elsewhere: $waiting")
+    }
+    if (relay.refreshOwed && !relay.busy) {
+        Text("This conversation view still needs a refresh.")
+        TextButton({ relay.selected?.id?.let(actions.select) }) { Text("Retry refresh") }
     }
     relay.transcript.forEach { line ->
         Text(

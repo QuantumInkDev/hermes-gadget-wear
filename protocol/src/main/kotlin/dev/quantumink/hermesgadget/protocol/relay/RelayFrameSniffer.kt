@@ -3,168 +3,138 @@ package dev.quantumink.hermesgadget.protocol.relay
 import dev.quantumink.hermesgadget.protocol.BinaryFrame
 
 /**
- * A cheap, allocation-light look at the top level of a raw text frame, made BEFORE the permissive stock
- * [dev.quantumink.hermesgadget.protocol.Message.parse] (depth 64, 1 MiB) is allowed to see it. Only a connection that
- * deliberately opted in to Relay asks: a frame whose top-level `type` is `relay.response` belongs to the Relay router
- * (bounded by [RelayLimits.FRAME_BYTES] and [RelayLimits.DEPTH]) and is never handed to the stock conversation; every
- * other frame continues to the stock parser unchanged.
- *
- * The scan reads the first top-level `type` member only (nested `type` members never count) without building a tree, and
- * is itself bounded by the stock frame limit. It is a ROUTING decision, not validation: [RelayEnvelope.decodeFrame]
- * still parses strictly and refuses duplicates and malformed frames.
+ * Bounded routing scan BEFORE stock Message.parse. Decodes JSON-equivalent top-level type keys and values without
+ * building a body tree. Any Relay type or ambiguous/malformed header goes to the strict Relay parser. Legitimate
+ * stock objects keep their original parser and limits. Allocation is constant (only short keys/type values).
  */
 object RelayFrameSniffer {
-    enum class Verdict {
-        /** The top-level `type` is `relay.response`. */
-        RELAY_RESPONSE,
+    enum class Verdict { RELAY_RESPONSE, OTHER, UNDETERMINED }
 
-        /** A top-level `type` is present and is something else (stock traffic). */
-        OTHER,
-
-        /** No readable top-level `type`: the stock parser decides (and normally refuses). */
-        UNDETERMINED
-    }
-
-    private const val TYPE = "type"
-    private const val RELAY_RESPONSE = "relay.response"
-    private const val MAX_KEY = 16
-
-    fun classify(text: String): Verdict {
-        if (text.length > BinaryFrame.MAX_FRAME_BYTES) return Verdict.UNDETERMINED
-        val scan = Scan(text)
-        return scan.run()
+    fun classify(text: String): Verdict = if (text.length > BinaryFrame.MAX_FRAME_BYTES) {
+        // No valid stock frame can be this long; never risk a Relay fallthrough.
+        Verdict.RELAY_RESPONSE
+    } else {
+        Scan(text).run()
     }
 
     private class Scan(private val text: String) {
         private var index = 0
 
         fun run(): Verdict {
-            skipSpace()
+            space()
             if (!take('{')) return Verdict.UNDETERMINED
-            while (true) {
-                skipSpace()
-                if (index >= text.length) return Verdict.UNDETERMINED
-                if (text[index] == '}') return Verdict.UNDETERMINED
-                if (text[index] != '"') return Verdict.UNDETERMINED
-                val key = readKey() ?: return Verdict.UNDETERMINED
-                skipSpace()
-                if (!take(':')) return Verdict.UNDETERMINED
-                skipSpace()
-                if (key == TYPE) {
-                    return when (readTypeValue()) {
-                        null -> Verdict.UNDETERMINED
-                        RELAY_RESPONSE -> Verdict.RELAY_RESPONSE
-                        else -> Verdict.OTHER
-                    }
-                }
-                if (!skipValue()) return Verdict.UNDETERMINED
-                skipSpace()
-                if (index >= text.length) return Verdict.UNDETERMINED
-                when (text[index]) {
-                    ',' -> index++
-                    else -> return Verdict.UNDETERMINED
-                }
-            }
-        }
-
-        /**
-         * A key without escapes of at most [MAX_KEY] characters; any other key is returned as a marker that
-         * never equals `type`.
-         */
-        private fun readKey(): String? {
-            index++ // opening quote
-            val start = index
-            var escaped = false
+            var types = 0
+            var relay = false
+            var sawType = false
+            space()
+            if (take('}')) return Verdict.UNDETERMINED
             while (index < text.length) {
-                val c = text[index]
-                if (c == '\\') {
-                    escaped = true
-                    index += 2
-                    continue
-                }
-                if (c == '"') {
-                    val length = index - start
-                    index++
-                    return if (escaped || length > MAX_KEY) {
-                        "\u0000"
+                space()
+                val key = string() ?: return Verdict.RELAY_RESPONSE
+                space()
+                if (!take(':')) return Verdict.RELAY_RESPONSE
+                space()
+                if (key == "type") {
+                    types++
+                    if (index < text.length && text[index] == '"') {
+                        val type = string() ?: return Verdict.RELAY_RESPONSE
+                        sawType = true
+                        relay = relay || type == "relay.response"
                     } else {
-                        text.substring(start, start + length)
+                        return Verdict.RELAY_RESPONSE
+                    }
+                } else if (!skipValue()) {
+                    return Verdict.RELAY_RESPONSE
+                }
+                space()
+                if (take('}')) {
+                    space()
+                    if (index != text.length) return Verdict.RELAY_RESPONSE
+                    return when {
+                        relay || types > 1 -> Verdict.RELAY_RESPONSE
+                        sawType -> Verdict.OTHER
+                        else -> Verdict.UNDETERMINED
                     }
                 }
-                index++
+                if (!take(',')) return Verdict.RELAY_RESPONSE
+            }
+            return Verdict.RELAY_RESPONSE
+        }
+
+        /** Decodes escapes but retains at most 32 characters, enough for type/key equality. */
+        private fun string(): String? {
+            if (!take('"')) return null
+            val small = StringBuilder(32)
+            var length = 0
+            while (index < text.length) {
+                var c = text[index++]
+                if (c == '"') return if (length <= 32) small.toString() else "\u0000"
+                if (c < ' ') return null
+                if (c == '\\') {
+                    if (index >= text.length) return null
+                    c = when (val escape = text[index++]) {
+                        '"', '\\', '/' -> escape
+                        'b' -> '\b'
+                        'f' -> '\u000c'
+                        'n' -> '\n'
+                        'r' -> '\r'
+                        't' -> '\t'
+                        'u' -> {
+                            if (index + 4 > text.length) return null
+                            var value = 0
+                            repeat(4) {
+                                val digit = text[index++].digitToIntOrNull(16) ?: return null
+                                value = value * 16 + digit
+                            }
+                            value.toChar()
+                        }
+                        else -> return null
+                    }
+                }
+                if (length++ < 32) small.append(c)
             }
             return null
         }
 
-        /**
-         * The `type` string value (without escapes, at most 32 characters), or null when it is not a plain
-         * short string.
-         */
-        private fun readTypeValue(): String? {
-            if (index >= text.length || text[index] != '"') return null
-            index++
+        /** Iterative, no tree or stack proportional to input. Full validation remains with the selected parser. */
+        private fun skipValue(): Boolean {
+            var depth = 0
             val start = index
             while (index < text.length) {
-                val c = text[index]
-                if (c == '\\' || index - start > 32) return null
-                if (c == '"') return text.substring(start, index)
-                index++
-            }
-            return null
-        }
-
-        /** Skips one JSON value of any shape without allocating; false when the text ends early. */
-        private fun skipValue(): Boolean {
-            if (index >= text.length) return false
-            var depth = 0
-            while (index < text.length) {
-                val c = text[index]
-                when {
-                    c == '"' -> {
-                        if (!skipString()) return false
+                when (text[index]) {
+                    '"' -> {
+                        if (string() == null) return false
                         if (depth == 0) return true
                         continue
                     }
-                    c == '{' || c == '[' -> depth++
-                    c == '}' || c == ']' -> {
-                        if (depth == 0) return true
+                    '{', '[' -> {
+                        depth++
+                        if (depth > 64) return false
+                    }
+                    '}', ']' -> {
+                        if (depth == 0) return index > start
                         depth--
                         if (depth == 0) {
                             index++
                             return true
                         }
                     }
-                    c == ',' && depth == 0 -> return true
+                    ',' -> if (depth == 0) return index > start
                 }
                 index++
-            }
-            return depth == 0
-        }
-
-        private fun skipString(): Boolean {
-            index++ // opening quote
-            while (index < text.length) {
-                val c = text[index]
-                if (c == '\\') {
-                    index += 2
-                    continue
-                }
-                index++
-                if (c == '"') return true
             }
             return false
         }
 
-        private fun skipSpace() {
+        private fun space() {
             while (index < text.length && text[index] in " \n\r\t") index++
         }
 
-        private fun take(c: Char): Boolean {
-            if (index < text.length && text[index] == c) {
-                index++
-                return true
-            }
-            return false
+        private fun take(c: Char): Boolean = if (index < text.length && text[index] == c) {
+            index++
+            true
+        } else {
+            false
         }
     }
 }

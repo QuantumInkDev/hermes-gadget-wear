@@ -25,7 +25,6 @@ import dev.quantumink.hermesgadget.protocol.relay.RelayOutcome
 import dev.quantumink.hermesgadget.protocol.relay.RelayRefusal
 import dev.quantumink.hermesgadget.protocol.relay.RelayTransport
 import dev.quantumink.hermesgadget.protocol.relay.RequestId
-import dev.quantumink.hermesgadget.protocol.relay.TaskPage
 import dev.quantumink.hermesgadget.protocol.relay.TaskState
 import dev.quantumink.hermesgadget.protocol.relay.state.BindingToken
 import dev.quantumink.hermesgadget.protocol.relay.state.CallKind
@@ -110,6 +109,8 @@ class RelayTiming(
     val backoffMaxMs: Long = 30_000,
     val maxRetries: Int = 6,
     val maxHistoryPages: Int = 24,
+    val maxHistoryRequests: Int = 64,
+    val maxTaskPages: Int = 24,
     val historyPageItems: Int = 50,
     val listPageItems: Int = 25,
     val maxResubmits: Int = 3,
@@ -156,6 +157,7 @@ class RelayController(
     }
 
     private var identity: EnrollmentIdentity? = null
+    private var foregroundSession = 0L
     private var stored: Stored = Stored.NotLoaded
     private var storeSequence = 0L
     private var runtime: RelayRuntime? = null
@@ -187,6 +189,9 @@ class RelayController(
     private var listing = false
     private val transcript = Transcript()
     private var historyIncomplete = false
+    private var historyComplete = false
+    private var tasksComplete = false
+    private var historyRequests = 0
     private val tasks = LinkedHashMap<String, TaskState>()
     private var notice = RelayNotice.NONE
     private var pollTimer: Cancelable? = null
@@ -196,6 +201,8 @@ class RelayController(
 
     /** Turns written in THIS process may be written again by themselves (same id) after a fresh attach and `not_found`. */
     private val resubmits = HashMap<TurnKey, Int>()
+    private var createOperation = 0L
+    private var createTimer: Cancelable? = null
     private var createHalted = false
     private var createAttempt = 0
     private var infoRefreshing = false
@@ -206,7 +213,11 @@ class RelayController(
 
     // -- public API (thread-safe) ------------------------------------------------------------------------------
 
-    fun prepare(identity: EnrollmentIdentity) = post {
+    fun prepare(identity: EnrollmentIdentity, foregroundSession: Long = 0) = post {
+        if (this.foregroundSession != foregroundSession) {
+            endSession(attachAgain = false)
+            this.foregroundSession = foregroundSession
+        }
         if (this.identity != identity) {
             endSession(attachAgain = false)
             this.identity = identity
@@ -302,6 +313,10 @@ class RelayController(
         val record = record() ?: return@post
         if (record.createIntent == null) return@post
         if (commitSection(withRecord(record.copy(createIntent = null)))) {
+            createOperation++
+            transport?.invalidatePending()
+            createTimer?.cancel()
+            createTimer = null
             createHalted = false
             notice = RelayNotice.NONE
         }
@@ -509,6 +524,14 @@ class RelayController(
     private fun advance(next: RelayRuntime) {
         runtime = next
         unsaved = !tryCommit(next)
+        if (unsaved) {
+            notice = when (notice) {
+                RelayNotice.STORAGE_UNCERTAIN -> RelayNotice.OBSERVATION_UNCERTAIN
+                RelayNotice.STORAGE_WRITE_FAILED -> RelayNotice.OBSERVATION_UNSAVED
+                // Keep typed capacity/clock reasons; their text makes no zero-send claim.
+                else -> notice
+            }
+        }
     }
 
     // -- the transport session ---------------------------------------------------------------------------------
@@ -566,10 +589,13 @@ class RelayController(
      * disable and a changed profile never do.
      */
     private fun endSession(attachAgain: Boolean) {
+        transport?.invalidatePending()
         serial++
         flow++
         pollTimer?.cancel()
         retryTimer?.cancel()
+        createTimer?.cancel()
+        createTimer = null
         pollTimer = null
         retryTimer = null
         pollInFlight = false
@@ -780,6 +806,7 @@ class RelayController(
      * grant may have changed) and the continuing session attaches again. Nothing is resubmitted by this.
      */
     private fun reattach() {
+        transport?.invalidatePending()
         val scope = scope()
         val rt = runtime
         token = null
@@ -811,6 +838,7 @@ class RelayController(
     }
 
     private fun stopScope() {
+        transport?.invalidatePending()
         val record = record() ?: return
         val rt = runtime ?: return
         val scope = record.scope()
@@ -866,6 +894,7 @@ class RelayController(
     }
 
     private fun requireReview() {
+        transport?.invalidatePending()
         val record = record() ?: return
         val rt = runtime ?: return
         val scope = record.scope()
@@ -1069,12 +1098,16 @@ class RelayController(
         if (!commitSection(withRecord(record.copy(createIntent = intent)))) return publish()
         createHalted = false
         createAttempt = 0
+        createOperation++
         sendCreate(intent)
         publish()
     }
 
-    private fun sendCreate(intent: CreateIntent) {
-        if (createHalted) return
+    private fun currentCreate(intent: CreateIntent, operation: Long): Boolean =
+        operation == createOperation && record()?.createIntent == intent
+
+    private fun sendCreate(intent: CreateIntent, operation: Long = createOperation) {
+        if (createHalted || !currentCreate(intent, operation) || !isReady()) return
         val at = now()
         if (at != null && at.serverMs - intent.preparedAtMs >= timing.createRetryWindowMs) {
             createHalted = true
@@ -1087,6 +1120,7 @@ class RelayController(
             return
         }
         request(call) { result ->
+            if (!currentCreate(intent, operation)) return@request
             when (result) {
                 is RelayCallResult.Outcome -> when (val outcome = result.outcome) {
                     is RelayOutcome.Success -> onCreated(intent, outcome.value)
@@ -1113,7 +1147,9 @@ class RelayController(
         notice = RelayNotice.CREATE_PENDING
         if (createAttempt < timing.maxRetries) {
             val attempt = createAttempt++
-            retryTimer = later(backoff(attempt)) { sendCreate(intent) }
+            val operation = createOperation
+            createTimer?.cancel()
+            createTimer = later(backoff(attempt)) { sendCreate(intent, operation) }
         }
     }
 
@@ -1197,12 +1233,17 @@ class RelayController(
     }
 
     private fun attach(id: ConversationId, attempt: Int = 0) {
+        if (record()?.selectedConversationId != id || !isReady()) return
+        transport?.invalidatePending()
         flow++
         val mine = flow
         attaching = true
         attachAttempt = attempt
         token = null
         historyIncomplete = false
+        historyComplete = false
+        tasksComplete = false
+        tasks.clear()
         pollTimer?.cancel()
         request(RelayCalls.attach(id)) { result ->
             if (mine != flow) return@request
@@ -1236,11 +1277,19 @@ class RelayController(
         if (attempt <
             timing.maxRetries
         ) {
-            retryTimer = later(backoff(attempt)) { attach(id, attempt + 1) }
+            val mine = flow
+            val scope = scope()
+            retryTimer = later(backoff(attempt)) {
+                if (mine == flow && scope == scope() && record()?.selectedConversationId == id) {
+                    attach(id, attempt + 1)
+                }
+            }
         }
     }
 
     private fun onAttachFailed(error: RelayError, id: ConversationId, attempt: Int) {
+        val mine = flow
+        val expectedScope = scope()
         attaching = false
         when {
             error.code == RelayErrorCode.NOT_FOUND -> {
@@ -1250,12 +1299,23 @@ class RelayController(
                 attachedOnce = false
                 notice = RelayNotice.CONVERSATION_DELETED
             }
-            commonError(error, { attach(id, attempt + 1) }, attempt) -> Unit
+            commonError(error, {
+                if (mine == flow && expectedScope == scope() &&
+                    record()?.selectedConversationId == id
+                ) {
+                    attach(id, attempt + 1)
+                }
+            }, attempt) -> Unit
             else -> notice = RelayNotice.SERVER_ERROR
         }
     }
 
     private fun attached(binding: Binding, mine: Long) {
+        if (mine != flow || record()?.selectedConversationId != binding.conversationId) {
+            attaching = false
+            notice = RelayNotice.ANOMALY
+            return
+        }
         val scope = scope() ?: return
         val rt = runtime ?: return
         val step = rt.authority.attach(scope, binding)
@@ -1287,11 +1347,18 @@ class RelayController(
         if (mine != flow) return
         val rt = runtime ?: return
         attaching = false
-        notice = if (historyIncomplete) RelayNotice.HISTORY_INCOMPLETE else RelayNotice.NONE
+        notice = when {
+            !tasksComplete -> RelayNotice.SNAPSHOT_INCOMPLETE
+            !historyComplete -> RelayNotice.HISTORY_INCOMPLETE
+            else -> RelayNotice.NONE
+        }
         rt.delivery(bound.scope)?.let { delivery ->
             val cleared = delivery.refreshed(
                 bound.conversation,
-                setOf(RefreshKind.HISTORY, RefreshKind.TASKS)
+                buildSet {
+                    if (historyComplete) add(RefreshKind.HISTORY)
+                    if (tasksComplete) add(RefreshKind.TASKS)
+                }
             )
             // A failed commit sets its own notice: it must not be overwritten by the one above.
             advance(rt.withDelivery(cleared.delivery))
@@ -1301,6 +1368,7 @@ class RelayController(
     }
 
     private fun leaveConversation() {
+        transport?.invalidatePending()
         val record = record() ?: return
         val bound = token
         if (bound != null && supports(RelayMethod.CONVERSATION_DETACH) &&
@@ -1573,6 +1641,9 @@ class RelayController(
     // -- history and tasks --------------------------------------------------------------------------------------
 
     private fun loadHistory(bound: BindingToken, mine: Long, then: () -> Unit) {
+        historyComplete = false
+        historyIncomplete = true
+        historyRequests = 0
         val rt = runtime ?: return then()
         if (!supports(RelayMethod.HISTORY_PAGE)) return then()
         val scope = HistoryScope(bound.conversation)
@@ -1590,10 +1661,15 @@ class RelayController(
         then: () -> Unit
     ) {
         if (mine != flow) return
+        if (historyRequests >= timing.maxHistoryRequests) {
+            historyIncomplete = true
+            return then()
+        }
         val planStep = assembly.planPage(timing.historyPageItems)
         val plan = (planStep.result as? HistoryPlanOutcome.Planned)?.plan ?: return then()
         var current = planStep.assembly
         storeHistory(current)
+        historyRequests++
         request(plan.call) { result ->
             if (mine != flow) return@request
             val next = when (result) {
@@ -1630,7 +1706,8 @@ class RelayController(
                     publish()
                     when {
                         outcome.listingComplete -> {
-                            if (outcome.refusedInListing > 0) historyIncomplete = true
+                            historyComplete = outcome.refusedInListing == 0
+                            historyIncomplete = !historyComplete
                             then()
                         }
                         pages + 1 >= timing.maxHistoryPages -> {
@@ -1695,25 +1772,66 @@ class RelayController(
     }
 
     private fun loadTasks(bound: BindingToken, mine: Long, then: () -> Unit) {
+        tasksComplete = false
+        tasks.clear()
         if (!supports(RelayMethod.TASKS_LIST)) return then()
-        request(RelayCalls.tasks(null, timing.listPageItems)) { result ->
-            if (mine != flow) return@request
-            if (result is RelayCallResult.Outcome) {
-                when (val outcome = result.outcome) {
-                    is RelayOutcome.Success -> onTasks(outcome.value, bound)
-                    is RelayOutcome.Failed -> commonError(outcome.error, null, 0)
-                    is RelayOutcome.Uncorrelated, is RelayOutcome.Invalid -> Unit
-                }
-            }
-            then()
-        }
+        taskPage(bound, mine, null, 0, 0, HashSet(), then)
     }
 
-    private fun onTasks(page: TaskPage, bound: BindingToken) {
-        tasks.clear()
-        for (task in page.items) {
-            if (task.conversationId == bound.conversationId && tasks.size < MAX_TASKS) {
-                tasks[task.taskId.value] = task.state
+    /** Enrollment-wide producer pages, bounded even when pages are empty but carry progress cursors. */
+    private fun taskPage(
+        bound: BindingToken,
+        mine: Long,
+        cursor: String?,
+        pages: Int,
+        attempt: Int,
+        cursors: MutableSet<String>,
+        then: () -> Unit
+    ) {
+        if (mine != flow) return
+        if (pages >= timing.maxTaskPages) return then()
+        request(RelayCalls.tasks(cursor, timing.listPageItems)) { result ->
+            if (mine != flow) return@request
+            val outcome = (result as? RelayCallResult.Outcome)?.outcome
+            if (outcome is RelayOutcome.Success) {
+                for (task in outcome.value.items) {
+                    if (task.conversationId != bound.conversationId) continue
+                    if (task.taskId.value !in tasks &&
+                        tasks.size >= MAX_TASKS
+                    ) {
+                        return@request then()
+                    }
+                    tasks[task.taskId.value] = task.state
+                }
+                val next = outcome.value.nextCursor
+                if (next == null) {
+                    tasksComplete = true
+                    then()
+                } else if (!cursors.add(next)) {
+                    then()
+                } else {
+                    taskPage(bound, mine, next, pages + 1, 0, cursors, then)
+                }
+                return@request
+            }
+            val error = (outcome as? RelayOutcome.Failed)?.error
+            if (error != null && error.action != RelayErrorAction.RETRY_SAME_REQUEST &&
+                commonError(error, null, 0)
+            ) {
+                if (mine == flow) then()
+                return@request
+            }
+            val retryable = error?.action == RelayErrorAction.RETRY_SAME_REQUEST ||
+                result == RelayCallResult.TimedOut || outcome is RelayOutcome.Invalid ||
+                outcome is RelayOutcome.Uncorrelated ||
+                (result is RelayCallResult.Refused && busyLocally(result))
+            if (retryable && attempt < timing.maxRetries) {
+                notice = RelayNotice.BUSY_TRY_AGAIN
+                retryTimer = later(backoff(attempt)) {
+                    taskPage(bound, mine, cursor, pages, attempt + 1, cursors, then)
+                }
+            } else if (result != RelayCallResult.Closed) {
+                then()
             }
         }
     }
@@ -1979,6 +2097,8 @@ class RelayController(
         val pending = record?.createIntent
         val scope = scope()
         ui = RelayUiState(
+            identity = identity,
+            foregroundSession = foregroundSession,
             phase = phase,
             reason = unavailable ?: RelayReason.NONE,
             enabled = enabled && problem == null,
@@ -2000,16 +2120,12 @@ class RelayController(
             transcript = transcript.lines(),
             historyIncomplete = historyIncomplete,
             turns = turnViews(),
-            tasksWorking = if (token !=
-                null
-            ) {
+            tasksWorking = if (token != null && tasksComplete) {
                 tasks.values.count { it == TaskState.WORKING }
             } else {
                 null
             },
-            tasksNeedInput = if (token !=
-                null
-            ) {
+            tasksNeedInput = if (token != null && tasksComplete) {
                 tasks.values.count { it == TaskState.NEEDS_INPUT }
             } else {
                 null
@@ -2018,11 +2134,23 @@ class RelayController(
             scope != null && runtime?.delivery(scope)?.refreshOwed?.isNotEmpty() == true,
             notice = notice,
             unsaved = unsaved,
+            contentEvictionPending = evictionPending(phase, scope),
             busy = attaching || listing,
             canSend = phase == RelayPhase.SELECTED && token != null,
             micAvailable = false
         )
         listener(ui)
+    }
+
+    private fun evictionPending(phase: RelayPhase, scope: EnrollmentScope?): Boolean {
+        if (phase != RelayPhase.STOPPED) return false
+        val rt = runtime ?: return true // fresh time/restore has not established removal yet
+        if (scope == null || unsaved) return true
+        val delivery = rt.delivery(scope)
+        return rt.ledger.scopeRecord(scope)?.contentEvictionOwed == true ||
+            rt.ledger.entriesFor(scope).any { it.text != null } ||
+            delivery?.let { it.seenCount > 0 || it.refreshOwed.isNotEmpty() } == true ||
+            rt.histories.any { it.scope.conversation.enrollment == scope }
     }
 
     private class Transcript {

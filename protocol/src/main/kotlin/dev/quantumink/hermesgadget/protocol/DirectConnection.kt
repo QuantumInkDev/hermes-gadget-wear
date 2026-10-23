@@ -118,6 +118,8 @@ class DirectConnection(
     }
     private val diagnostics = ConnectionDiagnostics(diagnosticTransport)
     private val actions = WatchActions.manifest(availableActions)
+    private val relayScopeLock = Any()
+    private val relayScope = java.util.concurrent.atomic.AtomicLong()
     private val relayChannel = relay?.let { RelayChannel(it.listener, it.monotonicNanos) }
     private val helloCapabilities =
         if (relayChannel != null) RelayNegotiation.withRelay(capabilities) else capabilities
@@ -135,10 +137,33 @@ class DirectConnection(
                 timeoutMs: Long,
                 handler: (RelayCallResult<R>) -> Unit
             ) {
+                val scope = relayScope.get()
                 submit(
-                    { channel.call(correlation, call, timeoutMs, now(), ::relaySend, handler) },
+                    {
+                        channel.callScoped(
+                            correlation,
+                            call,
+                            timeoutMs,
+                            now(),
+                            { text ->
+                                synchronized(relayScopeLock) {
+                                    scope == relayScope.get() &&
+                                        relaySend(text)
+                                }
+                            },
+                            { scope == relayScope.get() },
+                            handler
+                        )
+                    },
                     { handler(RelayCallResult.Refused(RelayRefusal.QUEUE_FULL)) }
                 )
+            }
+
+            override fun invalidatePending() {
+                synchronized(relayScopeLock) {
+                    relayScope.incrementAndGet()
+                } // synchronous fence before queue drain
+                submit({ channel.refuseObsolete() }, {})
             }
 
             override fun refreshInfo(handler: (RelayCallResult<Info>) -> Unit) {

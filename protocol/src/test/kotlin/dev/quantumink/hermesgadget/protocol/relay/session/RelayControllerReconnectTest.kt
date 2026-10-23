@@ -359,10 +359,16 @@ class RelayControllerReconnectTest {
         fx.run()
         assertEquals(RelayPhase.STOPPED, fx.ui.phase)
         assertTrue(fx.ui.unsaved)
+        assertTrue(fx.ui.contentEvictionPending)
         val onDisk = fx.store.reread()
         assertEquals(Standing.STOPPED, onDisk.section.enrollments.single().standing)
         assertEquals("owed text", onDisk.snapshot.ledger.turns.single().text)
         assertTrue(onDisk.snapshot.ledger.scopes.single().contentEvictionOwed)
+        val notYetRestored = ControllerFixture(store = fx.store)
+        notYetRestored.prepare()
+        assertEquals(RelayPhase.STOPPED, notYetRestored.ui.phase)
+        // No fresh clock/runtime yet: never claim removal.
+        assertTrue(notYetRestored.ui.contentEvictionPending)
         // A retry that still cannot store keeps it owed; once the store works the eviction is stored and the flag clears.
         fx.controller.retryStorage()
         fx.run()
@@ -374,6 +380,7 @@ class RelayControllerReconnectTest {
         assertEquals(null, stored.ledger.turns.single().text)
         assertFalse(stored.ledger.scopes.single().contentEvictionOwed)
         assertFalse(fx.ui.unsaved)
+        assertFalse(fx.ui.contentEvictionPending)
     }
 
     @Test fun profileChangedFreezesSendingAcrossARestartUntilADeliberateReview() {

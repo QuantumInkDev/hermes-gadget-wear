@@ -117,12 +117,6 @@ internal class EncryptedRelayStore(
         val state = inspect()
         if (state is Inspection.Broken) return StoreCommit.Failed(state.problem, false)
         val record = File(directory, RECORD)
-        val onDisk = when (state) {
-            is Inspection.Present -> header(state.record)?.second
-                ?: return StoreCommit.Failed(StoreProblem.CORRUPT, false)
-            else -> 0L
-        }
-        if (onDisk != base) return StoreCommit.Stale
         val fresh = state is Inspection.Absent
         val secret = try {
             // A key may be created only for a store that has never held a byte.
@@ -130,6 +124,17 @@ internal class EncryptedRelayStore(
         } catch (_: Exception) {
             return StoreCommit.Failed(StoreProblem.KEY_UNAVAILABLE, false)
         }
+        // The clear sequence alone cannot authorize replacement: authenticate and validate the EXISTING aggregate.
+        val onDisk = when (state) {
+            is Inspection.Present -> when (val old = readRecord(state.record, secret)) {
+                is StoreLoad.Loaded -> old.sequence
+                is StoreLoad.Unreadable -> return StoreCommit.Failed(old.problem, false)
+                StoreLoad.Empty -> return StoreCommit.Failed(StoreProblem.CORRUPT, false)
+            }
+            else -> 0L
+        }
+        if (onDisk != base) return StoreCommit.Stale
+        if (base == Long.MAX_VALUE) return StoreCommit.Failed(StoreProblem.CORRUPT, false)
         val next = base + 1
         val sealed = try {
             seal(secret, plaintext, next)
@@ -228,7 +233,7 @@ internal class EncryptedRelayStore(
         null
     }
 
-    private fun readRecord(record: File): StoreLoad {
+    private fun readRecord(record: File, existingKey: SecretKey? = null): StoreLoad {
         val size = record.length()
         if (size > StoreBounds.MAX_FILE_BYTES) return StoreLoad.Unreadable(StoreProblem.TOO_LARGE)
         if (size < HEADER + TAG_BYTES) return StoreLoad.Unreadable(StoreProblem.CORRUPT)
@@ -242,11 +247,12 @@ internal class EncryptedRelayStore(
             return StoreLoad.Unreadable(StoreProblem.UNSUPPORTED_VERSION)
         }
         val secret = try {
-            key(false)
+            existingKey ?: key(false)
         } catch (_: Exception) {
             return StoreLoad.Unreadable(StoreProblem.KEY_UNAVAILABLE)
         }
         val sequence = ByteBuffer.wrap(raw, 2 + IV_BYTES, 8).long
+        if (sequence <= 0) return StoreLoad.Unreadable(StoreProblem.CORRUPT)
         val plaintext = try {
             open(secret, raw, sequence)
         } catch (_: AEADBadTagException) {

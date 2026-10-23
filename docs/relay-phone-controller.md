@@ -39,10 +39,18 @@ START/FINISH cues, waveforms, server ElevenLabs/BYOK, Stop and lifecycle invalid
    `relay.info` (grant change, expiry) replaces the state and the clock fix.
 
 **Routing and bounds.** Before the permissive stock `Message.parse` (depth 64, 1 MiB) sees a text frame, `RelayFrameSniffer`
-reads only the first top-level `type` (no tree, no allocation, bounded by the 1 MiB stock frame limit). A `relay.response`
+scans top-level `type` members, decoding JSON escapes in keys and values (no body tree; short bounded string buffers,
+scan bounded by the 1 MiB stock frame limit). Duplicate, non-string or malformed type candidates go to strict Relay
+validation; a later Relay member cannot hide behind an earlier stock type. Legitimate stock frames keep their parser. A `relay.response`
 never reaches the stock conversation, however late, unknown or large: the channel checks UTF-8 bytes (≤ 65,536; a larger
 response is `Failed(OVERSIZE_RESPONSE)` for the Relay session and nothing for the stock one), depth (≤ 8, by the strict parser)
 and the correlation, then decodes with the method's own bounds (`RelayCall.interpret`: 8,192 / 65,536 bytes, depth 6).
+
+**Delayed dispatch.** Every queued frame retains its method, socket generation, accepted info serial and foreground scope
+fence. Before each token release the channel rechecks current readiness, method advertisement and those fences. A changed
+info view or failed info ends obsolete calls with `Refused(SCOPE_REPLACED)` exactly once, removing the whole obsolete set
+before callbacks (including reentrant callbacks). DirectConnection also checks scope under the send lock, so select/leave/
+discard/stop/review/hide/replacement can withdraw queued effects before release. Deadline and FIFO pacing remain bounded.
 
 **Correlations** are generation-tagged (`r<generation>-<n>`), never reused (a 256-entry memory plus the pending set), bounded to
 four calls in flight (queued or waiting), and every call ends exactly once: the typed outcome, `TimedOut`, `Closed` (socket
@@ -113,7 +121,8 @@ Encoded maxima (bytes; tested to be exact): scope record 824, turn (without text
 
 ### 4.4 Commit contract and failure handling
 
-`commit(document, base)`: encode → seal (random IV, sequence in the AAD) → write `state.pending` + fsync → read it back,
+`commit(document, base)`: encode → inspect and authenticate/decode the EXISTING record using the expected alias/key,
+format and bounds → compare its authenticated sequence with base → seal (random IV, sequence in the AAD) → write `state.pending` + fsync → read it back,
 authenticate and decode it → `ATOMIC_MOVE` over `state.v1` → write the marker (first time) → fsync the directory. A late
 writer whose `base` is not the on-disk sequence gets `Stale` and publishes nothing. Results are explicit: `Committed`,
 `Refused(reason)`, `Failed(problem, uncertain)`, `Stale`; read problems are `KEY_UNAVAILABLE`, `STORAGE_UNAVAILABLE`,
@@ -160,17 +169,28 @@ every transient condition (storage full / write failed / uncertain, clock, busy,
 `create(title)` mints a UUIDv7 from the server-time estimate, stores `CreateIntent{request_id, title}` **before**
 `relay.conversation.create` is written, and retries the SAME id and title on timeout, reconnect and process loss (never another
 conversation). `invalid_request`/`unsupported` spend the intent; `expired` and unknown answers halt it for the user (who may
-discard it; nothing is deleted); busy/rate/unavailable back off. Success stores the conversation identity and attaches.
+discard it; nothing is deleted); busy/rate/unavailable back off. Every dispatch and callback must still match the current
+durable request, title, prepared time and local create operation. A successful discard invalidates that operation, its
+retry timer and queued frames; a later new create is independent. Current intent reconnect recovery retains the same ID.
+Success stores the conversation identity and attaches.
 
 ### 5.3 Select / attach
 
 Selection stores only the conversation identity, then `relay.conversation.attach`. A new attach retires the old binding
 (`RelayAuthority`), starts the event session, and is followed, in this order, by: receipt lookups of unresolved turns, the
-advertised history (≤ 24 pages of 50, `HistoryAssembly`; an incomplete read is said so), the advertised task snapshot, then
+advertised history (≤ 24 pages of 50, ≤ 64 total requests including retries/restarts, `HistoryAssembly`), the advertised
+task snapshot (enrollment-wide pages of 25, ≤ 24 pages with ≤ 6 retries per page, ≤ 100 selected tasks), then
 event polling from the binding's baseline (1.5 s while a turn is awaited, 8 s idle). Full 90-day cache, browser, inbox and
 notifications are Tasks 4–5 — a refresh obligation is not proof they exist. After a **process restore nothing attaches by
 itself**: the stored selection is offered as "Resume". A reconnect inside the same foreground session re-attaches to the
 selection the user already chose.
+
+Attach backoff is bound to the initiating session, flow, selection and scope. A new selection or leave cannot revive an
+old attach, and a returned binding must name the still-selected conversation before adoption. History and tasks have
+separate completion results: only completed kinds clear their durable refresh obligations. Empty cursored task pages are
+progress, repeated cursors and finite caps stop with partial/unknown state. Failure/retry exhaustion leaves owed work on
+disk across process restore; it never labels the view current. Task counts remain unknown until the full bounded scan
+completes. Retry refresh deliberately reattaches the selected conversation and refreshes again; no inbox/cache expansion.
 
 ### 5.4 Typed turns (receipt-first)
 
@@ -212,8 +232,19 @@ resume points — **stays owed in memory and on disk until the eviction itself i
 The existing phone screen gains one "Relay conversations" section (off by default) and, inside a selected Relay conversation, a
 typed composer in place of the stock controls. **The microphone is unavailable there** (`InputRoute.UNAVAILABLE`): audio is never
 routed to the physical-device stock chat and an executing stock transcript is never resubmitted. Hiding or replacing the screen
-runs `RelayController.hide()`: timers and requests stop, the socket closes, nothing re-attaches by itself. Themes, art and the
+withdraws the `PhoneRelaySession` foreground lease before `RelayController.hide()`: timers and requests stop, the socket closes, nothing re-attaches by itself. Themes, art and the
 stock controls are untouched.
+
+The production-used `PhoneRelaySession` adapter binds pending enable/disable to the displayed endpoint and foreground
+lease, resolving only that endpoint's own existing/new-on-deliberate-connect vault identity before any settings write.
+A prepared enrollment cannot be replaced within a lease. Hide/open withdraw unrelated pending requests. Controller UI
+carries its prepared identity and foreground lease; stale UI/preparation/channel callbacks and rendered controls are
+qualified before use. The existing ConversationVault keys and alias are reused unchanged. JVM adapter tests drive the
+real controller/file store; AndroidViewModel construction, Compose lifecycle and native Keystore were not executed.
+
+Storage notices distinguish a pre-send refusal from an unsaved server observation (requests may already have reached the
+server). STOPPED exposes pending versus confirmed durable ledger-content eviction; failed eviction never claims content
+is gone. Native persistence and broader Task4 caches remain outside this evidence.
 
 ## 6. Carried OPEN to V5 (not changed here)
 

@@ -532,4 +532,50 @@ class RelayChannelRoutingTest {
             assertEquals(order.toList(), order.sortedBy { order.indexOf(it) })
         }
     }
+
+    @Test(timeout = 20000)
+    fun controllerScopeInvalidationRetractsATokenWaitingMutationAtTheRawConnection() {
+        RelayConnectionHarness(RelaySocketFixture()).use { h ->
+            val (peer, _) = ready(h)
+            val conversation = ConversationId.of("11111111-1111-4111-8111-111111111111")!!
+            val request = RequestId.of("01939c8e-7a00-7000-8000-000000000001")!!
+            repeat(14) {
+                h.transport.call(
+                    h.transport.correlation(),
+                    RelayCalls.receipt(conversation, request),
+                    10000
+                ) {
+                }
+                val frame = peer.nextRequest()
+                peer.fail(frame["id"]!!.jsonPrimitive.content, "not_found")
+                h.connection.text("").get(5, TimeUnit.SECONDS)
+            }
+            val done = CountDownLatch(1)
+            val results = CopyOnWriteArrayList<RelayCallResult<Receipt>>()
+            h.transport.call(
+                h.transport.correlation(),
+                RelayCalls.submit(
+                    BindingRef(BindingId.of("00000000-0000-4000-8000-000000000001")!!, 1),
+                    request,
+                    1_792_300_001_000L,
+                    "must not leave"
+                ),
+                10000
+            ) {
+                results.add(it)
+                done.countDown()
+            }
+            h.connection.text("").get(5, TimeUnit.SECONDS)
+            assertTrue(peer.relayRequests.isEmpty()) // mutation really is waiting for a token
+            h.transport.invalidatePending()
+            assertTrue(done.await(5, TimeUnit.SECONDS))
+            h.advance(2000)
+            assertNull(peer.relayRequests.poll(400, TimeUnit.MILLISECONDS))
+            assertEquals(1, results.size)
+            assertEquals(
+                RelayRefusal.SCOPE_REPLACED,
+                (results.single() as RelayCallResult.Refused).reason
+            )
+        }
+    }
 }
