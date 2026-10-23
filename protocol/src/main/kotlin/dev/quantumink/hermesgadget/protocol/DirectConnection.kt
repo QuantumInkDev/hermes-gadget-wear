@@ -550,7 +550,7 @@ class DirectConnection(
             if (healthySince?.let { now() - it >= 20000 } == true) retryCount = 0
         }
         pets.tick(now())
-        relayChannel?.tick(now())
+        relayChannel?.tick(now(), ::relaySend)
         effects(conversation.tick(now()))
         val inactivityLimit = if (conversation.busy) {
             idleMillis.coerceAtLeast(

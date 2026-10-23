@@ -1,0 +1,529 @@
+{
+ "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+ "kind": "captured",
+ "methods": [
+  "relay.info",
+  "relay.conversation.create",
+  "relay.conversation.attach",
+  "relay.conversation.detach",
+  "relay.turn.submit",
+  "relay.turn.receipt",
+  "relay.history.page",
+  "relay.events.read",
+  "relay.conversations.list",
+  "relay.conversation.delete",
+  "relay.outbox.read",
+  "relay.outbox.ack"
+ ],
+ "mint_plan": [
+  "01a14d67-a300-7101-8012-3456789abcdf",
+  "01a14d67-a300-7102-8012-3456789abce0",
+  "01a14d67-a300-7103-8012-3456789abce1",
+  "01a14d67-a300-7104-8012-3456789abce2",
+  "01a14d67-a300-7105-8012-3456789abce3",
+  "01a14d67-a300-7106-8012-3456789abce4"
+ ],
+ "scenario": "absent-not-found",
+ "server_time_ms": 1792300000000,
+ "source": {
+  "test": "tests/test_native_relay_task3_sessions.py::test_absent_turn_with_shared_receipt_grant_is_not_found"
+ },
+ "steps": [
+  {
+   "connection": 1,
+   "note": "negotiation",
+   "request": {
+    "id": "c1-1",
+    "method": "relay.info",
+    "params": {},
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "c1-1",
+    "result": {
+     "expires_at_ms": 1794892000000,
+     "grant_generation": 2,
+     "limits": {
+      "dto_bytes": 8192,
+      "dto_depth": 6,
+      "history_page_bytes": 65536,
+      "history_text_bytes": 32768,
+      "outbox_cursor": false,
+      "page_items": 50,
+      "text_bytes": 16384
+     },
+     "methods": [
+      "relay.info",
+      "relay.conversation.create",
+      "relay.conversation.attach",
+      "relay.conversation.detach",
+      "relay.turn.submit",
+      "relay.turn.receipt",
+      "relay.history.page",
+      "relay.events.read",
+      "relay.conversations.list",
+      "relay.conversation.delete",
+      "relay.outbox.read",
+      "relay.outbox.ack"
+     ],
+     "profile_id": "9e8af651-47eb-411f-b28c-ed292bbfd305",
+     "server_time_ms": 1792300000000
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "wire_bytes": 626
+  },
+  {
+   "connection": 1,
+   "note": "before any conversation exists",
+   "request": {
+    "id": "c1-2",
+    "method": "relay.conversations.list",
+    "params": {
+     "limit": 25
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "c1-2",
+    "result": {
+     "items": [],
+     "next_cursor": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "wire_bytes": 84
+  },
+  {
+   "connection": 1,
+   "note": "deliberate create",
+   "request": {
+    "id": "c1-3",
+    "method": "relay.conversation.create",
+    "params": {
+     "request_id": "01a14d67-a300-7101-8012-3456789abcdf",
+     "title": "Planning"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "c1-3",
+    "result": {
+     "bookmarked": false,
+     "can_continue": true,
+     "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+     "revision": 1,
+     "title": "Planning",
+     "updated_at_ms": 1792300000000
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "wire_bytes": 212
+  },
+  {
+   "connection": 1,
+   "note": "binding 1",
+   "request": {
+    "id": "c1-4",
+    "method": "relay.conversation.attach",
+    "params": {
+     "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "c1-4",
+    "result": {
+     "authority_epoch": 1,
+     "binding_id": "99355e14-5877-44bc-b68d-5c5da31b1de1",
+     "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+     "execution_generation": 0,
+     "execution_state": "idle",
+     "last_sequence": 0,
+     "replay_epoch": "bc46843c-a750-4c84-a525-5879737491b0",
+     "revision": 1
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "wire_bytes": 318
+  },
+  {
+   "connection": 1,
+   "note": "fresh conversation",
+   "request": {
+    "id": "c1-5",
+    "method": "relay.history.page",
+    "params": {
+     "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+     "limit": 50
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "c1-5",
+    "result": {
+     "items": [],
+     "next_cursor": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "wire_bytes": 84
+  },
+  {
+   "connection": 2,
+   "note": "binding 2: info",
+   "request": {
+    "id": "c2-6",
+    "method": "relay.info",
+    "params": {},
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "c2-6",
+    "result": {
+     "expires_at_ms": 1794892000000,
+     "grant_generation": 2,
+     "limits": {
+      "dto_bytes": 8192,
+      "dto_depth": 6,
+      "history_page_bytes": 65536,
+      "history_text_bytes": 32768,
+      "outbox_cursor": false,
+      "page_items": 50,
+      "text_bytes": 16384
+     },
+     "methods": [
+      "relay.info",
+      "relay.conversation.create",
+      "relay.conversation.attach",
+      "relay.conversation.detach",
+      "relay.turn.submit",
+      "relay.turn.receipt",
+      "relay.history.page",
+      "relay.events.read",
+      "relay.conversations.list",
+      "relay.conversation.delete",
+      "relay.outbox.read",
+      "relay.outbox.ack"
+     ],
+     "profile_id": "9e8af651-47eb-411f-b28c-ed292bbfd305",
+     "server_time_ms": 1792300000000
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "wire_bytes": 626
+  },
+  {
+   "connection": 2,
+   "note": "binding 2: list",
+   "request": {
+    "id": "c2-7",
+    "method": "relay.conversations.list",
+    "params": {
+     "limit": 25
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "c2-7",
+    "result": {
+     "items": [
+      {
+       "bookmarked": false,
+       "can_continue": true,
+       "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+       "revision": 1,
+       "title": "Planning",
+       "updated_at_ms": 1792300000000
+      }
+     ],
+     "next_cursor": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "wire_bytes": 243
+  },
+  {
+   "connection": 2,
+   "note": "binding 2",
+   "request": {
+    "id": "c2-8",
+    "method": "relay.conversation.attach",
+    "params": {
+     "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "c2-8",
+    "result": {
+     "authority_epoch": 1,
+     "binding_id": "6684367b-4256-464c-a388-a314f15b4135",
+     "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+     "execution_generation": 0,
+     "execution_state": "idle",
+     "last_sequence": 0,
+     "replay_epoch": "522e248a-0edc-4278-90f8-915905975981",
+     "revision": 1
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "wire_bytes": 318
+  },
+  {
+   "connection": 2,
+   "note": "the server never saw this request id",
+   "request": {
+    "id": "c2-9",
+    "method": "relay.turn.receipt",
+    "params": {
+     "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+     "request_id": "01a14d67-a300-7102-8012-3456789abce0"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "error": {
+     "code": "not_found"
+    },
+    "id": "c2-9",
+    "type": "relay.response",
+    "v": 1
+   },
+   "wire_bytes": 72
+  },
+  {
+   "connection": 2,
+   "note": "the SAME request id, text and expiry again",
+   "request": {
+    "id": "c2-10",
+    "method": "relay.turn.submit",
+    "params": {
+     "authority_epoch": 1,
+     "binding_id": "6684367b-4256-464c-a388-a314f15b4135",
+     "expires_at_ms": 1792300120000,
+     "request_id": "01a14d67-a300-7102-8012-3456789abce0",
+     "text": "first question"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "c2-10",
+    "result": {
+     "admission_id": "4d5eba8f-658f-4d83-aabe-cd2567556f1f",
+     "authority_epoch": 1,
+     "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+     "execution_generation": null,
+     "outcome": null,
+     "request_id": "01a14d67-a300-7102-8012-3456789abce0",
+     "status": "queued"
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "wire_bytes": 299
+  },
+  {
+   "connection": 2,
+   "note": "history",
+   "request": {
+    "id": "c2-11",
+    "method": "relay.history.page",
+    "params": {
+     "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+     "limit": 50
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "c2-11",
+    "result": {
+     "items": [
+      {
+       "attachment_ids": [],
+       "created_at_ms": 1792770096223,
+       "message_id": "8d51f2f3-1df4-53c4-a13d-10ef3292739c",
+       "role": "user",
+       "segment_count": 1,
+       "segment_index": 0,
+       "text": "first question"
+      },
+      {
+       "attachment_ids": [],
+       "created_at_ms": 1792770096223,
+       "message_id": "ceca283e-3792-5d77-863b-096b30c99c2c",
+       "role": "assistant",
+       "segment_count": 1,
+       "segment_index": 0,
+       "text": "first answer"
+      },
+      {
+       "attachment_ids": [],
+       "created_at_ms": 1792770096223,
+       "message_id": "09158521-b832-581d-865f-44cedd0a0d7a",
+       "role": "assistant",
+       "segment_count": 1,
+       "segment_index": 0,
+       "text": "first answer"
+      }
+     ],
+     "next_cursor": null
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "wire_bytes": 624
+  },
+  {
+   "connection": 2,
+   "note": "progress lookup",
+   "request": {
+    "id": "c2-12",
+    "method": "relay.turn.receipt",
+    "params": {
+     "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+     "request_id": "01a14d67-a300-7102-8012-3456789abce0"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "c2-12",
+    "result": {
+     "admission_id": "4d5eba8f-658f-4d83-aabe-cd2567556f1f",
+     "authority_epoch": 1,
+     "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+     "execution_generation": 1,
+     "outcome": "completed",
+     "request_id": "01a14d67-a300-7102-8012-3456789abce0",
+     "status": "terminal"
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "wire_bytes": 305
+  },
+  {
+   "connection": 2,
+   "note": "events",
+   "request": {
+    "id": "c2-13",
+    "method": "relay.events.read",
+    "params": {
+     "after_sequence": 0,
+     "binding_id": "6684367b-4256-464c-a388-a314f15b4135",
+     "limit": 25,
+     "replay_epoch": "522e248a-0edc-4278-90f8-915905975981"
+    },
+    "type": "relay.request",
+    "v": 1
+   },
+   "response": {
+    "id": "c2-13",
+    "result": {
+     "events": [
+      {
+       "binding_id": "6684367b-4256-464c-a388-a314f15b4135",
+       "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+       "event_id": "900c0d5e-0fdc-5b87-a0e7-6f9bf22309ee",
+       "kind": "task",
+       "payload": {
+        "admission_id": "4d5eba8f-658f-4d83-aabe-cd2567556f1f",
+        "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+        "outcome": null,
+        "run_id": "701b389e-ed69-5e7c-9d76-9ea3fcc725dd",
+        "state": "working",
+        "task_id": "f8cf3383-29c4-5864-a409-5ac66461e022",
+        "updated_at_ms": 1792300000000
+       },
+       "replay_epoch": "522e248a-0edc-4278-90f8-915905975981",
+       "sequence": 1
+      },
+      {
+       "binding_id": "6684367b-4256-464c-a388-a314f15b4135",
+       "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+       "event_id": "2486c4a4-0087-576e-921d-db3f8379107d",
+       "kind": "gap",
+       "payload": {
+        "snapshot_required": true
+       },
+       "replay_epoch": "522e248a-0edc-4278-90f8-915905975981",
+       "sequence": 2
+      },
+      {
+       "binding_id": "6684367b-4256-464c-a388-a314f15b4135",
+       "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+       "event_id": "b49bcc0d-41a9-5292-8924-dc75cff0223e",
+       "kind": "message",
+       "payload": {
+        "attachment_ids": [],
+        "created_at_ms": 1792770096223,
+        "message_id": "09158521-b832-581d-865f-44cedd0a0d7a",
+        "role": "assistant",
+        "text": "first answer"
+       },
+       "replay_epoch": "522e248a-0edc-4278-90f8-915905975981",
+       "sequence": 3
+      },
+      {
+       "binding_id": "6684367b-4256-464c-a388-a314f15b4135",
+       "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+       "event_id": "ee1db159-bc68-5eac-bba8-07f1f7fa123a",
+       "kind": "task",
+       "payload": {
+        "admission_id": "4d5eba8f-658f-4d83-aabe-cd2567556f1f",
+        "conversation_id": "658f124e-fd72-45d2-ae45-a0f41ac0d850",
+        "outcome": "completed",
+        "run_id": "701b389e-ed69-5e7c-9d76-9ea3fcc725dd",
+        "state": "finished",
+        "task_id": "f8cf3383-29c4-5864-a409-5ac66461e022",
+        "updated_at_ms": 1792300000000
+       },
+       "replay_epoch": "522e248a-0edc-4278-90f8-915905975981",
+       "sequence": 4
+      }
+     ],
+     "last_sequence": 4,
+     "replay_epoch": "522e248a-0edc-4278-90f8-915905975981",
+     "snapshot_required": false
+    },
+    "type": "relay.response",
+    "v": 1
+   },
+   "wire_bytes": 1900
+  }
+ ],
+ "welcomes": [
+  {
+   "connection": 1,
+   "relay": {
+    "version": 1
+   }
+  },
+  {
+   "connection": 2,
+   "relay": {
+    "version": 1
+   }
+  }
+ ]
+}

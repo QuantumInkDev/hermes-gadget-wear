@@ -695,6 +695,13 @@ class RelayController(
     private fun isReady(): Boolean = channel is RelayChannelState.Ready && runtime != null &&
         record()?.let { it.enabled && it.standing == Standing.ACTIVE } == true
 
+    /** A local refusal that only means "not now": the same step is tried again later, never given up as a link failure. */
+    private fun busyLocally(result: RelayCallResult<*>): Boolean = result is RelayCallResult.Refused &&
+        (
+            result.reason == RelayRefusal.TOO_MANY_OUTSTANDING || result.reason == RelayRefusal.QUEUE_FULL ||
+                result.reason == RelayRefusal.SOCKET_BACKPRESSURE
+            )
+
     // -- shared error rules ------------------------------------------------------------------------------------
 
     /** The client rules every call shares. True when the error was dealt with. */
@@ -900,7 +907,11 @@ class RelayController(
                     }
                 }
                 RelayCallResult.Closed -> Unit
-                is RelayCallResult.Refused -> notice = RelayNotice.LINK_FAILED
+                is RelayCallResult.Refused -> if (busyLocally(result) && attempt < timing.maxRetries) {
+                    retryTimer = later(backoff(attempt)) { listPage(cursor, attempt + 1) }
+                } else {
+                    notice = RelayNotice.LINK_FAILED
+                }
             }
             publish()
         }
@@ -985,7 +996,7 @@ class RelayController(
                 }
                 RelayCallResult.TimedOut -> retryCreate(intent)
                 RelayCallResult.Closed -> Unit
-                is RelayCallResult.Refused -> notice = RelayNotice.CREATE_PENDING
+                is RelayCallResult.Refused -> if (busyLocally(result)) retryCreate(intent) else notice = RelayNotice.CREATE_PENDING
             }
             publish()
         }
@@ -1090,7 +1101,12 @@ class RelayController(
                 RelayCallResult.Closed -> attaching = false
                 is RelayCallResult.Refused -> {
                     attaching = false
-                    notice = RelayNotice.LINK_FAILED
+                    if (busyLocally(result)) {
+                        notice = RelayNotice.RECONNECTING
+                        retryTimer = later(backoff(0)) { attach(id) }
+                    } else {
+                        notice = RelayNotice.LINK_FAILED
+                    }
                 }
             }
             publish()
@@ -1227,9 +1243,55 @@ class RelayController(
         runtime = rt.copy(ledger = step.ledger)
         val ref = planned.dispatch.ref
         request(planned.dispatch.call, correlation) { result ->
+            settleLookup(ref, result, bound) {
+                if (mine == flow && runtime?.ledger?.entry(key)?.phase == TurnPhase.ABSENT_SO_FAR) {
+                    resubmit(key, deliberate = false)
+                }
+                then()
+            }
+        }
+    }
+
+    private fun deniedLookup(result: RelayCallResult<Receipt>): RelayError? {
+        val failed = (result as? RelayCallResult.Outcome)?.outcome as? RelayOutcome.Failed ?: return null
+        return failed.error.takeIf { it.code == RelayErrorCode.PERMISSION_DENIED && !it.snapshotRequired }
+    }
+
+    /**
+     * A receipt lookup answered `permission_denied` is AMBIGUOUS. The registered SDK (`relay_store.find_request`) answers it
+     * for any request id that is not this device's own journaled turn when the device lacks `relay:receipt:shared` (which the
+     * default phone grant does), i.e. also for a turn that never arrived; a real revocation answers it too. So the denial is
+     * never taken at face value and never as proof of absence: read authority is probed with an ordinary read of the same
+     * conversation. A denied probe is a genuine revocation (the ledger stops the scope and owes the eviction). A readable
+     * conversation means the denial concerns an id this device never journaled: the ledger is told `not_found`, an
+     * OBSERVATION that allows the same id to be submitted again (the journal makes that idempotent), never a closure. An
+     * unanswered probe leaves the turn uncertain.
+     */
+    private fun settleLookup(
+        ref: CallRef,
+        result: RelayCallResult<Receipt>,
+        bound: BindingToken,
+        then: () -> Unit
+    ) {
+        val denial = deniedLookup(result)
+        if (denial == null || !supports(RelayMethod.HISTORY_PAGE)) {
             answerTurnCall(ref, result)
-            if (mine == flow && runtime?.ledger?.entry(key)?.phase == TurnPhase.ABSENT_SO_FAR) {
-                resubmit(key, deliberate = false)
+            return then()
+        }
+        val probe = try {
+            RelayCalls.history(bound.conversationId, null, 1)
+        } catch (_: IllegalArgumentException) {
+            answerTurnCall(ref, result)
+            return then()
+        }
+        request(probe) { probed ->
+            val outcome = (probed as? RelayCallResult.Outcome)?.outcome
+            when {
+                outcome is RelayOutcome.Success ->
+                    answerTurnCall(ref, RelayCallResult.Outcome(RelayOutcome.Failed(RelayError(RelayErrorCode.NOT_FOUND, false))))
+                outcome is RelayOutcome.Failed && outcome.error.code == RelayErrorCode.PERMISSION_DENIED ->
+                    answerTurnCall(ref, result)
+                else -> answerTurnCall(ref, RelayCallResult.TimedOut)
             }
             then()
         }

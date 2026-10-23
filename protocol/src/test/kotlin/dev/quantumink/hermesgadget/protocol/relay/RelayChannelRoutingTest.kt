@@ -454,4 +454,49 @@ class RelayChannelRoutingTest {
             assertNotNull(outcome.value.items.first().text)
         }
     }
+
+    @Test(timeout = 20000)
+    fun aBurstBeyondThePacingBucketWaitsInOrderAndIsNeverRefusedForTheRate() {
+        val fixture = RelaySocketFixture()
+        RelayConnectionHarness(fixture).use { harness ->
+            val (peer, _) = ready(harness)
+            val conversation = ConversationId.of("11111111-1111-4111-8111-111111111111")!!
+            val request = RequestId.of("01939c8e-7a00-7000-8000-000000000001")!!
+            val results = CopyOnWriteArrayList<RelayCallResult<Receipt>>()
+            val order = CopyOnWriteArrayList<String>()
+            // Five at a time is the outstanding bound: send, answer, repeat, far more than the bucket holds.
+            var sent = 0
+            while (sent < 40) {
+                val batch = minOf(RelayChannel.MAX_OUTSTANDING, 40 - sent)
+                val ids = (1..batch).map { harness.transport.correlation() }
+                ids.forEach { id ->
+                    harness.transport.call(id, RelayCalls.receipt(conversation, request), 20_000) { results.add(it) }
+                }
+                // Static connection time: tokens refill only as the clock moves, so requests beyond the bucket WAIT.
+                repeat(batch) {
+                    val sentRequest = peer.relayRequests.poll(2, TimeUnit.SECONDS)
+                    if (sentRequest != null) {
+                        order.add(sentRequest["id"]!!.jsonPrimitive.content)
+                        peer.fail(sentRequest["id"]!!.jsonPrimitive.content, "not_found")
+                    } else {
+                        harness.advance(500)
+                    }
+                }
+                sent += batch
+                val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+                while (results.size < sent && System.nanoTime() < deadline) {
+                    harness.advance(200)
+                    Thread.sleep(20)
+                    peer.relayRequests.poll()?.let {
+                        order.add(it["id"]!!.jsonPrimitive.content)
+                        peer.fail(it["id"]!!.jsonPrimitive.content, "not_found")
+                    }
+                }
+            }
+            assertEquals(40, results.size)
+            // Never refused for the rate; each one ended with its own typed outcome, in the order sent.
+            assertTrue(results.none { it is RelayCallResult.Refused })
+            assertEquals(order.toList(), order.sortedBy { order.indexOf(it) })
+        }
+    }
 }

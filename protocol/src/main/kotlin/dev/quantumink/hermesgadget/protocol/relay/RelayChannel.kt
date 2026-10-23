@@ -25,9 +25,6 @@ enum class RelayRefusal {
     /** The correlation was already used (ids are never reused). */
     CORRELATION_REUSED,
 
-    /** The local request pacing bucket is empty (the server's own bucket is 20 tokens at 10/s). */
-    LOCAL_RATE,
-
     /** The bounded socket write queue is full or the socket refused the frame. */
     SOCKET_BACKPRESSURE,
 
@@ -162,6 +159,10 @@ class RelayChannel internal constructor(
     private val pending = LinkedHashMap<String, Pending>()
     private val used = ArrayDeque<String>()
     private val usedSet = HashSet<String>()
+
+    /** Encoded requests waiting for a pacing token (oldest first); each has its `pending` entry and deadline. */
+    private class Waiting(val id: String, val text: String)
+    private val waiting = ArrayDeque<Waiting>()
     private var infoSerial = 0L
     private var tokens = RATE_CAPACITY
     private var tokensAtMs = 0L
@@ -291,13 +292,17 @@ class RelayChannel internal constructor(
             is RelayEncoded.Refused -> return refuse(RelayRefusal.FRAME_REFUSED, encoded.reason)
             is RelayEncoded.Frame -> encoded
         }
-        if (!takeToken(nowMs)) return refuse(RelayRefusal.LOCAL_RATE)
         remember(correlation.value)
         pending[correlation.value] = Pending(
             nowMs + timeoutMs,
             { reply -> guarded { handler(RelayCallResult.Outcome(call.interpret(correlation, reply))) } },
             { ended -> guarded { handler(ended) } }
         )
+        // Pacing: with no token the request WAITS (in order, under its own deadline); it is never refused for the rate.
+        if (waiting.isNotEmpty() || !takeToken(nowMs)) {
+            waiting.addLast(Waiting(correlation.value, frame.text))
+            return
+        }
         if (!send(frame.text)) {
             // A failing send may already have ended every call in flight (exactly one result per call).
             if (pending.remove(correlation.value) != null) refuse(RelayRefusal.SOCKET_BACKPRESSURE)
@@ -343,11 +348,20 @@ class RelayChannel internal constructor(
     }
 
     @Synchronized
-    fun tick(nowMs: Long) {
+    fun tick(nowMs: Long, send: (String) -> Boolean) {
         if (pending.isEmpty()) return
         val expired = pending.filterValues { nowMs >= it.deadlineMs }
-        for (id in expired.keys) pending.remove(id)
+        for (id in expired.keys) {
+            pending.remove(id)
+            waiting.removeAll { it.id == id }
+        }
         for (call in expired.values) call.end(RelayCallResult.TimedOut)
+        while (waiting.isNotEmpty() && takeToken(nowMs)) {
+            val next = waiting.removeFirst()
+            if (next.id in pending && !send(next.text)) {
+                pending.remove(next.id)?.end(RelayCallResult.Refused(RelayRefusal.SOCKET_BACKPRESSURE))
+            }
+        }
     }
 
     /**
@@ -371,6 +385,7 @@ class RelayChannel internal constructor(
     private fun endAll(result: RelayCallResult<Nothing>) {
         val all = pending.values.toList()
         pending.clear()
+        waiting.clear()
         for (call in all) call.end(result)
     }
 
@@ -410,8 +425,10 @@ class RelayChannel internal constructor(
         const val MAX_OUTSTANDING = 4
         const val INFO_TIMEOUT_MS = 10_000L
         const val MAX_REMEMBERED = 256
-        const val RATE_CAPACITY = 10.0
-        const val RATE_PER_MS = 8.0 / 1000.0
+
+        /** Pacing below the server's own bucket (20 tokens, 10 per second): a burst of 15, then 9 requests a second. */
+        const val RATE_CAPACITY = 15.0
+        const val RATE_PER_MS = 9.0 / 1000.0
         private const val RADIX = 36
     }
 }

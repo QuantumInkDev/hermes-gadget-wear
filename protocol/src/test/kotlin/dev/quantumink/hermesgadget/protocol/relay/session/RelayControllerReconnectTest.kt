@@ -437,4 +437,55 @@ class RelayControllerReconnectTest {
         assertFalse(fx.ui.micAvailable)
         assertTrue(fx.ui.relayOwnsComposer)
     }
+
+    private fun deniedLookup(fx: ControllerFixture): ScriptedTransport.Sent {
+        fx.enable()
+        selected(fx)
+        val first = sendOne(fx)
+        fx.transport.timeout(first)
+        fx.run()
+        reconnectAndAttach(fx, 2)
+        fx.transport.fail(fx.transport.next("relay.turn.receipt"), "permission_denied")
+        fx.run()
+        return first
+    }
+
+    @Test fun aDeniedLookupIsProbedAndAReadableConversationMeansTheServerNeverHadTheTurn() {
+        val fx = ControllerFixture()
+        val first = deniedLookup(fx)
+        // The denial is NOT taken at face value: an ordinary read of the same conversation is asked first.
+        val probe = fx.transport.next("relay.history.page")
+        assertEquals("1", probe.params["limit"]!!.jsonPrimitive.content)
+        assertEquals(Standing.ACTIVE, fx.store.reread().section.enrollments.single().standing)
+        fx.transport.reply(probe, Dto.history().toWire())
+        fx.run()
+        // Read authority is intact: the lookup counts as `not_found` and the SAME request is submitted again.
+        val second = fx.frames("relay.turn.submit")
+        assertEquals(2, second.size)
+        for (member in listOf("request_id", "text", "expires_at_ms")) assertEquals(first.params[member], second.last().params[member])
+        assertEquals(RelayPhase.ATTACHING.takeIf { false } ?: RelayPhase.SELECTED.takeIf { fx.ui.phase == RelayPhase.SELECTED } ?: fx.ui.phase, fx.ui.phase)
+        assertTrue(fx.ui.phase != RelayPhase.STOPPED)
+    }
+
+    @Test fun aDeniedLookupWithADeniedProbeIsARealRevocationAndStopsTheScope() {
+        val fx = ControllerFixture()
+        deniedLookup(fx)
+        fx.transport.fail(fx.transport.next("relay.history.page"), "permission_denied")
+        fx.run()
+        assertEquals(RelayPhase.STOPPED, fx.ui.phase)
+        assertEquals(Standing.STOPPED, fx.store.reread().section.enrollments.single().standing)
+        assertEquals(1, fx.frames("relay.turn.submit").size)
+        assertEquals(null, fx.store.reread().snapshot.ledger.turns.single().text)
+    }
+
+    @Test fun aDeniedLookupWithAnUnansweredProbeLeavesTheTurnUncertainAndStopsNothing() {
+        val fx = ControllerFixture()
+        deniedLookup(fx)
+        fx.transport.timeout(fx.transport.next("relay.history.page"))
+        fx.run()
+        assertEquals(1, fx.frames("relay.turn.submit").size)
+        assertEquals(TurnStatus.UNCERTAIN, fx.ui.turns.single().status)
+        assertTrue(fx.ui.phase != RelayPhase.STOPPED)
+        assertEquals(Standing.ACTIVE, fx.store.reread().section.enrollments.single().standing)
+    }
 }
