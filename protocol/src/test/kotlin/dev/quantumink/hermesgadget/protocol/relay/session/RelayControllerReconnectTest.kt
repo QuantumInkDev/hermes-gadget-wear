@@ -488,4 +488,135 @@ class RelayControllerReconnectTest {
         assertTrue(fx.ui.phase != RelayPhase.STOPPED)
         assertEquals(Standing.ACTIVE, fx.store.reread().section.enrollments.single().standing)
     }
+
+    @Test fun aChangedGrantRetiresTheBindingAndAttachesAgainButAnUnchangedRefreshDisturbsNothing() {
+        val fx = ControllerFixture()
+        fx.enable()
+        selected(fx)
+        val attaches = fx.frames("relay.conversation.attach").size
+        // The same grant read again (an expiry refresh): nothing restarts.
+        fx.ready(Dto.info())
+        assertEquals(attaches, fx.frames("relay.conversation.attach").size)
+        assertEquals(RelayPhase.SELECTED, fx.ui.phase)
+        // A new grant generation: the old binding is not reused; the continuing session attaches again.
+        fx.ready(Dto.info(grant = 9))
+        fx.listAnd(Dto.summary())
+        assertEquals(attaches + 1, fx.frames("relay.conversation.attach").size)
+        fx.answer("relay.conversation.attach", Dto.binding(2).toWire())
+        // The grant now lacks submit: sending is refused and nothing is written.
+        fx.ready(Dto.info(grant = 10, methods = Dto.ALL_METHODS - "relay.turn.submit"))
+        assertEquals(RelayPhase.UNAVAILABLE, fx.ui.phase)
+        assertEquals(RelayReason.MISSING_METHODS, fx.ui.reason)
+        var accepted = true
+        fx.controller.send("no longer allowed") { accepted = it }
+        fx.run()
+        assertFalse(accepted)
+        assertTrue(fx.frames("relay.turn.submit").isEmpty())
+    }
+
+    @Test fun anUnfinishedCreateIsRetriedWithTheSameIdAndTitleByANewProcess() {
+        val fx = ControllerFixture()
+        fx.enable()
+        fx.connect()
+        fx.listAnd()
+        fx.controller.create("Roadmap")
+        fx.run()
+        val first = fx.frames("relay.conversation.create").single()
+        // The process dies before any answer; a new process restores the durable intent.
+        val again = ControllerFixture(fx.identity, fx.store)
+        again.store.log = again.log
+        again.prepare()
+        again.connect()
+        assertEquals(1, again.ui.let { if (it.pendingCreate != null) 1 else 0 })
+        val second = again.frames("relay.conversation.create").single()
+        assertEquals(first.params["request_id"], second.params["request_id"])
+        assertEquals("Roadmap", second.params["title"]!!.jsonPrimitive.content)
+        // The user may drop it (the conversation may exist on the server; nothing is deleted).
+        again.controller.discardCreate()
+        again.run()
+        assertEquals(null, again.store.reread().section.enrollments.single().createIntent)
+    }
+
+    @Test fun aTurnOfAnEarlierReviewEpochIsNeverCheckedOrSentAgain() {
+        val fx = ControllerFixture()
+        fx.enable()
+        selected(fx)
+        val submit = sendOne(fx)
+        val id = submit.params["request_id"]!!.jsonPrimitive.content
+        fx.transport.timeout(submit)
+        fx.run()
+        // The profile changes, the user reviews and accepts: the unresolved turn now belongs to an earlier epoch.
+        fx.disconnect()
+        fx.connect(Dto.info(profile = Dto.otherProfile))
+        fx.controller.acceptReview()
+        fx.run()
+        val old = fx.ui.turns.single()
+        assertTrue(old.previousProfile)
+        assertFalse(old.canCheck)
+        assertFalse(old.canResend)
+        val frames = fx.transport.sent.size
+        fx.controller.resend(id)
+        fx.controller.check(id)
+        fx.run()
+        assertEquals(frames, fx.transport.sent.size)
+        assertEquals(1, fx.frames("relay.turn.submit").size)
+        // It can only be forgotten, by the user.
+        fx.controller.abandon(id)
+        fx.run()
+        assertTrue(fx.ui.turns.isEmpty())
+    }
+
+    @Test fun aTimedOutSubmitAttachesAgainByItselfAndAsksTheReceiptBeforeAnythingElse() {
+        val fx = ControllerFixture()
+        fx.enable()
+        selected(fx)
+        val submit = sendOne(fx)
+        fx.transport.timeout(submit)
+        fx.run()
+        assertEquals(TurnStatus.UNCERTAIN, fx.ui.turns.single().status)
+        assertEquals(0, fx.transport.refreshes)
+        // After the backoff the session reads info again and attaches again (a binding NEWER than the uncertainty).
+        fx.advanceTime(1_000)
+        assertEquals(1, fx.transport.refreshes)
+        fx.ready(Dto.info())
+        fx.listAnd(Dto.summary())
+        fx.answer("relay.conversation.attach", Dto.binding(2).toWire())
+        assertEquals("relay.turn.receipt", fx.transport.methods().last())
+        assertEquals(1, fx.frames("relay.turn.submit").size)
+    }
+
+    @Test fun theUsersCheckOfAnUncertainTurnAttachesFirstBecauseTheLedgerDemandsANewerBinding() {
+        val fx = ControllerFixture()
+        fx.enable()
+        selected(fx)
+        val submit = sendOne(fx)
+        fx.transport.timeout(submit)
+        fx.run()
+        val id = submit.params["request_id"]!!.jsonPrimitive.content
+        // The user taps "Check" before the automatic attach: no receipt is asked on the OLD binding; a fresh attach comes first.
+        fx.controller.check(id)
+        fx.run()
+        assertTrue(fx.frames("relay.turn.receipt").isEmpty())
+        assertEquals(1, fx.transport.refreshes)
+    }
+
+    @Test fun attachRetriesAreBoundedWhileTheServerStaysBusy() {
+        val fx = ControllerFixture()
+        fx.enable()
+        fx.connect()
+        fx.listAnd(Dto.summary())
+        fx.controller.select(Dto.conversation.value)
+        fx.run()
+        var guard = 0
+        while (guard++ < 40) {
+            val call = fx.transport.open("relay.conversation.attach").lastOrNull() ?: break
+            fx.transport.fail(call, "busy")
+            fx.run()
+            fx.advanceTime(31_000)
+        }
+        assertEquals(1 + fx.timing.maxRetries, fx.frames("relay.conversation.attach").size)
+        assertEquals(RelayPhase.READY, fx.ui.phase)
+        assertEquals(Dto.conversation.value, fx.ui.resumable!!.id)
+    }
 }
+

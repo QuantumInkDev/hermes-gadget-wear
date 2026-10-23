@@ -401,4 +401,20 @@ class SnapshotCodecTest {
         assertEquals(VoiceLimits.CAPTURES_TOTAL, StoreBounds.CAPTURES)
         assertFalse(StoreBounds.MAX_FILE_BYTES <= StoreBounds.PLAINTEXT_CAP_BYTES)
     }
+
+    @Test fun theDocumentedMaximaAreTheComputedOnes() {
+        // These numbers are quoted in docs/relay-phone-controller.md: a change to a limit or a field cap must change both.
+        assertEquals(824L, StoreBounds.scopeRecordMax)
+        assertEquals(203L, StoreBounds.admissionFactsMax)
+        assertEquals(1_337L, StoreBounds.turnFixedMax)
+        assertEquals(893L, StoreBounds.scopeDecisionMax)
+        assertEquals(254_673L, StoreBounds.historyMax)
+        assertEquals(1_950_663L, StoreBounds.deliveryMax)
+        assertEquals(1_237L, StoreBounds.captureMax)
+        assertEquals(3_594L, StoreBounds.enrollmentMax)
+        assertEquals(28L, StoreBounds.emptyDocumentBytes())
+        assertEquals(36_699_452L, StoreBounds.theoreticalMaxPlaintextBytes())
+        assertEquals(8L * 1024 * 1024, StoreBounds.PLAINTEXT_CAP_BYTES.toLong())
+        assertEquals(8L * 1024 * 1024 + 38, StoreBounds.MAX_FILE_BYTES.toLong())
+    }
 }

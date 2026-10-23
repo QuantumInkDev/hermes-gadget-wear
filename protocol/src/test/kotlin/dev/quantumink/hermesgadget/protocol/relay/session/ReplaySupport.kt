@@ -212,11 +212,16 @@ internal class ReplayHarness(
 
     val ui: RelayUiState get() = controller.currentState
 
-    /** Replace the connection AND the controller's process (a process loss): a new connection, same store. */
+    /** The socket drops and the SAME connection object dials again: a new socket generation, a new recorded connection. */
     fun reconnect() {
-        connection.disconnect()
-        settle()
+        drop()
         connection.connect()
+        settle()
+    }
+
+    /** The socket drops (what really loses a response); nothing dials again. */
+    fun drop() {
+        connection.disconnect()
         settle()
     }
 

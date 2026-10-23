@@ -28,6 +28,7 @@ import dev.quantumink.hermesgadget.protocol.relay.RequestId
 import dev.quantumink.hermesgadget.protocol.relay.TaskPage
 import dev.quantumink.hermesgadget.protocol.relay.TaskState
 import dev.quantumink.hermesgadget.protocol.relay.state.BindingToken
+import dev.quantumink.hermesgadget.protocol.relay.state.CallKind
 import dev.quantumink.hermesgadget.protocol.relay.state.CallRef
 import dev.quantumink.hermesgadget.protocol.relay.state.DeliveryEffect
 import dev.quantumink.hermesgadget.protocol.relay.state.DiscardMode
@@ -43,6 +44,7 @@ import dev.quantumink.hermesgadget.protocol.relay.state.LedgerStep
 import dev.quantumink.hermesgadget.protocol.relay.state.MintResult
 import dev.quantumink.hermesgadget.protocol.relay.state.PageOutcome
 import dev.quantumink.hermesgadget.protocol.relay.state.PlanOutcome
+import dev.quantumink.hermesgadget.protocol.relay.state.PlanRefusal
 import dev.quantumink.hermesgadget.protocol.relay.state.PrepareOutcome
 import dev.quantumink.hermesgadget.protocol.relay.state.Reactivation
 import dev.quantumink.hermesgadget.protocol.relay.state.ReadPlanOutcome
@@ -166,6 +168,9 @@ class RelayController(
     private var infoDigest: String? = null
     private var readyGeneration = -1L
 
+    /** The socket generation of the newest channel report. */
+    private var socketGeneration = 0L
+
     /** Bumped by everything that invalidates in-flight callbacks: socket change, session end, hide, profile review. */
     private var serial = 0L
 
@@ -194,6 +199,10 @@ class RelayController(
     private var createHalted = false
     private var createAttempt = 0
     private var infoRefreshing = false
+    private var attachAttempt = 0
+
+    /** Automatic fresh attaches after an uncertain submit, per turn (bounded; then it waits for the user). */
+    private val uncertainAttempts = HashMap<TurnKey, Int>()
 
     // -- public API (thread-safe) ------------------------------------------------------------------------------
 
@@ -493,6 +502,7 @@ class RelayController(
 
     private fun onChannelState(state: RelayChannelState, generation: Long) {
         channel = state
+        socketGeneration = generation
         when (state) {
             RelayChannelState.NotRequested, RelayChannelState.AwaitingWelcome -> Unit
             RelayChannelState.Closed -> endSession(attachAgain = true)
@@ -741,7 +751,7 @@ class RelayController(
         val link = transport
         flow++
         if (link == null || infoRefreshing || !(attachedOnce || attaching)) return
-        attaching = false
+        attaching = true
         infoRefreshing = true
         val expected = serial
         link.refreshInfo { result ->
@@ -785,8 +795,14 @@ class RelayController(
         val rt = runtime ?: return
         val record = record() ?: return
         val scope = record.scope() ?: return
-        val owed = record.standing == Standing.STOPPED ||
-            rt.ledger.scopeRecord(scope)?.contentEvictionOwed == true
+        val owed = rt.ledger.scopeRecord(scope)?.contentEvictionOwed == true ||
+            (
+                record.standing == Standing.STOPPED && (
+                    rt.ledger.entriesFor(scope).any { it.text != null } ||
+                        rt.delivery(scope)?.let { it.seenCount > 0 || it.refreshOwed.isNotEmpty() } == true ||
+                        rt.histories.any { it.scope.conversation.enrollment == scope }
+                    )
+                )
         if (!owed) return
         var next = rt.copy(ledger = rt.ledger.evictContent(scope).ledger)
         rt.delivery(scope)?.evictScopeContent()?.let { next = next.withDelivery(it.delivery) }
@@ -812,6 +828,13 @@ class RelayController(
         advance(next.copy(section = next.section.with(record.copy(standing = Standing.REVIEW_REQUIRED))))
         notice = RelayNotice.PROFILE_CHANGED
         publish()
+        // The profile now in force is read again so that the review can show what changed.
+        val link = transport
+        if (link != null && !infoRefreshing && channel is RelayChannelState.Ready) {
+            infoRefreshing = true
+            val expected = serial
+            link.refreshInfo { post { if (expected == serial) infoRefreshing = false } }
+        }
     }
 
     // -- review and re-authorisation ----------------------------------------------------------------------------
@@ -851,7 +874,7 @@ class RelayController(
         conversations.clear()
         notice = RelayNotice.NONE
         readyGeneration = -1
-        negotiated(state, state.serial)
+        negotiated(state, socketGeneration)
         publish()
     }
 
@@ -871,7 +894,7 @@ class RelayController(
         val state = channel
         if (state is RelayChannelState.Ready) {
             readyGeneration = -1
-            negotiated(state, state.serial)
+            negotiated(state, socketGeneration)
         }
         publish()
     }
@@ -1075,10 +1098,11 @@ class RelayController(
         publish()
     }
 
-    private fun attach(id: ConversationId) {
+    private fun attach(id: ConversationId, attempt: Int = 0) {
         flow++
         val mine = flow
         attaching = true
+        attachAttempt = attempt
         token = null
         historyIncomplete = false
         pollTimer?.cancel()
@@ -1087,26 +1111,19 @@ class RelayController(
             when (result) {
                 is RelayCallResult.Outcome -> when (val outcome = result.outcome) {
                     is RelayOutcome.Success -> attached(outcome.value, mine)
-                    is RelayOutcome.Failed -> onAttachFailed(outcome.error, id)
+                    is RelayOutcome.Failed -> onAttachFailed(outcome.error, id, attempt)
                     is RelayOutcome.Uncorrelated, is RelayOutcome.Invalid -> {
                         attaching = false
                         notice = RelayNotice.LINK_FAILED
                     }
                 }
-                RelayCallResult.TimedOut -> {
-                    attaching = false
-                    notice = RelayNotice.RECONNECTING
-                    retryTimer = later(backoff(0)) { attach(id) }
-                }
+                RelayCallResult.TimedOut -> retryAttach(id, attempt)
                 RelayCallResult.Closed -> attaching = false
-                is RelayCallResult.Refused -> {
+                is RelayCallResult.Refused -> if (busyLocally(result)) {
+                    retryAttach(id, attempt)
+                } else {
                     attaching = false
-                    if (busyLocally(result)) {
-                        notice = RelayNotice.RECONNECTING
-                        retryTimer = later(backoff(0)) { attach(id) }
-                    } else {
-                        notice = RelayNotice.LINK_FAILED
-                    }
+                    notice = RelayNotice.LINK_FAILED
                 }
             }
             publish()
@@ -1114,7 +1131,14 @@ class RelayController(
         publish()
     }
 
-    private fun onAttachFailed(error: RelayError, id: ConversationId) {
+    /** Bounded: after [RelayTiming.maxRetries] the user is asked (the selection stays; Resume tries again). */
+    private fun retryAttach(id: ConversationId, attempt: Int) {
+        attaching = false
+        notice = RelayNotice.RECONNECTING
+        if (attempt < timing.maxRetries) retryTimer = later(backoff(attempt)) { attach(id, attempt + 1) }
+    }
+
+    private fun onAttachFailed(error: RelayError, id: ConversationId, attempt: Int) {
         attaching = false
         when {
             error.code == RelayErrorCode.NOT_FOUND -> {
@@ -1124,7 +1148,7 @@ class RelayController(
                 attachedOnce = false
                 notice = RelayNotice.CONVERSATION_DELETED
             }
-            commonError(error, { attach(id) }, 0) -> Unit
+            commonError(error, { attach(id, attempt + 1) }, attempt) -> Unit
             else -> notice = RelayNotice.SERVER_ERROR
         }
     }
@@ -1134,6 +1158,12 @@ class RelayController(
         val rt = runtime ?: return
         val step = rt.authority.attach(scope, binding)
         val delivery = (rt.delivery(scope) ?: EnrollmentDelivery.begin(scope)).attach(step.authority, step.token)
+        if (delivery.result != null) {
+            // The state layer refused this binding (wrong scope, not current): never proceed on it.
+            attaching = false
+            notice = RelayNotice.ANOMALY
+            return
+        }
         advance(rt.copy(authority = step.authority).withDelivery(delivery.delivery))
         token = step.token
         // Receipt first, then history, then the task snapshot; only then is the view current and events are pulled.
@@ -1228,22 +1258,38 @@ class RelayController(
     }
 
     private fun lookup(key: TurnKey) {
-        val bound = token ?: return
-        lookupThen(key, bound, flow) { publish() }
+        val bound = token
+        if (bound == null) {
+            reattach()
+            return
+        }
+        lookupThen(key, bound, flow, userInitiated = true) { publish() }
     }
 
-    private fun lookupThen(key: TurnKey, bound: BindingToken, mine: Long, then: () -> Unit) {
+    private fun lookupThen(
+        key: TurnKey,
+        bound: BindingToken,
+        mine: Long,
+        userInitiated: Boolean = false,
+        then: () -> Unit
+    ) {
         val rt = runtime
         val at = now()
         val link = transport
         if (rt == null || at == null || link == null) return then()
         val correlation = link.correlation()
         val step = rt.ledger.planLookup(key, rt.authority, bound, at, correlation)
-        val planned = step.result as? PlanOutcome.Planned ?: return then()
+        val planned = step.result as? PlanOutcome.Planned
+        if (planned == null) {
+            // After uncertainty the ledger wants a binding made AFTER it: the user's "check" attaches again first.
+            val refused = (step.result as? PlanOutcome.Refused)?.reason
+            if (userInitiated && refused == PlanRefusal.FRESH_ATTACH_REQUIRED) reattach()
+            return then()
+        }
         runtime = rt.copy(ledger = step.ledger)
         val ref = planned.dispatch.ref
         request(planned.dispatch.call, correlation) { result ->
-            settleLookup(ref, result, bound) {
+            settleLookup(ref, key, result, bound) {
                 if (mine == flow && runtime?.ledger?.entry(key)?.phase == TurnPhase.ABSENT_SO_FAR) {
                     resubmit(key, deliberate = false)
                 }
@@ -1269,43 +1315,56 @@ class RelayController(
      */
     private fun settleLookup(
         ref: CallRef,
+        key: TurnKey,
         result: RelayCallResult<Receipt>,
         bound: BindingToken,
         then: () -> Unit
     ) {
         val denial = deniedLookup(result)
         if (denial == null || !supports(RelayMethod.HISTORY_PAGE)) {
-            answerTurnCall(ref, result)
+            answerTurnCall(ref, key, result)
             return then()
         }
         val probe = try {
             RelayCalls.history(bound.conversationId, null, 1)
         } catch (_: IllegalArgumentException) {
-            answerTurnCall(ref, result)
+            answerTurnCall(ref, key, result)
             return then()
         }
         request(probe) { probed ->
             val outcome = (probed as? RelayCallResult.Outcome)?.outcome
+            val notFound = RelayCallResult.Outcome(RelayOutcome.Failed(RelayError(RelayErrorCode.NOT_FOUND, false)))
             when {
-                outcome is RelayOutcome.Success ->
-                    answerTurnCall(ref, RelayCallResult.Outcome(RelayOutcome.Failed(RelayError(RelayErrorCode.NOT_FOUND, false))))
+                outcome is RelayOutcome.Success -> answerTurnCall(ref, key, notFound)
                 outcome is RelayOutcome.Failed && outcome.error.code == RelayErrorCode.PERMISSION_DENIED ->
-                    answerTurnCall(ref, result)
-                else -> answerTurnCall(ref, RelayCallResult.TimedOut)
+                    answerTurnCall(ref, key, result)
+                else -> answerTurnCall(ref, key, RelayCallResult.TimedOut)
             }
             then()
         }
     }
 
     /** One turn call ended: the ledger decides what it means. A call that never left is treated as unanswered. */
-    private fun answerTurnCall(ref: CallRef, result: RelayCallResult<Receipt>) {
+    private fun answerTurnCall(ref: CallRef, key: TurnKey, result: RelayCallResult<Receipt>) {
         val rt = runtime ?: return
         val step = when (result) {
             is RelayCallResult.Outcome -> rt.ledger.onReply(ref, result.outcome)
             RelayCallResult.TimedOut, is RelayCallResult.Refused -> rt.ledger.onTimeout(ref)
             RelayCallResult.Closed -> return
         }
+        val before = token
         applyLedger(step)
+        // An uncertain SUBMIT needs a fresh attach before its receipt can be asked (the ledger's rule): do it, with backoff.
+        val entry = runtime?.ledger?.entry(key)
+        if (ref.kind == CallKind.SUBMIT && entry != null && entry.phase == TurnPhase.UNCERTAIN &&
+            entry.hold == null && before === token && channel is RelayChannelState.Ready
+        ) {
+            val attempt = uncertainAttempts[key] ?: 0
+            if (attempt < timing.maxRetries) {
+                uncertainAttempts[key] = attempt + 1
+                retryTimer = later(backoff(attempt)) { reattach() }
+            }
+        }
     }
 
     private fun applyLedger(step: LedgerStep<ReplyOutcome>) {
@@ -1384,7 +1443,7 @@ class RelayController(
         resubmits[key] = 0
         notice = RelayNotice.NONE
         request(dispatch.call, correlation) { result ->
-            answerTurnCall(dispatch.ref, result)
+            answerTurnCall(dispatch.ref, key, result)
             schedulePoll()
             publish()
         }
@@ -1412,7 +1471,7 @@ class RelayController(
         if (!adopt(rt.copy(ledger = planned.ledger))) return publish()
         resubmits[key] = (attempts ?: 0) + 1
         request(dispatch.call, correlation) { result ->
-            answerTurnCall(dispatch.ref, result)
+            answerTurnCall(dispatch.ref, key, result)
             schedulePoll()
             publish()
         }

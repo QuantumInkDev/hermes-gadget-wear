@@ -68,10 +68,12 @@ class RelayReplaySessionTest {
             h.server.holdNextResponse("relay.turn.submit")
             h.send("third question")
             val held = h.server.heldIndexes().single()
-            h.advanceConnection(16_000)
+            // The socket drops before the response arrives.
+            h.drop()
             assertEquals(TurnStatus.UNCERTAIN, h.ui.turns.last().status)
             // The reconnect attaches, then asks for the receipt FIRST: no second submit exists anywhere.
-            h.reconnect()
+            h.connection.connect()
+            h.settle()
             h.assertClean()
             assertEquals(3, h.requests("relay.turn.submit").size)
             assertEquals(TurnStatus.FINISHED_COMPLETED, h.ui.turns.last().status)
@@ -96,9 +98,10 @@ class RelayReplaySessionTest {
             h.start()
             h.server.swallowNext("relay.turn.submit")
             h.send("first question")
-            h.advanceConnection(16_000)
+            h.drop()
             assertEquals(TurnStatus.UNCERTAIN, h.ui.turns.single().status)
-            h.reconnect()
+            h.connection.connect()
+            h.settle()
             h.assertClean()
             // receipt (denied) -> a read probe of the same conversation -> the SAME request again
             val methods = h.server.seen.map { it["method"]!!.jsonPrimitive.content }.takeLast(7)
@@ -133,7 +136,6 @@ class RelayReplaySessionTest {
             h.start()
             h.server.swallowNext("relay.turn.submit")
             h.send("first question")
-            h.advanceConnection(16_000)
             h.reconnect()
             h.assertClean()
             val methods = h.server.seen.map { it["method"]!!.jsonPrimitive.content }
@@ -207,7 +209,7 @@ class RelayReplaySessionTest {
             h.reconnect()
             h.server.holdNextResponse("relay.turn.submit")
             h.send("third question")
-            h.advanceConnection(16_000)
+            h.drop()
             assertEquals(TurnStatus.UNCERTAIN, h.ui.turns.last().status)
             h.assertClean()
             resumeAt = h.server.consumedCount
@@ -235,6 +237,40 @@ class RelayReplaySessionTest {
             assertTrue(h.requests("relay.turn.submit").isEmpty())
             assertEquals(TurnStatus.FINISHED_COMPLETED, h.ui.turns.last().status)
             assertEquals(9, h.ui.transcript.size)
+        }
+    }
+
+    @Test(timeout = 90000) fun aTimeoutOnALiveSocketReadsInfoAttachesAgainAndAsksTheReceiptBeforeAnythingElse() {
+        ReplayHarness("task3-timeout.json").use { h ->
+            h.start()
+            h.server.holdNextResponse("relay.turn.submit")
+            h.send("first question")
+            val held = h.server.heldIndexes().single()
+            // The socket stays up but the response never comes: the call times out and the turn is uncertain.
+            h.advanceConnection(16_000)
+            assertEquals(TurnStatus.UNCERTAIN, h.ui.turns.single().status)
+            assertEquals(1, h.requests("relay.turn.submit").size)
+            // After the backoff the controller reads info again, attaches again (a binding NEWER than the uncertainty)
+            // and asks the receipt first: still exactly one submit.
+            h.advanceController(1_000)
+            h.assertClean()
+            val methods = h.server.seen.map { it["method"]!!.jsonPrimitive.content }
+            assertEquals(
+                listOf(
+                    "relay.info", "relay.conversations.list", "relay.conversation.attach", "relay.turn.receipt",
+                    "relay.history.page"
+                ),
+                methods.takeLast(5)
+            )
+            assertEquals(1, h.requests("relay.turn.submit").size)
+            assertEquals(TurnStatus.FINISHED_COMPLETED, h.ui.turns.single().status)
+            assertEquals(3, h.ui.transcript.size)
+            // The response finally arrives under its old correlation: it names no outstanding call and changes nothing.
+            h.server.release(held)
+            h.settle()
+            assertEquals(TurnStatus.FINISHED_COMPLETED, h.ui.turns.single().status)
+            assertEquals(3, h.ui.transcript.size)
+            h.assertClean()
         }
     }
 }
