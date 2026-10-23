@@ -274,10 +274,12 @@ class RelayEnvelopeTest {
     }
 
     @Test fun methodNamesAndLimitsComeFromTheAcceptedSdk() {
-        // The 22 Task1 methods are unchanged; the seven canonical-voice methods (V4) are the only additions.
-        assertEquals(22, RelayMethod.entries.count { !it.isVoice })
-        assertEquals(7, RelayMethod.entries.count { it.isVoice })
-        assertEquals(29, RelayMethod.entries.size)
+        // The frozen 22 Task1 + seven voice methods remain; own receipt is separately optional.
+        val predecessor = RelayMethod.entries - RelayMethod.TURN_RECEIPT_OWN
+        assertEquals(22, predecessor.count { !it.isVoice })
+        assertEquals(7, predecessor.count { it.isVoice })
+        assertEquals(29, predecessor.size)
+        assertEquals(RelayMethod.TURN_RECEIPT_OWN, RelayMethod.fromWire("relay.turn.receipt.own"))
         assertEquals(RelayMethod.OUTBOX_ACK, RelayMethod.fromWire("relay.outbox.ack"))
         assertNull(RelayMethod.fromWire("relay.bogus"))
         assertEquals(

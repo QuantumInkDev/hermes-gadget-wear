@@ -156,8 +156,13 @@ class RelayDtoMutationTest {
                 }
             }
         }
-        // The voice methods have their own mutation property over their own vectors (VoiceDtoStrictnessTest).
-        assertEquals(RelayMethod.entries.filter { !it.isVoice }.toSet(), methodsSeen)
+        // These frozen vectors predate own receipt; voice and own have separate captured suites.
+        assertEquals(
+            RelayMethod.entries.filter {
+                !it.isVoice && it != RelayMethod.TURN_RECEIPT_OWN
+            }.toSet(),
+            methodsSeen
+        )
         assertTrue("only $executed mutations", executed > 5000)
         // Optional-member removals are a small minority; if they dominated, the property would be vacuous.
         assertTrue(stayedValid < executed / 10)

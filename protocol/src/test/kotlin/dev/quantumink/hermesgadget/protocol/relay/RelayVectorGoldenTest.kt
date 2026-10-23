@@ -283,8 +283,10 @@ class RelayVectorGoldenTest {
             "7c17e6d72a3b9ec2974b3566f02dab1ed4b94eae",
             manifest["core"]!!.jsonObject["head"]!!.jsonPrimitive.content
         )
-        // Task1 vectors cover the 22 Relay methods; the seven voice methods have their own vectors (relay-voice-v1).
-        val relayMethods = RelayMethod.entries.filter { !it.isVoice }
+        // This frozen Task1 manifest predates voice and own receipt; their captures stay separate.
+        val relayMethods = RelayMethod.entries.filter {
+            !it.isVoice && it != RelayMethod.TURN_RECEIPT_OWN
+        }
         val methods = relayMethods.filter { m ->
             cases.any {
                 it.method == m.wire &&
