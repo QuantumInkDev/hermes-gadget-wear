@@ -1134,12 +1134,13 @@ class RelayController(
     private fun finishAttach(bound: BindingToken, mine: Long) {
         if (mine != flow) return
         val rt = runtime ?: return
-        rt.delivery(bound.scope)?.let { delivery ->
-            val cleared = delivery.refreshed(bound.conversation, setOf(RefreshKind.HISTORY, RefreshKind.TASKS))
-            advance(rt.withDelivery(cleared.delivery))
-        }
         attaching = false
         notice = if (historyIncomplete) RelayNotice.HISTORY_INCOMPLETE else RelayNotice.NONE
+        rt.delivery(bound.scope)?.let { delivery ->
+            val cleared = delivery.refreshed(bound.conversation, setOf(RefreshKind.HISTORY, RefreshKind.TASKS))
+            // A failed commit sets its own notice: it must not be overwritten by the one above.
+            advance(rt.withDelivery(cleared.delivery))
+        }
         publish()
         schedulePoll()
     }
@@ -1177,6 +1178,12 @@ class RelayController(
         TurnPhase.UNCERTAIN, TurnPhase.ABSENT_SO_FAR, TurnPhase.QUEUED, TurnPhase.STARTED,
         TurnPhase.ADMITTED_UNKNOWN -> true
         else -> false
+    }
+
+    /** A turn whose outcome is still being waited for: poll quickly. */
+    private fun awaiting(entry: TurnEntry): Boolean = entry.closure == null && when (entry.phase) {
+        TurnPhase.PREPARED, TurnPhase.TERMINAL, TurnPhase.REFUSED -> false
+        else -> true
     }
 
     private fun progressing(entry: TurnEntry): Boolean = entry.closure == null && when (entry.phase) {
@@ -1319,6 +1326,7 @@ class RelayController(
             schedulePoll()
             publish()
         }
+        schedulePoll()
         publish()
         return true
     }
@@ -1508,7 +1516,7 @@ class RelayController(
     private fun schedulePoll() {
         pollTimer?.cancel()
         val bound = token ?: return
-        val active = runtime?.ledger?.entriesFor(bound.scope)?.any { unresolved(it) } == true
+        val active = runtime?.ledger?.entriesFor(bound.scope)?.any { awaiting(it) } == true
         pollTimer = later(if (active) timing.pollActiveMs else timing.pollIdleMs) { pollOnce() }
     }
 

@@ -100,6 +100,9 @@ internal class MemoryStore(var log: MutableList<String>? = null) : RelayStore {
     var unreadable: StoreProblem? = null
     var failures = ArrayDeque<StoreCommit>()
     var failAll: StoreCommit? = null
+
+    /** When set, this many further commits succeed and every later one fails (a failure at an exact step). */
+    var allowCommits: Int? = null
     var lastDocument: RelayDocument? = null
 
     override fun load(): StoreLoad {
@@ -124,6 +127,11 @@ internal class MemoryStore(var log: MutableList<String>? = null) : RelayStore {
     override fun commit(document: RelayDocument, base: Long): StoreCommit {
         attempts++
         log?.add("commit")
+        val allowed = allowCommits
+        if (allowed != null) {
+            if (allowed <= 0) return StoreCommit.Failed(StoreProblem.STORAGE_UNAVAILABLE, false)
+            allowCommits = allowed - 1
+        }
         val injected = failAll ?: failures.removeFirstOrNull()
         if (injected != null) {
             if (landOnFailure && injected is StoreCommit.Failed && injected.uncertain) {
