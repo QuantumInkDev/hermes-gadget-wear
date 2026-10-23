@@ -136,6 +136,8 @@ runtime with a pre-execution import-origin admission. Still required and unwaive
 controller's host and metadata runs, inspection of the ACTUAL initialized plugin registry and tracer provider (M1; static
 declarations or a source-registered fixture never close it), provider-real media, the NeuTTS/Kitten/Piper engine runtimes,
 other-box qualification at the per-box rollout gate, the remaining stock compatibility of Task 4 and the review of this follow-up.
+A first reviewed host run measured one file-descriptor ownership gap of the shared command runner (a reader that outlived the consumer left its stream open after a late EOF); the patch now
+includes the minimal owner fix and a real-pipe regression. Host qualification stays OPEN and a changed-head host recheck is a separate controller step.
 V2 stays blocked until the mandatory V1-P proof exists.
 
 ### V2 — SDK voice input (SDK patch, flags default false)

@@ -340,6 +340,8 @@ source coverage, not current-profile, plugin-registry, tracer-provider or runtim
 two-chunk speech joined through the existing launcher stand-in (synthetic, not media qualification). Controller host and metadata
 tools, their shared helper and a separate pinned controller runtime were authored beside it but are not part of this patch and have
 not been run.
+The command runner (`tools/tts_command_provider.py`) now closes a stream from its own reader thread at late EOF, so a consumer that returned while a finite detached writer still
+held the pipe leaves no descriptor open once that writer ends; `tests/tools/test_command_runner_pipe_ownership.py` is the real-pipe regression. Nothing else in the runner changed.
 
 Focused evidence is in the stage reports, not in this directory: warning-strict canonical-runner suites over the
 real OpenAI SDK, the real lock-pinned ElevenLabs 1.59.0, Edge 7.2.7 and Mistral 2.4.8 SDKs, `requests` (adapter replaced), the real

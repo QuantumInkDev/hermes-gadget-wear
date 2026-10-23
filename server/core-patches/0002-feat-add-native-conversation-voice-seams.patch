@@ -12114,6 +12114,91 @@ index 0000000000000000000000000000000000000000..dca6d30c90e9c1431fe67b96c78ff747
 +        transcript.write_text(f'{handle.getnchannels()}ch {handle.getframerate()}Hz {handle.getnframes()}fr', encoding='utf-8')
 +else:
 +    transcript.write_text('managed whisper words', encoding='utf-8')
+diff --git a/tests/tools/test_command_runner_pipe_ownership.py b/tests/tools/test_command_runner_pipe_ownership.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..fcb8f355c3e39fd66df2445ef048b6285b251c6a
+--- /dev/null
++++ b/tests/tools/test_command_runner_pipe_ownership.py
+@@ -0,0 +1,79 @@
++"""Command runner pipe ownership: a reader that outlives the consumer closes ITS OWN stream at late EOF.
++
++Real ``os.pipe`` descriptors wrapped exactly like ``Popen(text=True)`` pipes (``TextIOWrapper`` over ``BufferedReader`` over ``FileIO``) and the ACTUAL
++``_start_readers`` / ``_close_command_pipes`` of ``tools.tts_command_provider``; no subprocess, no fixture, no fake. The scenario is the measured host one
++(a finite detached writer keeps the pipe after the consumer returned): the consumer's close helper must return without blocking and without closing a
++stream under a live reader, and when the writer finally ends the reader must release its own descriptor with no garbage collection and no further
++call of the close helper. The test keeps references to the streams and to the Popen-like holder for its whole life, so only the reader can close them.
++Synchronization is the queue itself (first chunk delivered, EOF delivered) and ``Thread.join``; there is no sleep.
++"""
++import os
++import queue
++import time
++import types
++
++import pytest
++
++from tools import tts_command_provider as runner
++
++pytestmark = pytest.mark.skipif(os.name == 'nt', reason='real os.pipe descriptors; Windows is a separate gate')
++NAMES = ('stdout', 'stderr')
++
++
++def text_pipe():
++    read_fd, write_fd = os.pipe()
++    return os.fdopen(read_fd, 'r', encoding='utf-8', errors='replace'), write_fd  # what Popen(text=True) hands the runner
++
++
++def test_a_reader_outliving_the_consumer_closes_its_own_stream_at_late_eof_without_gc_or_a_second_close_call():
++    (out_stream, out_w), (err_stream, err_w) = text_pipe(), text_pipe()
++    holder = types.SimpleNamespace(stdout=out_stream, stderr=err_stream)  # Popen-like references retained by this test: nothing can be collected
++    streams, writers = dict(zip(NAMES, (out_stream, err_stream))), dict(zip(NAMES, (out_w, err_w)))
++    received, ended = {name: [] for name in NAMES}, set()
++    output_queue, _chunks, readers = runner._start_readers(holder)
++
++    def pump(done):
++        while not done():
++            try:
++                name, chunk = output_queue.get(timeout=10)
++            except queue.Empty:
++                pytest.fail('a reader delivered nothing within 10 s')
++            if chunk is None:
++                ended.add(name)
++            else:
++                received[name].append(chunk)
++    try:
++        for name in NAMES:
++            os.write(writers[name], f'first-{name} '.encode())
++        pump(lambda: all(received[name] for name in NAMES))  # both readers delivered a chunk, so each is now blocked in its NEXT read
++        assert all(reader.is_alive() for reader in readers) and not ended
++
++        started = time.monotonic()
++        runner._close_command_pipes(holder, readers, wait=0.05)  # the consumer returns while the writer still owns the pipe
++        assert time.monotonic() - started < 2.0  # bounded: it did not wait for the writer
++        assert all(reader.is_alive() for reader in readers)
++        assert not any(stream.closed or stream.buffer.closed or stream.buffer.raw.closed for stream in streams.values())  # never closed under a live reader
++
++        for name in NAMES:  # the finite detached writer finishes late: payload, then EOF
++            os.write(writers[name], f'late-{name}'.encode())
++            os.close(writers[name])
++            writers[name] = None
++        pump(lambda: ended == set(NAMES))
++        for reader in readers:
++            reader.join(10)
++        assert not any(reader.is_alive() for reader in readers)
++
++        assert {name: ''.join(received[name]) for name in NAMES} == {name: f'first-{name} late-{name}' for name in NAMES}  # payload intact, EOF delivered
++        # released by the reader itself: wrapper, buffer and raw descriptor object, with no GC and no second call of the close helper
++        assert all(stream.closed and stream.buffer.closed and stream.buffer.raw.closed for stream in streams.values())
++
++        runner._close_command_pipes(holder, readers, wait=0)  # a later helper call over already-closed streams is harmless
++        assert all(stream.closed for stream in streams.values())
++    finally:
++        for fd in writers.values():
++            if fd is not None:
++                os.close(fd)
++        for stream in streams.values():
++            stream.close()
++        for reader in readers:
++            reader.join(10)
 diff --git a/tests/tools/test_mistral_stock_transport.py b/tests/tools/test_mistral_stock_transport.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..d71fd2d793a816adf175fd6c226b941427dd54b5
@@ -15906,7 +15991,7 @@ index 072eed5f03a0ea2eba2deec36fbf4e13526144d2..a87b618a07cd6e62472143324e09c085
          return _transcribe_local_command(file_path, _normalize_local_model(local_model))
      return _error_result("No installed local STT backend is available.", provider="local")
 diff --git a/tools/tts_command_provider.py b/tools/tts_command_provider.py
-index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..a1da5facdfe7a258ba57672caf10cbbfc3dee996 100644
+index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..9905ffbe33e51c2897184bc89de0631747bcd35d 100644
 --- a/tools/tts_command_provider.py
 +++ b/tools/tts_command_provider.py
 @@ -11,18 +11,22 @@ process runner and the generic ``<section>.providers.<name>`` readers, re-import
@@ -16042,7 +16127,7 @@ index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..a1da5facdfe7a258ba57672caf10cbbf
          try:
              name, chunk = output_queue.get(timeout=min(0.05, remaining))
          except queue.Empty:
-@@ -214,13 +223,73 @@ def run_command_provider(
+@@ -214,13 +223,79 @@ def run_command_provider(
          if chunk is None:
              open_streams.discard(name)
              continue
@@ -16077,7 +16162,9 @@ index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..a1da5facdfe7a258ba57672caf10cbbf
 +
 +
 +def _start_readers(proc: subprocess.Popen) -> tuple[queue.Queue, dict[str, list[str]], list]:
-+    """One daemon reader per output stream, feeding ``(name, chunk)`` (``None`` at EOF) into one queue."""
++    """One daemon reader per output stream, feeding ``(name, chunk)`` (``None`` at EOF) into one queue. A reader owns its stream
++    for as long as it reads and closes it itself when it finishes, so a consumer that returned while a finite detached writer
++    still held the pipe (``_close_command_pipes`` never closes under a live reader) leaves no descriptor open after the late EOF."""
 +    output_queue: queue.Queue[tuple[str, Optional[str]]] = queue.Queue()
 +
 +    def read_stream(name: str, stream: Any) -> None:
@@ -16090,6 +16177,10 @@ index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..a1da5facdfe7a258ba57672caf10cbbf
 +                    break
 +                output_queue.put((name, chunk))
 +        finally:
++            close = getattr(stream, "close", None)
++            if callable(close):
++                with contextlib.suppress(OSError, ValueError):
++                    close()
 +            output_queue.put((name, None))
 +
 +    readers = [threading.Thread(target=read_stream, args=(name, stream), daemon=True)
@@ -16118,7 +16209,7 @@ index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..a1da5facdfe7a258ba57672caf10cbbf
      if timed_out:
          terminate_command_process_tree(proc)
          for reader in readers:
-@@ -230,6 +299,7 @@ def run_command_provider(
+@@ -230,6 +305,7 @@ def run_command_provider(
              if chunk:
                  chunks[name].append(chunk)
      stdout, stderr = "".join(chunks["stdout"]), "".join(chunks["stderr"])
@@ -16126,7 +16217,7 @@ index ee4df322a7ab0c753bb36ba203b7ba03ffc7207b..a1da5facdfe7a258ba57672caf10cbbf
      if timed_out:
          raise subprocess.TimeoutExpired(command, timeout, output=stdout, stderr=stderr) from (
              subprocess.TimeoutExpired(command, timeout))
-@@ -238,6 +308,101 @@ def run_command_provider(
+@@ -238,6 +314,101 @@ def run_command_provider(
      return subprocess.CompletedProcess(command, proc.returncode, stdout, stderr)
  
  
