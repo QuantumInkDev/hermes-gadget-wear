@@ -63,10 +63,16 @@ class RelayReconnectOrderingTest {
                 holdReconnect.set(true)
                 next.connect()
                 val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-                while (!readyPosted.await(5, TimeUnit.MILLISECONDS) && System.nanoTime() < deadline) {
+                while (!readyPosted.await(5, TimeUnit.MILLISECONDS) &&
+                    System.nanoTime() < deadline
+                ) {
                     h.server.pump()
                 }
-                assertEquals("fresh info never reached the controlled boundary", 0L, readyPosted.count)
+                assertEquals(
+                    "fresh info never reached the controlled boundary",
+                    0L,
+                    readyPosted.count
+                )
                 h.scheduler.runAll()
                 releaseSocketOwner.countDown()
                 h.settle()
@@ -81,7 +87,10 @@ class RelayReconnectOrderingTest {
                 assertEquals("relay.turn.receipt", methods.last())
                 assertEquals(1, h.requests("relay.turn.submit").size)
                 assertEquals(RelayPhase.STOPPED, h.ui.phase)
-                assertEquals(Standing.STOPPED, h.store.reread().section.enrollments.single().standing)
+                assertEquals(
+                    Standing.STOPPED,
+                    h.store.reread().section.enrollments.single().standing
+                )
                 assertFalse(h.ui.canSend)
                 assertTrue(h.server.extra.isEmpty())
             } finally {
