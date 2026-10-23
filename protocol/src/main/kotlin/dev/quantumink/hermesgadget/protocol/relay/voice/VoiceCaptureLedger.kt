@@ -673,7 +673,9 @@ class VoiceCaptureLedger private constructor(
         Triple(ResultOutcome.Ended(end, failure), end, failure)
 
     /**
-     * A failed voice call. `not_found` of a result read means nothing was sealed or billed: the capture ends [CaptureEnd.NOT_SEALED]. A stale binding,
+     * A failed voice call. `not_found` of a result read means nothing was sealed or billed ONLY when no local evidence says otherwise: the capture
+     * then ends [CaptureEnd.NOT_SEALED]. With evidence that it may have been billed it ends [CaptureEnd.UNKNOWN_OUTCOME] and keeps that evidence
+     * (the server purges terminal rows after 24 h, so a missing row proves nothing). A stale binding,
      * `permission_denied` or `profile_changed` withdraws the scope's transient intents (no later transcript may auto-submit); the scope decision itself
      * is the Task2 ledger's. Transient and unexpected errors change nothing.
      */
@@ -696,10 +698,15 @@ class VoiceCaptureLedger private constructor(
         if (entry != null && waiting && error.code == RelayErrorCode.NOT_FOUND &&
             monotonicRefusal(lastNanos, now) == null
         ) {
+            // Absence is not proof of no charge: with local evidence that something may have been billed (in flight, completed, failed after send,
+            // unknown) the server's purged row ends the capture as an UNKNOWN outcome and the evidence is kept. Only without such evidence does
+            // a missing row mean that nothing was sealed.
+            val billed = entry.provider?.mayHaveBeenBilled == true
+            val end = if (billed) CaptureEnd.UNKNOWN_OUTCOME else CaptureEnd.NOT_SEALED
             val finished = entry.update(
                 lifecycle = CaptureLifecycle.ENDED,
-                provider = VoiceProvider.NOT_STARTED,
-                end = CaptureEnd.NOT_SEALED,
+                provider = if (billed) entry.provider else VoiceProvider.NOT_STARTED,
+                end = end,
                 terminalAtMs = now.serverMs
             )
             val done = next.derive(
@@ -709,7 +716,7 @@ class VoiceCaptureLedger private constructor(
             )
             return CaptureStep(
                 done,
-                ErrorAdvice(action, CaptureEnd.NOT_SEALED),
+                ErrorAdvice(action, end),
                 listOf(CaptureEffect.PersistAggregate)
             )
         }
@@ -1102,8 +1109,8 @@ class VoiceCaptureLedger private constructor(
         }
 
         /**
-         * Billing evidence only moves forward and never back to "not billed": `unknown` is sticky, a concrete answer replaces an earlier concrete one only
-         * when the earlier one was `not_started` or `in_flight`.
+         * Billing evidence only moves forward and never back to "not billed": `unknown` is sticky, `in_flight` is never withdrawn by `not_started`,
+         * and a concrete answer replaces an earlier one only when the earlier one was `not_started` or `in_flight`.
          */
         internal fun mergeProvider(
             current: VoiceProvider?,
@@ -1112,6 +1119,9 @@ class VoiceCaptureLedger private constructor(
             current == null -> incoming
             current == VoiceProvider.UNKNOWN -> VoiceProvider.UNKNOWN
             incoming == VoiceProvider.UNKNOWN -> VoiceProvider.UNKNOWN
+            // a stale or reordered answer never withdraws a send that is already in flight
+            current == VoiceProvider.IN_FLIGHT &&
+                incoming == VoiceProvider.NOT_STARTED -> VoiceProvider.IN_FLIGHT
             current == VoiceProvider.NOT_STARTED || current == VoiceProvider.IN_FLIGHT -> incoming
             incoming == VoiceProvider.NOT_STARTED || incoming == VoiceProvider.IN_FLIGHT -> current
             else -> current
