@@ -47,3 +47,7 @@ they prove protocol, authority, accounting and refusal behaviour, NOT any provid
 is `false` and is never inferred from an import), installed profile, other host, device or the universal V1-P / initialized-plugin
 inspection. The core patch `0002` is unchanged by this stage. Interpretations and their boundary tests: design section 18;
 contract: SDK `docs/relay-voice.md`.
+
+Fix round 1 of that SDK increment (cross-kind identifier reservations in both directions held for the 7-day turn freshness window, a single audio owner
+across the seal, and runtime erasure that survives a temp-storage privacy verdict) changes the private voice database to schema 2 (preserving migration)
+and adds only SDK code, tests and docs; the core patch `0002` is still unchanged, and nothing is activated.
