@@ -406,7 +406,15 @@ class RelayController(
         ) as SnapshotBuild.Built
         ).snapshot
 
+    /**
+     * After an UNCERTAIN failure of our own write the new record may be in place: when the sequence on disk is exactly
+     * the next one, it is ours and the base moves on (the next commit rewrites it with the in-memory truth, which is
+     * never behind the disk). Any other sequence — a different writer — is never adopted.
+     */
     private fun noticeFor(result: StoreCommit) {
+        if (result is StoreCommit.Failed && result.uncertain && store.currentSequence() == storeSequence + 1) {
+            storeSequence += 1
+        }
         notice = when (result) {
             is StoreCommit.Refused ->
                 if (result.reason == EncodeRefusal.TOO_MANY) {
@@ -865,7 +873,6 @@ class RelayController(
 
     private fun listPage(cursor: String?, attempt: Int) {
         listing = true
-        val expected = flow
         val call = try {
             RelayCalls.conversations(cursor, timing.listPageItems)
         } catch (_: IllegalArgumentException) {
@@ -874,7 +881,6 @@ class RelayController(
         }
         request(call) { result ->
             listing = false
-            if (expected != flow) return@request
             when (result) {
                 is RelayCallResult.Outcome -> when (val outcome = result.outcome) {
                     is RelayOutcome.Success -> onListed(outcome.value, cursor == null)

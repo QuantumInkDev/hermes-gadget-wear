@@ -93,14 +93,20 @@ object StoreBounds {
     const val HEADER_BYTES = 4L + 2 + 2
     const val TRAILER_BYTES = 4L
 
+    /** The five u16 counts of the document plus the capture section's version and count. */
+    const val COUNTS_BYTES = 2L * 5 + 4 + 2
+
+    /** The size of a version 2 document with every collection empty. */
+    fun emptyDocumentBytes(): Long = HEADER_BYTES + TRAILER_BYTES + COUNTS_BYTES
+
     /** Every collection at its limit and every string at its cap; turn text bounded by the ledger-wide total. */
-    fun theoreticalMaxPlaintextBytes(): Long = HEADER_BYTES + TRAILER_BYTES +
-        2 + ENROLLMENTS * enrollmentMax +
-        2 + TURNS * turnFixedMax + TURN_TEXT_TOTAL_BYTES + TURNS * 4L +
-        2 + SCOPE_DECISIONS * scopeDecisionMax +
-        2 + HISTORIES * historyMax +
-        2 + DELIVERIES * deliveryMax +
-        1 + 4 + 2 + CAPTURES * captureMax
+    fun theoreticalMaxPlaintextBytes(): Long = emptyDocumentBytes() +
+        ENROLLMENTS * enrollmentMax +
+        TURNS * turnFixedMax + TURN_TEXT_TOTAL_BYTES + TURNS * 4L +
+        SCOPE_DECISIONS * scopeDecisionMax +
+        HISTORIES * historyMax +
+        DELIVERIES * deliveryMax +
+        CAPTURES * captureMax
 
     /** True: the deliberate cap is below the full capacity the state layer itself would accept. */
     val capIsBelowFullCapacity: Boolean get() = theoreticalMaxPlaintextBytes() > PLAINTEXT_CAP_BYTES

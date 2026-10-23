@@ -79,4 +79,10 @@ interface RelayStore {
      * empty); a different on-disk sequence answers [StoreCommit.Stale].
      */
     fun commit(document: RelayDocument, base: Long): StoreCommit
+
+    /**
+     * The sequence of the record on disk (0 when nothing is stored), or -1 when it cannot be read. Used after a commit
+     * that failed UNCERTAINLY, to learn whether the new record is in place.
+     */
+    fun currentSequence(): Long
 }
