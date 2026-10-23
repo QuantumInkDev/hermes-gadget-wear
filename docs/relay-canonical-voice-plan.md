@@ -129,8 +129,10 @@ unchanged.
 
 Qualification follow-up status (source and controller-tool authoring only; this is NOT V1-P completion and activates nothing):
 core test `tests/gateway/test_native_voice_profile_integration.py` (sentinel ElevenLabs/STT profile shapes over the real seam, the
-installed ElevenLabs SDK, stock config/secret scope and the registered authority) and three controller tools that have not been run
-(a Darwin 27 arm64 host harness, a read-only profile-metadata extractor and one detach fixture). Still required and unwaived: the
+installed ElevenLabs SDK, stock config/secret scope and the registered authority; Stop and a revoked grant are proved with a
+two-chunk speech whose second chunk is never sent) and controller tools that have not been run (a Darwin 27 arm64 host harness, a
+read-only profile-metadata extractor, a shared bootstrap helper and one detach fixture) over a separate, hash-pinned controller
+runtime with a pre-execution import-origin admission. Still required and unwaived: the
 controller's host and metadata runs, inspection of the ACTUAL initialized plugin registry and tracer provider (M1; static
 declarations or a source-registered fixture never close it), provider-real media, the NeuTTS/Kitten/Piper engine runtimes,
 other-box qualification at the per-box rollout gate, the remaining stock compatibility of Task 4 and the review of this follow-up.

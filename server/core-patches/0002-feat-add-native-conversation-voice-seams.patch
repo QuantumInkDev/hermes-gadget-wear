@@ -8112,10 +8112,10 @@ index 0000000000000000000000000000000000000000..c2004e416d597997480bd15ac2780669
 +    assert wrapped_programs(spawns) == [] and (wire.count, cb.before_send_calls, fallback) == (0, 0, [])
 diff --git a/tests/gateway/test_native_voice_profile_integration.py b/tests/gateway/test_native_voice_profile_integration.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..e58487f6470fa2bcc5430c6120fe8c4b61ce32ba
+index 0000000000000000000000000000000000000000..4b09a1c9c69ac8bfc35ae479627fd2c4bdcc4405
 --- /dev/null
 +++ b/tests/gateway/test_native_voice_profile_integration.py
-@@ -0,0 +1,358 @@
+@@ -0,0 +1,486 @@
 +"""Native voice seam: profile-shaped ElevenLabs/STT integration controls (source coverage, NOT runtime or current-profile proof).
 +
 +What runs for real: ``synthesize_native_once`` / ``transcribe_native_once``, the stock config and ``.env`` secret-scope paths
@@ -8135,6 +8135,7 @@ index 0000000000000000000000000000000000000000..e58487f6470fa2bcc5430c6120fe8c4b
 +import json
 +import logging
 +import os
++import shutil
 +import threading
 +from dataclasses import replace
 +from pathlib import Path
@@ -8150,6 +8151,11 @@ index 0000000000000000000000000000000000000000..e58487f6470fa2bcc5430c6120fe8c4b
 +home_rig = relay_native_support.home_rig
 +
 +TEXT = 'Qualification sentence for the profile controls.'
++# A two-sentence speech that the stock chunker splits into EXACTLY two chunks under the configured per-chunk cap (the premise is
++# asserted by ``chunks_of`` and proved by a successful control); EXPECTED_CHUNKS are literal expectations, not read back.
++MULTI_TEXT = 'First qualification sentence is here. Second qualification sentence follows now.'
++MULTI_CAP = 45
++EXPECTED_CHUNKS = ['First qualification sentence is here.', 'Second qualification sentence follows now.']
 +# Independent expected values: the configs below are written FROM these, the assertions compare the REQUESTS to these.
 +PROFILES = {
 +    'A': dict(voice='QualVoiceAlpha001', model='qual_model_alpha', key='el-qual-key-alpha', audio=b'ID3qual-alpha'),
@@ -8168,6 +8174,11 @@ index 0000000000000000000000000000000000000000..e58487f6470fa2bcc5430c6120fe8c4b
 +@pytest.fixture
 +def clip(tmp_path):
 +    return support.write_wav(tmp_path / 'clip.wav')
++
++
++@pytest.fixture
++def scratch(tmp_path, monkeypatch):
++    return support.private_tmp(tmp_path, monkeypatch)  # a leaked work directory of the join becomes visible
 +
 +
 +@pytest.fixture
@@ -8206,9 +8217,25 @@ index 0000000000000000000000000000000000000000..e58487f6470fa2bcc5430c6120fe8c4b
 +    return home
 +
 +
-+def elevenlabs_tts(label):
++def elevenlabs_tts(label, cap=None):
 +    profile = PROFILES[label]
-+    return {'provider': 'elevenlabs', 'elevenlabs': {'voice_id': profile['voice'], 'model_id': profile['model']}}
++    config = {'voice_id': profile['voice'], 'model_id': profile['model']}
++    if cap is not None:
++        config['max_text_length'] = cap  # the stock per-provider chunk cap override
++    return {'provider': 'elevenlabs', 'elevenlabs': config}
++
++
++def chunks_of(text=MULTI_TEXT, cap=MULTI_CAP):
++    """The seam's own normalization and the stock chunker: the premise that an input is a multi-chunk speech."""
++    from gateway.session_native_voice import speakable_text
++    from tools.tts_tool_delivery import _split_text_for_tts
++    return _split_text_for_tts(speakable_text(text), cap)
++
++
++def real_mp3_answers(tmp_path, count):
++    """``count`` real MP3 answers (distinct tone each) from the real ffmpeg: the synthetic provider bytes of a multi-chunk speech."""
++    assert shutil.which('ffmpeg') and shutil.which('ffprobe'), 'the owned ffmpeg/ffprobe are required for the multi-chunk controls'
++    return [support.synth_mp3(tmp_path / f'answer{i}.mp3', seconds=0.5, frequency=440 * (i + 1)) for i in range(count)]
 +
 +
 +async def speak(out, callbacks, text=TEXT, deadline_s=60):
@@ -8359,8 +8386,10 @@ index 0000000000000000000000000000000000000000..e58487f6470fa2bcc5430c6120fe8c4b
 +# --- Stop / lost authorization while the SDK answer is held -----------------------------------------------------------
 +
 +@pytest.mark.asyncio
-+async def test_stop_while_the_sdk_answer_is_held_sends_nothing_more_and_keeps_nothing(
++async def test_stop_while_a_single_chunk_answer_is_held_keeps_no_output_and_runs_no_callback(
 +        monkeypatch, out, tmp_path, real_elevenlabs, caplog):
++    """One chunk: a second send cannot occur here, so this control carries NO 'no additional send' claim (see the two-chunk controls).
++    The callback counts are a structural fence of this seam's contract, not a universal SDK property."""
 +    from gateway import session_native_voice_tts as tts_module
 +    caplog.set_level(logging.DEBUG)
 +    monkeypatch.setenv('HERMES_HOME', str(make_home(tmp_path, 'A', tts=elevenlabs_tts('A'),
@@ -8381,7 +8410,7 @@ index 0000000000000000000000000000000000000000..e58487f6470fa2bcc5430c6120fe8c4b
 +            assert await asyncio.to_thread(finished.wait, 10)  # the abandoned worker has fully returned
 +    finally:
 +        release.set()
-+    assert wire.count == 1 and at_stop == (2, 1)
++    assert wire.count == 1 and at_stop == (2, 1)  # coupled to this seam's callback structure on purpose
 +    assert (cb.authorize_calls, cb.before_send_calls) == at_stop  # no callback after Stop
 +    assert os.listdir(out) == [] and all(client['httpx_client'].is_closed for client in real_elevenlabs)
 +    for secret in (PROFILES['A']['key'], TEXT):
@@ -8410,8 +8439,8 @@ index 0000000000000000000000000000000000000000..e58487f6470fa2bcc5430c6120fe8c4b
 +    return ref, viewer
 +
 +
-+def configure_rig_home(tmp_path):
-+    support.write_config(tmp_path, {'tts': elevenlabs_tts('A')})
++def configure_rig_home(tmp_path, cap=None):
++    support.write_config(tmp_path, {'tts': elevenlabs_tts('A', cap)})
 +    (tmp_path / '.env').write_text(f"ELEVENLABS_API_KEY={PROFILES['A']['key']}\n")
 +
 +
@@ -8447,8 +8476,10 @@ index 0000000000000000000000000000000000000000..e58487f6470fa2bcc5430c6120fe8c4b
 +
 +
 +@pytest.mark.asyncio
-+async def test_authority_lost_while_the_sdk_answer_is_held_withholds_the_audio_and_sends_nothing_more(
++async def test_authority_lost_while_a_single_chunk_answer_is_held_withholds_the_audio(
 +        home_rig, monkeypatch, out, tmp_path, real_elevenlabs, caplog):
++    """One chunk: the revoked grant withholds the answered audio; a second send cannot occur here (see the two-chunk controls). The
++    exact event order is a structural fence of this seam's contract and will change with a benign restructuring."""
 +    from gateway import session_native_voice_tts as tts_module
 +    caplog.set_level(logging.DEBUG)
 +    configure_rig_home(tmp_path)
@@ -8473,6 +8504,103 @@ index 0000000000000000000000000000000000000000..e58487f6470fa2bcc5430c6120fe8c4b
 +    assert events == ['authorize', 'authorize', 'before_send', 'authorize']  # no callback beyond the lost-authority check
 +    assert os.listdir(out) == []  # no late retained output
 +    for secret in (PROFILES['A']['key'], TEXT):
++        assert secret not in caplog.text and secret not in repr(result)
++
++
++# --- Two-chunk speech: the premise, then Stop / revocation with the FIRST chunk's answer held (I6) -------------------------
++# HARNESS, stated plainly: the multi-chunk join runs through the hashed pass-through launcher stand-in (``support.qualify``, NOT a
++# sandbox) with the owned real ffmpeg/ffprobe. It is synthetic and is NOT host, launcher or media qualification.
++
++@pytest.mark.asyncio
++async def test_premise_a_two_chunk_speech_sends_each_chunk_once_in_order_and_joins(
++        monkeypatch, out, tmp_path, scratch, real_elevenlabs):
++    assert chunks_of() == EXPECTED_CHUNKS  # the premise: exactly two chunks under the configured cap
++    support.qualify(monkeypatch)
++    monkeypatch.setenv('HERMES_HOME', str(make_home(tmp_path, 'A', tts=elevenlabs_tts('A', MULTI_CAP),
++                                                    env={'ELEVENLABS_API_KEY': PROFILES['A']['key']})))
++    answers = real_mp3_answers(tmp_path, 2)
++    wire = support.Wire([('ok', {'audio': audio}) for audio in answers])
++    cb = support.Callbacks()
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb, text=MULTI_TEXT)
++    assert (result.state, result.provider, result.source) == ('synthesized', 'completed', 'configured')
++    assert wire.count == 2 and cb.before_send_calls == 2
++    facts = [request_facts(request) for request in wire.requests]
++    assert [fact['text'] for fact in facts] == EXPECTED_CHUNKS
++    assert {(fact['voice'], fact['model'], fact['key']) for fact in facts} == {
++        (PROFILES['A']['voice'], PROFILES['A']['model'], PROFILES['A']['key'])}
++    assert os.listdir(out) == [os.path.basename(result.path)] and os.listdir(scratch) == []
++    assert Path(result.path).stat().st_size > max(len(audio) for audio in answers)  # a join of both answers, not one of them
++    assert len(real_elevenlabs) == 2
++
++
++@pytest.mark.asyncio
++async def test_stop_while_the_first_of_two_chunks_is_held_sends_no_second_chunk_and_keeps_nothing(
++        monkeypatch, out, tmp_path, scratch, real_elevenlabs, caplog):
++    from gateway import session_native_voice_tts as tts_module
++    caplog.set_level(logging.DEBUG)
++    assert len(chunks_of()) == 2
++    support.qualify(monkeypatch)
++    monkeypatch.setenv('HERMES_HOME', str(make_home(tmp_path, 'A', tts=elevenlabs_tts('A', MULTI_CAP),
++                                                    env={'ELEVENLABS_API_KEY': PROFILES['A']['key']})))
++    finished = watch_worker(monkeypatch, tts_module, '_synthesize')
++    release = threading.Event()
++    wire = support.Wire([('ok', {'audio': audio}) for audio in real_mp3_answers(tmp_path, 2)], hold=release)
++    cb = support.Callbacks()
++    try:
++        with support.provider_wire(monkeypatch, wire):
++            task = asyncio.create_task(speak(out, cb, text=MULTI_TEXT))
++            assert await asyncio.to_thread(wire.entered.wait, 10)  # the first chunk's send left and is held at the provider
++            at_stop = (wire.count, cb.before_send_calls)
++            callbacks_at_stop = (cb.authorize_calls, cb.before_send_calls)
++            task.cancel()
++            with pytest.raises(asyncio.CancelledError):
++                await task
++            release.set()  # the held first answer returns; the abandoned worker would now reach the second chunk
++            assert await asyncio.to_thread(finished.wait, 10)  # it has fully returned BEFORE the negative assertions
++    finally:
++        release.set()
++    assert at_stop == (1, 1)  # exactly the first chunk was sent and accounted when Stop arrived
++    assert wire.count == 1 and cb.before_send_calls == 1  # the second chunk was never sent after Stop
++    assert [request_facts(request)['text'] for request in wire.requests] == EXPECTED_CHUNKS[:1]
++    assert (cb.authorize_calls, cb.before_send_calls) == callbacks_at_stop  # no callback after Stop (structural fence)
++    assert os.listdir(out) == [] and os.listdir(scratch) == [] and all(client['httpx_client'].is_closed for client in real_elevenlabs)
++    for secret in (PROFILES['A']['key'], *EXPECTED_CHUNKS):
++        assert secret not in caplog.text
++
++
++@pytest.mark.asyncio
++async def test_authority_lost_while_the_first_of_two_chunks_is_held_sends_no_second_chunk(
++        home_rig, monkeypatch, out, tmp_path, scratch, real_elevenlabs, caplog):
++    """Registered-authority variant (core call under a registered profile context, NOT a V2 bridge)."""
++    from gateway import session_native_voice_tts as tts_module
++    caplog.set_level(logging.DEBUG)
++    assert len(chunks_of()) == 2
++    support.qualify(monkeypatch)
++    configure_rig_home(tmp_path, MULTI_CAP)
++    ref, viewer = await registered_route(home_rig)
++    events = []
++    cb = AuthorityCallbacks(home_rig.authority, ref, viewer, events)
++    finished = watch_worker(monkeypatch, tts_module, '_synthesize')
++    release = threading.Event()
++    wire = support.Wire([('ok', {'audio': audio}) for audio in real_mp3_answers(tmp_path, 2)], hold=release)
++    try:
++        with support.provider_wire(monkeypatch, wire):
++            task = asyncio.create_task(speak(out, cb, text=MULTI_TEXT))
++            assert await asyncio.to_thread(wire.entered.wait, 10)
++            assert (wire.count, cb.before_send_calls) == (1, 1)  # the first chunk was sent and accounted
++            cb.actor = replace(viewer, capabilities=frozenset())  # the grant is revoked at the registered authority
++            at_revoke = len(events)
++            release.set()
++            result = await task
++            assert await asyncio.to_thread(finished.wait, 10)
++    finally:
++        release.set()
++    assert (result.state, result.path, result.provider) == ('refused', None, 'completed')  # the first send is accounted
++    assert wire.count == 1 and cb.before_send_calls == 1  # the second chunk was refused at the gate, never sent
++    assert 'before_send' not in events[at_revoke:] and 'authorize' in events[at_revoke:]  # re-asked, refused, no commit
++    assert os.listdir(out) == [] and os.listdir(scratch) == []
++    for secret in (PROFILES['A']['key'], *EXPECTED_CHUNKS):
 +        assert secret not in caplog.text and secret not in repr(result)
 diff --git a/tests/gateway/test_native_voice_rest_fences.py b/tests/gateway/test_native_voice_rest_fences.py
 new file mode 100644

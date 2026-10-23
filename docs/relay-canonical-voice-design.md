@@ -1109,7 +1109,9 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   installed ElevenLabs SDK over synthetic network bytes, stock config and `.env` scope, the registered authority as `authorize`); they
   are source coverage, not current-profile proof. The controller's metadata path must label raw declarations, resolved config,
   credential-presence origin, static plugin declarations and the ACTUAL initialized plugin registry and tracer provider
-  separately; an unobtainable runtime fact is recorded UNKNOWN with its remaining action, and M1 stays open until it is inspected.
+  separately; YAML is read with the stock safe helper and `.env` data with the pure python-dotenv parser as RAW declarations only (the
+  stock resolution of `${VAR}`, layering and sanitization is not reproduced, so resolved availability stays UNKNOWN); an unobtainable
+  runtime fact is recorded UNKNOWN with its remaining action, and M1 stays open until it is inspected.
   The host harness is Darwin 27 arm64 only; other boxes are qualified at the per-box rollout gate and are not claimed here.
 * Voice output is listed only with the complete seam (TTS **and** display read): there is no reduced
   live-only mode that would narrow approved deliberate playback.

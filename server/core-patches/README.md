@@ -336,8 +336,10 @@ during a native call. `provider` is billing evidence about the configured remote
 *Qualification follow-up (source and controller tooling only).* The patch now also carries
 `tests/gateway/test_native_voice_profile_integration.py`: sentinel ElevenLabs/STT single-profile shapes over the real seam, the
 installed ElevenLabs SDK (network bytes synthetic), stock config/secret scope and the registered authority as `authorize`. It is
-source coverage, not current-profile, plugin-registry, tracer-provider or runtime proof. Controller host and metadata tools were
-authored beside it but are not part of this patch and have not been run.
+source coverage, not current-profile, plugin-registry, tracer-provider or runtime proof; its Stop and revoked-grant controls use a
+two-chunk speech joined through the existing launcher stand-in (synthetic, not media qualification). Controller host and metadata
+tools, their shared helper and a separate pinned controller runtime were authored beside it but are not part of this patch and have
+not been run.
 
 Focused evidence is in the stage reports, not in this directory: warning-strict canonical-runner suites over the
 real OpenAI SDK, the real lock-pinned ElevenLabs 1.59.0, Edge 7.2.7 and Mistral 2.4.8 SDKs, `requests` (adapter replaced), the real
