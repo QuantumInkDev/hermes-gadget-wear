@@ -12,8 +12,10 @@ history, notification taps and server restarts (I1, §9.1–§9.2, §9.6); defin
 code-point continuation (I2, §9.4); adds an output-routing and walking-controls contract (I3, §9.7, §11); and
 makes the Minor precision corrections listed in the round-1 report. Unchanged sections keep their meaning.
 
-Revision 2 (V2 input stage): adds the explicit activation-scope amendment (§12.1). No other contract section changes in this
-step and no stage is accepted by this revision.
+Revision 2 (V2 input stage): adds the explicit activation-scope amendment (§12.1), the V2 STT outcome table that §12.1 delegates to V2
+(§8.1a) and the V2 INTERPRETATION REGISTER (§18). Every frozen requirement keeps its original wording; where the private source
+implementation had to choose, §18 quotes the original text, states why a choice was unavoidable, and names the boundary tests. No stage
+is accepted by this revision: the INPUT half is a private source implementation, both flags default false, nothing is activated.
 
 Labels used throughout:
 
@@ -154,6 +156,8 @@ Full witness hash lists: `.local/canonical-voice-design/evidence/source-witnesse
 8. Latent risk, source-derived and **unproven**: for a logical Relay chat the adapter's auto-TTS probe falls
    through to the global `voice.auto_tts` default; `_should_send_voice_reply` could then synthesize (paid) a reply
    that `_play_file` cannot deliver. This must be confirmed or refuted by a registered fixture (plan V2 RED).
+   *V2 measurement (appended, original text above unchanged):* confirmed on the registered rig. A Relay TEXT turn with
+   `voice.auto_tts` on reached the TTS tool once (RED `tests/test_relay_voice_autotts.py`); the §12.1 guard makes it zero (§18, I-12).
 9. No identity-addressed canonical read exists. History is read by position (`read_native_history_fragment`),
    and public message ids are one-way hashes kept in a bounded, oldest-first-evicted alias table. Message-
    addressed deliberate playback therefore needs a minimal reviewed core display seam (§9.2). [SRC]
@@ -640,6 +644,24 @@ something could actually be sent (M1). The seam (core, PROPOSED):
 
 Empty/whitespace transcript → `empty`; over-limit → `too_long` (text discarded, never truncated); command-like
 text is **not** filtered here (core classification refuses it at admission, §8.3).
+
+### 8.1a STT outcome table (V2, reviewed contract; M10)
+
+The core seam answers `(state, provider)`; the bridge answers the wire `(state, reason, provider)` exactly as below, parametrized over all
+32 pairs in `tests/test_relay_voice_wire.py` (no new wire value). Anything outside the closed vocabularies is `unknown` / `unknown`.
+
+| core state | provider `not_started` | `completed` / `failed_after_send` | `unknown` |
+| --- | --- | --- | --- |
+| `transcribed`, `empty`, `too_long` | same state | same state | same state |
+| `unavailable` | `failed(stt_unavailable)` | `failed(provider_failed)` | `unknown` |
+| `failed`, `timeout` | `failed(provider_failed)` | `failed(provider_failed)` | `unknown` |
+| `refused` | `revoked` | `revoked` (withheld, still billed) | `revoked` |
+| `cancelled` | `failed(interrupted)` | `unknown` | `unknown` |
+
+A `refused` result while the bridge's own S4 recheck still holds is `failed(stt_unavailable)`, not `revoked`; an unreadable grant document
+is never a revocation (nothing is delivered, nothing is erased). The wire `provider` of a row never says `not_started` when anything may
+have left, and `in_flight` exists only between the durable `before_send` commit and the answer. A seam answer that is not a recognised value
+is `failed` / `unknown`, never `not_started`; an answer that cannot be stored is marked `unknown`.
 
 ### 8.2 Client persistence and admission order (normative)
 
@@ -1257,3 +1279,34 @@ No material owner decision is required to implement this design within the appro
 across devices, history, notification taps and restarts, concise two-to-three-sentence speech with exact More,
 and earbuds-preferred routing are approved behaviour and are specified here as required, not optional. A
 model-summarized concise mode (alternative J) is not part of this design.
+
+## 18. V2 input interpretation register (private source implementation; reviewed with the V2 task)
+
+Every place where the INPUT source implementation had to choose is listed here: the original wording (quoted, unchanged above), the
+choice, why a choice was unavoidable, and the boundary tests (SDK `tests/`, `test_relay_voice_*.py`). Nothing here adds a wire member,
+enum value, permission, method or limit, and none of it is acceptance of any provider, profile, host or device. A reviewer may reject
+any entry; an entry never overrides the quoted requirement.
+
+| # | Original wording | Choice | Why unavoidable | Boundary tests |
+| --- | --- | --- | --- | --- |
+| I-1 | §6.2 "`local_fallback` is a boolean only; no provider names, keys, models or paths are disclosed." (example `true`); §8.1 the seam tries "the already installed and already cached local `faster-whisper` backend once". | `input.local_fallback` is **`false`** in V2. It is NOT derived from importing the Python module. | The key must carry a boolean. `true` would assert runtime facts (backend installed, model cached, launcher qualified, the actual profile) that a source stage cannot have; an import probe proves none of them. `false` claims nothing and stays truthful. The seam's own one installed-only fallback is untouched and is reported where it happened, as `source: "local_fallback"`. Only a later reviewed per-profile activation with that evidence may change the value. | `test_local_fallback_is_never_claimed_from_an_import_or_a_cache_the_server_cannot_see`, `test_info_is_the_exact_documented_dto` |
+| I-2 | §6.3 "`duration_ms` equals `frames × 20` (Opus) or `bytes/32` (PCM, stock formula)"; params `duration_ms:int`. | PCM `duration_ms = bytes // 32` (integer floor); Opus exactly `frames × 20`. The byte limits (min 8,000 B = stock `bytes < 8000` / server `0.25 s`, cap 1,920,000 B = `16000*2*60`) are enforced on bytes, not on the rounded value. | Stock has no integer-ms: the server compares float seconds (`len/2/rate` < `MIN_UTTERANCE_S`), the client compares bytes. An `int` DTO needs one rounding rule. Floor is the only rule that keeps the stock minimum boundary exact (ceil would accept 7,998 B, nearest 7,984 B, both refused by stock); frames of 2..640 even bytes can end between whole milliseconds. A client must send the floor; the floor ± 1 is `audio_incomplete`. | `test_floor_is_the_only_integer_rounding_that_keeps_the_stock_minimum_byte_boundary`, `test_byte_caps_stay_exact_and_floor_never_decides_them`, `test_fractional_millisecond_totals_floor_and_the_client_must_send_the_floor`, `test_minimum_duration_is_250_ms`, `test_opus_duration_is_exact_frames_times_20` |
+| I-3 | §8.4 internal `discard_pending` → "on result `discarded`"; §6.3 discard "started work cannot be cancelled and its transcript is erased on arrival"; `discarded` = "Client discarded"; `provider` ∈ `not_started`, `in_flight`, `completed`, `failed_after_send`, `unknown`. | The internal-only `discard_pending` row is answered on the wire as `state: "discarded"` with `provider: "in_flight"`; when the provider answers the row becomes `discarded` with the provider's truth (`completed`, `failed_after_send` or `unknown`). | `discard` must return a `CaptureResult`. Both values already exist in the approved capture contract; the code adds no enum and no field. `transcribing` would hide that the discard was accepted; `not_started` would be false. | `test_the_code_vocabularies_equal_the_approved_tables_exactly`, `test_every_internal_row_state_renders_only_approved_wire_values_including_discard_pending`, `test_pre_seal_and_mapped_outcomes_emit_only_approved_values`, `test_discard_while_the_provider_is_working_erases_on_arrival_and_never_claims_cancellation` |
+| I-4 | §12.1 "The mapping from each `(state, provider)` pair to the wire `state`/`reason` is V2/V3's reviewed contract: no new wire value is introduced." | The §8.1a table (also SDK `docs/relay-voice.md`). Authority-lost (`refused`) is `revoked`; `refused` while the bridge's own recheck still holds is `failed(stt_unavailable)`; any possibly-sent outcome is never `not_started`. | The document delegates exactly this table to V2. | `test_table_is_total_over_the_closed_core_vocabularies`, `test_nothing_possibly_billed_is_ever_reported_as_not_started`, `test_reviewed_rows`, `test_anything_outside_the_vocabulary_is_unknown_and_maybe_billed`, `test_each_provider_outcome_maps_to_one_truthful_state_with_one_call` |
+| I-5 | §7.1 "a `start` naming a stream that is live on the session → `conflict`"; §7.3 "≤ 1 live capture per session ... Excess → `busy`". | A second start naming the live stream is `conflict`; any other second live capture is `busy`. | Both rules fire for the same request; an order is needed. | `test_one_live_capture_per_session_and_a_repeated_start_is_idempotent_or_conflict` |
+| I-6 | §6.1 ids; silent on a repeated `start`. | A start identical to the live capture's own parameters returns the same answer; the same id with different parameters is `conflict`. | A lost `start` response would otherwise strand the capture (the client could neither retry nor proceed). No new authority. | same test |
+| I-7 | §6.1 "reuse of one value across kinds is `conflict`". | Enforced at `capture.start` (a new capture id that already is a voice record or a journaled turn request id of that device and key). The reverse (a later turn request id equal to an earlier capture id) is NOT enforced in V2: the journal path is unchanged. | The journal path is a reviewed single owner; changing it is out of scope. Collision needs a client to reuse a UUIDv7 deliberately. **Residual, unresolved.** | `test_a_capture_id_is_never_an_existing_turn_request_id`, `test_a_capture_id_cannot_be_reused_after_it_was_sealed` |
+| I-8 | §7.1 "no `finish` by `deadline_ms`, socket close, enrollment change or binding retirement before seal → capture dropped (no record, no provider call)". | Also dropped on any VERIFIED loss of grant, key, namespace or membership at `finish`/`discard` or at upkeep; an unreadable grant document drops nothing. | Holding up to ~2 MB of unsealed audio for a revoked author until the deadline helps no one. | `test_s3_finish_rechecks_everything_before_the_record_and_the_provider`, `test_s2_does_no_io_and_a_revoked_grant_is_caught_at_the_seal_not_the_frame` |
+| I-9 | §4.1 layer 4 "channel 5 is enabled for the socket only after layer 3 succeeded on this socket generation". | `capture.start` itself does not require a prior info; frames do (they are dropped at the hub). | The layer gates frames, not the RPC; a start without info can never be sealed (`audio_incomplete`), so nothing can be billed. | `test_channel_5_is_dropped_until_info_succeeded_on_this_socket_generation` |
+| I-10 | §7.3 "long-polls hold one slot". | A `result` with `wait_ms > 0` runs as its own task so the receive loop keeps reading (frames, other requests). | The hub awaits relay requests inline; an inline 20 s wait would delay a new press by up to 20 s. | `test_result_is_a_bounded_long_poll_that_does_not_block_the_socket`, `test_whole_exchange_through_the_real_hub_receive_path` |
+| I-11 | §7.4 "Hourly per device 30 STT ... checked before accounting". | An "attempt" is a durable sealed row (including later decode failures and restart interruptions) in a sliding hour on `sealed_at_ms`. | The durable row is the only accounting. | `test_hourly_budget_is_30_per_device_refused_before_accounting`, `test_hourly_budget_is_per_device_checked_before_accounting_and_slides` |
+| I-12 | §2.8 / §12.1 "Logical-chat auto-TTS guard (R-6)". | Guard in `GadgetAdapter._should_auto_tts_for_chat`; stock chats keep the inherited default. | Measured RED (1 TTS call) on the registered rig before the fix. | `test_auto_tts_default_on_never_reaches_a_tts_provider_for_a_logical_relay_chat`, `test_auto_tts_guard_is_scoped_to_logical_chats` |
+| I-13 | §5.2 S4 "if denied, key changed or namespace differs → `revoked`, transcript erased". | Only a VERIFIED denial revokes. An unreadable authority document is neither a revocation nor delivery: the transcript is kept, `result` answers `permission_denied` until readable; if the seam itself could not authorize after the answer, the result is withheld as `failed(stt_unavailable)` and stays billed. | "Denied" must be distinguishable from "cannot tell". | `test_unreadable_authority_is_not_a_revocation_but_nothing_is_delivered_until_it_is_readable`, `test_if_the_seam_itself_cannot_read_authority_after_the_answer_the_result_is_withheld_but_billed`, `test_s4_authority_lost_while_the_provider_answers_stores_no_transcript` |
+| I-14 | §12.1 results "reported as `failed`/`unknown`, never `synthesized`/`not_started`". | A seam answer outside the closed vocabularies, or a raised seam call after a send, is `failed`/`unknown` (wire `unknown`); an answer that cannot be stored is marked `unknown` while the process lives and by the next start otherwise. | No provider state may be invented. | `test_a_hostile_seam_answer_never_becomes_not_started`, `test_an_unrecognised_answer_is_failed_unknown_never_not_started`, `test_an_answer_that_cannot_be_stored_is_marked_unknown_while_the_process_lives`, `test_crash_while_the_answer_is_being_stored_is_unknown_after_the_restart` |
+| I-15 | §6.2 exact-key DTO; "`output`... may be `null`". | `output` is always `null`; speak methods are unlisted and `unsupported`; the documented `limits` object is served unchanged (its speech numbers are inert constants). | Output does not exist yet; the exact key set must not change between V2 and V3. | `test_output_is_never_advertised_from_its_flag_alone`, `test_info_is_the_exact_documented_dto` |
+| I-16 | §12.1 "validated like `CoreBridge`: exact dataclass fields ... ABI, with parameter kinds and defaults exactly as implemented". | The int `1` only (not `True`), all four frozen value types for both directions, exact parameter names/kinds/defaults and coroutine-ness. | "Exact". | `tests/test_relay_voice_core.py` (31 tests) |
+| I-17 | §10.3 / §13 private storage, `synchronous=FULL`. | 128 MiB page ceiling (`busy`), strict schema/namespace pin (never borrowed or reset), an unexpected temp-directory entry or a loose mode makes voice unavailable, any open failure leaves the rest of Relay working. | A fail-closed policy needs concrete limits; voice must not break stock Relay. | `tests/test_relay_voice_store.py`, `test_anything_unexpected_in_the_private_directory_fails_closed`, `test_a_broken_voice_seam_probe_leaves_voice_unavailable_and_the_rest_of_relay_working` |
+| I-18 | §5.2 / existing relay service. | A request the conversation bridge does not receive because the Relay service answers first (changed profile namespace, an O5-only device) keeps that service's existing answer (`unsupported`/`permission_denied`); upkeep then ends the capture. | Unchanged existing behaviour, pinned so it is not mistaken for a voice decision. | `test_s1_start_re_derives_grant_key_namespace_pairing_and_membership`, `test_listing_follows_flag_seam_and_grant` |
+
+Not claimed anywhere above: that any local backend, provider, model, voice, codec on a real device or any profile works; V1-P, M1,
+other-box, native or physical acceptance; or that the Windows additions are more than simulated-denial and API-double tests.

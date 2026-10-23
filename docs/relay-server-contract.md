@@ -205,6 +205,14 @@ requests are never auto-resubmitted. Retain idempotency tombstones for at least 
 days after terminal settlement; after that return `expired` for the old timestamped
 request, never treat it as new.
 
+### Optional canonical conversation voice input (separate contract)
+
+`relay.voice.info` and `relay.voice.capture.{start,finish,result,discard}` plus binary channel 5 are an OPTIONAL, separately gated
+input-only extension (flags `enable_relay_voice_input`, default false; the exact core voice seam; usable private storage). They add no
+member to `relay.info.limits`, no permission string and no change to the methods above; a transcript is a result that the author submits
+through the unchanged `relay.turn.submit`. Contract: [relay-canonical-voice-design.md](relay-canonical-voice-design.md) (§6-§8, §12) and
+the SDK `docs/relay-voice.md`. Output (speech) is a later stage.
+
 ## Optional outbox and attachments
 
 The first increment advertises `limits.outbox_cursor=false`, `page_items=50`,

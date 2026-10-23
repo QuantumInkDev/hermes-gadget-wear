@@ -34,3 +34,16 @@ The reduced token reads its permissive control and receives exact 0xC0000022 for
 private leaf through fresh relative opens. This is the stated leaf-DACL test boundary,
 not another real account's full-path access. Existing installed source/ACLs/listeners and
 optional flags remain unchanged. Per-profile rollout preflight is still required.
+
+SDK canonical conversation voice INPUT (V2, private incremental source delta over the Task10 fix1 SDK `286e1348`; **not** a standalone
+stock-v0.2.0 installer, and no standalone patch `0007` is claimed here; folding it into the final clean series remains a later explicit
+obligation). Both flags (`enable_relay_voice_input`, `enable_relay_voice_output`) default false and nothing is activated. The input half
+adds `relay.voice.info` and `relay.voice.capture.{start,finish,result,discard}`, strict channel-5 uplink assembly, a private durable
+paid-attempt store (`relay-voice.sqlite3`), exactly one accounted configured STT call per sealed capture, authority checkpoints S1-S6,
+content-free logs, the exact core voice-seam validation, the logical-chat auto-TTS guard and Windows verifier coverage of the new
+storage. A transcript is a result that the author submits through the unchanged `relay.turn.submit`. Stock channels 1-4, `audio.start`
+and `on_utterance` are unchanged. Source tests use the registered rig with a synthetic socket and a synthetic provider boundary only:
+they prove protocol, authority, accounting and refusal behaviour, NOT any provider, model, voice, local backend (`input.local_fallback`
+is `false` and is never inferred from an import), installed profile, other host, device or the universal V1-P / initialized-plugin
+inspection. The core patch `0002` is unchanged by this stage. Interpretations and their boundary tests: design section 18;
+contract: SDK `docs/relay-voice.md`.
