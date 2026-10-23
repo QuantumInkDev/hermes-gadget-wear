@@ -71,6 +71,12 @@ admission route; `NativeAdmissionOptions` stays TEXT-only; ordinary voice/STT/TT
   `field` is `locate_rows` / `locate_deadline`: only a completed search reports absence. The existing-source
   analogs also take `adapter` and `source`, as every existing-source reader does. The Relay SDK's 8,192/65,536
   response-bound regression for existing-source history is not addressed here.
+* `SessionAuthority.read_delegated_request_use(actor, *, adapter, source, request_id, authorize)` (`NATIVE_DELEGATED_REQUEST_USE_VERSION = 1`; the
+  delegation ABI stays 3) — a content-free boolean: has the caller's OWN native principal a live admission, or a deleted session's retained terminal
+  tombstone, with this request id on ANY session of the profile. Read-only, no delegation needed (it reveals only what the caller itself did), no
+  session, admission, payload or owner named, never restores a route. The admission identity stays `(principal, target, request_id)`; this is a
+  cross-target read for a consumer that must keep one request-id space distinct from another kind (the Relay voice `capture_id` vs an existing-
+  conversation turn id, fix round 2).
 
 Send accounting is fail-closed: a hooked SDK is proven to send through the client that carries the gate before it
 is called and must produce exactly one gated send, else the result is `failed` with `provider='unknown'` — on the

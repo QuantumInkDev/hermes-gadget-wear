@@ -147,10 +147,25 @@ index ae4a30e6e0d0904bd1aa873e832243afc757905d..9041db42880f5f1be90a298fb975f702
          self, text: str, *, voice: Optional[str] = None, model: Optional[str] = None,
          format: str = "opus", **extra: Any,
 diff --git a/gateway/session_authority.py b/gateway/session_authority.py
-index 14703329aef89b5516dc67f6379d3f284627d99c..7741eb05aacf82bdf9b232d4e2c9b06ecef052a3 100644
+index 14703329aef89b5516dc67f6379d3f284627d99c..15b9e5d37790f055c9784fb48eb240800ea41d03 100644
 --- a/gateway/session_authority.py
 +++ b/gateway/session_authority.py
-@@ -348,6 +348,40 @@ class SessionAuthority:
+@@ -233,6 +233,14 @@ class SessionAuthority:
+         return await read_delegated_receipt(self, actor, ref, adapter=adapter, source=source, request_id=request_id,
+                                             authorize=authorize)
+ 
++    # Whether the caller's OWN principal already spent a request id on any session (content-free boolean; gateway/session_delegation.py).
++    NATIVE_DELEGATED_REQUEST_USE_VERSION = 1
++
++    async def read_delegated_request_use(self, actor, *, adapter, source, request_id, authorize):
++        from gateway.session_delegation import read_delegated_request_use
++        return await read_delegated_request_use(self, actor, adapter=adapter, source=source, request_id=request_id,
++                                                authorize=authorize)
++
+     # Read-only existing (non-Relay) session projections for a consumer's own scoped candidates
+     # (gateway/session_existing.py): never restores, adopts or discovers a session.
+     NATIVE_EXISTING_SOURCES_VERSION = 2
+@@ -348,6 +356,40 @@ class SessionAuthority:
          from gateway.session_history_segments import check_history_position
          return check_history_position(self, actor, ref, authorize=authorize, position=position)
  
@@ -191,6 +206,56 @@ index 14703329aef89b5516dc67f6379d3f284627d99c..7741eb05aacf82bdf9b232d4e2c9b06e
      async def read_native_admissions(self, actor, ref, *, adapter, source, authorize, after=0, limit=25):
          from gateway.session_admission_projection import read_native_admissions
          return await read_native_admissions(self, actor, ref, adapter=adapter, source=source,
+diff --git a/gateway/session_delegation.py b/gateway/session_delegation.py
+index f4ccdbbffa57523e3f00a06fdfdb00bdf886c51a..76e8f6ba23d0ceb2462235c1f351c36c06c7b1b1 100644
+--- a/gateway/session_delegation.py
++++ b/gateway/session_delegation.py
+@@ -583,3 +583,45 @@ async def read_delegated_receipt(authority, actor, ref, *, adapter, source, requ
+     result = await asyncio.to_thread(read)
+     prove()
+     return result
++
++
++# -- the caller's OWN request id, on any session (v1) -----------------------------------------------------------
++
++
++NATIVE_DELEGATED_REQUEST_USE_VERSION = 1
++
++
++async def read_delegated_request_use(authority, actor, *, adapter, source, request_id, authorize):
++    """Whether the caller's OWN native principal already holds an admission with ``request_id`` on ANY session of this profile: a live
++    ``session_admissions`` row, or a deleted session's retained terminal tombstone (the same "an identity key is spent across targets"
++    reading as ``terminal_api_admissions``). A content-free boolean, read-only, bounded to the caller's own principal; it names no session,
++    admission, payload or owner, never restores a route and needs no delegation (it reveals only what the caller itself did). The admission
++    identity itself stays ``(principal, target, request_id)``: this is a cross-target READ for a consumer that must keep one request-id space
++    distinct from another kind (design 6.1), not a new admission rule."""
++    from gateway.session_authorities import require_serving
++    from gateway.session_native_admission import native_principal, source_owner
++
++    def prove():
++        require_serving(authority)
++        authorize()
++        if actor.profile_id != authority.profile_id:
++            raise RuntimeStoreError('profile_mismatch')
++        if 'session:read' not in actor.capabilities or actor.subject != native_principal(source):
++            raise RuntimeStoreError('permission_denied')
++        source_owner(authority, source, adapter)
++    prove()
++    if not isinstance(request_id, str) or not 0 < len(request_id) <= 1024:
++        raise RuntimeStoreError('invalid_params')
++
++    def read():
++        from hermes_state_terminal import ADMISSION_PREFIX
++        with authority.db._read_ctx() as conn:
++            if conn.execute('SELECT 1 FROM session_admissions WHERE principal_id=? AND request_id=? LIMIT 1',
++                            (actor.subject, request_id)).fetchone() is not None:
++                return True
++            return conn.execute("SELECT 1 FROM state_meta WHERE key GLOB ? AND json_extract(value, '$.principal_id')=? "
++                                "AND json_extract(value, '$.request_id')=? LIMIT 1",
++                                (ADMISSION_PREFIX + '*', actor.subject, request_id)).fetchone() is not None
++    found = await asyncio.to_thread(read)
++    prove()
++    return found
 diff --git a/gateway/session_native_voice.py b/gateway/session_native_voice.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..92c77b8d8950909ff6579df78044ea40f2ee3cbd
@@ -11732,6 +11797,158 @@ index 0000000000000000000000000000000000000000..9cd4424a272052020bcc6782b9b0baac
 +    with rest.oauth_wire(monkeypatch, oauth):
 +        credentials = resolve_xai_http_credentials(prefer_api_key=True)
 +    assert credentials['api_key'] == '' and 'synthetic oauth failure' in caplog.text  # stock still logs it
+diff --git a/tests/gateway/test_relay_session_request_use.py b/tests/gateway/test_relay_session_request_use.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..430f108af2310d6fb72cc583ec3d77ee44f69e2e
+--- /dev/null
++++ b/tests/gateway/test_relay_session_request_use.py
+@@ -0,0 +1,146 @@
++"""``read_delegated_request_use``: has the caller's OWN native principal already spent a request id on ANY session of this profile?
++
++The core's admission identity is ``(principal, target session, request_id)`` and ``read_delegated_receipt`` is tied to ONE session, so after a rebind it
++cannot answer for an earlier conversation. This read answers across targets for the caller's own principal only, including a deleted session's retained
++tombstone, as a content-free boolean. Real GatewayRunner / SessionAuthority / registered Gadget adapter / SessionDB / owner control channel
++(``test_relay_session_delegation`` fixtures); only provider execution and network delivery are replaced.
++"""
++import inspect
++
++import pytest
++
++from gateway.session_contract import SessionRef, Submission
++from hermes_state_runtime import RuntimeStoreError
++from tests.gateway.test_relay_session_delegation import (Devices, READ_SUBMIT, delegate, denied, home_rig, owned_local)  # noqa: F401  (fixture)
++
++
++async def second_session(owner, tmp_path, name='owner-local-2'):
++    created = await owner.rpc('session.create', request_id=name, cwd=str(tmp_path), model='fixture', toolsets=[])
++    assert 'result' in created, created
++    return created['result']['session_id']
++
++
++async def used(rig, devices, device, request_id):
++    return await rig.authority.read_delegated_request_use(devices.actor(device), adapter=rig.adapter, source=devices.source(device),
++                                                          request_id=request_id, authorize=lambda: None)
++
++
++async def admit(rig, devices, owner, sid, request_id, device='phone'):
++    ref = SessionRef(rig.authority.profile_id, sid)
++    actor = devices.actor(device)
++    await rig.authority.attach(actor, ref)
++    receipt = await rig.authority.submit(actor, Submission(request_id, ref, {'text': 'hello ' + request_id}, 'queue'))
++    await rig.settle(ref)
++    return ref, receipt
++
++
++def test_the_seam_has_an_exact_version_and_signature(home_rig):
++    authority = type(home_rig.authority)
++    assert authority.NATIVE_DELEGATED_REQUEST_USE_VERSION == 1
++    assert list(inspect.signature(authority.read_delegated_request_use).parameters) == [
++        'self', 'actor', 'adapter', 'source', 'request_id', 'authorize']
++    from gateway import session_delegation
++    assert session_delegation.NATIVE_DELEGATED_REQUEST_USE_VERSION == 1 and session_delegation.NATIVE_SESSION_DELEGATION_VERSION == 3  # ABI 3 untouched
++
++
++@pytest.mark.asyncio
++async def test_a_request_id_spent_on_one_session_is_seen_from_every_other_and_receipt_alone_is_not(home_rig, tmp_path, monkeypatch):
++    rig = home_rig
++    channel, owner, first = await owned_local(rig, tmp_path, monkeypatch)
++    try:
++        second = await second_session(owner, tmp_path)
++        devices = Devices(rig, tmp_path)
++        devices.scope((first, 'local'), (second, 'local'))
++        for sid in (first, second):
++            assert 'result' in await delegate(owner, sid)
++        assert await used(rig, devices, 'phone', 'turn-1') is False
++        ref, receipt = await admit(rig, devices, owner, first, 'turn-1')
++        assert await used(rig, devices, 'phone', 'turn-1') is True                                       # no session named, no delegation consulted
++        assert await used(rig, devices, 'phone', 'turn-2') is False
++        # the receipt read is tied to ONE conversation: for the other session the same id is simply absent
++        other = SessionRef(rig.authority.profile_id, second)
++        found = await rig.authority.read_delegated_receipt(devices.actor('phone'), other, adapter=rig.adapter, source=devices.source('phone'),
++                                                           request_id='turn-1', authorize=lambda: None)
++        assert found.state == 'absent'
++        assert (await rig.authority.read_delegated_receipt(devices.actor('phone'), ref, adapter=rig.adapter, source=devices.source('phone'),
++                                                           request_id='turn-1', authorize=lambda: None)).receipt.admission_id == receipt.admission_id
++    finally:
++        await channel.stop()
++
++
++@pytest.mark.asyncio
++async def test_it_answers_only_for_the_callers_own_principal(home_rig, tmp_path, monkeypatch):
++    rig = home_rig
++    channel, owner, sid = await owned_local(rig, tmp_path, monkeypatch)
++    try:
++        devices = Devices(rig, tmp_path)
++        devices.scope((sid, 'local'))
++        assert 'result' in await delegate(owner, sid)
++        await admit(rig, devices, owner, sid, 'phone-turn')
++        assert await used(rig, devices, 'phone', 'phone-turn') is True
++        assert await used(rig, devices, 'watch', 'phone-turn') is False                                  # another device's principal never sees it
++        # the owner's own submission id is a different principal's: not visible to the device either
++        assert 'result' in await owner.rpc('prompt.submit', session_id=sid, submission_id='owner-turn', text='mine')
++        await rig.settle(SessionRef(rig.authority.profile_id, sid))
++        assert await used(rig, devices, 'phone', 'owner-turn') is False
++    finally:
++        await channel.stop()
++
++
++@pytest.mark.asyncio
++async def test_a_deleted_sessions_retained_tombstone_still_spends_the_id_and_a_revoked_delegation_changes_nothing(home_rig, tmp_path, monkeypatch):
++    rig = home_rig
++    channel, owner, sid = await owned_local(rig, tmp_path, monkeypatch)
++    try:
++        devices = Devices(rig, tmp_path)
++        devices.scope((sid, 'local'))
++        grant = (await delegate(owner, sid))['result']
++        await admit(rig, devices, owner, sid, 'gone-turn')
++        revoked = await owner.rpc('session.delegation.revoke', session_id=sid, delegation_id=grant['delegation_id'])
++        assert revoked['result']['detached'] == 1
++        assert await used(rig, devices, 'phone', 'gone-turn') is True                                    # own id use, not session access
++        assert rig.authority.db.delete_session(sid)
++        with rig.authority.db._read_ctx() as conn:
++            assert conn.execute("SELECT COUNT(*) FROM session_admissions WHERE request_id='gone-turn'").fetchone()[0] == 0   # retired from the live table
++        assert await used(rig, devices, 'phone', 'gone-turn') is True                                    # the tombstone still answers
++        assert await used(rig, devices, 'watch', 'gone-turn') is False and await used(rig, devices, 'phone', 'other') is False
++    finally:
++        await channel.stop()
++
++
++@pytest.mark.asyncio
++async def test_it_is_read_only_and_refuses_the_wrong_actor_source_capability_and_input(home_rig, tmp_path, monkeypatch):
++    rig = home_rig
++    channel, owner, sid = await owned_local(rig, tmp_path, monkeypatch)
++    try:
++        devices = Devices(rig, tmp_path)
++        devices.scope((sid, 'local'))
++        assert 'result' in await delegate(owner, sid)
++        await admit(rig, devices, owner, sid, 'kept')
++
++        def snapshot():
++            with rig.authority.db._read_ctx() as conn:
++                return (conn.execute('SELECT COUNT(*) FROM session_admissions').fetchone()[0], conn.execute('SELECT COUNT(*) FROM state_meta').fetchone()[0])
++        before = snapshot()
++        call = rig.authority.read_delegated_request_use
++        phone, source = devices.actor('phone'), devices.source('phone')
++        assert await call(phone, adapter=rig.adapter, source=source, request_id='kept', authorize=lambda: None) is True
++        with denied():
++            await call(devices.actor('watch'), adapter=rig.adapter, source=source, request_id='kept', authorize=lambda: None)   # actor != source principal
++        with denied():
++            await call(devices.actor('phone', ('session:submit',)), adapter=rig.adapter, source=source, request_id='kept', authorize=lambda: None)
++        with denied('profile_mismatch'):
++            from gateway.session_contract import Principal
++            await call(Principal(phone.subject, 'another-profile', phone.capabilities, phone.transport_id), adapter=rig.adapter, source=source,
++                       request_id='kept', authorize=lambda: None)
++        for bad in ('', 5, None, 'x' * 1025):
++            with denied('invalid_params'):
++                await call(phone, adapter=rig.adapter, source=source, request_id=bad, authorize=lambda: None)
++
++        def refuse():
++            raise RuntimeStoreError('stale_authority')
++        with denied('stale_authority'):
++            await call(phone, adapter=rig.adapter, source=source, request_id='kept', authorize=refuse)           # the consumer's own authority fence
++        assert snapshot() == before                                                                              # nothing was written, restored or retired
++    finally:
++        await channel.stop()
 diff --git a/tests/tools/native_command_fixtures/big_transcript.py b/tests/tools/native_command_fixtures/big_transcript.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..c9511ccadf1b2408be717f53521eb2d0c41bf79a
