@@ -1,5 +1,38 @@
 # Pets: verified atlas contract and missing states
 
+## Pet Factory skill — 2026-10-23
+
+The reusable [Pet Factory skill](../skills/hermes-pet-factory/SKILL.md) creates or
+updates a complete Hermes/Quantum Relay character pack: pixel portraits, all nine
+desktop states and three watch companion states, a signature in the current
+waiting slot, a proposed SOUL diff, and an existing or designed ElevenLabs voice.
+It asks all missing material questions together, then stops at actual look,
+motion, SOUL, voice and target-install previews for approval. Changed artifacts
+invalidate their recorded approval; original art and profile configuration remain
+available for rollback.
+
+Invoke it naturally: **Use Pet Factory to create a new pet for my research
+profile**, or explicitly use `$hermes-pet-factory`. The local installation covers
+the global Codex/T3 and Claude skill roots, plus default Hermes and every existing
+local Hermes profile. Other machines need their own skill installation; no remote
+installation is claimed by this entry.
+
+For another machine, copy this self-contained skill directory and run
+`python scripts/install_skill.py --discover-local` from that directory to preview
+the destinations, then add `--apply`. The installer refuses to replace a different
+existing skill. Explicit `--root <skills-directory>` and `--mode copy` support
+other layouts and Windows. Use Python 3.11+; create a skill-local virtual environment
+and install `requirements.txt` for packing/previews. The installer and voice helper
+use the standard library. Keep personal factory runs outside source control.
+
+Verification: 14 offline tests pass for packing, all-state previews, alpha/mouth
+bounds, approval invalidation, safe portable installation and bounded no-retry voice
+requests. Skill metadata validation passes. A synthetic browser check paints all
+12 states/69 frames without external images and preserves the watch cell aspect
+ratio. The portable archive and repository snapshot match the installed skill's
+11 source files. No real generation, synthesis, pet/profile mutation or device
+delivery was performed for this skill work; each future pet retains those gates.
+
 Optional local metadata `gadgetBasePath` selects a separately validated Gadget base
 while retaining the regular `spritesheetPath` and desktop atlas bytes. The paired SDK
 and staging changes below implement the [preserving delivery plan](superpowers/plans/2026-10-18-pet-gadget-base.md).

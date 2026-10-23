@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pet Factory"
+  short_description: "Create complete Hermes and Relay pet packs"
+  default_prompt: "Use $hermes-pet-factory to create or update a profile pet, portraits, SOUL and ElevenLabs voice with previews and approvals."
