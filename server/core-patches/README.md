@@ -333,6 +333,12 @@ path except the audio file a successful synthesis wrote, and the stock provider 
 during a native call. `provider` is billing evidence about the configured remote provider (`not_started`,
 `completed`, `failed_after_send`, `unknown`).
 
+*Qualification follow-up (source and controller tooling only).* The patch now also carries
+`tests/gateway/test_native_voice_profile_integration.py`: sentinel ElevenLabs/STT single-profile shapes over the real seam, the
+installed ElevenLabs SDK (network bytes synthetic), stock config/secret scope and the registered authority as `authorize`. It is
+source coverage, not current-profile, plugin-registry, tracer-provider or runtime proof. Controller host and metadata tools were
+authored beside it but are not part of this patch and have not been run.
+
 Focused evidence is in the stage reports, not in this directory: warning-strict canonical-runner suites over the
 real OpenAI SDK, the real lock-pinned ElevenLabs 1.59.0, Edge 7.2.7 and Mistral 2.4.8 SDKs, `requests` (adapter replaced), the real
 xAI resolver, credential pool and token store (OAuth HTTP transport replaced) with only the network transport (for Edge, the socket) replaced, the real ffmpeg on local synthetic audio, the registered core

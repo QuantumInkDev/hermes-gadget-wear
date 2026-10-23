@@ -114,18 +114,27 @@ category below on the registered fixtures, then ONE source review and a current-
 
 | Provider | Exit gate |
 | --- | --- |
-| STT Mistral | real installed SDK transport, one gated send, zero hidden retries — **source delivered** (patch 0002, V1-P Task 1; review pending): pinned `mistralai` 2.4.8, a configured `stt.prompt` the SDK cannot carry is refused UNSENT |
+| STT Mistral | real installed SDK transport, one gated send, zero hidden retries — **source delivered** (patch 0002, V1-P Task 1; source dependency admitted, qualification open): pinned `mistralai` 2.4.8, a configured `stt.prompt` the SDK cannot carry is refused UNSENT |
 | STT command and plugin (including `local_command`) | native-once capability adapter: no implicit install/download, explicit cancellation and output bounds; incapable custom implementations refuse UNSENT |
-| TTS MiniMax / xAI / Gemini | instrument each actual HTTP boundary, including auxiliary transformations (tag rewrite calls); no hidden second paid request; fail closed before a disallowed send — **source delivered** (patch 0002, V1-P Task 2; review pending): the gate precedes the one `requests.post` in `_post_json`; a native call makes zero auxiliary tag calls (xAI keeps its local pass, Gemini the unchanged transcript; the script differs from an ordinary call's) |
-| TTS Mistral | real installed SDK boundary and zero-retry proof — **source delivered** (patch 0002, V1-P Task 1; review pending) |
+| TTS MiniMax / xAI / Gemini | instrument each actual HTTP boundary, including auxiliary transformations (tag rewrite calls); no hidden second paid request; fail closed before a disallowed send — **source delivered** (patch 0002, V1-P Task 2; source dependency admitted, qualification open): the gate precedes the one `requests.post` in `_post_json`; a native call makes zero auxiliary tag calls (xAI keeps its local pass, Gemini the unchanged transcript; the script differs from an ordinary call's) |
+| TTS Mistral | real installed SDK boundary and zero-retry proof — **source delivered** (patch 0002, V1-P Task 1; source dependency admitted, qualification open) |
 | TTS NeuTTS / Kitten / Piper | installed AND cached assets only, no downloads, bounded local execution, truthful `not_started` remote accounting, no paid-provider fallback — NeuTTS dependency rows corrected at **source** level (own transformers 5.1.0 / normal phonemizer rows; managed 3.14 stays unsupported; no usable runtime, closure, platform or cache is provisioned or proved) |
 | TTS command and plugin | the same native-once capability contract as STT; an arbitrary program cannot be certified single-attempt by a provider-name allowlist |
-| Pre-send credential freshness (xAI OAuth, M2) | refresh BEFORE the paid send with synthetic transport proof; never refresh-and-resend after a send — **source delivered** (patch 0002, V1-P Task 2; review pending): real resolver/pool/token store over a synthetic OAuth transport; an OAuth bearer without a future `exp` is refused UNSENT; the exchange is never a paid attempt and every actual OAuth request is authorization-probed on the consumer loop and a refusal is terminal for the call, including under STT auto-detect (an admitted POST may still persist its rotated token) |
+| Pre-send credential freshness (xAI OAuth, M2) | refresh BEFORE the paid send with synthetic transport proof; never refresh-and-resend after a send — **source delivered** (patch 0002, V1-P Task 2; source dependency admitted, qualification open): real resolver/pool/token store over a synthetic OAuth transport; an OAuth bearer without a future `exp` is refused UNSENT; the exchange is never a paid attempt and every actual OAuth request is authorization-probed on the consumer loop and a refusal is terminal for the call, including under STT auto-detect (an admitted POST may still persist its rotated token) |
 | Edge full range and the joiner (round-2 N2) | test a full-range (> 600 code points) Edge call with the real ffmpeg joiner and the missing-joiner outcome (`unavailable`/`not_started` before any send, no paid fallback, no silent truncation); concise ≤ 600 code points independent |
 | Auxiliary native audio (AUX-audio) | source: wrapped STT preparation (optional probe/trim skipped without a qualified launcher, required CAF/compaction, one-request eligibility), native Silk unsupported (WAV ingress), Gemini converter preflight and wrapped conversion; runtime qualification of the launcher, `afconvert`, codecs and per-spawn latency remains required and unwaived |
 
 Until V1-P passes, V1 alone is not configured-provider acceptance and V2 cannot start. The full fifteen-feature scope is
 unchanged.
+
+Qualification follow-up status (source and controller-tool authoring only; this is NOT V1-P completion and activates nothing):
+core test `tests/gateway/test_native_voice_profile_integration.py` (sentinel ElevenLabs/STT profile shapes over the real seam, the
+installed ElevenLabs SDK, stock config/secret scope and the registered authority) and three controller tools that have not been run
+(a Darwin 27 arm64 host harness, a read-only profile-metadata extractor and one detach fixture). Still required and unwaived: the
+controller's host and metadata runs, inspection of the ACTUAL initialized plugin registry and tracer provider (M1; static
+declarations or a source-registered fixture never close it), provider-real media, the NeuTTS/Kitten/Piper engine runtimes,
+other-box qualification at the per-box rollout gate, the remaining stock compatibility of Task 4 and the review of this follow-up.
+V2 stays blocked until the mandatory V1-P proof exists.
 
 ### V2 — SDK voice input (SDK patch, flags default false)
 

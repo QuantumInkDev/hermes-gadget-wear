@@ -8110,6 +8110,370 @@ index 0000000000000000000000000000000000000000..c2004e416d597997480bd15ac2780669
 +        result = await hear(support.write_wav(tmp_path / 'clip.wav'), cb)
 +    assert (result.state, result.transcript, result.source, result.provider) == ('failed', None, None, 'not_started')
 +    assert wrapped_programs(spawns) == [] and (wire.count, cb.before_send_calls, fallback) == (0, 0, [])
+diff --git a/tests/gateway/test_native_voice_profile_integration.py b/tests/gateway/test_native_voice_profile_integration.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..e58487f6470fa2bcc5430c6120fe8c4b61ce32ba
+--- /dev/null
++++ b/tests/gateway/test_native_voice_profile_integration.py
+@@ -0,0 +1,358 @@
++"""Native voice seam: profile-shaped ElevenLabs/STT integration controls (source coverage, NOT runtime or current-profile proof).
++
++What runs for real: ``synthesize_native_once`` / ``transcribe_native_once``, the stock config and ``.env`` secret-scope paths
++(``HERMES_HOME`` is the single served profile of the call, the declared contract), the stock STT auto-detect, the REAL installed
++``elevenlabs`` SDK and the real ``requests``/``httpx`` clients. Only the network bytes are synthetic (``native_voice_support`` and
++the existing ``Wire``/``RequestsWire`` seams). The registered cases run the core call under a REAL ``GatewayRunner`` /
++``SessionAuthority`` / Gadget adapter (``relay_native_support.home_rig``) whose ``authority.authorize`` is the consumer's
++``authorize`` callback. They are NOT a V2 bridge and NOT a runner voice-message dispatch: no such path exists yet.
++
++What this file does NOT prove, and cannot: the sentinels below are explicit synthetic values. A passing run says nothing about
++the real M5/GPU/Windows profiles, their credentials, their installed SDK versions/extras, their initialized plugin registry
++(a source-registered hook here is not the live registry), the process-global OpenTelemetry tracer provider (M1 stays OPEN
++until a controller inspects the ACTUAL initialized state), local-STT caches, the launcher/codecs of any host, or any provider
++header/quality. Those are UNKNOWN here and remain controller-owned gates.
++"""
++import asyncio
++import json
++import logging
++import os
++import threading
++from dataclasses import replace
++from pathlib import Path
++
++import pytest
++
++from gateway.session_contract import Principal
++from gateway.session_native_voice import synthesize_native_once, transcribe_native_once
++from hermes_state_runtime import RuntimeStoreError
++from tests.gateway import native_voice_support as support
++from tests.gateway import relay_native_support
++
++home_rig = relay_native_support.home_rig
++
++TEXT = 'Qualification sentence for the profile controls.'
++# Independent expected values: the configs below are written FROM these, the assertions compare the REQUESTS to these.
++PROFILES = {
++    'A': dict(voice='QualVoiceAlpha001', model='qual_model_alpha', key='el-qual-key-alpha', audio=b'ID3qual-alpha'),
++    'B': dict(voice='QualVoiceBravo002', model='qual_model_bravo', key='el-qual-key-bravo', audio=b'ID3qual-bravo'),
++}
++GROQ_KEY = 'gsk-qual-key-bravo'
++
++
++@pytest.fixture(autouse=True)
++def unqualified_host(monkeypatch):
++    """Host-independent: no launcher qualifies, so the optional STT trim/probe is skipped and nothing can spawn."""
++    from tools import native_local_launcher
++    monkeypatch.setattr(native_local_launcher, 'QUALIFIED', ())
++
++
++@pytest.fixture
++def clip(tmp_path):
++    return support.write_wav(tmp_path / 'clip.wav')
++
++
++@pytest.fixture
++def out(tmp_path):
++    path = tmp_path / 'caller-output'
++    path.mkdir()
++    return str(path)
++
++
++@pytest.fixture
++def real_elevenlabs(monkeypatch):
++    """The REAL installed SDK class, observed (never replaced): every client the seam builds is recorded."""
++    from elevenlabs.client import ElevenLabs
++    assert ElevenLabs.__module__.startswith('elevenlabs')
++    built = []
++
++    class Observed(ElevenLabs):
++        def __init__(self, *args, **kwargs):
++            built.append(kwargs)
++            super().__init__(*args, **kwargs)
++    monkeypatch.setattr('tools.tts_tool._import_elevenlabs', lambda: Observed)
++    return built
++
++
++def make_home(root, name, *, tts=None, stt=None, env=None):
++    """A single-profile home exactly as the stock loaders read it: ``config.yaml`` plus a scoped ``.env``."""
++    home = root / f'profile-{name}'
++    config = {}
++    if tts is not None:
++        config['tts'] = tts
++    if stt is not None:
++        config['stt'] = stt
++    support.write_config(home, config)
++    if env:
++        (home / '.env').write_text(''.join(f'{key}={value}\n' for key, value in env.items()))
++    return home
++
++
++def elevenlabs_tts(label):
++    profile = PROFILES[label]
++    return {'provider': 'elevenlabs', 'elevenlabs': {'voice_id': profile['voice'], 'model_id': profile['model']}}
++
++
++async def speak(out, callbacks, text=TEXT, deadline_s=60):
++    return await synthesize_native_once(text, output_dir=out, authorize=callbacks.authorize,
++                                        before_send=callbacks.before_send, deadline_s=deadline_s)
++
++
++async def hear(clip, callbacks, deadline_s=30):
++    return await transcribe_native_once(clip, authorize=callbacks.authorize, before_send=callbacks.before_send,
++                                        deadline_s=deadline_s)
++
++
++def watch_worker(monkeypatch, module, name):
++    """An Event set when the worker function has fully returned (the late path has finished)."""
++    finished = threading.Event()
++    original = getattr(module, name)
++
++    def watched(*args, **kwargs):
++        try:
++            return original(*args, **kwargs)
++        finally:
++            finished.set()
++    monkeypatch.setattr(module, name, watched)
++    return finished
++
++
++def request_facts(request):
++    body = json.loads(request.read())
++    return dict(voice=request.url.path.rsplit('/', 1)[-1], model=body.get('model_id'), text=body.get('text'),
++                key=request.headers['xi-api-key'], output_format=request.url.params.get('output_format'))
++
++
++# --- TTS: each served profile reaches only its own voice, model and key ------------------------------------------------
++
++@pytest.mark.asyncio
++async def test_each_single_profile_home_speaks_only_with_its_own_elevenlabs_voice_model_and_key(
++        monkeypatch, out, tmp_path, real_elevenlabs, caplog):
++    caplog.set_level(logging.DEBUG)
++    homes = {label: make_home(tmp_path, label, tts=elevenlabs_tts(label), env={'ELEVENLABS_API_KEY': PROFILES[label]['key']})
++             for label in 'AB'}
++    seen = []
++    for label in 'ABA':
++        monkeypatch.setenv('HERMES_HOME', str(homes[label]))
++        wire = support.Wire([('ok', {'audio': PROFILES[label]['audio']})])
++        cb = support.Callbacks()
++        with support.provider_wire(monkeypatch, wire):
++            result = await speak(out, cb)
++        assert (result.state, result.source, result.provider) == ('synthesized', 'configured', 'completed'), label
++        assert wire.count == 1 and cb.before_send_calls == 1, label  # exactly one gated send for the one chunk
++        assert Path(result.path).read_bytes() == PROFILES[label]['audio'], label  # the output belongs to this profile's answer
++        seen.append(request_facts(wire.requests[0]))
++        os.remove(result.path)
++    expected = [dict(voice=PROFILES[label]['voice'], model=PROFILES[label]['model'], text=TEXT, key=PROFILES[label]['key'],
++                     output_format='mp3_44100_128') for label in 'ABA']
++    assert seen == expected
++    assert len(real_elevenlabs) == 3  # the real SDK built one client per call, none shared across profiles
++    assert PROFILES['B']['voice'] not in (seen[0]['voice'], seen[2]['voice']) and PROFILES['A']['key'] != seen[1]['key']
++    for secret in [p['key'] for p in PROFILES.values()] + [TEXT]:
++        assert secret not in caplog.text and secret not in repr(result)
++
++
++@pytest.mark.asyncio
++async def test_a_home_without_its_own_key_never_borrows_another_profiles_key_or_voice(monkeypatch, out, tmp_path, real_elevenlabs):
++    homes = {label: make_home(tmp_path, label, tts=elevenlabs_tts(label), env={'ELEVENLABS_API_KEY': PROFILES[label]['key']})
++             for label in 'AB'}
++    keyless = make_home(tmp_path, 'C', tts={'provider': 'elevenlabs', 'elevenlabs': {'voice_id': 'QualVoiceCharlie3'}})
++    for home in (homes['A'], homes['B'], keyless):  # the other homes' keys really exist on disk and were just used
++        monkeypatch.setenv('HERMES_HOME', str(home))
++        wire = support.Wire([('ok', {'audio': b'ID3any'})])
++        cb = support.Callbacks()
++        with support.provider_wire(monkeypatch, wire):
++            result = await speak(out, cb)
++        if home is keyless:
++            assert (result.state, result.path, result.provider) == ('unavailable', None, 'not_started')
++            assert wire.count == 0 and cb.before_send_calls == 0 and os.listdir(out) == []
++        else:
++            os.remove(result.path)
++    assert len(real_elevenlabs) == 2  # the keyless home never built an SDK client at all
++
++
++# --- STT: the current M5 shapes (default = enabled, no provider; others = no STT mapping), controlled scoped availability --
++
++@pytest.mark.asyncio
++async def test_stt_auto_detect_follows_each_homes_own_scoped_keys_and_never_crosses(monkeypatch, clip, tmp_path):
++    a = make_home(tmp_path, 'A', stt={'enabled': True},
++                  env={'ELEVENLABS_API_KEY': PROFILES['A']['key']})
++    b = make_home(tmp_path, 'B', env={'ELEVENLABS_API_KEY': PROFILES['B']['key'], 'GROQ_API_KEY': GROQ_KEY})  # no STT mapping at all
++    seen = []
++    for label, home in (('A', a), ('B', b), ('A', a)):
++        monkeypatch.setenv('HERMES_HOME', str(home))
++        rest_wire, httpx_wire = support.RequestsWire([('ok', {})]), support.Wire([('ok', {'text': 'groq words', 'json': False})])
++        with support.requests_wire(monkeypatch, rest_wire), support.provider_wire(monkeypatch, httpx_wire):
++            result = await hear(clip, support.Callbacks())
++        assert result.state == 'transcribed' and result.provider == 'completed', label
++        assert rest_wire.count + httpx_wire.count == 1, label  # exactly one gated send in total
++        if rest_wire.count:
++            request = rest_wire.requests[0][0]
++            seen.append((label, 'elevenlabs', request.url.split('/')[2], request.headers['xi-api-key'], result.transcript))
++        else:
++            request = httpx_wire.requests[0]
++            seen.append((label, 'groq', request.url.host, request.headers['authorization'], result.transcript))
++    assert seen == [('A', 'elevenlabs', 'api.elevenlabs.io', PROFILES['A']['key'], 'hello world'),
++                    ('B', 'groq', 'api.groq.com', f'Bearer {GROQ_KEY}', 'groq words'),  # groq outranks its own elevenlabs key
++                    ('A', 'elevenlabs', 'api.elevenlabs.io', PROFILES['A']['key'], 'hello world')]
++
++
++@pytest.mark.asyncio
++async def test_stt_without_scoped_availability_or_with_an_unavailable_explicit_provider_sends_nothing(monkeypatch, clip, tmp_path):
++    keyed = make_home(tmp_path, 'A', stt={'enabled': True}, env={'ELEVENLABS_API_KEY': PROFILES['A']['key']})
++    shapes = {
++        'no-stt-mapping-and-no-key': make_home(tmp_path, 'C', tts=elevenlabs_tts('A')),
++        'enabled-no-provider-and-no-key': make_home(tmp_path, 'D', stt={'enabled': True}),
++        'explicit-elevenlabs-without-its-key': make_home(tmp_path, 'E', stt={'provider': 'elevenlabs'},
++                                                          env={'GROQ_API_KEY': GROQ_KEY}),
++    }
++    monkeypatch.setenv('HERMES_HOME', str(keyed))  # another profile's key was just in scope
++    with support.requests_wire(monkeypatch, support.RequestsWire([('ok', {})])):
++        assert (await hear(clip, support.Callbacks())).state == 'transcribed'
++    for name, home in shapes.items():
++        monkeypatch.setenv('HERMES_HOME', str(home))
++        rest_wire, httpx_wire, cb = support.RequestsWire(), support.Wire(), support.Callbacks()
++        with support.requests_wire(monkeypatch, rest_wire), support.provider_wire(monkeypatch, httpx_wire):
++            result = await hear(clip, cb)
++        assert (result.state, result.transcript, result.source, result.provider) == ('unavailable', None, None, 'not_started'), name
++        assert rest_wire.count == 0 and httpx_wire.count == 0 and cb.before_send_calls == 0, name  # explicit: no silent cloud fallback
++
++
++@pytest.mark.asyncio
++async def test_a_registered_pre_transcription_hook_refuses_before_any_provider_work(monkeypatch, clip, tmp_path):
++    """The refusal precedes provider selection and credentials. The hook is registered through the real ``PluginContext`` on the
++    PROCESS-LOCAL manager of this test; it is a source-registered fixture, NOT the live runner's initialized registry."""
++    from hermes_cli import plugins
++    from hermes_cli.plugins_manifest import PluginManifest
++    home = make_home(tmp_path, 'A', stt={'enabled': True}, env={'ELEVENLABS_API_KEY': PROFILES['A']['key']})
++    monkeypatch.setenv('HERMES_HOME', str(home))
++    manager = plugins.get_plugin_manager()
++    monkeypatch.setattr(manager, '_hooks', {})
++    calls = []
++    plugins.PluginContext(PluginManifest(name='qualification-hook-fixture'), manager).register_hook(
++        'pre_transcription', lambda **kw: calls.append(kw) or {'prompt': 'HOOKED'})
++    rest_wire, cb = support.RequestsWire(), support.Callbacks()
++    with support.requests_wire(monkeypatch, rest_wire):
++        result = await hear(clip, cb)
++    assert (result.state, result.transcript, result.provider) == ('unavailable', None, 'not_started')
++    assert calls == [] and rest_wire.count == 0 and cb.before_send_calls == 0
++
++
++# --- Stop / lost authorization while the SDK answer is held -----------------------------------------------------------
++
++@pytest.mark.asyncio
++async def test_stop_while_the_sdk_answer_is_held_sends_nothing_more_and_keeps_nothing(
++        monkeypatch, out, tmp_path, real_elevenlabs, caplog):
++    from gateway import session_native_voice_tts as tts_module
++    caplog.set_level(logging.DEBUG)
++    monkeypatch.setenv('HERMES_HOME', str(make_home(tmp_path, 'A', tts=elevenlabs_tts('A'),
++                                                    env={'ELEVENLABS_API_KEY': PROFILES['A']['key']})))
++    finished = watch_worker(monkeypatch, tts_module, '_synthesize')
++    release = threading.Event()
++    wire = support.Wire([('ok', {'audio': PROFILES['A']['audio']})], hold=release)
++    cb = support.Callbacks()
++    try:
++        with support.provider_wire(monkeypatch, wire):
++            task = asyncio.create_task(speak(out, cb))
++            assert await asyncio.to_thread(wire.entered.wait, 10)  # the one send left and is held at the provider
++            at_stop = (cb.authorize_calls, cb.before_send_calls)
++            task.cancel()
++            with pytest.raises(asyncio.CancelledError):
++                await task
++            release.set()
++            assert await asyncio.to_thread(finished.wait, 10)  # the abandoned worker has fully returned
++    finally:
++        release.set()
++    assert wire.count == 1 and at_stop == (2, 1)
++    assert (cb.authorize_calls, cb.before_send_calls) == at_stop  # no callback after Stop
++    assert os.listdir(out) == [] and all(client['httpx_client'].is_closed for client in real_elevenlabs)
++    for secret in (PROFILES['A']['key'], TEXT):
++        assert secret not in caplog.text
++
++
++class AuthorityCallbacks:
++    """The consumer's callbacks over the REGISTERED authority: ``authorize`` is the real ``SessionAuthority.authorize``."""
++
++    def __init__(self, authority, ref, actor, events):
++        self.authority, self.ref, self.actor, self.events = authority, ref, actor, events
++        self.before_send_calls = 0
++
++    def authorize(self):
++        self.events.append('authorize')
++        self.authority.authorize(self.actor, self.ref, 'session:read')
++
++    def before_send(self):
++        self.before_send_calls += 1
++        self.events.append('before_send')
++
++
++async def registered_route(rig):
++    ref = await rig.authority.register_native_route(rig.event().source)
++    viewer = Principal('viewer', rig.authority.profile_id, frozenset({'session:read'}), 'test')
++    return ref, viewer
++
++
++def configure_rig_home(tmp_path):
++    support.write_config(tmp_path, {'tts': elevenlabs_tts('A')})
++    (tmp_path / '.env').write_text(f"ELEVENLABS_API_KEY={PROFILES['A']['key']}\n")
++
++
++@pytest.mark.asyncio
++async def test_core_call_under_the_registered_profile_context_uses_the_real_authority(
++        home_rig, monkeypatch, out, tmp_path, real_elevenlabs, caplog):
++    """Core call under a registered profile context with the real authority as ``authorize`` (not a V2 bridge)."""
++    caplog.set_level(logging.DEBUG)
++    configure_rig_home(tmp_path)
++    ref, viewer = await registered_route(home_rig)
++    events = []
++    cb = AuthorityCallbacks(home_rig.authority, ref, viewer, events)
++    wire = support.Wire([('ok', {'audio': PROFILES['A']['audio']})], tap=lambda request: events.append('request'))
++    with support.provider_wire(monkeypatch, wire):
++        result = await speak(out, cb)
++    assert (result.state, result.provider) == ('synthesized', 'completed') and wire.count == 1
++    assert events == ['authorize', 'authorize', 'before_send', 'request', 'authorize']  # the authority gates before and after
++    assert request_facts(wire.requests[0]) == dict(voice=PROFILES['A']['voice'], model=PROFILES['A']['model'], text=TEXT,
++                                                   key=PROFILES['A']['key'], output_format='mp3_44100_128')
++    assert PROFILES['A']['key'] not in caplog.text and TEXT not in caplog.text
++
++    for name, actor in (('no capability', replace(viewer, capabilities=frozenset())),
++                        ('another profile', replace(viewer, profile_id='another-profile'))):
++        refused_events = []
++        refused = AuthorityCallbacks(home_rig.authority, ref, actor, refused_events)
++        wire = support.Wire([('ok', {'audio': b'ID3never'})])
++        with support.provider_wire(monkeypatch, wire):
++            result = await speak(out, refused)
++        assert (result.state, result.path, result.provider) == ('refused', None, 'not_started'), name
++        assert wire.count == 0 and refused.before_send_calls == 0, name
++    with pytest.raises(RuntimeStoreError, match='profile_mismatch'):
++        home_rig.authority.authorize(replace(viewer, profile_id='another-profile'), ref, 'session:read')
++
++
++@pytest.mark.asyncio
++async def test_authority_lost_while_the_sdk_answer_is_held_withholds_the_audio_and_sends_nothing_more(
++        home_rig, monkeypatch, out, tmp_path, real_elevenlabs, caplog):
++    from gateway import session_native_voice_tts as tts_module
++    caplog.set_level(logging.DEBUG)
++    configure_rig_home(tmp_path)
++    ref, viewer = await registered_route(home_rig)
++    events = []
++    cb = AuthorityCallbacks(home_rig.authority, ref, viewer, events)
++    finished = watch_worker(monkeypatch, tts_module, '_synthesize')
++    release = threading.Event()
++    wire = support.Wire([('ok', {'audio': PROFILES['A']['audio']})], hold=release)
++    try:
++        with support.provider_wire(monkeypatch, wire):
++            task = asyncio.create_task(speak(out, cb))
++            assert await asyncio.to_thread(wire.entered.wait, 10)
++            cb.actor = replace(viewer, capabilities=frozenset())  # the grant is revoked at the registered authority
++            release.set()
++            result = await task
++            assert await asyncio.to_thread(finished.wait, 10)
++    finally:
++        release.set()
++    assert (result.state, result.path, result.provider) == ('refused', None, 'completed')  # the one send is accounted
++    assert wire.count == 1 and cb.before_send_calls == 1
++    assert events == ['authorize', 'authorize', 'before_send', 'authorize']  # no callback beyond the lost-authority check
++    assert os.listdir(out) == []  # no late retained output
++    for secret in (PROFILES['A']['key'], TEXT):
++        assert secret not in caplog.text and secret not in repr(result)
 diff --git a/tests/gateway/test_native_voice_rest_fences.py b/tests/gateway/test_native_voice_rest_fences.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..c4541eed7a02e9d0df13fb6930d408a2bed43a2a

@@ -1040,8 +1040,8 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   `openai`, `groq`, `deepinfra` (pinned model), `xai`, `elevenlabs`, `mistral`, cached local `faster-whisper`
   fallback; TTS `edge`, `elevenlabs`, `openai`, `deepinfra` (pinned model), `mistral`, `minimax`, `xai`, `gemini`. Everything else is refused
   **unsent** (`unavailable`) — never replaced by another provider — until its V1-P gate passes. This is not the final
-  provider scope and is not configured-provider acceptance. **Mistral (V1-P Task 1, source delivered, review
-  pending):** the real pinned `mistralai` 2.4.8 SDK is held to one gated request per STT call / TTS chunk (client
+  provider scope and is not configured-provider acceptance. **Mistral (V1-P Task 1, source delivered, source dependency admitted,
+  qualification open):** the real pinned `mistralai` 2.4.8 SDK is held to one gated request per STT call / TTS chunk (client
   built by the policy, identity proven before the invocation, `retries=None`, explicit timeout, no redirects, SDK
   trace exporter and debug logger off, the answer bounded as it is read); an endpoint signature that cannot carry a
   configured field is refused unsent — the pinned STT endpoint has no `prompt`, so a configured `stt.prompt`
@@ -1055,8 +1055,8 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   AND cached assets only, no downloads, bounded local execution, truthful `not_started` remote accounting, no
   paid-provider fallback; TTS command and plugin — the same native-once capability contract (an arbitrary program
   cannot be certified single-attempt by a provider-name allowlist); full-range Edge and the missing-joiner behaviour
-  below. **REST TTS MiniMax/xAI/Gemini and xAI OAuth pre-send freshness (V1-P Task 2, source delivered, review
-  pending):** these three send through one stock helper, `tts_tool_providers._post_json`, which inside a native call is
+  below. **REST TTS MiniMax/xAI/Gemini and xAI OAuth pre-send freshness (V1-P Task 2, source delivered, source dependency admitted,
+  qualification open):** these three send through one stock helper, `tts_tool_providers._post_json`, which inside a native call is
   the HTTP boundary — the gate runs immediately before `requests.post` (the REST STT adjacency), the timeout is
   min(60 s, call bound), redirects are not followed (a 3xx is a counted unusable answer), the body is requested
   uncompressed and read in 64 KiB reads under the 16 MiB chunk cap (chunk-granular, not an allocation-hard cap). Failures
@@ -1105,6 +1105,12 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   inspected phonemizer releases are source-qualified (their decimal phonemization differs upstream, neither is forced). A usable NeuTTS still needs a
   separately provisioned supported interpreter below 3.14, its closure, a platform wheel and complete offline caches; none of that is provisioned or
   evidenced here.
+* **Qualification follow-up (source and tooling only).** Profile-shaped ElevenLabs/STT controls run the real seam with sentinels (the
+  installed ElevenLabs SDK over synthetic network bytes, stock config and `.env` scope, the registered authority as `authorize`); they
+  are source coverage, not current-profile proof. The controller's metadata path must label raw declarations, resolved config,
+  credential-presence origin, static plugin declarations and the ACTUAL initialized plugin registry and tracer provider
+  separately; an unobtainable runtime fact is recorded UNKNOWN with its remaining action, and M1 stays open until it is inspected.
+  The host harness is Darwin 27 arm64 only; other boxes are qualified at the per-box rollout gate and are not claimed here.
 * Voice output is listed only with the complete seam (TTS **and** display read): there is no reduced
   live-only mode that would narrow approved deliberate playback.
 * Hub: PROPOSED `DeviceSession.send_binary(data, *, authorize=None)` mirroring `send_json`; channel-5 routing in
