@@ -25,7 +25,13 @@ import org.junit.Test
  * key or a device; the native screen itself is not exercised in this stage.
  */
 class PhoneRelayRoutingTest {
-    private val conversation = ConversationItem(ConversationId.of("3ff4ef74-af70-4efc-a3d4-e797b98a4dea")!!.value, "Plan", 1, true)
+    private val conversation =
+        ConversationItem(
+            ConversationId.of("3ff4ef74-af70-4efc-a3d4-e797b98a4dea")!!.value,
+            "Plan",
+            1,
+            true
+        )
 
     @Test fun withRelayOffTheStockRoutesAreUnchangedAndNoRelayCapabilityIsOffered() {
         val off = PhoneConversationState().relay
@@ -42,16 +48,29 @@ class PhoneRelayRoutingTest {
     }
 
     @Test fun relayEnabledButNothingSelectedStillRoutesToTheStockChatAndStockVoice() {
-        for (phase in listOf(RelayPhase.CONNECTING, RelayPhase.READY, RelayPhase.UNAVAILABLE, RelayPhase.REVIEW_REQUIRED, RelayPhase.STOPPED)) {
+        for (phase in listOf(
+            RelayPhase.CONNECTING,
+            RelayPhase.READY,
+            RelayPhase.UNAVAILABLE,
+            RelayPhase.REVIEW_REQUIRED,
+            RelayPhase.STOPPED
+        )) {
             val state = RelayUiState(phase = phase, enabled = true)
             assertEquals(phase.toString(), InputRoute.STOCK, PhoneRelay.typedRoute(state))
             assertEquals(phase.toString(), InputRoute.STOCK, PhoneRelay.voiceRoute(state))
         }
     }
 
-    @Test fun insideASelectedRelayConversationTypingGoesToRelayAndTheMicrophoneIsUnavailableNeverStock() {
+    @Test fun insideASelectedRelayConversationTypingGoesToRelayAndTheMicrophoneIsUnavailable() {
         for (phase in listOf(RelayPhase.SELECTED, RelayPhase.ATTACHING)) {
-            val state = RelayUiState(phase = phase, enabled = true, selected = conversation, canSend = phase == RelayPhase.SELECTED)
+            val state =
+                RelayUiState(
+                    phase = phase,
+                    enabled = true,
+                    selected = conversation,
+                    canSend =
+                    phase == RelayPhase.SELECTED
+                )
             assertTrue(state.relayOwnsComposer)
             assertEquals(InputRoute.RELAY, PhoneRelay.typedRoute(state))
             assertEquals(InputRoute.UNAVAILABLE, PhoneRelay.voiceRoute(state))
@@ -61,17 +80,44 @@ class PhoneRelayRoutingTest {
 
     @Test fun stockAudioCapabilitiesAreExactlyTheStockOnesWhetherOrNotRelayIsOffered() {
         val stock = PhoneConversation.audioCapabilities(opus = false, clientSpeech = false)
-        assertEquals(Protocol.pcmCapabilities().keys + "mic" + "speaker", stock.keys + "mic" + "speaker")
+        assertEquals(
+            Protocol.pcmCapabilities().keys + "mic" + "speaker",
+            stock.keys + "mic" + "speaker"
+        )
         assertFalse("relay" in stock)
         // The relay capability is added to the hello by the connection, never by the audio capability builder.
-        assertFalse("relay" in PhoneConversation.audioCapabilities(opus = true, clientSpeech = true))
+        assertFalse(
+            "relay" in PhoneConversation.audioCapabilities(opus = true, clientSpeech = true)
+        )
     }
 
     @Test fun everyNoticeReasonStorageProblemAndTurnStatusHasPlainText() {
-        for (notice in RelayNotice.entries) assertEquals(notice.name, notice == RelayNotice.NONE, relayNoticeText(notice).isEmpty())
-        for (reason in RelayReason.entries) if (reason != RelayReason.NONE) assertTrue(reason.name, relayReasonText(reason).isNotBlank())
-        for (problem in StoreProblem.entries) assertTrue(problem.name, relayStorageText(problem).isNotBlank())
-        for (status in TurnStatus.entries) assertTrue(status.name, turnStatusText(status).isNotBlank())
+        for (notice in RelayNotice.entries) {
+            assertEquals(
+                notice.name,
+                notice == RelayNotice.NONE,
+                relayNoticeText(notice).isEmpty()
+            )
+        }
+        for (reason in RelayReason.entries) {
+            if (reason !=
+                RelayReason.NONE
+            ) {
+                assertTrue(reason.name, relayReasonText(reason).isNotBlank())
+            }
+        }
+        for (problem in StoreProblem.entries) {
+            assertTrue(
+                problem.name,
+                relayStorageText(problem).isNotBlank()
+            )
+        }
+        for (status in TurnStatus.entries) {
+            assertTrue(
+                status.name,
+                turnStatusText(status).isNotBlank()
+            )
+        }
         // The uncertain states are never worded as success.
         assertFalse(turnStatusText(TurnStatus.UNCERTAIN).contains("Done"))
         assertFalse(turnStatusText(TurnStatus.UNKNOWN_ADMITTED).contains("Done"))

@@ -77,8 +77,10 @@ object StoreBounds {
         REFUSED_MESSAGES * (string(UUID_BYTES) + string(ENUM_BYTES) + 4)
 
     val deliveryMax: Long = scopeRecordMax + 9 + 2 +
-        SEEN_KEYS * (string(ENUM_BYTES) + string(OPAQUE_CONVERSATION_BYTES) +
-            string(OPAQUE_EVENT_BYTES) + 8) + 2 +
+        SEEN_KEYS * (
+            string(ENUM_BYTES) + string(OPAQUE_CONVERSATION_BYTES) +
+                string(OPAQUE_EVENT_BYTES) + 8
+            ) + 2 +
         OBLIGATIONS * (nullableString(UUID_BYTES) + string(ENUM_BYTES) + string(ENUM_BYTES)) + 2 +
         PENDING_ACKS * string(UUID_BYTES)
 
@@ -86,9 +88,10 @@ object StoreBounds {
         string(ENUM_BYTES) + nullableString(UUID_BYTES) + nullableString(ENUM_BYTES) +
         nullableString(ENUM_BYTES) + nullableString(ENUM_BYTES) + 9
 
-    val enrollmentMax: Long = string(SCOPE_KEY_BYTES) + string(URL_BYTES) + string(SCOPE_KEY_BYTES) +
-        1 + nullableString(UUID_BYTES) + 8 + string(ENUM_BYTES) + nullableString(UUID_BYTES) +
-        nullableString(UUID_BYTES) + 1 + string(UUID_BYTES) + nullableString(TITLE_BYTES) + 8
+    val enrollmentMax: Long =
+        string(SCOPE_KEY_BYTES) + string(URL_BYTES) + string(SCOPE_KEY_BYTES) +
+            1 + nullableString(UUID_BYTES) + 8 + string(ENUM_BYTES) + nullableString(UUID_BYTES) +
+            nullableString(UUID_BYTES) + 1 + string(UUID_BYTES) + nullableString(TITLE_BYTES) + 8
 
     const val HEADER_BYTES = 4L + 2 + 2
     const val TRAILER_BYTES = 4L
@@ -117,4 +120,3 @@ object StoreBounds {
     /** The largest legal file on disk. */
     const val MAX_FILE_BYTES = PLAINTEXT_CAP_BYTES + CONTAINER_OVERHEAD_BYTES
 }
-

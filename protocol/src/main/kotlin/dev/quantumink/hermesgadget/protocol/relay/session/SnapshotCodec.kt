@@ -116,7 +116,11 @@ object SnapshotCodec {
             }
             if (size + extra > buffer.size) {
                 var next = buffer.size
-                while (next < size + extra) next = minOf(next.toLong() * 2, Int.MAX_VALUE.toLong()).toInt()
+                while (next <
+                    size + extra
+                ) {
+                    next = minOf(next.toLong() * 2, Int.MAX_VALUE.toLong()).toInt()
+                }
                 buffer = buffer.copyOf(minOf(next, StoreBounds.PLAINTEXT_CAP_BYTES))
             }
         }
@@ -191,9 +195,13 @@ object SnapshotCodec {
                 w.section(document.section)
                 w.ledger(snapshot.ledger)
                 w.count(snapshot.histories.size, StoreBounds.HISTORIES, "histories")
-                snapshot.histories.forEachIndexed { index, item -> w.history(item, "histories[$index]") }
+                snapshot.histories.forEachIndexed { index, item ->
+                    w.history(item, "histories[$index]")
+                }
                 w.count(snapshot.deliveries.size, StoreBounds.DELIVERIES, "deliveries")
-                snapshot.deliveries.forEachIndexed { index, item -> w.delivery(item, "deliveries[$index]") }
+                snapshot.deliveries.forEachIndexed { index, item ->
+                    w.delivery(item, "deliveries[$index]")
+                }
                 if (snapshot.version == RelayStateSnapshot.VERSION) {
                     w.captures(snapshot.captures)
                 } else if (snapshot.captures.records.isNotEmpty()) {
@@ -222,7 +230,11 @@ object SnapshotCodec {
                 nullableString(item.pinnedProfileId?.value, StoreBounds.UUID_BYTES, "$path.pinned")
                 i64(item.reviewEpoch)
                 string(item.standing.name, StoreBounds.ENUM_BYTES, "$path.standing")
-                nullableString(item.observedProfileId?.value, StoreBounds.UUID_BYTES, "$path.observed")
+                nullableString(
+                    item.observedProfileId?.value,
+                    StoreBounds.UUID_BYTES,
+                    "$path.observed"
+                )
                 nullableString(
                     item.selectedConversationId?.value,
                     StoreBounds.UUID_BYTES,
@@ -317,7 +329,11 @@ object SnapshotCodec {
             count(item.obligations.size, StoreBounds.OBLIGATIONS, "$path.obligations")
             item.obligations.forEachIndexed { index, obligation ->
                 val at = "$path.obligations[$index]"
-                nullableString(obligation.conversationId, StoreBounds.UUID_BYTES, "$at.conversationId")
+                nullableString(
+                    obligation.conversationId,
+                    StoreBounds.UUID_BYTES,
+                    "$at.conversationId"
+                )
                 string(obligation.kind, StoreBounds.ENUM_BYTES, "$at.kind")
                 string(obligation.cause, StoreBounds.ENUM_BYTES, "$at.cause")
             }
@@ -374,7 +390,8 @@ object SnapshotCodec {
 
         fun u16(path: String): Int {
             need(2, path)
-            val value = ((bytes[position].toInt() and 0xff) shl 8) or (bytes[position + 1].toInt() and 0xff)
+            val value =
+                ((bytes[position].toInt() and 0xff) shl 8) or (bytes[position + 1].toInt() and 0xff)
             position += 2
             return value
         }
@@ -420,19 +437,30 @@ object SnapshotCodec {
         fun nullableLong(path: String): Long? = if (bool(path)) i64(path) else null
 
         fun document(): RelayDocument {
-            if (bytes.size < StoreBounds.HEADER_BYTES + StoreBounds.TRAILER_BYTES) corrupt("document")
+            if (bytes.size <
+                StoreBounds.HEADER_BYTES + StoreBounds.TRAILER_BYTES
+            ) {
+                corrupt("document")
+            }
             if (bytes.size > StoreBounds.PLAINTEXT_CAP_BYTES) corrupt("document")
-            if (i32("magic") != MAGIC) throw DecodeFailure(DecodeRefusal.UNSUPPORTED_VERSION, "magic")
+            if (i32("magic") !=
+                MAGIC
+            ) {
+                throw DecodeFailure(DecodeRefusal.UNSUPPORTED_VERSION, "magic")
+            }
             if (u16("formatVersion") != FORMAT_VERSION) {
                 throw DecodeFailure(DecodeRefusal.UNSUPPORTED_VERSION, "formatVersion")
             }
             val version = u16("snapshotVersion")
-            if (version != RelayStateSnapshot.VERSION && version != RelayStateSnapshot.LEGACY_VERSION) {
+            if (version != RelayStateSnapshot.VERSION &&
+                version != RelayStateSnapshot.LEGACY_VERSION
+            ) {
                 throw DecodeFailure(DecodeRefusal.UNSUPPORTED_VERSION, "snapshotVersion")
             }
             val section = section()
             val ledger = ledger()
-            val histories = List(count(StoreBounds.HISTORIES, "histories")) { history("histories[$it]") }
+            val histories =
+                List(count(StoreBounds.HISTORIES, "histories")) { history("histories[$it]") }
             val deliveries =
                 List(count(StoreBounds.DELIVERIES, "deliveries")) { delivery("deliveries[$it]") }
             val captures = if (version == RelayStateSnapshot.VERSION) {
@@ -476,8 +504,9 @@ object SnapshotCodec {
                     ConversationId.of(it) ?: corrupt("$path.selected")
                 }
                 val create = if (bool("$path.create")) {
-                    val request = RequestId.of(string(StoreBounds.UUID_BYTES, "$path.create.request"))
-                        ?: corrupt("$path.create.request")
+                    val request =
+                        RequestId.of(string(StoreBounds.UUID_BYTES, "$path.create.request"))
+                            ?: corrupt("$path.create.request")
                     val title = nullableString(StoreBounds.TITLE_BYTES, "$path.create.title")
                     val prepared = i64("$path.create.preparedAt")
                     try {

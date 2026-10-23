@@ -7,8 +7,8 @@ import dev.quantumink.hermesgadget.protocol.relay.session.StoreCommit
 import dev.quantumink.hermesgadget.protocol.relay.session.StoreLoad
 import dev.quantumink.hermesgadget.protocol.relay.session.StoreProblem
 import dev.quantumink.hermesgadget.protocol.relay.state.RelayStateSnapshot
-import dev.quantumink.hermesgadget.protocol.relay.state.TurnLedger
 import dev.quantumink.hermesgadget.protocol.relay.state.SnapshotBuild
+import dev.quantumink.hermesgadget.protocol.relay.state.TurnLedger
 import dev.quantumink.hermesgadget.protocol.relay.voice.VoiceCaptureLedger
 import java.io.File
 import java.security.KeyStore
@@ -28,7 +28,12 @@ class EncryptedRelayStoreNativeTest {
         val directory = File(context.cacheDir, "relay-state-" + UUID.randomUUID())
         val alias = "test.relay.state." + UUID.randomUUID()
         val snapshot = (
-            RelayStateSnapshot.of(TurnLedger.empty(), emptyList(), emptyList(), VoiceCaptureLedger.empty())
+            RelayStateSnapshot.of(
+                TurnLedger.empty(),
+                emptyList(),
+                emptyList(),
+                VoiceCaptureLedger.empty()
+            )
                 as SnapshotBuild.Built
             ).snapshot
         val document = RelayDocument(ControllerSection.EMPTY, snapshot)
@@ -43,7 +48,11 @@ class EncryptedRelayStoreNativeTest {
                 load(null)
                 deleteEntry(alias)
             }
-            val unreadable = EncryptedRelayStore.android(context, directory, alias).load() as StoreLoad.Unreadable
+            val unreadable = EncryptedRelayStore.android(
+                context,
+                directory,
+                alias
+            ).load() as StoreLoad.Unreadable
             assertEquals(StoreProblem.KEY_UNAVAILABLE, unreadable.problem)
             assertEquals(bytes.toList(), File(directory, "state.v1").readBytes().toList())
         } finally {

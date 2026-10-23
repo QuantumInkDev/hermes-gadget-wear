@@ -66,8 +66,15 @@ class EnrollmentRecord(
     val createIntent: CreateIntent?
 ) {
     init {
-        require(endpointKey.length in 1..RelayScope.MAX_KEY && endpointKey.none { it.isISOControl() })
-        require(enrollmentKey.length in 1..RelayScope.MAX_KEY && enrollmentKey.none { it.isISOControl() })
+        require(
+            endpointKey.length in 1..RelayScope.MAX_KEY && endpointKey.none {
+                it.isISOControl()
+            }
+        )
+        require(
+            enrollmentKey.length in 1..RelayScope.MAX_KEY &&
+                enrollmentKey.none { it.isISOControl() }
+        )
         require(endpointUrl.length in 1..MAX_URL_CHARS)
         require(reviewEpoch >= 0)
     }
@@ -123,18 +130,19 @@ class EnrollmentRecord(
             return "ep1:" + digest.joinToString("") { "%02x".format(it) }
         }
 
-        fun fresh(canonicalUrl: String, enrollmentLabel: String): EnrollmentRecord = EnrollmentRecord(
-            endpointKey(canonicalUrl),
-            canonicalUrl,
-            enrollmentLabel,
-            enabled = false,
-            pinnedProfileId = null,
-            reviewEpoch = 0,
-            standing = Standing.ACTIVE,
-            observedProfileId = null,
-            selectedConversationId = null,
-            createIntent = null
-        )
+        fun fresh(canonicalUrl: String, enrollmentLabel: String): EnrollmentRecord =
+            EnrollmentRecord(
+                endpointKey(canonicalUrl),
+                canonicalUrl,
+                enrollmentLabel,
+                enabled = false,
+                pinnedProfileId = null,
+                reviewEpoch = 0,
+                standing = Standing.ACTIVE,
+                observedProfileId = null,
+                selectedConversationId = null,
+                createIntent = null
+            )
     }
 }
 
@@ -143,7 +151,9 @@ class ControllerSection(enrollments: List<EnrollmentRecord>) {
     val enrollments: List<EnrollmentRecord> = Collections.unmodifiableList(ArrayList(enrollments))
 
     init {
-        require(this.enrollments.size <= StateLimits.MAX_ENROLLMENTS + 1) { "Too many enrollments." }
+        require(this.enrollments.size <= StateLimits.MAX_ENROLLMENTS + 1) {
+            "Too many enrollments."
+        }
         require(
             this.enrollments.map { it.endpointKey to it.enrollmentKey }.toSet().size ==
                 this.enrollments.size

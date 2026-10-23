@@ -71,22 +71,28 @@ internal fun relayNoticeText(notice: RelayNotice): String = when (notice) {
     RelayNotice.STORAGE_FULL_PENDING_ITEMS ->
         "Can't save more until pending or unconfirmed messages are reviewed. Nothing was sent."
     RelayNotice.STORAGE_WRITE_FAILED -> "Relay could not save its state. Nothing was sent."
-    RelayNotice.STORAGE_UNCERTAIN -> "Relay could not confirm that its state was saved. Nothing was sent."
+    RelayNotice.STORAGE_UNCERTAIN ->
+        "Relay could not confirm that its state was saved. Nothing was sent."
     RelayNotice.SEND_REFUSED_STORAGE -> "Relay state is not saved yet. Try again."
     RelayNotice.CLOCK_UNAVAILABLE -> "The server clock is not available yet."
     RelayNotice.LEDGER_FULL -> "Too many messages are tracked. Clear finished ones to continue."
     RelayNotice.TURN_REFUSED -> "That message cannot be sent."
-    RelayNotice.CONVERSATION_NOT_CONTINUABLE -> "This conversation cannot be continued from the phone."
-    RelayNotice.CREATE_PENDING -> "A new conversation is still being created. It will not be created twice."
+    RelayNotice.CONVERSATION_NOT_CONTINUABLE ->
+        "This conversation cannot be continued from the phone."
+    RelayNotice.CREATE_PENDING ->
+        "A new conversation is still being created. It will not be created twice."
     RelayNotice.CREATE_REFUSED -> "The server refused to create the conversation."
-    RelayNotice.CREATE_EXPIRED -> "The new conversation could not be confirmed in time. Discard it and try again."
-    RelayNotice.CREATE_FAILED -> "The new conversation could not be created. Discard it and try again."
+    RelayNotice.CREATE_EXPIRED ->
+        "The new conversation could not be confirmed in time. Discard it and try again."
+    RelayNotice.CREATE_FAILED ->
+        "The new conversation could not be created. Discard it and try again."
     RelayNotice.NAME_INVALID -> "That name is not valid."
     RelayNotice.BUSY_TRY_AGAIN -> "The server is busy. Retrying."
     RelayNotice.RECONNECTING -> "Reconnecting."
     RelayNotice.HISTORY_INCOMPLETE -> "Only part of this conversation's history is shown."
     RelayNotice.PROMPT_ELSEWHERE -> "Hermes is waiting for an answer on another device."
-    RelayNotice.PERMISSION_DENIED -> "This phone no longer has access. Cached Relay content was removed."
+    RelayNotice.PERMISSION_DENIED ->
+        "This phone no longer has access. Cached Relay content was removed."
     RelayNotice.PROFILE_CHANGED -> "The server or profile changed. Review it before continuing."
     RelayNotice.SERVER_ERROR -> "The server could not do that."
     RelayNotice.ANOMALY -> "The server answered something unexpected. Nothing was changed."
@@ -97,25 +103,34 @@ internal fun relayNoticeText(notice: RelayNotice): String = when (notice) {
 
 internal fun relayReasonText(reason: RelayReason): String = when (reason) {
     RelayReason.NONE -> ""
-    RelayReason.NOT_OFFERED -> "This server does not offer Relay conversations. The normal chat still works."
-    RelayReason.MALFORMED_WELCOME -> "The server's Relay answer was not understood. Relay is off for this connection."
+    RelayReason.NOT_OFFERED ->
+        "This server does not offer Relay conversations. The normal chat still works."
+    RelayReason.MALFORMED_WELCOME ->
+        "The server's Relay answer was not understood. Relay is off for this connection."
     RelayReason.NOT_PAIRED -> "Approve this phone on the box first, then reconnect."
-    RelayReason.MISSING_METHODS -> "This server's Relay grant does not allow conversations from the phone."
+    RelayReason.MISSING_METHODS ->
+        "This server's Relay grant does not allow conversations from the phone."
     RelayReason.NO_SERVER_TIME -> "This Relay grant has no conversation access."
     RelayReason.INFO_FAILED -> "Relay could not be set up with this server."
+    RelayReason.ACCESS_DENIED -> "The server does not give this phone Relay access."
     RelayReason.CLOCK_UNAVAILABLE -> "The server clock could not be read."
     RelayReason.TLS_REQUIRED -> "Relay conversations require a wss endpoint."
     RelayReason.TOO_MANY_ENROLLMENTS -> "Relay supports at most 16 phone enrollments."
 }
 
 internal fun relayStorageText(problem: StoreProblem): String = when (problem) {
-    StoreProblem.KEY_UNAVAILABLE -> "The key for Relay's saved state is unavailable. The saved state was kept."
-    StoreProblem.STORAGE_UNAVAILABLE -> "Relay's saved state cannot be read or written. It was kept."
+    StoreProblem.KEY_UNAVAILABLE ->
+        "The key for Relay's saved state is unavailable. The saved state was kept."
+    StoreProblem.STORAGE_UNAVAILABLE ->
+        "Relay's saved state cannot be read or written. It was kept."
     StoreProblem.RECORD_MISSING -> "Relay's saved state went missing. Nothing was replaced."
     StoreProblem.CORRUPT -> "Relay's saved state could not be verified. It was kept untouched."
-    StoreProblem.UNSUPPORTED_VERSION -> "Relay's saved state is from a newer version. It was kept untouched."
-    StoreProblem.TOO_LARGE -> "Relay's saved state is larger than this version supports. It was kept untouched."
-    StoreProblem.UNRESTORABLE -> "Relay's saved state cannot be restored by this version. It was kept untouched."
+    StoreProblem.UNSUPPORTED_VERSION ->
+        "Relay's saved state is from a newer version. It was kept untouched."
+    StoreProblem.TOO_LARGE ->
+        "Relay's saved state is larger than this version supports. It was kept untouched."
+    StoreProblem.UNRESTORABLE ->
+        "Relay's saved state cannot be restored by this version. It was kept untouched."
 }
 
 internal fun turnStatusText(status: TurnStatus): String = when (status) {
@@ -147,7 +162,10 @@ internal fun RelaySection(
             RelayPhase.OFF -> RelayOff(requested, relay.reason, actions)
             RelayPhase.CHECKING -> Text("Checking saved Relay state.")
             RelayPhase.STORAGE_PROBLEM -> {
-                Text(relay.storage?.let(::relayStorageText).orEmpty(), color = MaterialTheme.colorScheme.error)
+                Text(
+                    relay.storage?.let(::relayStorageText).orEmpty(),
+                    color = MaterialTheme.colorScheme.error
+                )
                 TextButton(actions.retryStorage) { Text("Check again") }
             }
             RelayPhase.CONNECTING -> Text("Relay is on. Connecting.")
@@ -157,7 +175,9 @@ internal fun RelaySection(
             }
             RelayPhase.REVIEW_REQUIRED -> RelayReview(relay, actions)
             RelayPhase.STOPPED -> {
-                Text("This phone's Relay access was removed by the server. Nothing is sent and cached content is gone.")
+                Text(
+                    "This phone's Relay access was removed by the server. Nothing is sent and cached content is gone."
+                )
                 Button(actions.reauthorize) { Text("Allow Relay again") }
                 TextButton({ actions.enable(false) }) { Text("Turn off Relay") }
             }
@@ -181,7 +201,11 @@ private fun RelayOff(requested: Boolean, reason: RelayReason, actions: RelayActi
             "the normal chat is unchanged. Voice in a Relay conversation comes later.",
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
-    if (reason != RelayReason.NONE) Text(relayReasonText(reason), color = MaterialTheme.colorScheme.error)
+    if (reason !=
+        RelayReason.NONE
+    ) {
+        Text(relayReasonText(reason), color = MaterialTheme.colorScheme.error)
+    }
     if (requested) {
         Text("Relay is on. It starts when you connect.")
         TextButton({ actions.enable(false) }) { Text("Turn off Relay") }
@@ -192,7 +216,9 @@ private fun RelayOff(requested: Boolean, reason: RelayReason, actions: RelayActi
 
 @Composable
 private fun RelayReview(relay: RelayUiState, actions: RelayActions) {
-    Text("The server or profile this phone talks to has changed. Nothing is sent until you review it.")
+    Text(
+        "The server or profile this phone talks to has changed. Nothing is sent until you review it."
+    )
     Text("Remembered profile: " + relay.pinnedDigest.orEmpty())
     Text("Profile now: " + (relay.observedDigest ?: "unknown, reconnect to see it"))
     Button(actions.review, enabled = relay.observedDigest != null) { Text("Review and continue") }
@@ -298,8 +324,16 @@ private fun TurnRow(turn: TurnView, actions: RelayActions) {
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (turn.canCheck) TextButton({ actions.check(turn.requestId) }) { Text("Check") }
-            if (turn.canResend) TextButton({ actions.resend(turn.requestId) }) { Text("Send again") }
-            if (turn.canAbandon) TextButton({ actions.abandon(turn.requestId) }) { Text("Stop tracking") }
+            if (turn.canResend) {
+                TextButton({
+                    actions.resend(turn.requestId)
+                }) { Text("Send again") }
+            }
+            if (turn.canAbandon) {
+                TextButton({
+                    actions.abandon(turn.requestId)
+                }) { Text("Stop tracking") }
+            }
         }
     }
 }
@@ -312,7 +346,10 @@ internal fun RelayComposer(
     send: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        modifier.fillMaxWidth().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         OutlinedTextField(
             state.draft,
             draft,

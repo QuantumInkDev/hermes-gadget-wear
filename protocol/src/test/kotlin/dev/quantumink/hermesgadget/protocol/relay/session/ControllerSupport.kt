@@ -27,8 +27,8 @@ import dev.quantumink.hermesgadget.protocol.relay.RelayEnvelope
 import dev.quantumink.hermesgadget.protocol.relay.RelayEvent
 import dev.quantumink.hermesgadget.protocol.relay.RelayMethod
 import dev.quantumink.hermesgadget.protocol.relay.RelayTransport
-import dev.quantumink.hermesgadget.protocol.relay.RequestId
 import dev.quantumink.hermesgadget.protocol.relay.RelayVectors
+import dev.quantumink.hermesgadget.protocol.relay.RequestId
 import dev.quantumink.hermesgadget.protocol.relay.state.ClockFix
 import dev.quantumink.hermesgadget.protocol.relay.state.RequestIdEntropy
 import dev.quantumink.hermesgadget.protocol.relay.state.ServerClock
@@ -186,7 +186,7 @@ internal class ScriptedTransport(val log: MutableList<String>) : RelayTransport 
     var refreshes = 0
     var refreshHandler: ((RelayCallResult<Info>) -> Unit)? = null
 
-    override fun correlation(): CorrelationId = CorrelationId.of("t${generation}-${++counter}")!!
+    override fun correlation(): CorrelationId = CorrelationId.of("t$generation-${++counter}")!!
 
     override fun <R : Any> call(
         correlation: CorrelationId,
@@ -202,9 +202,19 @@ internal class ScriptedTransport(val log: MutableList<String>) : RelayTransport 
                 { result -> handler(result) },
                 { body ->
                     val text = RelayVectors.asciiJson(
-                        JsonObject(mapOf("type" to JsonPrimitive("relay.response"), "v" to JsonPrimitive(1)) + body)
+                        JsonObject(
+                            mapOf(
+                                "type" to JsonPrimitive("relay.response"),
+                                "v" to JsonPrimitive(1)
+                            ) +
+                                body
+                        )
                     )
-                    handler(RelayCallResult.Outcome(call.interpret(correlation, RelayEnvelope.decodeFrame(text))))
+                    handler(
+                        RelayCallResult.Outcome(
+                            call.interpret(correlation, RelayEnvelope.decodeFrame(text))
+                        )
+                    )
                 }
             )
         )
@@ -225,7 +235,12 @@ internal class ScriptedTransport(val log: MutableList<String>) : RelayTransport 
 
     fun reply(call: Sent, result: JsonObject) {
         call.answered = true
-        call.frame(buildJsonObject { put("id", call.correlation.value); put("result", result) })
+        call.frame(
+            buildJsonObject {
+                put("id", call.correlation.value)
+                put("result", result)
+            }
+        )
     }
 
     fun fail(call: Sent, code: String, snapshotRequired: Boolean = false) {
@@ -265,7 +280,9 @@ internal class ScriptedTransport(val log: MutableList<String>) : RelayTransport 
         fun paramsOf(call: RelayCall<*>): JsonObject {
             val frame = RelayEnvelope.encodeRequest(CorrelationId.of("p")!!, call)
             val text = (frame as dev.quantumink.hermesgadget.protocol.relay.RelayEncoded.Frame).text
-            return kotlinx.serialization.json.Json.parseToJsonElement(text).jsonObject["params"]!!.jsonObject
+            return kotlinx.serialization.json.Json.parseToJsonElement(
+                text
+            ).jsonObject["params"]!!.jsonObject
         }
     }
 }
@@ -278,7 +295,9 @@ internal object Dto {
     const val EXPIRES = 1_794_892_000_000L
 
     val conversation: ConversationId = ConversationId.of("3ff4ef74-af70-4efc-a3d4-e797b98a4dea")!!
-    val otherConversation: ConversationId = ConversationId.of("150a3e5a-3f41-48b5-85b6-b63879fa6274")!!
+    val otherConversation: ConversationId = ConversationId.of(
+        "150a3e5a-3f41-48b5-85b6-b63879fa6274"
+    )!!
     val admission: AdmissionId = AdmissionId.of("b51c880f-2574-4650-99fb-cd685725b5b3")!!
 
     val ALL_METHODS = listOf(
@@ -370,16 +389,13 @@ internal object Dto {
         payload
     )
 
-    fun events(
-        binding: Binding,
-        vararg events: RelayEvent,
-        snapshotRequired: Boolean = false
-    ) = EventsPage(
-        events.toList(),
-        binding.replayEpoch,
-        events.lastOrNull()?.sequence ?: binding.lastSequence,
-        snapshotRequired
-    )
+    fun events(binding: Binding, vararg events: RelayEvent, snapshotRequired: Boolean = false) =
+        EventsPage(
+            events.toList(),
+            binding.replayEpoch,
+            events.lastOrNull()?.sequence ?: binding.lastSequence,
+            snapshotRequired
+        )
 
     fun messageEvent(
         n: Int,
@@ -420,7 +436,11 @@ internal class ControllerFixture(
         store,
         scheduler,
         nanos::get,
-        { bytes -> Dto.scriptedEntropy.fill(bytes); bytes[1] = (entropySeed.getAndIncrement()).toByte() },
+        { bytes ->
+            Dto.scriptedEntropy.fill(bytes)
+            bytes[1] =
+                (entropySeed.getAndIncrement()).toByte()
+        },
         timing
     ) { states.add(it) }
 
@@ -461,6 +481,12 @@ internal class ControllerFixture(
         run()
     }
 
+    /** The channel reports [state] for the current socket. */
+    fun channel(state: RelayChannelState) {
+        controller.onChannel(state, socket)
+        run()
+    }
+
     /** The socket ended: calls in flight end Closed, then the channel reports Closed. */
     fun disconnect() {
         transport.closeAll()
@@ -485,7 +511,11 @@ internal class ControllerFixture(
         answer("relay.conversations.list", Dto.page(*summaries).toWire())
     }
 
-    fun attachTo(binding: Binding, history: HistoryPage = Dto.history(), withTasks: Boolean = true) {
+    fun attachTo(
+        binding: Binding,
+        history: HistoryPage = Dto.history(),
+        withTasks: Boolean = true
+    ) {
         answer("relay.conversation.attach", binding.toWire())
         // Receipt lookups of unresolved turns come first; the caller answers those before calling this when present.
         answer("relay.history.page", history.toWire())
@@ -497,5 +527,8 @@ internal class ControllerFixture(
         }
     }
 
-    fun frames(method: String): List<ScriptedTransport.Sent> = transport.sent.filter { it.method == method }
+    fun frames(method: String): List<ScriptedTransport.Sent> = transport.sent.filter {
+        it.method ==
+            method
+    }
 }

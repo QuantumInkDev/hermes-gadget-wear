@@ -42,7 +42,10 @@ import org.junit.Test
 class SnapshotCodecTest {
     private val section = ControllerSection(
         listOf(
-            EnrollmentRecord.fresh("wss://relay.example.invalid/gadget", "phone:hg-0011223344556677").copy(
+            EnrollmentRecord.fresh(
+                "wss://relay.example.invalid/gadget",
+                "phone:hg-0011223344556677"
+            ).copy(
                 enabled = true,
                 pinnedProfileId = Dto.profile,
                 reviewEpoch = 3,
@@ -101,16 +104,30 @@ class SnapshotCodecTest {
             )
         )
         val history = HistorySnapshot(
-            scope(), Dto.conversation.value, "RELAY", 2, "REBUILD", "CONSUMER", "ACTIVE", null, 5, true,
+            scope(), Dto.conversation.value, "RELAY", 2, "REBUILD", "CONSUMER", "ACTIVE", null, 5,
+            true,
             "opaque-cursor", false,
-            listOf(KnownMessageSnapshot("00000000-0000-4000-9000-000000000001", "assistant", 77, 2)),
-            listOf(RefusedMessageSnapshot("00000000-0000-4000-9000-000000000002", "TOO_MANY_SEGMENTS", 500))
+            listOf(
+                KnownMessageSnapshot("00000000-0000-4000-9000-000000000001", "assistant", 77, 2)
+            ),
+            listOf(
+                RefusedMessageSnapshot(
+                    "00000000-0000-4000-9000-000000000002",
+                    "TOO_MANY_SEGMENTS",
+                    500
+                )
+            )
         )
         val delivery = DeliverySnapshot(
             scope(),
             9,
             listOf(
-                SeenKeySnapshot("canonical", Dto.conversation.value, "00000000-0000-4000-a000-000000000001", 5),
+                SeenKeySnapshot(
+                    "canonical",
+                    Dto.conversation.value,
+                    "00000000-0000-4000-a000-000000000001",
+                    5
+                ),
                 SeenKeySnapshot("opaque", "stock-chat", "stock-final", 6)
             ),
             listOf(ObligationSnapshot(Dto.conversation.value, "HISTORY", "ATTACHED")),
@@ -143,7 +160,12 @@ class SnapshotCodecTest {
         assertEquals(2, decoded.snapshot.deliveries.single().seen.size)
         // Every version-1 turn state survives the round trip: UNCERTAIN, EXPIRED_REPORTED and the refusal.
         assertEquals(document.snapshot.ledger.turns.map { it.closure }, turns.map { it.closure })
-        assertEquals(document.snapshot.ledger.turns.map { it.lastErrorCode }, turns.map { it.lastErrorCode })
+        assertEquals(
+            document.snapshot.ledger.turns.map {
+                it.lastErrorCode
+            },
+            turns.map { it.lastErrorCode }
+        )
     }
 
     @Test fun aVersionOneAggregateRoundTripsAndRestoresWithoutCapturesAndKeepsEveryTurnState() {
@@ -153,7 +175,11 @@ class SnapshotCodecTest {
         val decoded = (SnapshotCodec.decode(bytes) as DecodeResult.Decoded).document
         assertEquals(1, decoded.snapshot.version)
         assertTrue(decoded.snapshot.captures.records.isEmpty())
-        val restored = RelayStateRestore.restore(decoded.snapshot, StateTestSupport.at(60_000), RelayAuthority.fresh())
+        val restored = RelayStateRestore.restore(
+            decoded.snapshot,
+            StateTestSupport.at(60_000),
+            RelayAuthority.fresh()
+        )
         assertTrue(restored.toString(), restored is RestoreResult.Restored)
         val state = (restored as RestoreResult.Restored).value
         // A restored turn that may have reached the server is UNCERTAIN (process loss); none was lost or converted.
@@ -161,7 +187,12 @@ class SnapshotCodecTest {
         assertTrue(state.ledger.entries.none { it.phase == TurnPhase.PREPARED && it.sent })
         // Writing it again as a version 2 aggregate keeps the same turns and adds the explicit empty capture section.
         val rebuilt = (
-            RelayStateSnapshot.of(state.ledger, state.histories, state.deliveries, VoiceCaptureLedger.empty())
+            RelayStateSnapshot.of(
+                state.ledger,
+                state.histories,
+                state.deliveries,
+                VoiceCaptureLedger.empty()
+            )
                 as SnapshotBuild.Built
             ).snapshot
         assertEquals(2, rebuilt.version)
@@ -174,14 +205,23 @@ class SnapshotCodecTest {
     @Test fun anUnsupportedVersionOrMagicIsReportedAndNeverReinterpreted() {
         val bytes = encoded(full())
         val wrongMagic = bytes.copyOf().also { it[0] = 0x00 }
-        assertEquals(DecodeRefusal.UNSUPPORTED_VERSION, (SnapshotCodec.decode(wrongMagic) as DecodeResult.Rejected).reason)
+        assertEquals(
+            DecodeRefusal.UNSUPPORTED_VERSION,
+            (SnapshotCodec.decode(wrongMagic) as DecodeResult.Rejected).reason
+        )
         val futureFormat = bytes.copyOf().also { it[5] = 9 }
-        assertEquals(DecodeRefusal.UNSUPPORTED_VERSION, (SnapshotCodec.decode(futureFormat) as DecodeResult.Rejected).reason)
+        assertEquals(
+            DecodeRefusal.UNSUPPORTED_VERSION,
+            (SnapshotCodec.decode(futureFormat) as DecodeResult.Rejected).reason
+        )
         val futureSnapshot = bytes.copyOf().also { it[7] = 9 }
-        assertEquals(DecodeRefusal.UNSUPPORTED_VERSION, (SnapshotCodec.decode(futureSnapshot) as DecodeResult.Rejected).reason)
+        assertEquals(
+            DecodeRefusal.UNSUPPORTED_VERSION,
+            (SnapshotCodec.decode(futureSnapshot) as DecodeResult.Rejected).reason
+        )
     }
 
-    @Test fun everyTruncationAndSingleByteCorruptionIsATypedRejectionNeverAnExceptionOrAShortenedDocument() {
+    @Test fun everyTruncationAndSingleByteCorruptionIsATypedRejectionNeverAnException() {
         val bytes = encoded(full())
         for (length in 0 until bytes.size) {
             val result = SnapshotCodec.decode(bytes.copyOf(length))
@@ -224,7 +264,12 @@ class SnapshotCodecTest {
     }
 
     private fun emptySnapshot(): RelayStateSnapshot = (
-        RelayStateSnapshot.of(TurnLedger.empty(), emptyList(), emptyList(), VoiceCaptureLedger.empty())
+        RelayStateSnapshot.of(
+            TurnLedger.empty(),
+            emptyList(),
+            emptyList(),
+            VoiceCaptureLedger.empty()
+        )
             as SnapshotBuild.Built
         ).snapshot
 
@@ -243,8 +288,16 @@ class SnapshotCodecTest {
         )
         val tooLongText = withTurn(
             TurnSnapshot(
-                turn.scope, turn.conversationId, turn.requestId, turn.expiresAtMs, turn.preparedAtMs,
-                turn.fingerprint, "x".repeat(StoreBounds.TURN_TEXT_BYTES + 1), turn.sent, turn.facts, turn.closure,
+                turn.scope,
+                turn.conversationId,
+                turn.requestId,
+                turn.expiresAtMs,
+                turn.preparedAtMs,
+                turn.fingerprint,
+                "x".repeat(
+                    StoreBounds.TURN_TEXT_BYTES + 1
+                ),
+                turn.sent, turn.facts, turn.closure,
                 turn.held, turn.lastErrorCode, turn.anomalies
             )
         )
@@ -253,12 +306,19 @@ class SnapshotCodecTest {
         assertEquals("ledger.turns[0].text", refused.path)
         val unencodable = withTurn(
             TurnSnapshot(
-                turn.scope, turn.conversationId, turn.requestId, turn.expiresAtMs, turn.preparedAtMs,
+                turn.scope,
+                turn.conversationId,
+                turn.requestId,
+                turn.expiresAtMs,
+                turn.preparedAtMs,
                 turn.fingerprint, "lone \ud800 surrogate", turn.sent, turn.facts, turn.closure,
                 turn.held, turn.lastErrorCode, turn.anomalies
             )
         )
-        assertEquals(EncodeRefusal.INVALID_VALUE, (SnapshotCodec.encode(unencodable) as EncodeResult.Refused).reason)
+        assertEquals(
+            EncodeRefusal.INVALID_VALUE,
+            (SnapshotCodec.encode(unencodable) as EncodeResult.Refused).reason
+        )
         // One more turn than the ledger holds: the public constructor keeps one past the limit and the codec refuses it.
         val tooMany = withTurn(turn, StateLimits.MAX_RETAINED_TURNS + 1)
         val many = SnapshotCodec.encode(tooMany) as EncodeResult.Refused
@@ -270,7 +330,9 @@ class SnapshotCodecTest {
                 EnrollmentRecord.fresh("wss://h$it.example.invalid/g", "phone:hg-%016d".format(it))
             }
         )
-        val tooManyEnrollments = SnapshotCodec.encode(RelayDocument(enrollments, emptySnapshot())) as EncodeResult.Refused
+        val tooManyEnrollments = SnapshotCodec.encode(
+            RelayDocument(enrollments, emptySnapshot())
+        ) as EncodeResult.Refused
         assertEquals(EncodeRefusal.TOO_MANY, tooManyEnrollments.reason)
         assertEquals("section.enrollments", tooManyEnrollments.path)
     }
@@ -278,7 +340,9 @@ class SnapshotCodecTest {
     @Test fun theDeliberateStorageCapIsNamedBackpressureBelowTheFullCapacity() {
         // The state layer would accept far more than the cap: the derivation of the full capacity is exact and larger.
         assertTrue(StoreBounds.capIsBelowFullCapacity)
-        assertTrue(StoreBounds.theoreticalMaxPlaintextBytes() > 3L * StoreBounds.PLAINTEXT_CAP_BYTES)
+        assertTrue(
+            StoreBounds.theoreticalMaxPlaintextBytes() > 3L * StoreBounds.PLAINTEXT_CAP_BYTES
+        )
         // Sixteen delivery tables with opaque keys at their field caps exceed the cap: refused as local backpressure.
         val seen = List(StateLimits.MAX_SEEN_KEYS) {
             SeenKeySnapshot("opaque", "c".repeat(128), "e".repeat(200) + "%056d".format(it), 1)
@@ -288,13 +352,24 @@ class SnapshotCodecTest {
         }
         val big = RelayDocument(
             ControllerSection.EMPTY,
-            RelayStateSnapshot(2, TurnLedgerSnapshot(emptyList(), emptyList()), emptyList(), deliveries, CaptureLedgerSnapshot.EMPTY)
+            RelayStateSnapshot(
+                2,
+                TurnLedgerSnapshot(emptyList(), emptyList()),
+                emptyList(),
+                deliveries,
+                CaptureLedgerSnapshot.EMPTY
+            )
         )
         val result = SnapshotCodec.encode(big) as EncodeResult.Refused
         assertEquals(EncodeRefusal.STORAGE_CAP, result.reason)
         // ... while a realistic table of canonical keys fits comfortably and is NOT refused.
         val canonical = List(StateLimits.MAX_SEEN_KEYS) {
-            SeenKeySnapshot("canonical", Dto.conversation.value, "00000000-0000-4000-a000-%012d".format(it), 1)
+            SeenKeySnapshot(
+                "canonical",
+                Dto.conversation.value,
+                "00000000-0000-4000-a000-%012d".format(it),
+                1
+            )
         }
         val fits = RelayDocument(
             ControllerSection.EMPTY,
@@ -302,7 +377,9 @@ class SnapshotCodecTest {
                 2,
                 TurnLedgerSnapshot(emptyList(), emptyList()),
                 emptyList(),
-                (0 until 8).map { DeliverySnapshot(scope(it), null, canonical, emptyList(), emptyList()) },
+                (0 until 8).map {
+                    DeliverySnapshot(scope(it), null, canonical, emptyList(), emptyList())
+                },
                 CaptureLedgerSnapshot.EMPTY
             )
         )
@@ -313,7 +390,10 @@ class SnapshotCodecTest {
 
     @Test fun theDerivedMaximaAreExactForEveryComponentAtItsFieldCaps() {
         val empty = StoreBounds.emptyDocumentBytes()
-        assertEquals(empty, encoded(RelayDocument(ControllerSection.EMPTY, emptySnapshot())).size.toLong())
+        assertEquals(
+            empty,
+            encoded(RelayDocument(ControllerSection.EMPTY, emptySnapshot())).size.toLong()
+        )
         val wideScope = ScopeRecordSnapshot(
             "€".repeat(128),
             Dto.profile.value,
@@ -325,12 +405,22 @@ class SnapshotCodecTest {
         // One turn with every field at its cap.
         val facts = AdmissionFactsSnapshot(uuid, 1, enum, 1L, enum, 1L)
         val turn = TurnSnapshot(
-            wideScope, uuid, uuid, 1, 1, "f".repeat(64), "t".repeat(StoreBounds.TURN_TEXT_BYTES), true, facts,
+            wideScope, uuid, uuid, 1, 1,
+            "f".repeat(
+                64
+            ),
+            "t".repeat(StoreBounds.TURN_TEXT_BYTES), true, facts,
             enum, true, enum, 1
         )
         val one = RelayDocument(
             ControllerSection.EMPTY,
-            RelayStateSnapshot(2, TurnLedgerSnapshot(listOf(turn), emptyList()), emptyList(), emptyList(), CaptureLedgerSnapshot.EMPTY)
+            RelayStateSnapshot(
+                2,
+                TurnLedgerSnapshot(listOf(turn), emptyList()),
+                emptyList(),
+                emptyList(),
+                CaptureLedgerSnapshot.EMPTY
+            )
         )
         assertEquals(
             empty + StoreBounds.turnFixedMax + 4 + StoreBounds.TURN_TEXT_BYTES,
@@ -350,30 +440,49 @@ class SnapshotCodecTest {
         assertEquals(empty + StoreBounds.scopeDecisionMax, encoded(decision).size.toLong())
         // One history with every list full.
         val history = HistorySnapshot(
-            wideScope, uuid, enum, 1, enum, enum, enum, enum, 1, true, "c".repeat(StoreBounds.CURSOR_BYTES), true,
+            wideScope, uuid, enum, 1, enum, enum, enum, enum, 1, true,
+            "c".repeat(
+                StoreBounds.CURSOR_BYTES
+            ),
+            true,
             List(StoreBounds.KNOWN_MESSAGES) { KnownMessageSnapshot(uuid, enum, 1, 1) },
             List(StoreBounds.REFUSED_MESSAGES) { RefusedMessageSnapshot(uuid, enum, 1) }
         )
         val histories = RelayDocument(
             ControllerSection.EMPTY,
-            RelayStateSnapshot(2, TurnLedgerSnapshot(emptyList(), emptyList()), listOf(history), emptyList(), CaptureLedgerSnapshot.EMPTY)
+            RelayStateSnapshot(
+                2,
+                TurnLedgerSnapshot(emptyList(), emptyList()),
+                listOf(history),
+                emptyList(),
+                CaptureLedgerSnapshot.EMPTY
+            )
         )
         assertEquals(empty + StoreBounds.historyMax, encoded(histories).size.toLong())
         // One delivery with every list full.
         val delivery = DeliverySnapshot(
             wideScope,
             1,
-            List(StoreBounds.SEEN_KEYS) { SeenKeySnapshot(enum, "c".repeat(128), "e".repeat(256), 1) },
+            List(StoreBounds.SEEN_KEYS) {
+                SeenKeySnapshot(enum, "c".repeat(128), "e".repeat(256), 1)
+            },
             List(StoreBounds.OBLIGATIONS) { ObligationSnapshot(uuid, enum, enum) },
             List(StoreBounds.PENDING_ACKS) { uuid }
         )
         val deliveries = RelayDocument(
             ControllerSection.EMPTY,
-            RelayStateSnapshot(2, TurnLedgerSnapshot(emptyList(), emptyList()), emptyList(), listOf(delivery), CaptureLedgerSnapshot.EMPTY)
+            RelayStateSnapshot(
+                2,
+                TurnLedgerSnapshot(emptyList(), emptyList()),
+                emptyList(),
+                listOf(delivery),
+                CaptureLedgerSnapshot.EMPTY
+            )
         )
         assertEquals(empty + StoreBounds.deliveryMax, encoded(deliveries).size.toLong())
         // One capture record with every optional field present.
-        val capture = CaptureRecordSnapshot(wideScope, uuid, uuid, 1, enum, uuid, enum, enum, enum, 1L)
+        val capture =
+            CaptureRecordSnapshot(wideScope, uuid, uuid, 1, enum, uuid, enum, enum, enum, 1L)
         val captures = RelayDocument(
             ControllerSection.EMPTY,
             RelayStateSnapshot(
@@ -387,9 +496,16 @@ class SnapshotCodecTest {
         assertEquals(empty + StoreBounds.captureMax, encoded(captures).size.toLong())
         // One enrollment with every optional field present.
         val record = EnrollmentRecord(
-            "€".repeat(128), "w".repeat(StoreBounds.URL_BYTES), "€".repeat(128), true, Dto.profile, 1,
+            "€".repeat(
+                128
+            ),
+            "w".repeat(StoreBounds.URL_BYTES), "€".repeat(128), true, Dto.profile, 1,
             Standing.STOPPED, Dto.otherProfile, Dto.conversation,
-            CreateIntent(RequestId.of("01939c8e-7a00-7000-8000-00000000abcd")!!, "t".repeat(StoreBounds.TITLE_BYTES), 1)
+            CreateIntent(
+                RequestId.of("01939c8e-7a00-7000-8000-00000000abcd")!!,
+                "t".repeat(StoreBounds.TITLE_BYTES),
+                1
+            )
         )
         val enrollment = RelayDocument(ControllerSection(listOf(record)), emptySnapshot())
         // `standing` is written by its name, which is shorter than the cap: the derivation is an upper bound, not equal.

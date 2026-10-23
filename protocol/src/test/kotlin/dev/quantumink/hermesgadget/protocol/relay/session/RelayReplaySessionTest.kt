@@ -34,22 +34,34 @@ class RelayReplaySessionTest {
         settle()
     }
 
-    @Test(timeout = 90000) fun deliberateCreateAttachAndTwoTurnsOfOneLineageThenReconnectReceiptFirstAfterALostResponse() {
+    @Test(timeout = 90000)
+    fun deliberateCreateAttachAndTwoTurnsOfOneLineageThenReconnectReceiptFirstAfterALostResponse() {
         ReplayHarness("task3-lineage.json").use { h ->
             h.start()
             val conversation = h.session.conversationId
-            assertEquals(conversation, h.store.reread().section.enrollments.single().selectedConversationId!!.value)
+            assertEquals(
+                conversation,
+                h.store.reread().section.enrollments.single().selectedConversationId!!.value
+            )
             // The create carried the durable id the entropy seam minted and the immutable title.
-            assertEquals(h.session.mintPlan[0], h.requests("relay.conversation.create").single()["params"].toString().let {
-                Regex("\"request_id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
-            })
+            assertEquals(
+                h.session.mintPlan[0],
+                h.requests("relay.conversation.create").single()["params"].toString().let {
+                    Regex("\"request_id\":\"([^\"]+)\"").find(it)!!.groupValues[1]
+                }
+            )
             // Turn 1: stored first, written, admitted; the events carry the answer AND a gap, so the session attaches again.
             h.send("first question")
             assertEquals(TurnStatus.QUEUED, h.ui.turns.single().status)
             h.advanceController(h.timing.pollActiveMs)
             h.assertClean()
             assertEquals(TurnStatus.FINISHED_COMPLETED, h.ui.turns.single().status)
-            assertEquals(listOf("first question", "first answer", "first answer"), h.ui.transcript.map { it.text })
+            assertEquals(
+                listOf("first question", "first answer", "first answer"),
+                h.ui.transcript.map {
+                    it.text
+                }
+            )
             // Turn 2 in the SAME conversation: a second admission of the same lineage.
             h.send("second question")
             h.advanceController(h.timing.pollActiveMs)
@@ -62,7 +74,10 @@ class RelayReplaySessionTest {
             assertEquals(RelayPhase.SELECTED, h.ui.phase)
             assertEquals(
                 listOf("first question", "second question"),
-                h.ui.transcript.filter { it.role == dev.quantumink.hermesgadget.protocol.relay.HistoryRole.USER }.map { it.text }
+                h.ui.transcript.filter {
+                    it.role ==
+                        dev.quantumink.hermesgadget.protocol.relay.HistoryRole.USER
+                }.map { it.text }
             )
             // Turn 3: admitted and executed by the server, but its response is LOST.
             h.server.holdNextResponse("relay.turn.submit")
@@ -78,9 +93,18 @@ class RelayReplaySessionTest {
             assertEquals(3, h.requests("relay.turn.submit").size)
             assertEquals(TurnStatus.FINISHED_COMPLETED, h.ui.turns.last().status)
             assertEquals(9, h.ui.transcript.size)
-            val receiptAt = h.server.seen.indexOfLast { it["method"]!!.jsonPrimitive.content == "relay.turn.receipt" }
-            val attachAt = h.server.seen.indexOfLast { it["method"]!!.jsonPrimitive.content == "relay.conversation.attach" }
-            val historyAt = h.server.seen.indexOfLast { it["method"]!!.jsonPrimitive.content == "relay.history.page" }
+            val receiptAt = h.server.seen.indexOfLast {
+                it["method"]!!.jsonPrimitive.content ==
+                    "relay.turn.receipt"
+            }
+            val attachAt = h.server.seen.indexOfLast {
+                it["method"]!!.jsonPrimitive.content ==
+                    "relay.conversation.attach"
+            }
+            val historyAt = h.server.seen.indexOfLast {
+                it["method"]!!.jsonPrimitive.content ==
+                    "relay.history.page"
+            }
             assertTrue(attachAt < receiptAt && receiptAt < historyAt)
             // The lost response now arrives on the NEW socket under an old correlation: ignored, nothing changes.
             val before = h.ui.turns.map { it.status }
@@ -93,45 +117,32 @@ class RelayReplaySessionTest {
         }
     }
 
-    @Test(timeout = 90000) fun aTurnThatNeverArrivedIsDeniedThenProbedAndSubmittedAgainWithTheSameIdTextAndExpiry() {
-        ReplayHarness("task3-absent-denied.json").use { h ->
+    @Test(timeout = 90000)
+    fun aTurnReceiptDeniedByTheRegisteredProducerStopsWithoutAProbeOrAnotherSubmit() {
+        ReplayHarness("task3-absent-denied-stop.json").use { h ->
             h.start()
             h.server.swallowNext("relay.turn.submit")
             h.send("first question")
-            h.drop()
-            assertEquals(TurnStatus.UNCERTAIN, h.ui.turns.single().status)
-            h.connection.connect()
-            h.settle()
+            h.reconnect()
             h.assertClean()
-            // receipt (denied) -> a read probe of the same conversation -> the SAME request again
-            val methods = h.server.seen.map { it["method"]!!.jsonPrimitive.content }.takeLast(7)
             assertEquals(
-                listOf(
-                    "relay.conversations.list", "relay.conversation.attach", "relay.turn.receipt",
-                    "relay.history.page", "relay.turn.submit", "relay.history.page"
-                ),
-                methods.takeLast(6)
+                "relay.turn.receipt",
+                h.server.seen.last()["method"]!!.jsonPrimitive.content
             )
-            val submits = h.requests("relay.turn.submit")
-            assertEquals(2, submits.size)
-            val first = submits[0]["params"] as kotlinx.serialization.json.JsonObject
-            val second = submits[1]["params"] as kotlinx.serialization.json.JsonObject
-            for (member in listOf("request_id", "text", "expires_at_ms")) assertEquals(member, first[member], second[member])
-            assertNotEquals(first["binding_id"], second["binding_id"])
-            assertEquals(h.session.mintPlan[1], first["request_id"]!!.jsonPrimitive.content)
-            assertEquals(1, h.ui.turns.size)
-            assertEquals(TurnStatus.QUEUED, h.ui.turns.single().status)
-            // The scope was NOT stopped by the denial: the probe proved read authority.
-            assertEquals(RelayPhase.SELECTED, h.ui.phase)
-            assertEquals(Standing.ACTIVE, h.store.reread().section.enrollments.single().standing)
+            assertEquals(1, h.requests("relay.turn.submit").size)
+            assertEquals(RelayPhase.STOPPED, h.ui.phase)
+            assertEquals(Standing.STOPPED, h.store.reread().section.enrollments.single().standing)
+            assertEquals(null, h.store.reread().snapshot.ledger.turns.single().text)
+            assertFalse(h.ui.canSend)
             h.advanceController(h.timing.pollActiveMs)
             h.assertClean()
-            assertEquals(TurnStatus.FINISHED_COMPLETED, h.ui.turns.single().status)
-            assertTrue(h.ui.transcript.any { it.text == "first answer" })
+            assertEquals(1, h.requests("relay.turn.submit").size)
+            assertTrue(h.server.extra.isEmpty())
         }
     }
 
-    @Test(timeout = 90000) fun aTurnThatNeverArrivedIsNotFoundWithTheSharedReceiptGrantAndSubmittedAgainWithoutAProbe() {
+    @Test(timeout = 90000)
+    fun aTurnThatNeverArrivedIsNotFoundWithTheSharedReceiptGrantAndSubmittedAgainWithoutAProbe() {
         ReplayHarness("task3-absent-not-found.json").use { h ->
             h.start()
             h.server.swallowNext("relay.turn.submit")
@@ -145,13 +156,25 @@ class RelayReplaySessionTest {
             )
             val submits = h.requests("relay.turn.submit")
             assertEquals(2, submits.size)
-            assertEquals(submits[0]["params"]!!.toString().substringAfter("request_id"), submits[1]["params"]!!.toString().substringAfter("request_id").let { it })
+            assertEquals(
+                submits[0]["params"]!!.toString().substringAfter("request_id"),
+                submits[1]["params"]!!.toString().substringAfter("request_id").let {
+                    it
+                }
+            )
             assertEquals(TurnStatus.QUEUED, h.ui.turns.single().status)
-            assertTrue(h.requests("relay.history.page").none { (it["params"] as kotlinx.serialization.json.JsonObject)["limit"]!!.jsonPrimitive.content == "1" })
+            assertTrue(
+                h.requests("relay.history.page").none {
+                    (it["params"] as kotlinx.serialization.json.JsonObject)["limit"]!!
+                        .jsonPrimitive.content ==
+                        "1"
+                }
+            )
         }
     }
 
-    @Test(timeout = 90000) fun anEventGapAndAnOverflowEachRefreshByAFreshAttachAndNothingIsSubmittedAgain() {
+    @Test(timeout = 90000)
+    fun anEventGapAndAnOverflowEachRefreshByAFreshAttachAndNothingIsSubmittedAgain() {
         ReplayHarness("task3-gap.json").use { h ->
             h.start()
             h.send("first question")
@@ -171,7 +194,8 @@ class RelayReplaySessionTest {
         }
     }
 
-    @Test(timeout = 90000) fun responsesMayArriveOutOfOrderAndTheEndStateIsTheSame() {
+    @Test(timeout = 90000)
+    fun responsesMayArriveOutOfOrderAndTheEndStateIsTheSame() {
         ReplayHarness("task3-lineage.json").use { h ->
             h.start()
             h.send("first question")
@@ -195,7 +219,8 @@ class RelayReplaySessionTest {
         }
     }
 
-    @Test(timeout = 90000) fun afterProcessLossNothingIsSentByItselfAndTheUserResumesWithTheReceiptFirst() {
+    @Test(timeout = 90000)
+    fun afterProcessLossNothingIsSentByItselfAndTheUserResumesWithTheReceiptFirst() {
         val store = MemoryStore()
         var resumeAt = 0
         var minted = 0
@@ -217,7 +242,12 @@ class RelayReplaySessionTest {
         }
         // A NEW process: new controller, new connection, same encrypted state. It restores with the fresh server time of the
         // first info, lists, and then waits: no attach, no receipt, no submit until the user chooses the conversation.
-        ReplayHarness("task3-lineage.json", store, startAt = resumeAt, mintStart = minted).use { h ->
+        ReplayHarness(
+            "task3-lineage.json",
+            store,
+            startAt = resumeAt,
+            mintStart = minted
+        ).use { h ->
             h.controller.prepare(h.identity)
             h.settle()
             assertTrue(h.ui.enabled)
@@ -240,7 +270,8 @@ class RelayReplaySessionTest {
         }
     }
 
-    @Test(timeout = 90000) fun aTimeoutOnALiveSocketReadsInfoAttachesAgainAndAsksTheReceiptBeforeAnythingElse() {
+    @Test(timeout = 90000)
+    fun aTimeoutOnALiveSocketReadsInfoAttachesAgainAndAsksTheReceiptBeforeAnythingElse() {
         ReplayHarness("task3-timeout.json").use { h ->
             h.start()
             h.server.holdNextResponse("relay.turn.submit")
@@ -257,7 +288,10 @@ class RelayReplaySessionTest {
             val methods = h.server.seen.map { it["method"]!!.jsonPrimitive.content }
             assertEquals(
                 listOf(
-                    "relay.info", "relay.conversations.list", "relay.conversation.attach", "relay.turn.receipt",
+                    "relay.info",
+                    "relay.conversations.list",
+                    "relay.conversation.attach",
+                    "relay.turn.receipt",
                     "relay.history.page"
                 ),
                 methods.takeLast(5)

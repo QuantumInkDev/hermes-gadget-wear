@@ -18,7 +18,10 @@ import org.junit.Test
  * controller. Replies are decoded by the real envelope and DTO decoders.
  */
 class RelayControllerReconnectTest {
-    private fun selected(fx: ControllerFixture, binding: Int = 1): dev.quantumink.hermesgadget.protocol.relay.Binding {
+    private fun selected(
+        fx: ControllerFixture,
+        binding: Int = 1
+    ): dev.quantumink.hermesgadget.protocol.relay.Binding {
         fx.connect()
         fx.listAnd(Dto.summary(), Dto.summary(Dto.otherConversation, "Other"))
         fx.controller.select(Dto.conversation.value)
@@ -29,7 +32,10 @@ class RelayControllerReconnectTest {
         return b
     }
 
-    private fun sendOne(fx: ControllerFixture, text: String = "the question"): ScriptedTransport.Sent {
+    private fun sendOne(
+        fx: ControllerFixture,
+        text: String = "the question"
+    ): ScriptedTransport.Sent {
         var accepted = false
         fx.controller.send(text) { accepted = it }
         fx.run()
@@ -141,7 +147,10 @@ class RelayControllerReconnectTest {
         assertEquals("relay.turn.receipt", methods.last())
         assertEquals(1, fx.frames("relay.turn.submit").size)
         val id = RequestId.of(first.params["request_id"]!!.jsonPrimitive.content)!!
-        fx.transport.reply(fx.transport.next("relay.turn.receipt"), Dto.receipt(id, ReceiptStatus.STARTED, generation = 1).toWire())
+        fx.transport.reply(
+            fx.transport.next("relay.turn.receipt"),
+            Dto.receipt(id, ReceiptStatus.STARTED, generation = 1).toWire()
+        )
         fx.run()
         assertEquals(TurnStatus.RUNNING, fx.ui.turns.single().status)
     }
@@ -184,8 +193,16 @@ class RelayControllerReconnectTest {
         assertTrue(fx.transport.open("relay.history.page").isEmpty())
         fx.transport.reply(second, Dto.binding(2, Dto.otherConversation).toWire())
         fx.run()
-        assertEquals(Dto.otherConversation.value, fx.transport.next("relay.history.page").params["conversation_id"]!!.jsonPrimitive.content)
-        assertEquals(Dto.otherConversation, fx.store.reread().section.enrollments.single().selectedConversationId)
+        assertEquals(
+            Dto.otherConversation.value,
+            fx.transport.next(
+                "relay.history.page"
+            ).params["conversation_id"]!!.jsonPrimitive.content
+        )
+        assertEquals(
+            Dto.otherConversation,
+            fx.store.reread().section.enrollments.single().selectedConversationId
+        )
     }
 
     @Test fun anEventGapRefreshesHistoryAndTasksWithoutAnyResubmission() {
@@ -199,7 +216,10 @@ class RelayControllerReconnectTest {
         val historyCalls = fx.frames("relay.history.page").size
         fx.advanceTime(fx.timing.pollActiveMs)
         // An admitted turn is looked up first (read only), then the events are pulled.
-        fx.transport.reply(fx.transport.next("relay.turn.receipt"), Dto.receipt(id, ReceiptStatus.QUEUED).toWire())
+        fx.transport.reply(
+            fx.transport.next("relay.turn.receipt"),
+            Dto.receipt(id, ReceiptStatus.QUEUED).toWire()
+        )
         fx.run()
         val read = fx.transport.next("relay.events.read")
         val gap = Dto.event(1, binding, EventPayload.Gap)
@@ -226,16 +246,34 @@ class RelayControllerReconnectTest {
         fx.enable()
         val binding = selected(fx)
         fx.advanceTime(fx.timing.pollIdleMs)
-        val foreignBinding = Dto.event(1, Dto.binding(9), Dto.messageEvent(1, HistoryRole.ASSISTANT, "from elsewhere", 1))
-        fx.transport.reply(fx.transport.next("relay.events.read"), Dto.events(binding, foreignBinding).toWire())
+        val foreignBinding = Dto.event(
+            1,
+            Dto.binding(9),
+            Dto.messageEvent(1, HistoryRole.ASSISTANT, "from elsewhere", 1)
+        )
+        fx.transport.reply(
+            fx.transport.next("relay.events.read"),
+            Dto.events(binding, foreignBinding).toWire()
+        )
         fx.run()
         assertTrue(fx.ui.transcript.isEmpty())
         assertEquals(RelayNotice.ANOMALY, fx.ui.notice)
         fx.advanceTime(fx.timing.pollIdleMs)
         val again = fx.transport.next("relay.events.read")
-        assertEquals(binding.lastSequence.toString(), again.params["after_sequence"]!!.jsonPrimitive.content)
-        val foreignEpoch = Dto.event(1, binding, Dto.messageEvent(2, HistoryRole.ASSISTANT, "old epoch", 1), "stale-epoch")
-        fx.transport.reply(again, EventsPage(listOf(foreignEpoch), "stale-epoch", 1, false).toWire())
+        assertEquals(
+            binding.lastSequence.toString(),
+            again.params["after_sequence"]!!.jsonPrimitive.content
+        )
+        val foreignEpoch = Dto.event(
+            1,
+            binding,
+            Dto.messageEvent(2, HistoryRole.ASSISTANT, "old epoch", 1),
+            "stale-epoch"
+        )
+        fx.transport.reply(
+            again,
+            EventsPage(listOf(foreignEpoch), "stale-epoch", 1, false).toWire()
+        )
         fx.run()
         assertTrue(fx.ui.transcript.isEmpty())
     }
@@ -260,7 +298,10 @@ class RelayControllerReconnectTest {
         var calls = 1
         repeat(20) {
             val call = fx.transport.open("relay.conversations.list").lastOrNull() ?: return@repeat
-            fx.transport.fail(call, listOf("busy", "rate_limited", "temporarily_unavailable")[it % 3])
+            fx.transport.fail(
+                call,
+                listOf("busy", "rate_limited", "temporarily_unavailable")[it % 3]
+            )
             fx.run()
             val before = fx.transport.sent.size
             var waited = 0L
@@ -301,7 +342,10 @@ class RelayControllerReconnectTest {
         again.controller.reauthorize()
         again.run()
         assertEquals(Standing.ACTIVE, again.store.reread().section.enrollments.single().standing)
-        assertEquals(RelayPhase.READY, again.ui.phase.takeIf { it != RelayPhase.CONNECTING } ?: RelayPhase.READY)
+        assertEquals(
+            RelayPhase.READY,
+            again.ui.phase.takeIf { it != RelayPhase.CONNECTING } ?: RelayPhase.READY
+        )
     }
 
     @Test fun theEvictionObligationStaysOwedUntilTheEvictionItselfIsStored() {
@@ -381,7 +425,11 @@ class RelayControllerReconnectTest {
         val record = fx.store.reread().section.enrollments.single()
         assertEquals(Dto.otherProfile, record.pinnedProfileId)
         assertEquals(1L, record.reviewEpoch)
-        assertEquals(RelayPhase.READY, fx.ui.phase.takeIf { it == RelayPhase.READY || it == RelayPhase.CONNECTING } ?: RelayPhase.READY)
+        assertEquals(
+            RelayPhase.READY,
+            fx.ui.phase.takeIf { it == RelayPhase.READY || it == RelayPhase.CONNECTING }
+                ?: RelayPhase.READY
+        )
     }
 
     @Test fun hidingStopsEveryTimerAndFrameAndReopeningDoesNotAttachByItself() {
@@ -405,7 +453,8 @@ class RelayControllerReconnectTest {
     @Test fun twoEnrollmentsKeepIndependentPinsStandingsAndTurns() {
         val fx = ControllerFixture()
         val a = fx.identity
-        val b = EnrollmentIdentity("wss://other.example.invalid/gadget", "phone:hg-8899aabbccddeeff")
+        val b =
+            EnrollmentIdentity("wss://other.example.invalid/gadget", "phone:hg-8899aabbccddeeff")
         fx.enable()
         selected(fx)
         sendOne(fx, "for A")
@@ -418,7 +467,10 @@ class RelayControllerReconnectTest {
         val section = fx.store.reread().section
         assertEquals(2, section.enrollments.size)
         assertEquals(Dto.profile, section.find(a.endpointKey, a.enrollmentLabel)!!.pinnedProfileId)
-        assertEquals(Dto.otherProfile, section.find(b.endpointKey, b.enrollmentLabel)!!.pinnedProfileId)
+        assertEquals(
+            Dto.otherProfile,
+            section.find(b.endpointKey, b.enrollmentLabel)!!.pinnedProfileId
+        )
         assertTrue(fx.ui.turns.isEmpty())
         // Back to A: its pin, selection and unresolved turn are untouched.
         fx.controller.hide()
@@ -438,55 +490,61 @@ class RelayControllerReconnectTest {
         assertTrue(fx.ui.relayOwnsComposer)
     }
 
-    private fun deniedLookup(fx: ControllerFixture): ScriptedTransport.Sent {
+    private fun deniedLookup(
+        fx: ControllerFixture,
+        beforeDenial: () -> Unit = {}
+    ): ScriptedTransport.Sent {
         fx.enable()
         selected(fx)
         val first = sendOne(fx)
         fx.transport.timeout(first)
         fx.run()
         reconnectAndAttach(fx, 2)
+        beforeDenial()
         fx.transport.fail(fx.transport.next("relay.turn.receipt"), "permission_denied")
         fx.run()
         return first
     }
 
-    @Test fun aDeniedLookupIsProbedAndAReadableConversationMeansTheServerNeverHadTheTurn() {
-        val fx = ControllerFixture()
-        val first = deniedLookup(fx)
-        // The denial is NOT taken at face value: an ordinary read of the same conversation is asked first.
-        val probe = fx.transport.next("relay.history.page")
-        assertEquals("1", probe.params["limit"]!!.jsonPrimitive.content)
-        assertEquals(Standing.ACTIVE, fx.store.reread().section.enrollments.single().standing)
-        fx.transport.reply(probe, Dto.history().toWire())
-        fx.run()
-        // Read authority is intact: the lookup counts as `not_found` and the SAME request is submitted again.
-        val second = fx.frames("relay.turn.submit")
-        assertEquals(2, second.size)
-        for (member in listOf("request_id", "text", "expires_at_ms")) assertEquals(first.params[member], second.last().params[member])
-        assertEquals(RelayPhase.ATTACHING.takeIf { false } ?: RelayPhase.SELECTED.takeIf { fx.ui.phase == RelayPhase.SELECTED } ?: fx.ui.phase, fx.ui.phase)
-        assertTrue(fx.ui.phase != RelayPhase.STOPPED)
-    }
-
-    @Test fun aDeniedLookupWithADeniedProbeIsARealRevocationAndStopsTheScope() {
+    @Test fun aDeniedReceiptRemainsStoppedAfterProcessRestore() {
         val fx = ControllerFixture()
         deniedLookup(fx)
-        fx.transport.fail(fx.transport.next("relay.history.page"), "permission_denied")
+        val again = ControllerFixture(fx.identity, fx.store)
+        again.store.log = again.log
+        again.prepare()
+        again.connect()
+        assertEquals(RelayPhase.STOPPED, again.ui.phase)
+        assertTrue(again.transport.sent.isEmpty())
+        assertEquals(null, fx.store.reread().snapshot.ledger.turns.single().text)
+    }
+
+    @Test fun aLateReadableHistoryResponseCannotUndoADeniedReceipt() {
+        val fx = ControllerFixture()
+        deniedLookup(fx)
+        val oldHistory = fx.frames("relay.history.page").last()
+        fx.transport.reply(oldHistory, Dto.history().toWire())
         fx.run()
         assertEquals(RelayPhase.STOPPED, fx.ui.phase)
         assertEquals(Standing.STOPPED, fx.store.reread().section.enrollments.single().standing)
         assertEquals(1, fx.frames("relay.turn.submit").size)
-        assertEquals(null, fx.store.reread().snapshot.ledger.turns.single().text)
+        assertFalse(fx.ui.canSend)
     }
 
-    @Test fun aDeniedLookupWithAnUnansweredProbeLeavesTheTurnUncertainAndStopsNothing() {
+    @Test fun aDeniedReceiptKeepsEvictionOwedUntilItsCommitSucceeds() {
         val fx = ControllerFixture()
-        deniedLookup(fx)
-        fx.transport.timeout(fx.transport.next("relay.history.page"))
+        deniedLookup(fx) { fx.store.allowCommits = 2 }
+        assertEquals(RelayPhase.STOPPED, fx.ui.phase)
+        assertTrue(fx.ui.unsaved)
+        val owed = fx.store.reread().snapshot
+        assertEquals(Standing.STOPPED, fx.store.reread().section.enrollments.single().standing)
+        assertTrue(owed.ledger.scopes.single().contentEvictionOwed)
+        assertEquals("the question", owed.ledger.turns.single().text)
+        fx.store.allowCommits = null
+        fx.controller.retryStorage()
         fx.run()
+        assertFalse(fx.store.reread().snapshot.ledger.scopes.single().contentEvictionOwed)
+        assertEquals(null, fx.store.reread().snapshot.ledger.turns.single().text)
         assertEquals(1, fx.frames("relay.turn.submit").size)
-        assertEquals(TurnStatus.UNCERTAIN, fx.ui.turns.single().status)
-        assertTrue(fx.ui.phase != RelayPhase.STOPPED)
-        assertEquals(Standing.ACTIVE, fx.store.reread().section.enrollments.single().standing)
     }
 
     @Test fun aChangedGrantRetiresTheBindingAndAttachesAgainButAnUnchangedRefreshDisturbsNothing() {
@@ -618,5 +676,49 @@ class RelayControllerReconnectTest {
         assertEquals(RelayPhase.READY, fx.ui.phase)
         assertEquals(Dto.conversation.value, fx.ui.resumable!!.id)
     }
-}
 
+    @Test fun aRefusedInfoReadWithPermissionDeniedStopsTheScopeAndOneWithProfileChangedFreezesIt() {
+        val fx = ControllerFixture()
+        fx.enable()
+        selected(fx)
+        fx.channel(
+            dev.quantumink.hermesgadget.protocol.relay.RelayChannelState.Failed(
+                dev.quantumink.hermesgadget.protocol.relay.RelayFailure.INFO_REFUSED,
+                dev.quantumink.hermesgadget.protocol.relay.RelayError(
+                    dev.quantumink.hermesgadget.protocol.relay.RelayErrorCode.PERMISSION_DENIED,
+                    false
+                )
+            )
+        )
+        assertEquals(RelayPhase.STOPPED, fx.ui.phase)
+        assertEquals(Standing.STOPPED, fx.store.reread().section.enrollments.single().standing)
+        val other = ControllerFixture()
+        other.enable()
+        selected(other)
+        other.channel(
+            dev.quantumink.hermesgadget.protocol.relay.RelayChannelState.Failed(
+                dev.quantumink.hermesgadget.protocol.relay.RelayFailure.INFO_REFUSED,
+                dev.quantumink.hermesgadget.protocol.relay.RelayError(
+                    dev.quantumink.hermesgadget.protocol.relay.RelayErrorCode.PROFILE_CHANGED,
+                    false
+                )
+            )
+        )
+        assertEquals(RelayPhase.REVIEW_REQUIRED, other.ui.phase)
+    }
+
+    @Test fun aReceiptPermissionDenialCannotBePromotedToAbsenceByHistoryRead() {
+        val fx = ControllerFixture()
+        deniedLookup(fx)
+        // The same conversation was readable at attach. That says nothing about receipt authority.
+        assertEquals(RelayPhase.STOPPED, fx.ui.phase)
+        assertEquals(Standing.STOPPED, fx.store.reread().section.enrollments.single().standing)
+        assertEquals(1, fx.frames("relay.turn.submit").size)
+        assertEquals(null, fx.store.reread().snapshot.ledger.turns.single().text)
+        assertTrue(
+            fx.frames("relay.history.page").none {
+                it.params["limit"]?.jsonPrimitive?.content == "1"
+            }
+        )
+    }
+}

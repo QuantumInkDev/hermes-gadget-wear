@@ -156,7 +156,8 @@ internal class EncryptedRelayStore(
         } catch (_: Exception) {
             // Atomic replace: either the old record is still in place and unchanged, or the outcome is unknown.
             val unchanged = pending.exists() && when (state) {
-                is Inspection.Present -> header(record)?.second == onDisk && sameBytes(record, state)
+                is Inspection.Present -> header(record)?.second == onDisk &&
+                    sameBytes(record, state)
                 else -> !record.exists()
             }
             if (unchanged) pending.delete()
@@ -284,7 +285,9 @@ internal class EncryptedRelayStore(
     }
 
     private fun aad(sequence: Long): ByteArray {
-        val head = "hermes-gadget|phone-relay-state|container-v1|$alias|".toByteArray(Charsets.UTF_8)
+        val head = "hermes-gadget|phone-relay-state|container-v1|$alias|".toByteArray(
+            Charsets.UTF_8
+        )
         return head + ByteBuffer.allocate(8).putLong(sequence).array()
     }
 

@@ -80,7 +80,9 @@ sealed interface RelayChannelState {
     data object NotOffered : RelayChannelState
     data class Invalid(val reason: RelayInvalid) : RelayChannelState
     data object LoadingInfo : RelayChannelState
-    data class Failed(val reason: RelayFailure) : RelayChannelState
+
+    /** [error] is the server's answer when `relay.info` itself was refused (e.g. `permission_denied`): never flattened away. */
+    data class Failed(val reason: RelayFailure, val error: RelayError? = null) : RelayChannelState
 
     /** Negotiated and `relay.info` answered. [serial] changes on every accepted `relay.info`. */
     class Ready(val info: Info, val clock: ServerClock, val serial: Long) : RelayChannelState {
@@ -180,7 +182,8 @@ class RelayChannel internal constructor(
 
     /** Safe from any thread. */
     fun correlation(): CorrelationId {
-        val value = "r" + generation.toString(RADIX) + "-" + counter.incrementAndGet().toString(RADIX)
+        val value =
+            "r" + generation.toString(RADIX) + "-" + counter.incrementAndGet().toString(RADIX)
         return requireNotNull(CorrelationId.of(value))
     }
 
@@ -198,7 +201,9 @@ class RelayChannel internal constructor(
     fun welcome(message: Message, paired: Boolean, nowMs: Long, send: (String) -> Boolean) {
         when (RelayNegotiation.welcome(message)) {
             RelayWelcome.NOT_OFFERED -> setState(RelayChannelState.NotOffered)
-            RelayWelcome.INVALID -> setState(RelayChannelState.Invalid(RelayInvalid.MALFORMED_WELCOME))
+            RelayWelcome.INVALID -> setState(
+                RelayChannelState.Invalid(RelayInvalid.MALFORMED_WELCOME)
+            )
             RelayWelcome.NEGOTIATED -> if (!paired) {
                 setState(RelayChannelState.Invalid(RelayInvalid.NEGOTIATED_WITHOUT_PAIRING))
             } else {
@@ -234,12 +239,18 @@ class RelayChannel internal constructor(
         when (result) {
             is RelayCallResult.Outcome -> when (val outcome = result.outcome) {
                 is RelayOutcome.Success -> adopt(outcome.value)
-                is RelayOutcome.Failed, is RelayOutcome.Uncorrelated, is RelayOutcome.Invalid ->
+                is RelayOutcome.Failed ->
+                    setState(RelayChannelState.Failed(RelayFailure.INFO_REFUSED, outcome.error))
+                is RelayOutcome.Uncorrelated, is RelayOutcome.Invalid ->
                     setState(RelayChannelState.Failed(RelayFailure.INFO_REFUSED))
             }
-            RelayCallResult.TimedOut -> setState(RelayChannelState.Failed(RelayFailure.INFO_TIMED_OUT))
+            RelayCallResult.TimedOut -> setState(
+                RelayChannelState.Failed(RelayFailure.INFO_TIMED_OUT)
+            )
             RelayCallResult.Closed -> Unit
-            is RelayCallResult.Refused -> setState(RelayChannelState.Failed(RelayFailure.SEND_REFUSED))
+            is RelayCallResult.Refused -> setState(
+                RelayChannelState.Failed(RelayFailure.SEND_REFUSED)
+            )
         }
     }
 
@@ -295,7 +306,9 @@ class RelayChannel internal constructor(
         remember(correlation.value)
         pending[correlation.value] = Pending(
             nowMs + timeoutMs,
-            { reply -> guarded { handler(RelayCallResult.Outcome(call.interpret(correlation, reply))) } },
+            { reply ->
+                guarded { handler(RelayCallResult.Outcome(call.interpret(correlation, reply))) }
+            },
             { ended -> guarded { handler(ended) } }
         )
         // Pacing: with no token the request WAITS (in order, under its own deadline); it is never refused for the rate.
@@ -359,7 +372,9 @@ class RelayChannel internal constructor(
         while (waiting.isNotEmpty() && takeToken(nowMs)) {
             val next = waiting.removeFirst()
             if (next.id in pending && !send(next.text)) {
-                pending.remove(next.id)?.end(RelayCallResult.Refused(RelayRefusal.SOCKET_BACKPRESSURE))
+                pending.remove(
+                    next.id
+                )?.end(RelayCallResult.Refused(RelayRefusal.SOCKET_BACKPRESSURE))
             }
         }
     }

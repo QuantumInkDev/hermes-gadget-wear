@@ -25,7 +25,9 @@ import org.junit.Test
  * nothing here is a live integration.
  */
 class RelayChannelRoutingTest {
-    private val info = RelayVectors.forMethod(RelayMethod.INFO).first { it.id == "relay-info/ok-03" }
+    private val info = RelayVectors.forMethod(RelayMethod.INFO).first {
+        it.id == "relay-info/ok-03"
+    }
 
     private fun awaitPeer(fixture: RelaySocketFixture, count: Int = 1): RelaySocketFixture.Peer {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
@@ -86,7 +88,10 @@ class RelayChannelRoutingTest {
         RelayConnectionHarness(fixture).use { harness ->
             harness.connection.connect()
             val peer = awaitPeer(fixture)
-            assertEquals(RelayChannelState.NotOffered, harness.awaitState<RelayChannelState.NotOffered>())
+            assertEquals(
+                RelayChannelState.NotOffered,
+                harness.awaitState<RelayChannelState.NotOffered>()
+            )
             harness.awaitConnected()
             assertTrue(peer.relayRequests.isEmpty())
             val seen = CopyOnWriteArrayList<RelayCallResult<Info>>()
@@ -153,7 +158,10 @@ class RelayChannelRoutingTest {
         RelayConnectionHarness(fixture).use { harness ->
             harness.connection.connect()
             val peer = awaitPeer(fixture)
-            assertEquals(RelayChannelState.LoadingInfo, harness.awaitState<RelayChannelState.LoadingInfo>())
+            assertEquals(
+                RelayChannelState.LoadingInfo,
+                harness.awaitState<RelayChannelState.LoadingInfo>()
+            )
             val infoRequest = peer.nextRequest()
             assertEquals("relay.info", infoRequest["method"]!!.jsonPrimitive.content)
             assertEquals(JsonObject(emptyMap()), infoRequest["params"])
@@ -178,8 +186,15 @@ class RelayChannelRoutingTest {
             harness.transport.call(harness.transport.correlation(), RelayCalls.tasks(), 1000) {
                 denied.add(it)
             }
-            while (denied.isEmpty() && System.nanoTime() < deadline + 5_000_000_000L) Thread.sleep(5)
-            assertEquals(RelayRefusal.NOT_ADVERTISED, (denied.single() as RelayCallResult.Refused).reason)
+            while (denied.isEmpty() &&
+                System.nanoTime() < deadline + 5_000_000_000L
+            ) {
+                Thread.sleep(5)
+            }
+            assertEquals(
+                RelayRefusal.NOT_ADVERTISED,
+                (denied.single() as RelayCallResult.Refused).reason
+            )
             assertTrue(peer.relayRequests.isEmpty())
             // An advertised method is written, with the exact correlation the caller got.
             val correlation = harness.transport.correlation()
@@ -211,7 +226,10 @@ class RelayChannelRoutingTest {
             val peer = awaitPeer(fixture)
             val request = peer.nextRequest()
             peer.deliver(o5.readdressed(request["id"]!!.jsonPrimitive.content))
-            assertEquals(RelayFailure.NO_SERVER_TIME, harness.awaitState<RelayChannelState.Failed>().reason)
+            assertEquals(
+                RelayFailure.NO_SERVER_TIME,
+                harness.awaitState<RelayChannelState.Failed>().reason
+            )
         }
     }
 
@@ -350,9 +368,18 @@ class RelayChannelRoutingTest {
             harness.awaitState<RelayChannelState.Ready>()
             assertTrue(harness.transport.generation > oldGeneration)
             val stale = CopyOnWriteArrayList<RelayCallResult<Receipt>>()
-            harness.transport.call(old, RelayCalls.receipt(conversation, request), 5000) { stale.add(it) }
-            while (stale.isEmpty() && System.nanoTime() < deadline + 5_000_000_000L) Thread.sleep(10)
-            assertEquals(RelayRefusal.STALE_GENERATION, (stale.single() as RelayCallResult.Refused).reason)
+            harness.transport.call(old, RelayCalls.receipt(conversation, request), 5000) {
+                stale.add(it)
+            }
+            while (stale.isEmpty() &&
+                System.nanoTime() < deadline + 5_000_000_000L
+            ) {
+                Thread.sleep(10)
+            }
+            assertEquals(
+                RelayRefusal.STALE_GENERATION,
+                (stale.single() as RelayCallResult.Refused).reason
+            )
             assertTrue(second.relayRequests.isEmpty())
         }
     }
@@ -398,7 +425,11 @@ class RelayChannelRoutingTest {
                 RelayCalls.receipt(conversation, request),
                 5000
             ) { extra.add(it) }
-            while (extra.isEmpty() && System.nanoTime() < deadline + 5_000_000_000L) Thread.sleep(10)
+            while (extra.isEmpty() &&
+                System.nanoTime() < deadline + 5_000_000_000L
+            ) {
+                Thread.sleep(10)
+            }
             assertEquals(
                 RelayRefusal.TOO_MANY_OUTSTANDING,
                 (extra.single() as RelayCallResult.Refused).reason
@@ -470,7 +501,9 @@ class RelayChannelRoutingTest {
                 val batch = minOf(RelayChannel.MAX_OUTSTANDING, 40 - sent)
                 val ids = (1..batch).map { harness.transport.correlation() }
                 ids.forEach { id ->
-                    harness.transport.call(id, RelayCalls.receipt(conversation, request), 20_000) { results.add(it) }
+                    harness.transport.call(id, RelayCalls.receipt(conversation, request), 20_000) {
+                        results.add(it)
+                    }
                 }
                 // Static connection time: tokens refill only as the clock moves, so requests beyond the bucket WAIT.
                 repeat(batch) {

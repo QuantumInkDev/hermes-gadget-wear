@@ -20,10 +20,10 @@ import dev.quantumink.hermesgadget.protocol.DirectConnection
 import dev.quantumink.hermesgadget.protocol.EndpointProfile
 import dev.quantumink.hermesgadget.protocol.Protocol
 import dev.quantumink.hermesgadget.protocol.RecordingFeedback
+import dev.quantumink.hermesgadget.protocol.SpeechRequest
 import dev.quantumink.hermesgadget.protocol.relay.session.EnrollmentIdentity
 import dev.quantumink.hermesgadget.protocol.relay.session.RelayController
 import dev.quantumink.hermesgadget.protocol.relay.session.RelayUiState
-import dev.quantumink.hermesgadget.protocol.SpeechRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -140,7 +140,9 @@ class PhoneConversation @JvmOverloads constructor(
         if (PhoneRelay.hasState(getApplication())) {
             val version = epoch
             relayPrepare.execute {
-                val known = runCatching { vault.identity(profile.endpoint, create = false) }.getOrNull()
+                val known = runCatching {
+                    vault.identity(profile.endpoint, create = false)
+                }.getOrNull()
                 if (known != null && profile.endpoint.isTls) {
                     synchronized(this) { if (!active(version)) return@execute }
                     relay.prepare(relayIdentity(profile, known))
@@ -472,7 +474,9 @@ class PhoneConversation @JvmOverloads constructor(
             ),
             httpClient = httpClient,
             previousReply = saved.getValue(profile.endpoint.url).reply,
-            relay = PhoneRelay.optIn(relayOn) { state, generation -> relay.onChannel(state, generation) }
+            relay = PhoneRelay.optIn(relayOn) { state, generation ->
+                relay.onChannel(state, generation)
+            }
         )
         relay.attachTransport(connection?.relayTransport)
         mutable.update { it.copy(error = notice, sessionVersion = version, relayRequested = false) }
@@ -612,7 +616,11 @@ class PhoneConversation @JvmOverloads constructor(
 
     /** A typed message into the SELECTED Relay conversation: stored first, then written; never the stock chat. */
     private fun sendRelay(current: PhoneConversationState) {
-        if (!current.visible || current.sending || current.draft.isBlank() || !current.relay.canSend) return
+        if (!current.visible || current.sending || current.draft.isBlank() ||
+            !current.relay.canSend
+        ) {
+            return
+        }
         val version = epoch
         val text = current.draft
         mutable.update { it.copy(sending = true, error = "") }

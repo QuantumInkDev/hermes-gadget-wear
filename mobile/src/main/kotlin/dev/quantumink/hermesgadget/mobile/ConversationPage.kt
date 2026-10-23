@@ -236,7 +236,10 @@ internal fun ConversationContent(
                             RelaySection(state.relay, state.relayRequested, relayActions)
                         }
 
-                        if (!state.relay.relayOwnsComposer && paired && conversation.reply.isBlank() &&
+                        if (
+                            !state.relay.relayOwnsComposer &&
+                            paired &&
+                            conversation.reply.isBlank() &&
                             conversation.transcript.isBlank() &&
                             !conversation.busy && !listening
                         ) {
@@ -259,7 +262,9 @@ internal fun ConversationContent(
                                 state,
                                 draft,
                                 send,
-                                Modifier.heightIn(max = controlsHeight).verticalScroll(rememberScrollState())
+                                Modifier.heightIn(
+                                    max = controlsHeight
+                                ).verticalScroll(rememberScrollState())
                             )
                         } else {
                             ConversationControls(

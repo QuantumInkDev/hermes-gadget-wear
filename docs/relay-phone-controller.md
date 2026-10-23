@@ -183,16 +183,20 @@ new id by a new explicit send. Replies, events and receipts apply only to the ex
 conversation/binding/generation (`BindingToken`, `CallRef`, session serial). Actions, prompts and outbox copies never execute by
 themselves; a prompt event is only noted ("waiting on another device").
 
-### 5.5 Receipt lookups answered `permission_denied` (finding)
+### 5.5 Receipt permission denial is not evidence of absence
 
-The registered SDK (`relay_store.find_request`) answers `permission_denied` for any request id that is not this device's own
-journaled turn when the device lacks `relay:receipt:shared` — and the default phone grant lacks it. A turn that never arrived
-therefore answers `permission_denied`, indistinguishable from a revocation. Taken at face value the accepted ledger would stop the
-scope and evict content. The controller never takes that denial as proof of absence **or** of revocation: it probes read
-authority with `relay.history.page {limit:1}` of the same conversation. Denied probe ⇒ genuine revocation (stop + evict);
-readable ⇒ the ledger is told `not_found` (an observation that allows the same id again; the journal makes that idempotent);
-unanswered ⇒ the turn stays uncertain. With the shared grant the server answers `not_found` directly. Both shapes are captured
-(§8). This should be raised with the SDK owners; it changes no accepted source here.
+The registered SDK (`relay_store.find_request`) currently answers `permission_denied` for any request id that is not this
+device's own journaled turn when the device lacks `relay:receipt:shared`; the default phone grant lacks that permission.
+Thus a turn lost before admission can receive the same error as a revoked receipt authority. A successful history read
+cannot resolve that ambiguity: read and receipt permissions are distinct, and it cannot prove that an earlier turn was
+never admitted. The controller passes the actual denial unchanged to the ledger: **stop the scope, retire authority and
+retain the content-eviction obligation until its durable completion**. It emits no read probe or automatic submit.
+
+The original stopped worker's probe-to-`not_found` workaround violated this rule and was removed after a semantic RED
+regression. Replay covers the registered producer's default-grant denial and verifies no further request; a separate
+registered shared-receipt-grant capture proves the true `not_found` same-ID path. No additional grant is silently added.
+The default-grant lost-before-admission compatibility issue requires a reviewed SDK contract change before live automatic
+recovery is claimed. SDK production is unchanged in this Task3 stage; this limit remains open for later server integration.
 
 ### 5.6 Errors, backoff, stop and review
 
@@ -245,6 +249,6 @@ watch. Original N6/N10 exact recovery stays REQUIRED, unrestored and unwaived (n
 2. Enable/disable before the clock exists rewrite the controller section only and carry the stored aggregate unchanged; every
    other mutation waits for the fresh clock (the brief's "block mutation" applies to the aggregate).
 3. A restored turn is looked up but never resent without the user; a same-process absent turn is resent by itself (same id).
-4. A lookup `permission_denied` is probed (§5.5) rather than taken at face value.
+4. A lookup `permission_denied` is passed unchanged to the ledger (§5.5); history reads never establish receipt absence.
 5. History resume points are kept per scope (newest 8); an over-limit one only means "read that listing from its top".
 6. The channel queues rather than refuses on its pacing bucket (a refusal would have failed a flow that merely had to wait).

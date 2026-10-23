@@ -15,8 +15,15 @@ import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
 /** The controller's single thread: every Relay state change runs on it, off the main thread (disk and crypto live here). */
-internal class ExecutorRelayScheduler : RelayScheduler, AutoCloseable {
-    private val executor = ScheduledThreadPoolExecutor(1) { Thread(it, "relay-controller").apply { isDaemon = true } }
+internal class ExecutorRelayScheduler :
+    RelayScheduler,
+    AutoCloseable {
+    private val executor = ScheduledThreadPoolExecutor(1) {
+        Thread(it, "relay-controller").apply {
+            isDaemon =
+                true
+        }
+    }
         .apply { removeOnCancelPolicy = true }
 
     override fun post(task: Runnable) {
@@ -71,7 +78,13 @@ internal object PhoneRelay {
         enabled: Boolean,
         nanos: () -> Long = SystemClock::elapsedRealtimeNanos,
         listener: (state: RelayChannelState, generation: Long) -> Unit
-    ): RelayOptIn? = if (enabled) RelayOptIn({ state, generation -> listener(state, generation) }, nanos) else null
+    ): RelayOptIn? = if (enabled) {
+        RelayOptIn({ state, generation ->
+            listener(state, generation)
+        }, nanos)
+    } else {
+        null
+    }
 
     /** True once Relay state was ever written on this phone: only then is an enrolled identity read when the screen opens. */
     fun hasState(application: Application): Boolean =

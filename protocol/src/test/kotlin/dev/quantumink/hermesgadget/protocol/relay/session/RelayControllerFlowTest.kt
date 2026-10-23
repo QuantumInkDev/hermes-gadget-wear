@@ -42,7 +42,12 @@ class RelayControllerFlowTest {
         assertEquals(Dto.profile, record.pinnedProfileId)
         assertEquals(0, record.reviewEpoch)
         assertEquals(Standing.ACTIVE, record.standing)
-        assertEquals(listOf("send:relay.conversations.list"), fx.log.filter { it.startsWith("send") })
+        assertEquals(
+            listOf("send:relay.conversations.list"),
+            fx.log.filter {
+                it.startsWith("send")
+            }
+        )
         fx.listAnd(Dto.summary())
         assertEquals(RelayPhase.READY, fx.ui.phase)
         assertEquals(1, fx.ui.conversations.size)
@@ -62,7 +67,10 @@ class RelayControllerFlowTest {
         val first = fx.frames("relay.conversation.create").single()
         val requestId = first.params["request_id"]!!.jsonPrimitive.content
         assertEquals("Planning", first.params["title"]!!.jsonPrimitive.content)
-        assertEquals(requestId, fx.store.reread().section.enrollments.single().createIntent!!.requestId.value)
+        assertEquals(
+            requestId,
+            fx.store.reread().section.enrollments.single().createIntent!!.requestId.value
+        )
         // The answer is lost with the connection; the SAME id and title are sent again after reconnecting.
         fx.disconnect()
         fx.connect()
@@ -73,7 +81,10 @@ class RelayControllerFlowTest {
         assertEquals("Planning", second.params["title"]!!.jsonPrimitive.content)
         // Never a second conversation: the retry that finally answers selects the one id.
         fx.answer("relay.conversation.create", Dto.summary(Dto.conversation, "Planning").toWire())
-        assertEquals(Dto.conversation, fx.store.reread().section.enrollments.single().selectedConversationId)
+        assertEquals(
+            Dto.conversation,
+            fx.store.reread().section.enrollments.single().selectedConversationId
+        )
         assertEquals(null, fx.store.reread().section.enrollments.single().createIntent)
         assertEquals(RelayPhase.ATTACHING, fx.ui.phase)
         assertEquals(2, fx.frames("relay.conversation.create").size)
@@ -98,10 +109,16 @@ class RelayControllerFlowTest {
         assertEquals(listOf("first question", "first answer"), fx.ui.transcript.map { it.text })
         assertEquals(0, fx.ui.tasksWorking)
         // Attach, history, tasks — in that order — and the event baseline is the binding's last sequence.
-        val order = fx.log.filter { it.startsWith("send:relay.conversation.attach") ||
-            it.startsWith("send:relay.history") || it.startsWith("send:relay.tasks") }
+        val order = fx.log.filter {
+            it.startsWith("send:relay.conversation.attach") ||
+                it.startsWith("send:relay.history") || it.startsWith("send:relay.tasks")
+        }
         assertEquals(
-            listOf("send:relay.conversation.attach", "send:relay.history.page", "send:relay.tasks.list"),
+            listOf(
+                "send:relay.conversation.attach",
+                "send:relay.history.page",
+                "send:relay.tasks.list"
+            ),
             order
         )
         assertTrue(fx.ui.canSend)
@@ -151,7 +168,11 @@ class RelayControllerFlowTest {
         val read = fx.transport.next("relay.events.read")
         assertEquals(4L, read.params["after_sequence"]!!.jsonPrimitive.content.toLong())
         assertEquals(binding.replayEpoch, read.params["replay_epoch"]!!.jsonPrimitive.content)
-        val answer = Dto.event(5, binding, Dto.messageEvent(9, HistoryRole.ASSISTANT, "the answer", 5))
+        val answer = Dto.event(
+            5,
+            binding,
+            Dto.messageEvent(9, HistoryRole.ASSISTANT, "the answer", 5)
+        )
         fx.transport.reply(read, Dto.events(binding, answer).toWire())
         fx.run()
         assertEquals(listOf("the answer"), fx.ui.transcript.map { it.text })

@@ -23,8 +23,11 @@ import org.junit.rules.TemporaryFolder
 class RelayControllerOnFileStoreTest {
     @get:Rule val temp = TemporaryFolder()
 
-    private val secret: SecretKey = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
-    private val identity = EnrollmentIdentity("wss://relay.example.invalid/gadget", "phone:hg-0011223344556677")
+    private val secret: SecretKey = KeyGenerator.getInstance("AES").apply {
+        init(256)
+    }.generateKey()
+    private val identity =
+        EnrollmentIdentity("wss://relay.example.invalid/gadget", "phone:hg-0011223344556677")
 
     /** Runs every task at once on the caller: the state machine is under test, not the thread. */
     private class Immediate : RelayScheduler {

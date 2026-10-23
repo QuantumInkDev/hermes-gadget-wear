@@ -27,7 +27,12 @@ import kotlinx.serialization.json.jsonPrimitive
  * client side under test is the production controller over the production [DirectConnection].
  */
 internal class RecordedSession(private val root: JsonObject) {
-    class Step(val connection: Int, val request: JsonObject, val response: JsonObject, val note: String) {
+    class Step(
+        val connection: Int,
+        val request: JsonObject,
+        val response: JsonObject,
+        val note: String
+    ) {
         val method: String get() = request["method"]!!.jsonPrimitive.content
         val params: JsonObject get() = request["params"]!!.jsonObject
         val ok: Boolean get() = "result" in response
@@ -36,7 +41,12 @@ internal class RecordedSession(private val root: JsonObject) {
 
     val steps: List<Step> = root["steps"]!!.jsonArray.map {
         val o = it.jsonObject
-        Step(o["connection"]!!.jsonPrimitive.content.toInt(), o["request"]!!.jsonObject, o["response"]!!.jsonObject, o["note"]!!.jsonPrimitive.content)
+        Step(
+            o["connection"]!!.jsonPrimitive.content.toInt(),
+            o["request"]!!.jsonObject,
+            o["response"]!!.jsonObject,
+            o["note"]!!.jsonPrimitive.content
+        )
     }
     val mintPlan: List<String> = root["mint_plan"]!!.jsonArray.map { it.jsonPrimitive.content }
     val serverTimeMs: Long = root["server_time_ms"]!!.jsonPrimitive.content.toLong()
@@ -57,7 +67,8 @@ internal class RecordedSession(private val root: JsonObject) {
         fun entropyFor(id: String): ByteArray {
             val hex = id.replace("-", "")
             val randomA = hex.substring(13, 16).toInt(16)
-            val random62 = java.lang.Long.parseUnsignedLong(hex.substring(16), 16) and ((1L shl 62) - 1)
+            val random62 =
+                java.lang.Long.parseUnsignedLong(hex.substring(16), 16) and ((1L shl 62) - 1)
             val bytes = ByteArray(10)
             bytes[0] = (randomA shr 8).toByte()
             bytes[1] = randomA.toByte()
@@ -74,9 +85,15 @@ internal class RecordedSession(private val root: JsonObject) {
  * the recording is counted and unanswered; a request can be swallowed (lost in transit) and a response withheld (lost) or
  * delivered late.
  */
-internal class RecordedServer(val session: RecordedSession, val fixture: RelaySocketFixture, startAt: Int = 0) {
+internal class RecordedServer(
+    val session: RecordedSession,
+    val fixture: RelaySocketFixture,
+    startAt: Int = 0
+) {
     class Mismatch(val index: Int, val expected: JsonObject?, val actual: JsonObject) {
-        override fun toString(): String = "Mismatch(#$index expected=${expected?.get("method")} ${expected?.get("params")} actual=${actual["method"]} ${actual["params"]})"
+        override fun toString(): String = "Mismatch(#$index expected=${expected?.get(
+            "method"
+        )} ${expected?.get("params")} actual=${actual["method"]} ${actual["params"]})"
     }
 
     val mismatches = CopyOnWriteArrayList<Mismatch>()
@@ -110,7 +127,15 @@ internal class RecordedServer(val session: RecordedSession, val fixture: RelaySo
     fun release(index: Int, onPeer: RelaySocketFixture.Peer? = null, correlation: String? = null) {
         val (peer, frame) = held.remove(index) ?: error("Step $index is not held")
         val target = onPeer ?: peer
-        target.deliver(if (correlation == null) frame else JsonObject(frame + ("id" to JsonPrimitive(correlation))))
+        target.deliver(
+            if (correlation ==
+                null
+            ) {
+                frame
+            } else {
+                JsonObject(frame + ("id" to JsonPrimitive(correlation)))
+            }
+        )
     }
 
     fun heldIndexes(): Set<Int> = held.keys.toSet()
@@ -141,7 +166,9 @@ internal class RecordedServer(val session: RecordedSession, val fixture: RelaySo
             return
         }
         val step = session.steps[next]
-        val same = step.request["method"] == request["method"] && step.request["params"] == request["params"]
+        val same =
+            step.request["method"] == request["method"] &&
+                step.request["params"] == request["params"]
         if (!same) {
             mismatches.add(Mismatch(next, step.request, request))
             return
@@ -177,7 +204,9 @@ internal class ReplayHarness(
     /** The connection's monotonic milliseconds: real time plus what a test moved on (so pacing refills as it would live). */
     private fun connectionNow(): Long = System.nanoTime() / 1_000_000L + offset.get()
     val nanos = AtomicLong(5_000_000_000L)
-    val identity = identity ?: EnrollmentIdentity("wss://relay.example.invalid/gadget", "phone:hg-0011223344556677")
+    val identity =
+        identity
+            ?: EnrollmentIdentity("wss://relay.example.invalid/gadget", "phone:hg-0011223344556677")
     private var mint = mintStart
     val states = CopyOnWriteArrayList<RelayUiState>()
     val events = ArrayList<String>()
@@ -205,7 +234,9 @@ internal class ReplayHarness(
         },
         now = ::connectionNow,
         relay = RelayOptIn(
-            RelayListener { state: RelayChannelState, generation: Long -> controller.onChannel(state, generation) }
+            RelayListener { state: RelayChannelState, generation: Long ->
+                controller.onChannel(state, generation)
+            }
         ) { nanos.get() },
         webSockets = fixture
     )

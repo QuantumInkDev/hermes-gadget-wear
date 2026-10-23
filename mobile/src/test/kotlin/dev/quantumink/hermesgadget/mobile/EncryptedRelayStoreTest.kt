@@ -40,7 +40,9 @@ import org.junit.rules.TemporaryFolder
 class EncryptedRelayStoreTest {
     @get:Rule val temp = TemporaryFolder()
 
-    private val secret: SecretKey = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+    private val secret: SecretKey = KeyGenerator.getInstance("AES").apply {
+        init(256)
+    }.generateKey()
     private val profile = ProfileId.of("9e8af651-47eb-411f-b28c-ed292bbfd305")!!
 
     private fun store(
@@ -51,7 +53,10 @@ class EncryptedRelayStoreTest {
     ) = EncryptedRelayStore(directory, key, alias, files)
 
     private fun document(marker: String = "one", seen: Int = 0): RelayDocument {
-        val record = EnrollmentRecord.fresh("wss://relay.example.invalid/$marker", "phone:hg-0011223344556677").copy(
+        val record = EnrollmentRecord.fresh(
+            "wss://relay.example.invalid/$marker",
+            "phone:hg-0011223344556677"
+        ).copy(
             enabled = true,
             pinnedProfileId = profile,
             selectedConversationId = ConversationId.of("3ff4ef74-af70-4efc-a3d4-e797b98a4dea")
@@ -65,7 +70,12 @@ class EncryptedRelayStoreTest {
                     scope,
                     null,
                     List(seen) {
-                        SeenKeySnapshot("canonical", "3ff4ef74-af70-4efc-a3d4-e797b98a4dea", "00000000-0000-4000-a000-%012d".format(it), 1)
+                        SeenKeySnapshot(
+                            "canonical",
+                            "3ff4ef74-af70-4efc-a3d4-e797b98a4dea",
+                            "00000000-0000-4000-a000-%012d".format(it),
+                            1
+                        )
                     },
                     emptyList(),
                     emptyList()
@@ -74,12 +84,20 @@ class EncryptedRelayStoreTest {
         }
         return RelayDocument(
             ControllerSection(listOf(record)),
-            RelayStateSnapshot(2, TurnLedgerSnapshot(emptyList(), emptyList()), emptyList(), deliveries, CaptureLedgerSnapshot.EMPTY)
+            RelayStateSnapshot(
+                2,
+                TurnLedgerSnapshot(emptyList(), emptyList()),
+                emptyList(),
+                deliveries,
+                CaptureLedgerSnapshot.EMPTY
+            )
         )
     }
 
     private fun digest(file: File): String =
-        MessageDigest.getInstance("SHA-256").digest(file.readBytes()).joinToString("") { "%02x".format(it) }
+        MessageDigest.getInstance("SHA-256").digest(file.readBytes()).joinToString("") {
+            "%02x".format(it)
+        }
 
     private val record get() = File(temp.root, "state/state.v1")
 
@@ -139,7 +157,10 @@ class EncryptedRelayStoreTest {
         store.commit(document(), 0)
         val bytes = record.readBytes()
         record.writeBytes(bytes.copyOf().also { it[0] = 2 })
-        assertEquals(StoreProblem.UNSUPPORTED_VERSION, (store.load() as StoreLoad.Unreadable).problem)
+        assertEquals(
+            StoreProblem.UNSUPPORTED_VERSION,
+            (store.load() as StoreLoad.Unreadable).problem
+        )
         record.writeBytes(bytes.copyOf(10))
         assertEquals(StoreProblem.CORRUPT, (store.load() as StoreLoad.Unreadable).problem)
         record.writeBytes(ByteArray(StoreBounds.MAX_FILE_BYTES + 1))
@@ -167,7 +188,8 @@ class EncryptedRelayStoreTest {
         // The key may be asked to CREATE only for a store that never held a byte; here it never was.
         assertTrue(creates.none { it })
         // Another key cannot read it either (and cannot replace it).
-        val wrong = store(key = { KeyGenerator.getInstance("AES").apply { init(256) }.generateKey() })
+        val wrong =
+            store(key = { KeyGenerator.getInstance("AES").apply { init(256) }.generateKey() })
         assertEquals(StoreProblem.CORRUPT, (wrong.load() as StoreLoad.Unreadable).problem)
         assertEquals(before, digest(record))
     }
@@ -195,7 +217,10 @@ class EncryptedRelayStoreTest {
         val stray = File(temp.root, "other")
         stray.mkdirs()
         File(stray, "unknown.bin").writeBytes(byteArrayOf(1, 2, 3))
-        assertEquals(StoreProblem.RECORD_MISSING, (store(stray).load() as StoreLoad.Unreadable).problem)
+        assertEquals(
+            StoreProblem.RECORD_MISSING,
+            (store(stray).load() as StoreLoad.Unreadable).problem
+        )
     }
 
     @Test fun aSymlinkedDirectoryIsStorageUnavailable() {
@@ -206,7 +231,10 @@ class EncryptedRelayStoreTest {
         } catch (_: Exception) {
             return // the platform cannot create one
         }
-        assertEquals(StoreProblem.STORAGE_UNAVAILABLE, (store(link).load() as StoreLoad.Unreadable).problem)
+        assertEquals(
+            StoreProblem.STORAGE_UNAVAILABLE,
+            (store(link).load() as StoreLoad.Unreadable).problem
+        )
     }
 
     @Test fun anOverCapOrTooManyDocumentIsRefusedBeforeAnythingIsWritten() {
@@ -215,11 +243,23 @@ class EncryptedRelayStoreTest {
             SeenKeySnapshot("opaque", "c".repeat(128), "e".repeat(200) + "%056d".format(it), 1)
         }
         val deliveries = (0 until StateLimits.MAX_ENROLLMENTS).map {
-            DeliverySnapshot(ScopeRecordSnapshot("k$it", profile.value, "phone:hg-$it", 0), null, seen, emptyList(), emptyList())
+            DeliverySnapshot(
+                ScopeRecordSnapshot("k$it", profile.value, "phone:hg-$it", 0),
+                null,
+                seen,
+                emptyList(),
+                emptyList()
+            )
         }
         val big = RelayDocument(
             ControllerSection.EMPTY,
-            RelayStateSnapshot(2, TurnLedgerSnapshot(emptyList(), emptyList()), emptyList(), deliveries, CaptureLedgerSnapshot.EMPTY)
+            RelayStateSnapshot(
+                2,
+                TurnLedgerSnapshot(emptyList(), emptyList()),
+                emptyList(),
+                deliveries,
+                CaptureLedgerSnapshot.EMPTY
+            )
         )
         val refused = store.commit(big, 0) as StoreCommit.Refused
         assertEquals(EncodeRefusal.STORAGE_CAP, refused.reason)
@@ -233,7 +273,8 @@ class EncryptedRelayStoreTest {
         val failing = store(
             files = object : RelayFiles {
                 override fun move(from: File, to: File) = throw IOException("move refused")
-                override fun syncDirectory(directory: File) = RealRelayFiles.syncDirectory(directory)
+                override fun syncDirectory(directory: File) =
+                    RealRelayFiles.syncDirectory(directory)
                 override fun write(file: File, bytes: ByteArray) = RealRelayFiles.write(file, bytes)
             }
         )
@@ -245,7 +286,8 @@ class EncryptedRelayStoreTest {
         val unwritable = store(
             files = object : RelayFiles {
                 override fun move(from: File, to: File) = RealRelayFiles.move(from, to)
-                override fun syncDirectory(directory: File) = RealRelayFiles.syncDirectory(directory)
+                override fun syncDirectory(directory: File) =
+                    RealRelayFiles.syncDirectory(directory)
                 override fun write(file: File, bytes: ByteArray) = throw IOException("disk full")
             }
         )
@@ -267,7 +309,11 @@ class EncryptedRelayStoreTest {
         val failed = failing.commit(document("n"), 1) as StoreCommit.Failed
         assertTrue(failed.uncertain)
         assertEquals(2L, store().currentSequence())
-        assertEquals("n", (store().load() as StoreLoad.Loaded).document.section.enrollments.single().endpointUrl.substringAfterLast('/'))
+        assertEquals(
+            "n",
+            (store().load() as StoreLoad.Loaded)
+                .document.section.enrollments.single().endpointUrl.substringAfterLast('/')
+        )
     }
 
     @Test fun aLargeButLegalDocumentCommitsWithinTheCap() {
@@ -277,6 +323,9 @@ class EncryptedRelayStoreTest {
         assertTrue(record.length() > 300_000)
         assertTrue(record.length() <= StoreBounds.MAX_FILE_BYTES)
         val loaded = store.load() as StoreLoad.Loaded
-        assertEquals(StateLimits.MAX_SEEN_KEYS, loaded.document.snapshot.deliveries.single().seen.size)
+        assertEquals(
+            StateLimits.MAX_SEEN_KEYS,
+            loaded.document.snapshot.deliveries.single().seen.size
+        )
     }
 }
