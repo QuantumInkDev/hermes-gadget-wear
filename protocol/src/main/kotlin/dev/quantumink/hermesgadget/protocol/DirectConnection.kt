@@ -1,5 +1,15 @@
 package dev.quantumink.hermesgadget.protocol
 
+import dev.quantumink.hermesgadget.protocol.relay.CorrelationId
+import dev.quantumink.hermesgadget.protocol.relay.Info
+import dev.quantumink.hermesgadget.protocol.relay.RelayCall
+import dev.quantumink.hermesgadget.protocol.relay.RelayCallResult
+import dev.quantumink.hermesgadget.protocol.relay.RelayChannel
+import dev.quantumink.hermesgadget.protocol.relay.RelayFrameSniffer
+import dev.quantumink.hermesgadget.protocol.relay.RelayNegotiation
+import dev.quantumink.hermesgadget.protocol.relay.RelayOptIn
+import dev.quantumink.hermesgadget.protocol.relay.RelayRefusal
+import dev.quantumink.hermesgadget.protocol.relay.RelayTransport
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -62,7 +72,14 @@ class EndpointDns(private val endpoint: Endpoint, private val delegate: Dns = Dn
     }
 }
 
-/** One socket and a bounded event queue. Never logs frames, addresses, or failures. */
+/**
+ * One socket and a bounded event queue. Never logs frames, addresses, or failures.
+ *
+ * [relay] is the explicit opt-in to Relay v1 for a deliberate phone mode: without it nothing about the hello, the
+ * routing or the stock behaviour changes. With it this connection also owns the ONE raw `relay.response` router
+ * ([RelayChannel], exposed as [relayTransport]) on the same serial event queue and socket generation.
+ * [webSockets] replaces the OkHttp client as the socket factory (tests and in-process fixtures; no network).
+ */
 class DirectConnection(
     private val endpoint: Endpoint,
     private val identity: DeviceIdentity,
@@ -75,7 +92,9 @@ class DirectConnection(
     connectionProxy: Proxy = Proxy.NO_PROXY,
     previousReply: String = "",
     private val now: () -> Long = { TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) },
-    private val idleMillis: Long = 90000
+    private val idleMillis: Long = 90000,
+    relay: RelayOptIn? = null,
+    private val webSockets: WebSocket.Factory? = null
 ) : AutoCloseable {
     private class Work(val block: () -> Unit, val rejected: () -> Unit) : Runnable {
         override fun run() = block()
@@ -99,6 +118,37 @@ class DirectConnection(
     }
     private val diagnostics = ConnectionDiagnostics(diagnosticTransport)
     private val actions = WatchActions.manifest(availableActions)
+    private val relayChannel = relay?.let { RelayChannel(it.listener, it.monotonicNanos) }
+    private val helloCapabilities =
+        if (relayChannel != null) RelayNegotiation.withRelay(capabilities) else capabilities
+
+    /** Non-null only for a connection built with [RelayOptIn]. Calls run on this connection's event queue. */
+    val relayTransport: RelayTransport? = relayChannel?.let { channel ->
+        object : RelayTransport {
+            override val generation: Long get() = channel.currentGeneration
+
+            override fun correlation(): CorrelationId = channel.correlation()
+
+            override fun <R : Any> call(
+                correlation: CorrelationId,
+                call: RelayCall<R>,
+                timeoutMs: Long,
+                handler: (RelayCallResult<R>) -> Unit
+            ) {
+                submit(
+                    { channel.call(correlation, call, timeoutMs, now(), ::relaySend, handler) },
+                    { handler(RelayCallResult.Refused(RelayRefusal.QUEUE_FULL)) }
+                )
+            }
+
+            override fun refreshInfo(handler: (RelayCallResult<Info>) -> Unit) {
+                submit(
+                    { channel.refreshInfo(now(), ::relaySend, handler) },
+                    { handler(RelayCallResult.Refused(RelayRefusal.QUEUE_FULL)) }
+                )
+            }
+        }
+    }
     private fun offeredFormats(direction: String): Set<String> {
         val formats = (capabilities[direction] as? JsonObject)?.get("formats") as? JsonArray
         return formats?.mapNotNull { (it as? JsonPrimitive)?.content }?.toSet() ?: setOf("pcm16")
@@ -257,6 +307,7 @@ class DirectConnection(
     private fun open() {
         if (!desired || stopped.get()) return
         generation++
+        relayChannel?.open(generation)
         diagnostics.reset(diagnosticTransport, now())
         val epoch = generation
         handshake = newHandshake()
@@ -275,7 +326,7 @@ class DirectConnection(
                 pairingCommand = ""
             )
         publish()
-        socket = client.newWebSocket(
+        socket = (webSockets ?: client).newWebSocket(
             Request.Builder().url(
                 endpoint.url
             ).header("Sec-WebSocket-Protocol", Protocol.SUBPROTOCOL).build(),
@@ -292,6 +343,19 @@ class DirectConnection(
                 }
                 override fun onMessage(webSocket: WebSocket, text: String) = dispatch {
                     if (epoch != generation) return@dispatch
+                    if (relayChannel != null &&
+                        RelayFrameSniffer.classify(text) ==
+                        RelayFrameSniffer.Verdict.RELAY_RESPONSE
+                    ) {
+                        // Judged before the permissive stock parse; never stock conversation traffic.
+                        if (handshake.canSendConversation) {
+                            handshake.recordInbound(now())
+                            relayChannel.frame(text)
+                            activityAt = now()
+                        }
+                        publish()
+                        return@dispatch
+                    }
                     val message = Message.parse(text)
                     if (message == null) {
                         fail("Invalid or oversized server message.", false)
@@ -406,6 +470,9 @@ class DirectConnection(
                         clientSpeechOffered && message.string("tts") == "client"
                 }
                 val paired = handshake.canSendConversation
+                if (message.type == "welcome") {
+                    relayChannel?.welcome(message, paired, now(), ::relaySend)
+                }
                 effects(conversation.setPaired(paired, now()))
                 if (handshake.state in setOf(Handshake.State.PAIRED, Handshake.State.UNPAIRED)) {
                     diagnostics.connection(
@@ -483,6 +550,7 @@ class DirectConnection(
             if (healthySince?.let { now() - it >= 20000 } == true) retryCount = 0
         }
         pets.tick(now())
+        relayChannel?.tick(now())
         effects(conversation.tick(now()))
         val inactivityLimit = if (conversation.busy) {
             idleMillis.coerceAtLeast(
@@ -503,6 +571,7 @@ class DirectConnection(
         category: FailureCategory = FailureCategory.PROTOCOL
     ) {
         generation++
+        relayChannel?.close(generation)
         socket?.cancel()
         socket = null
         handshake.close()
@@ -555,6 +624,7 @@ class DirectConnection(
         desired = false
         reconnectAt = null
         generation++
+        relayChannel?.close(generation)
         socket?.cancel()
         socket = null
         handshake.close()
@@ -624,6 +694,22 @@ class DirectConnection(
         return false
     }
 
+    /** One Relay request frame on the shared socket queue: bounded, and only for a paired connection. */
+    private fun relaySend(text: String): Boolean {
+        val active = socket
+        if (active == null || !handshake.canSendConversation ||
+            active.queueSize() > RELAY_QUEUE_BYTES
+        ) {
+            return false
+        }
+        if (active.send(text)) {
+            activityAt = now()
+            return true
+        }
+        fail("Connection cannot send.", true, FailureCategory.DISCONNECTED)
+        return false
+    }
+
     private fun publish() {
         if (stopped.get()) return
         state = state.copy(
@@ -663,7 +749,7 @@ class DirectConnection(
 
     private fun newHandshake() = Handshake(
         identity,
-        capabilities,
+        helloCapabilities,
         accessToken = accessToken,
         actions = actions,
         sensors = sensors
@@ -671,6 +757,7 @@ class DirectConnection(
 
     override fun close() {
         if (!stopped.compareAndSet(false, true)) return
+        relayChannel?.close(generation + 1)
         socket?.cancel()
         timer.shutdownNow()
         executor.shutdownNow().forEach { (it as? Work)?.rejected?.invoke() }
@@ -690,5 +777,10 @@ class DirectConnection(
             client.dispatcher.executorService.shutdown()
             client.connectionPool.evictAll()
         }
+    }
+
+    private companion object {
+        /** A relay frame is at most 64 KiB: refuse new ones once this many bytes wait on the socket. */
+        const val RELAY_QUEUE_BYTES = 262_144L
     }
 }
