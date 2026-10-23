@@ -12,6 +12,9 @@ history, notification taps and server restarts (I1, §9.1–§9.2, §9.6); defin
 code-point continuation (I2, §9.4); adds an output-routing and walking-controls contract (I3, §9.7, §11); and
 makes the Minor precision corrections listed in the round-1 report. Unchanged sections keep their meaning.
 
+Revision 2 (V2 input stage): adds the explicit activation-scope amendment (§12.1). No other contract section changes in this
+step and no stage is accepted by this revision.
+
 Labels used throughout:
 
 | Label | Meaning |
@@ -1113,6 +1116,15 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   stock resolution of `${VAR}`, layering and sanitization is not reproduced, so resolved availability stays UNKNOWN); an unobtainable
   runtime fact is recorded UNKNOWN with its remaining action, and M1 stays open until it is inspected.
   The host harness is Darwin 27 arm64 only; other boxes are qualified at the per-box rollout gate and are not claimed here.
+* **Activation scope (V2 input stage amendment).** Source implementation, both flags default false, may proceed on this
+  admitted seam without runtime-qualifying every optional backend. Broad optional-provider qualification is separate from
+  per-profile activation. Before a profile or direction is enabled, a later reviewed rollout must prove the CURRENT exact
+  resolved provider/config/runtime compatibility (initialized plugin registry and tracer included, M1) and supported media
+  for THAT profile and direction; unknown or unavailable configuration answers truthfully (`unsupported`, `stt_unavailable`,
+  `tts_unavailable`) and keeps text and stock conversations usable. Hugging Face/NeuTTS and Mistral accounts, model installs
+  and paid calls are NOT prerequisites of an ElevenLabs-only profile; the no-install, once-only, transport and launcher
+  gates, no provider substitution and no paid fallback stay. No wire schema, provider roster in a user DTO or bespoke
+  account UI is added. Historical V1-P reports stay as written; V1-P is not recorded as passed.
 * Voice output is listed only with the complete seam (TTS **and** display read): there is no reduced
   live-only mode that would narrow approved deliberate playback.
 * Hub: PROPOSED `DeviceSession.send_binary(data, *, authorize=None)` mirroring `send_json`; channel-5 routing in

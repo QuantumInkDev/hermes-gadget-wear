@@ -6,6 +6,10 @@ acceptance and reviews. This plan inserts reviewable voice increments between th
 (private `c0b808b`) and the phone/watch controller tasks; it does not replace O1–O5/N1–N10, the existing Task3–8
 requirements, or the fifteen-deliverable goal, and it never treats a text-only controller as preserved voice.
 
+Revision 2 (V2 input stage, private source implementation): records the explicit stage amendment in §1 and the V2 status
+in §2. It changes no other stage and accepts no stage. Earlier text that says V1-P must pass before V2 SOURCE work is
+superseded by that amendment; every activation gate it describes remains.
+
 Revision 1 (correction round 1): adds the core display seam and deliberate playback (I1), range coverage
 controls (I2) and routing/walking-control stages (I3), and records the Minor dispositions as concrete stage
 obligations. Approved Replay/More/notification playback, concise speech and routing are required in V1–V8.
@@ -43,8 +47,21 @@ V0 design review ─► V1 core voice seam ─► V1-P provider parity ─► V2
                     V8 staged server rollout + authorized physical/owner-observed checks (inside Task8)
 ```
 
-V2 depends on V1 **and V1-P** (the bridge refuses to advertise without the exact seam; V2 must not start, and
-configured-provider voice must not be claimed, until V1-P passes). V3 depends on V2 (store, flags,
+V2 depends on V1 **and the V1-P source seam**. **Stage amendment (V2 input, this revision):** the later controller
+interpretation that EVERY optional backend must be runtime-tested before V2 is withdrawn as a prerequisite of V2 SOURCE
+work. The approved fifteen-feature contract requires the selected profile's server speech, optional ElevenLabs BYOK and
+truthful capability absence; it does NOT require acquiring additional speech-provider accounts (Hugging Face/NeuTTS model
+access, Mistral) or installing unused models, and the owner's question about them authorizes no access, account, consent,
+model installation or paid call. V2 SOURCE implementation, both flags default false, therefore proceeds on the admitted
+source seam; the bridge still refuses to advertise without the exact seam. Broad optional-provider RUNTIME qualification is
+separated from PER-PROFILE ACTIVATION: source tests prove protocol, authority, accounting and refusal behaviour only; they
+do not pass universal V1-P, the initialized profile config/plugin/tracer inspection (M1), provider quality/media, other-box
+or physical gates. Before a profile or direction is enabled, a later reviewed rollout must prove the current exact resolved
+provider/config/runtime compatibility and supported media for THAT profile and direction; an unknown or unavailable
+configuration refuses truthfully (the conversation stays usable as text and stock voice). The no-install, once-only,
+transport and launcher gates, the ban on provider substitution, paid fallback and account acquisition, and every original
+provider/budget limit are kept. The historical V1-P reports are preserved and V1-P is NOT recorded as passed; support code
+for all providers is not deleted and no fifteen-feature deliverable shrinks. No profile is enabled by V2 source. V3 depends on V2 (store, flags,
 channel routing). V4 needs V2/V3 fixtures for captured vectors. V5 needs V4 and the Task3 controller base; V6 needs
 V4 and the Task6 base. V7 needs V5/V6. V8 needs V7 and the Task10/server gates. Task3/Task6 may implement their
 typed-text parts before V5/V6, but **no build may expose hold-to-talk inside a selected Relay conversation before
@@ -124,8 +141,10 @@ category below on the registered fixtures, then ONE source review and a current-
 | Edge full range and the joiner (round-2 N2) | test a full-range (> 600 code points) Edge call with the real ffmpeg joiner and the missing-joiner outcome (`unavailable`/`not_started` before any send, no paid fallback, no silent truncation); concise ≤ 600 code points independent |
 | Auxiliary native audio (AUX-audio) | source: wrapped STT preparation (optional probe/trim skipped without a qualified launcher, required CAF/compaction, one-request eligibility), native Silk unsupported (WAV ingress), Gemini converter preflight and wrapped conversion; runtime qualification of the launcher, `afconvert`, codecs and per-spawn latency remains required and unwaived |
 
-Until V1-P passes, V1 alone is not configured-provider acceptance and V2 cannot start. The full fifteen-feature scope is
-unchanged.
+Until V1-P passes, V1 alone is not configured-provider acceptance. **Amended (V2 input stage):** V1-P is NOT recorded as
+passed and universal-provider support stays unclaimed, but its all-provider runtime qualification no longer gates V2 SOURCE
+work (see §1); it gates the activation of each profile/direction, per its own exit rows, through a current-profile proof. The
+full fifteen-feature scope is unchanged.
 
 Qualification follow-up status (source and controller-tool authoring only; this is NOT V1-P completion and activates nothing):
 core test `tests/gateway/test_native_voice_profile_integration.py` (sentinel ElevenLabs/STT profile shapes over the real seam, the
@@ -138,9 +157,17 @@ declarations or a source-registered fixture never close it), provider-real media
 other-box qualification at the per-box rollout gate, the remaining stock compatibility of Task 4 and the review of this follow-up.
 A first reviewed host run measured one file-descriptor ownership gap of the shared command runner (a reader that outlived the consumer left its stream open after a late EOF); the patch now
 includes the minimal owner fix and a real-pipe regression. Host qualification stays OPEN and a changed-head host recheck is a separate controller step.
-V2 stays blocked until the mandatory V1-P proof exists.
+V2 SOURCE work is no longer blocked by the all-provider proof (stage amendment above); V2 ACTIVATION for any profile stays
+blocked until that profile's own current-profile proof exists.
 
 ### V2 — SDK voice input (SDK patch, flags default false)
+
+Status (this revision): **source implemented in a private incremental SDK baseline over `286e1348`, flags default false,
+nothing activated** — see `.local/voice-v2-input` evidence. Input only: `relay.voice.info` reports `output: null` and the
+speak methods are not listed or served until the V3 stage exists. The incremental private SDK delta is not a standalone stock
+v0.2.0 installer and no misleading standalone `0007` is invented; the final clean-series integration remains a later
+obligation. Source tests (registered rig, synthetic socket and a synthetic provider boundary only) do NOT pass universal
+V1-P, M1, provider media quality, other-box, native or physical gates.
 
 Scope (PROPOSED): `plugin/relay_voice.py` (`VoiceBridge`, `Captures`, `VoiceStore` on `relay-voice.sqlite3`),
 `relay.voice.info` and `relay.voice.capture.{start,finish,result,discard}`, channel-5 routing in `hub._on_binary`
