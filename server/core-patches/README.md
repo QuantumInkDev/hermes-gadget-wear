@@ -133,8 +133,8 @@ and, before any preflight or vendor import, requires every module the engine imp
 distribution at its exact supported version from installed metadata (Piper 1.8.0, KittenTTS 0.8.1, NeuTTS 1.4.1,
 huggingface-hub 1.24.0, transformers 5.17.0, neucodec 0.0.4, misaki 0.9.4, phonemizer-fork 3.3.2, espeakng-loader 0.2.4,
 num2words 0.5.14; an installed resemble-perth must be 1.0.1): missing is `not_installed`, another version
-`unsupported_version`. NeuTTS 1.4.1's own metadata pins transformers 5.1.0 against the supported 5.17.0, so a NeuTTS
-install that satisfies both is not established. Before any engine, a tiny synthetic WAV→MP3 conversion must succeed
+`unsupported_version`. (Those global rows are the 3.14 lock / KittenTTS set; NeuTTS 1.4.1 validates against its own
+engine-scoped rows - see *NeuTTS dependency compatibility* below.) Before any engine, a tiny synthetic WAV→MP3 conversion must succeed
 under the same launcher (a missing or broken ffmpeg refuses unsent); each chunk's conversion is the same wrapped,
 Stop-aware, WAV-forced, file-only child bounded by the exact remaining deadline. A multi-chunk join was still the shared
 stock joiner at this stage (closed by Task4, below). A NeuTTS language is passed only for a local GGUF. The pre-existing faster-whisper local path is
@@ -185,7 +185,7 @@ no converter, the model/language rules, cached-hash verification and the no-down
 `timeout`/`cancelled` and never becomes `unavailable`; a failed spawn is not a launch (`unavailable`/`not_started`). The Mistral
 client supplies an inert async client, so the SDK's own unused one is never created or finalized on a loop. Not claimed: any
 real engine, host sandbox, live Edge/provider, current-profile, global-telemetry or usable-parity result; the NeuTTS runtime
-conflict, legacy faster-whisper isolation, detached `setsid` descendants and the roughly 4 s refusal-reader join of the shared
+qualification (source rows corrected below, no runtime), legacy faster-whisper isolation, detached `setsid` descendants and the roughly 4 s refusal-reader join of the shared
 runner remain open. *Auxiliary native audio (AUX-audio, source only).* The cloud STT preparation and the Gemini conversion that the earlier stages left on the
 stock unwrapped runner are now native-wrapped. **STT preparation** (duration probe, silence trim, CAF -> WAV, full-recording compaction)
 runs only as the same qualified-launcher, Stop-aware, exact-remainder, stdin-less, local-file-protocol (`-protocol_whitelist file`),
@@ -228,6 +228,21 @@ provider `unknown` (conservative, never authorizes a retry); a runner-noticed de
 preparation is exercised only by the three AUX test files and the command-STT controls.
 Not claimed: actual launcher, `afconvert`, codec, platform or sandbox qualification, real provider output, per-spawn latency under the real launcher,
 or any runtime result.
+
+*NeuTTS dependency compatibility (source only).* The helper had validated NeuTTS against the global lock/Kitten rows (transformers 5.17.0,
+phonemizer-fork 3.3.2), which no installation consistent with NeuTTS 1.4.1's own metadata (`transformers==5.1.0`, the normal `phonemizer`
+distribution) can satisfy, while an upstream-inconsistent set was accepted. NeuTTS now uses engine-scoped rows: transformers 5.1.0 and the NORMAL
+phonemizer 3.3.0 or 3.4.0 (the two inspected releases; their decimal-numeral phonemization differs upstream, neither is forced or rewritten). The
+Piper/KittenTTS rows, the global tables and chains, the weights/cache logic and the 3.14 refusal (parent and child, before any import) are unchanged.
+Normal AND fork phonemizer metadata together is ambiguous (both own the `phonemizer` package directory, so metadata cannot say whose code loads) and is
+refused as `unsupported_version` (fork-only is `not_installed`); a transformers 5.17.0 / fork-only NeuTTS environment the old rows accepted is now
+refused. The known phonemizer load requirements are probed by metadata and spec only, with no version guessed: `joblib`, `typing_extensions`, `dlinfo`
+(not on Windows) and `segments` (3.3.0 only; 3.4.0 imports it lazily). Cost: a hand-damaged environment missing one of them is `unavailable` before
+the engine instead of `failed` after it; presence is not dependency closure, ABI or runtime health. A usable NeuTTS still needs a separately
+provisioned supported interpreter below 3.14 that hosts the whole core (there is no selector; core viability on 3.13 is unevidenced), its closure
+(torch, llama-cpp-python, torchtune and torchao status unstaged), a platform wheel (NeuTTS ships macOS arm64, Linux x86_64 and Windows only) and complete
+offline caches; Kitten (transformers 5.17.0) and NeuTTS (5.1.0) cannot share one interpreter at the admitted rows. Not claimed: any installed or usable
+engine, genuine 3.13, model, cache, closure, platform, media, network-denial, lifetime or profile result.
 
 **Disclosures that bind this stage (carried review findings).** (1) *Process-global telemetry (M1):* the pinned Mistral
 SDK's own key-carrying trace exporter is switched off for a native call, but a process-global OpenTelemetry tracer

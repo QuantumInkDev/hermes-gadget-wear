@@ -1098,6 +1098,13 @@ waveform from playback level callbacks, recording elapsed timer, phone routing w
   `native: local-sandboxed` with `normalize: true` needs the same qualified converter (required work: it counts as a local launch). When the outer
   deadline wins after a send may have left, the existing gate reports provider `unknown`, not `completed`. Not evidence of any installation, decoder,
   launcher, `afconvert` or runtime behaviour.
+* **NeuTTS dependency rows (source only).** The native NeuTTS engine is validated against its own metadata (transformers 5.1.0 and the normal
+  phonemizer 3.3.0 or 3.4.0, never the Kitten lock's transformers 5.17.0 / phonemizer-fork); the managed 3.14 interpreter stays unsupported (NeuTTS
+  requires Python below 3.14) and is refused before any import. Costs: normal and fork phonemizer metadata together is refused as ambiguous; a
+  previously accepted upstream-inconsistent environment is refused; Kitten and NeuTTS cannot share one interpreter at the admitted rows; only the two
+  inspected phonemizer releases are source-qualified (their decimal phonemization differs upstream, neither is forced). A usable NeuTTS still needs a
+  separately provisioned supported interpreter below 3.14, its closure, a platform wheel and complete offline caches; none of that is provisioned or
+  evidenced here.
 * Voice output is listed only with the complete seam (TTS **and** display read): there is no reduced
   live-only mode that would narrow approved deliberate playback.
 * Hub: PROPOSED `DeviceSession.send_binary(data, *, authorize=None)` mirroring `send_json`; channel-5 routing in

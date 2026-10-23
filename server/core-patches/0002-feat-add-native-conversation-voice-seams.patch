@@ -12266,10 +12266,10 @@ index 0000000000000000000000000000000000000000..469bd591fd0e3e7f9766ab2cdeaa0be4
 +        _answer_through(monkeypatch, {'Content-Length': '2048'}, b'x' * 2048)
 diff --git a/tests/tools/test_native_tts_engine_helper.py b/tests/tools/test_native_tts_engine_helper.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..09d91cd7866b0457415bd7a2b6f9572b6a36c53b
+index 0000000000000000000000000000000000000000..fcfca1293b292694d2772349de3c0bb96dae033c
 --- /dev/null
 +++ b/tests/tools/test_native_tts_engine_helper.py
-@@ -0,0 +1,444 @@
+@@ -0,0 +1,688 @@
 +"""Native local-engine helper: request validation and complete-cache preflight (unit), plus the REAL helper as a
 +launcher-wrapped child on this runtime.
 +
@@ -12278,9 +12278,11 @@ index 0000000000000000000000000000000000000000..09d91cd7866b0457415bd7a2b6f9572b
 +never engine or library behaviour. No engine package is installed here, so the real child stops at ``not_installed``
 +or ``runtime_unsupported`` before any vendor import.
 +"""
++import importlib.metadata
 +import json
 +import os
 +import sys
++import types
 +import time
 +from pathlib import Path
 +
@@ -12465,12 +12467,14 @@ index 0000000000000000000000000000000000000000..09d91cd7866b0457415bd7a2b6f9572b
 +    hub.put(helper.W2V_BERT_REPO, 'preprocessor_config.json', {'feature_extractor_type': 'SeamlessM4TFeatureExtractor'})
 +    if encoder == 'safetensors':
 +        hub.put(helper.W2V_BERT_REPO, 'model.safetensors')
-+    elif encoder in ('sharded', 'sharded-missing'):
++    elif encoder in ('sharded', 'sharded-missing', 'sharded-missing-bin'):
 +        hub.put(helper.W2V_BERT_REPO, 'model.safetensors.index.json',
 +                {'weight_map': {'a': 'model-00001.safetensors', 'b': 'model-00002.safetensors'}})
 +        hub.put(helper.W2V_BERT_REPO, 'model-00001.safetensors')
 +        if encoder == 'sharded':
 +            hub.put(helper.W2V_BERT_REPO, 'model-00002.safetensors')
++        if encoder == 'sharded-missing-bin':  # a complete .bin is available, but transformers never falls back to it
++            hub.put(helper.W2V_BERT_REPO, 'pytorch_model.bin')
 +    elif encoder == 'bin':
 +        hub.put(helper.W2V_BERT_REPO, 'pytorch_model.bin')
 +    ref_audio, ref_text = tmp_path / 'jo.wav', tmp_path / 'jo.txt'
@@ -12508,6 +12512,7 @@ index 0000000000000000000000000000000000000000..09d91cd7866b0457415bd7a2b6f9572b
 +    (dict(), {'original_repo': 'neuphonic/neutts-air'}, 'unsupported_backbone'),
 +    (dict(codec=False), {}, 'codec_not_cached'), (dict(encoder='none'), {}, 'codec_encoder_not_cached'),
 +    (dict(encoder='sharded-missing'), {}, 'codec_encoder_not_cached'),
++    (dict(encoder='sharded-missing-bin'), {}, 'codec_encoder_not_cached'),
 +    (dict(remote_code=True), {}, 'codec_encoder_not_cached'), (dict(espeak=False), {}, 'espeak_missing'),
 +    (dict(perth='incomplete'), {}, 'watermarker_incomplete'), (dict(), {'ref_audio_path': '/absent.wav'}, 'reference_missing')])
 +def test_neutts_refuses_every_missing_prerequisite(tmp_path, hub, world, opts_over, reason):
@@ -12714,6 +12719,245 @@ index 0000000000000000000000000000000000000000..09d91cd7866b0457415bd7a2b6f9572b
 +        run_native_argv([sys.executable, '-I', NATIVE_ENGINE_HELPER], timeout=15, env=dict(os.environ),
 +                        cwd=str(tmp_path), stdin_bytes=b'not json', probe=probe)
 +    assert policy.local_launched is (not probe)
++
++
++# ---- NeuTTS compatibility: engine-scoped rows, simultaneous normal+fork, conditional load modules ------------------------
++# An ordinary NeuTTS 1.4.1 installation per NeuTTS's OWN METADATA (Requires-Dist transformers==5.1.0, phonemizer>=3.0.0 =
++# the NORMAL distribution); the Kitten lock set is transformers 5.17.0 + phonemizer-fork. A distribution a test does not name is
++# installed at an arbitrary version, except phonemizer-fork, which is absent unless named.
++ORDINARY_NEUTTS = {'neutts': '1.4.1', 'transformers': '5.1.0', 'phonemizer': '3.4.0', 'neucodec': '0.0.4',
++                   'huggingface-hub': '1.24.0'}
++KITTEN_LOCK = {'kittentts': '0.8.1', 'misaki': '0.9.4', 'num2words': '0.5.14', 'espeakng-loader': '0.2.4',
++               'transformers': '5.17.0', 'phonemizer-fork': '3.3.2', 'huggingface-hub': '1.24.0'}
++VENDOR = ('neutts', 'neutts.neutts', 'neucodec', 'transformers', 'phonemizer', 'phonemizer.backend', 'torch', 'torchaudio',
++          'librosa', 'llama_cpp', 'perth', 'soundfile')
++STAGES = ('hub', 'package_dir', 'preflight', 'synth')
++
++
++class World:
++    """A synthetic installation seen only through the helper's metadata and spec probes; every probe is recorded."""
++
++    def __init__(self, versions, absent_distributions=(), absent_modules=()):
++        self.versions, self.absent_distributions = dict(versions), set(absent_distributions)
++        self.absent_modules, self.events = set(absent_modules), []
++
++    def version_of(self, distribution):
++        self.events.append(('metadata', distribution))
++        fork_unnamed = distribution == 'phonemizer-fork' and distribution not in self.versions
++        if distribution in self.absent_distributions or fork_unnamed:
++            raise importlib.metadata.PackageNotFoundError(distribution)
++        return self.versions.get(distribution, '9.9.9')
++
++    def find(self, name):
++        self.events.append(('find', name))
++        return name not in self.absent_modules
++
++
++def probes_then_stages(events):
++    """Every metadata/spec probe precedes the first cache/package/preflight/synthesis step (and none follows it)."""
++    kinds = [event[0] for event in events]
++    first = next((i for i, kind in enumerate(kinds) if kind in STAGES), len(kinds))
++    return all(kind in ('metadata', 'find') for kind in kinds[:first]) and not {'metadata', 'find'} & set(kinds[first:])
++
++
++def neutts_boundary(monkeypatch, tmp_path, hub, world, interpreter=(3, 13), **options):
++    """LABELLED SYNTHETIC ENGINE BOUNDARY (source wiring only: not a genuine 3.13, model, cache, closure or inference). The REAL
++    ``helper.run`` routes over an injected metadata/spec world and the existing synthetic cache tree; the helper's module-level
++    ``sys`` is a stand-in carrying only a synthetic ``version_info``; vendor modules are None in ``sys.modules`` so any import
++    would fail; ``_synthesize_neutts`` records its call and writes a small non-vendor WAV."""
++    opts, pkg, _ = neutts_world(tmp_path, hub)
++    real_preflight, events = helper.preflight_neutts, world.events
++    for name in VENDOR:
++        monkeypatch.setitem(sys.modules, name, None)
++    monkeypatch.setattr(helper, 'sys',
++                        types.SimpleNamespace(version_info=(*interpreter, 0, 'final', 0), platform=sys.platform))
++    monkeypatch.setattr(helper, '_installed', world.find)
++    monkeypatch.setattr(helper, '_version_of', world.version_of)
++    monkeypatch.setattr(helper, 'package_dir',
++                        lambda name: (events.append(('package_dir', name)), pkg if name == 'neutts' else None)[1])
++    monkeypatch.setattr(helper, 'HubCache', lambda: (events.append(('hub',)), hub)[1])
++    monkeypatch.setattr(helper, 'preflight_neutts', lambda o, h, p, perth: (
++        events.append(('preflight',)), real_preflight(o, h, p, perth, version=(3, 13)))[1])
++
++    def synthesize(req, resolved):
++        events.append(('synth', dict(req['neutts']), resolved))
++        Path(req['wav_path']).write_bytes(b'RIFF' + bytes(100))
++        return 24000
++    monkeypatch.setattr(helper, '_synthesize_neutts', synthesize)
++    req = json.loads(request(tmp_path, 'neutts'))
++    req['neutts'] = {**opts, **options}
++    return helper.parse_request(json.dumps(req).encode())
++
++
++@pytest.mark.parametrize('phonemizer,backbone', [('3.3.0', 'repo'), ('3.4.0', 'repo'), ('3.4.0', 'local')])
++def test_run_reaches_the_engine_boundary_for_a_neutts_consistent_set(monkeypatch, tmp_path, hub, phonemizer, backbone):
++    world = World({**ORDINARY_NEUTTS, 'phonemizer': phonemizer})
++    options = {}
++    if backbone == 'local':
++        local = tmp_path / 'custom.gguf'
++        local.write_bytes(b'gguf')
++        options = {'original_repo': str(local), 'language': 'de'}
++    req = neutts_boundary(monkeypatch, tmp_path, hub, world, **options)
++    answer = helper.run(req)
++    assert answer == {'api': 1, 'status': 'ok', 'reason': 'ok', 'sample_rate': 24000, 'wav_bytes': 104}
++    assert [e[0] for e in world.events if e[0] in ('hub', 'preflight', 'synth')] == ['hub', 'preflight', 'synth']
++    assert probes_then_stages(world.events)
++    synth = next(e for e in world.events if e[0] == 'synth')
++    assert synth[1] == req['neutts']  # options, language and reference paths reach the engine boundary untouched
++    assert synth[2]['ref_text'] == req['neutts']['ref_text_path']
++    assert synth[2]['backbone_path'].endswith('.gguf')
++    if backbone == 'local':
++        assert synth[2]['backbone_path'] == options['original_repo']
++    probed = {e[1] for e in world.events if e[0] == 'metadata'}
++    assert {'transformers', 'phonemizer', 'phonemizer-fork'} <= probed  # NeuTTS's own rows, then the ambiguity probe
++    assert (('find', 'segments') in world.events) == (phonemizer == '3.3.0')  # eagerly imported by 3.3.0 only
++
++
++@pytest.mark.parametrize('case,versions,gone,reason', [
++    ('transformers 5.17.0 (the Kitten lock row)', {'transformers': '5.17.0'}, (), 'unsupported_version'),
++    ('fork only, no normal distribution', {'phonemizer-fork': '3.3.2'}, ('phonemizer',), 'not_installed'),
++    ('no phonemizer at all', {}, ('phonemizer',), 'not_installed'),
++    ('unsupported normal 3.2.0', {'phonemizer': '3.2.0'}, (), 'unsupported_version'),
++    ('unsupported normal 3.3.2 (the fork number)', {'phonemizer': '3.3.2'}, (), 'unsupported_version'),
++    ('normal AND fork metadata (NEW fail-closed ambiguity)', {'phonemizer-fork': '3.3.2'}, (), 'unsupported_version'),
++    ('old-helper-accepted upstream-inconsistent set: transformers 5.17.0 + fork only',
++     {'transformers': '5.17.0', 'phonemizer-fork': '3.3.2'}, ('phonemizer',), 'unsupported_version'),
++    ('wrong neucodec', {'neucodec': '0.0.5'}, (), 'unsupported_version')])
++def test_run_refuses_these_neutts_sets_before_any_cache_or_vendor_step(monkeypatch, tmp_path, hub, case, versions, gone,
++                                                                         reason):
++    world = World({**ORDINARY_NEUTTS, **versions}, absent_distributions=gone)
++    req = neutts_boundary(monkeypatch, tmp_path, hub, world)
++    with pytest.raises(helper.Unavailable) as refused:
++        helper.run(req)
++    assert refused.value.reason == reason, case
++    assert world.events and {e[0] for e in world.events} <= {'metadata', 'find'}  # no hub, package, preflight, synthesis
++
++
++def test_simultaneous_normal_and_fork_metadata_is_refused_by_the_probe_before_the_load_modules(monkeypatch, tmp_path, hub):
++    """NEW fail-closed behavior (no old defect is claimed): the refusal comes from the ambiguity probe itself, after the
++    NeuTTS chain validated and before any load module or cache step is looked at."""
++    world = World({**ORDINARY_NEUTTS, 'phonemizer-fork': '3.3.2'})
++    req = neutts_boundary(monkeypatch, tmp_path, hub, world)
++    with pytest.raises(helper.Unavailable) as refused:
++        helper.run(req)
++    assert refused.value.reason == 'unsupported_version'
++    assert world.events[-1] == ('metadata', 'phonemizer-fork') and ('find', 'phonemizer') in world.events
++    assert not {('find', 'joblib'), ('metadata', 'joblib')} & set(world.events)
++
++
++@pytest.mark.parametrize('missing', ['joblib', 'typing_extensions', 'segments'])
++@pytest.mark.parametrize('how', ['metadata', 'module'])
++def test_run_refuses_a_missing_known_phonemizer_load_module_before_any_cache_step(monkeypatch, tmp_path, hub, missing, how):
++    dist = {'joblib': 'joblib', 'typing_extensions': 'typing-extensions', 'segments': 'segments'}[missing]
++    world = World({**ORDINARY_NEUTTS, 'phonemizer': '3.3.0'},  # 3.3.0 imports segments eagerly, so every case is required
++                  absent_distributions={dist} if how == 'metadata' else (), absent_modules={missing} if how == 'module' else ())
++    req = neutts_boundary(monkeypatch, tmp_path, hub, world)
++    with pytest.raises(helper.Unavailable) as refused:
++        helper.run(req)
++    assert refused.value.reason == 'not_installed' and {e[0] for e in world.events} <= {'metadata', 'find'}
++
++
++@pytest.mark.platforms('posix')
++def test_run_refuses_a_missing_dlinfo_on_a_posix_host(monkeypatch, tmp_path, hub):
++    world = World(ORDINARY_NEUTTS, absent_modules={'dlinfo'})
++    req = neutts_boundary(monkeypatch, tmp_path, hub, world)
++    with pytest.raises(helper.Unavailable) as refused:
++        helper.run(req)
++    assert refused.value.reason == 'not_installed' and {e[0] for e in world.events} <= {'metadata', 'find'}
++
++
++@pytest.mark.parametrize('version,platform,segments,dlinfo', [
++    ('3.3.0', 'linux', True, True), ('3.4.0', 'darwin', False, True), ('3.4.0', 'win32', False, False),
++    ('3.3.0', 'win32', True, False)])
++def test_the_conditional_load_modules_follow_the_release_and_the_platform_as_data(version, platform, segments, dlinfo):
++    modules = helper.neutts_load_modules(version, platform)
++    assert {'joblib', 'typing_extensions'} <= set(modules)
++    assert ('segments' in modules) is segments and ('dlinfo' in modules) is dlinfo
++
++
++@pytest.mark.parametrize('version,platform,absent', [('3.4.0', 'linux', {'segments'}), ('3.4.0', 'win32', {'dlinfo', 'segments'}),
++                                                     ('3.3.0', 'win32', {'dlinfo'})])
++def test_conditional_requirements_do_not_reject_a_valid_set(version, platform, absent):
++    """Positive controls on injected metadata only (nothing is imported): 3.4.0 needs no segments; Windows needs no dlinfo."""
++    world = World({**ORDINARY_NEUTTS, 'phonemizer': version}, absent_distributions=absent, absent_modules=absent)
++    helper.require_neutts_packages(world.find, world.version_of, platform)
++    probed = {e[1] for e in world.events}
++    assert absent.isdisjoint(probed)  # an unrequired module is not even looked up
++
++
++def test_the_same_absence_is_required_where_the_release_and_platform_need_it():
++    world = World({**ORDINARY_NEUTTS, 'phonemizer': '3.4.0'}, absent_distributions={'dlinfo'})
++    with pytest.raises(helper.Unavailable) as refused:
++        helper.require_neutts_packages(world.find, world.version_of, 'linux')
++    assert refused.value.reason == 'not_installed'
++
++
++def other_engine_boundary(monkeypatch, tmp_path, world, engine):
++    """Synthetic stand-ins for the Piper / KittenTTS preflight and synthesis (not the vendors); returns the event list."""
++    events = world.events
++    for name in VENDOR:
++        monkeypatch.setitem(sys.modules, name, None)
++    monkeypatch.setattr(helper, '_installed', world.find)
++    monkeypatch.setattr(helper, '_version_of', world.version_of)
++    monkeypatch.setattr(helper, 'package_dir', lambda name: (events.append(('package_dir', name)), tmp_path)[1])
++    monkeypatch.setattr(helper, 'HubCache', lambda: (events.append(('hub',)), None)[1])
++    monkeypatch.setattr(helper, f'preflight_{engine}', lambda *a: (events.append(('preflight',)), {})[1])
++
++    def synthesize(req, resolved):
++        events.append(('synth',))
++        Path(req['wav_path']).write_bytes(b'RIFF' + bytes(100))
++        return 24000
++    monkeypatch.setattr(helper, f'_synthesize_{engine}', synthesize)
++    return helper.parse_request(request(tmp_path, engine))
++
++
++@pytest.mark.parametrize('engine,installed', [('piper', {'piper-tts': '1.8.0', **ORDINARY_NEUTTS}),
++                                              ('kittentts', {**KITTEN_LOCK, 'phonemizer': '3.4.0'})])
++def test_piper_and_kitten_keep_their_global_rows_beside_a_neutts_installation(monkeypatch, tmp_path, engine, installed):
++    world = World(installed)
++    answer = helper.run(other_engine_boundary(monkeypatch, tmp_path, world, engine))
++    assert answer['status'] == 'ok' and [e[0] for e in world.events if e[0] in ('preflight', 'synth')] == ['preflight', 'synth']
++
++
++@pytest.mark.parametrize('case,versions,gone,reason', [
++    ('NeuTTS transformers 5.1.0', {'transformers': '5.1.0'}, (), 'unsupported_version'),
++    ('normal phonemizer instead of the fork', {}, ('phonemizer-fork',), 'not_installed')])
++def test_kitten_does_not_accept_the_neutts_rows(monkeypatch, tmp_path, case, versions, gone, reason):
++    world = World({**KITTEN_LOCK, 'phonemizer': '3.4.0', **versions}, absent_distributions=gone)
++    with pytest.raises(helper.Unavailable) as refused:
++        helper.run(other_engine_boundary(monkeypatch, tmp_path, world, 'kittentts'))
++    assert refused.value.reason == reason, case
++    assert {e[0] for e in world.events} <= {'metadata', 'find'}
++
++
++def test_the_global_rows_still_govern_a_call_without_engine_rows():
++    world = World(ORDINARY_NEUTTS)  # NeuTTS's set measured against the global rows: transformers 5.1.0 is not 5.17.0
++    with pytest.raises(helper.Unavailable) as refused:
++        helper.require_packages(helper.CHAINS['neutts'], world.find, world.version_of)
++    assert refused.value.reason == 'unsupported_version'
++
++
++def test_the_managed_interpreter_is_refused_before_any_metadata_probe(monkeypatch, tmp_path, hub):
++    world = World(ORDINARY_NEUTTS)
++    req = neutts_boundary(monkeypatch, tmp_path, hub, world, interpreter=(3, 14))
++    with pytest.raises(helper.Unavailable) as refused:
++        helper.run(req)
++    assert refused.value.reason == 'runtime_unsupported' and world.events == []
++
++
++def test_the_parent_ceiling_precedes_every_module_probe(monkeypatch):
++    """The unchanged parent: the NeuTTS interpreter ceiling is read first; a lower interpreter proceeds to the module probe."""
++    from tools import native_send_policy, tts_tool_local
++    probes = []
++    with monkeypatch.context() as patched:
++        patched.setattr('importlib.util.find_spec', lambda name: (probes.append(name), object())[1])
++        patched.setattr(tts_tool_local, 'sys', types.SimpleNamespace(version_info=(3, 14, 0, 'final', 0)))
++        with pytest.raises(native_send_policy.NativeSendRefused) as refused:
++            tts_tool_local.native_engine_options('neutts', {})
++        assert refused.value.reason == 'unsupported' and probes == []
++        patched.setattr(tts_tool_local, 'sys', types.SimpleNamespace(version_info=(3, 13, 0, 'final', 0)))
++        options = tts_tool_local.native_engine_options('neutts', {})
++    assert options['original_repo'] and probes == ['neutts']
 diff --git a/tests/tools/test_native_voice_stock_transport.py b/tests/tools/test_native_voice_stock_transport.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..5ff5c62f947ca0aba0872f5934717bef0a40443c
@@ -13936,10 +14180,10 @@ index 0000000000000000000000000000000000000000..3c6ed05132e454d4584858beda6216a8
 +            'receive_timeout': max(1, int(policy.timeout_s))}
 diff --git a/tools/native_tts_engine_helper.py b/tools/native_tts_engine_helper.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..dc0a08db84aff8592ddf705f2430719d480529ce
+index 0000000000000000000000000000000000000000..f7d0a61864c7c9b04963a94bc88ac485b29c4f27
 --- /dev/null
 +++ b/tools/native_tts_engine_helper.py
-@@ -0,0 +1,415 @@
+@@ -0,0 +1,471 @@
 +"""Native (Relay) local TTS engine helper: ONE chunk of Piper, KittenTTS or NeuTTS in a separate, launcher-wrapped child.
 +
 +Run only by ``tools.tts_tool_local.native_engine_chunk`` as ``[<launcher…>, sys.executable, -I, <this file>]`` (an
@@ -13959,9 +14203,12 @@ index 0000000000000000000000000000000000000000..dc0a08db84aff8592ddf705f2430719d
 +distribution at its exact supported version (:data:`SUPPORTED_VERSIONS`, read from installed metadata, no import;
 +missing → ``not_installed``, other version → ``unsupported_version``) → complete-cache preflight on the filesystem (no
 +vendor model API is called to discover anything) → only then the vendor import and inference. Every missing
-+prerequisite is ``unavailable`` before the engine runs; nothing is downloaded, installed or substituted. The child's own
-+``RLIMIT_FSIZE`` bounds every file it writes while it runs. Trust: installed engine packages are trusted code; network
-+denial is the launcher's job, not this file's.
++prerequisite is ``unavailable`` before the engine runs; nothing is downloaded, installed or substituted. The global rows
++below are the 3.14 lock / KittenTTS set. NeuTTS 1.4.1 (Requires-Python <3.14; its own Requires-Dist
++``transformers==5.1.0`` and the normal ``phonemizer`` distribution) validates against its OWN engine-scoped rows
++(:data:`NEUTTS_ROWS`) instead. Source support for a <3.14 interpreter is not an installed, current or qualified runtime,
++and the managed 3.14 interpreter stays refused. The child's own ``RLIMIT_FSIZE`` bounds every file it writes while it
++runs. Trust: installed engine packages are trusted code; network denial is the launcher's job, not this file's.
 +"""
 +from __future__ import annotations
 +
@@ -13989,7 +14236,9 @@ index 0000000000000000000000000000000000000000..dc0a08db84aff8592ddf705f2430719d
 +W2V_BERT_REPO = 'facebook/w2v-bert-2.0'  # NeuCodec.__init__ nested encoder + feature extractor (model.py:29-34)
 +PERTH_FILES = ('hparams.yaml', 'id.txt', 'perth_net_250000.pth.tar')
 +# The source-backed combination this helper's lower-level calls and cache conclusions were verified against (staged
-+# inert sources and the locked dependency set). Any other installed version is refused, never guessed at.
++# inert sources and the locked dependency set). Any other installed version is refused, never guessed at. These GLOBAL rows
++# serve Piper and KittenTTS; NeuTTS's differing rows are the engine-scoped NEUTTS_ROWS below (its 'transformers' and
++# 'phonemizer' rows here are never consulted for it).
 +SUPPORTED_VERSIONS = {'piper-tts': '1.8.0', 'kittentts': '0.8.1', 'neutts': '1.4.1', 'huggingface-hub': '1.24.0',
 +                      'transformers': '5.17.0', 'neucodec': '0.0.4', 'resemble-perth': '1.0.1', 'misaki': '0.9.4',
 +                      'phonemizer-fork': '3.3.2', 'espeakng-loader': '0.2.4', 'num2words': '0.5.14'}
@@ -14014,6 +14263,16 @@ index 0000000000000000000000000000000000000000..dc0a08db84aff8592ddf705f2430719d
 +               'soundfile', 'numpy', 'huggingface_hub', 'einops', 'local_attention', 'torchtune',
 +               'vector_quantize_pytorch'),
 +}
++# NeuTTS 1.4.1's own METADATA (Requires-Dist transformers==5.1.0 and phonemizer>=3.0.0, the NORMAL distribution) differs
++# from the global rows above. Import name -> (distribution, accepted versions); an empty tuple is "present, any version".
++# Only the two normal phonemizer releases whose sources were read (3.3.0, 3.4.0: identical EspeakBackend /
++# EspeakWrapper.set_library / phonemize surface as NeuTTS calls it) are accepted; their phonemization of decimal numerals
++# differs upstream and neither release is forced.
++NEUTTS_ROWS = {'transformers': ('transformers', ('5.1.0',)), 'phonemizer': ('phonemizer', ('3.3.0', '3.4.0'))}
++# Modules NeuTTS's `from phonemizer.backend import EspeakBackend` imports at load, present at any version (no version is
++# guessed); used only through require_packages rows, chosen by neutts_load_modules.
++NEUTTS_LOAD_ROWS = {'joblib': ('joblib', ()), 'typing_extensions': ('typing-extensions', ()), 'dlinfo': ('dlinfo', ()),
++                    'segments': ('segments', ())}
 +REQUEST_FIELDS = frozenset({'api', 'engine', 'text', 'wav_path', 'max_wav_bytes'})
 +
 +
@@ -14075,21 +14334,58 @@ index 0000000000000000000000000000000000000000..dc0a08db84aff8592ddf705f2430719d
 +
 +
 +def require_packages(names: tuple[str, ...], find: Callable[[str], bool],
-+                     version_of: Optional[Callable[[str], str]] = None) -> None:
++                     version_of: Optional[Callable[[str], str]] = None,
++                     rows: Optional[dict[str, tuple[str, tuple[str, ...]]]] = None) -> None:
 +    """Every module present (spec found, no import) with its distribution's metadata, at the supported version when
-+    one is pinned. Missing → ``not_installed``; other version → ``unsupported_version``."""
++    one is pinned. Missing → ``not_installed``; other version → ``unsupported_version``. ``rows`` (engine-scoped, import
++    name → (distribution, accepted versions)) replace the global row for that name only; without them the global tables
++    rule."""
 +    version_of = version_of or _version_of
++    rows = rows or {}
 +    for name in names:
-+        distribution = DISTRIBUTIONS[name]
++        if name in rows:
++            distribution, wanted = rows[name]
++        else:
++            distribution = DISTRIBUTIONS[name]
++            wanted = (SUPPORTED_VERSIONS[distribution],) if distribution in SUPPORTED_VERSIONS else ()
 +        try:
 +            installed = version_of(distribution)
 +        except importlib.metadata.PackageNotFoundError:
 +            raise Unavailable('not_installed') from None
 +        if not find(name):
 +            raise Unavailable('not_installed')
-+        wanted = SUPPORTED_VERSIONS.get(distribution)
-+        if wanted is not None and installed != wanted:
++        if wanted and installed not in wanted:
 +            raise Unavailable('unsupported_version')
++
++
++def neutts_load_modules(phonemizer_version: str, platform: str = sys.platform) -> tuple[str, ...]:
++    """The extra modules NeuTTS's ``from phonemizer.backend import EspeakBackend`` (neutts/phonemizers.py:2) imports at
++    load, from the staged phonemizer sources: ``joblib`` (backend/base.py:23) and ``typing_extensions``
++    (backend/espeak/language_switch.py:41) in every accepted release; ``dlinfo`` except on Windows
++    (backend/espeak/api.py:30-32, ``if sys.platform != 'win32'``); ``segments`` only in 3.3.0, which imports it eagerly
++    (backend/__init__.py:22; 3.4.0 imports it lazily, so it is NOT required there). ``platform`` is data: the Windows arm
++    is a pure function, not a faked host."""
++    return ('joblib', 'typing_extensions', *(() if platform == 'win32' else ('dlinfo',)),
++            *(('segments',) if phonemizer_version == '3.3.0' else ()))
++
++
++def require_neutts_packages(find: Callable[[str], bool], version_of: Optional[Callable[[str], str]] = None,
++                            platform: str = sys.platform) -> None:
++    """NeuTTS's prerequisites, before any vendor, cache or inference call: the chain against :data:`NEUTTS_ROWS`; then
++    BOTH ``phonemizer`` and ``phonemizer-fork`` metadata present is ambiguous (they share the ``phonemizer`` package
++    directory, so metadata cannot say whose code an import loads) and is refused as ``unsupported_version`` (fork-only is
++    already ``not_installed``); then the known load-time modules of the installed phonemizer release. Metadata and spec
++    probes only: nothing is imported."""
++    version_of = version_of or _version_of
++    require_packages(CHAINS['neutts'], find, version_of, rows=NEUTTS_ROWS)
++    try:
++        version_of('phonemizer-fork')
++    except importlib.metadata.PackageNotFoundError:
++        pass
++    else:
++        raise Unavailable('unsupported_version')
++    modules = neutts_load_modules(version_of(NEUTTS_ROWS['phonemizer'][0]), platform)
++    require_packages(modules, find, version_of, rows=NEUTTS_LOAD_ROWS)
 +
 +
 +def optional_perth(pkg: Optional[Path], version_of: Optional[Callable[[str], str]] = None) -> Optional[Path]:
@@ -14201,8 +14497,11 @@ index 0000000000000000000000000000000000000000..dc0a08db84aff8592ddf705f2430719d
 +
 +
 +def transformers_weights(hub: Any, repo: str) -> Optional[list[str]]:
-+    """The weight files transformers 5.17.0 selects for a hub repo (modeling_utils.py:642-717 order: safetensors,
-+    safetensors index + every shard, pytorch bin, bin index + every shard), all present; None otherwise."""
++    """The weight files transformers selects for a hub repo, all present; None otherwise. The order is the one NeuTTS
++    1.4.1's own pin (transformers 5.1.0) uses, modeling_utils.py:580-663 with shard names
++    ``sorted(set(weight_map.values()))`` at utils/hub.py:857: safetensors, safetensors index + every shard (an index
++    whose shard is missing is final: no fall back to the bin), pytorch bin, bin index + every shard. transformers 5.17.0
++    (the global row, modeling_utils.py:638-709) selects in the same order."""
 +    for single, index in (('model.safetensors', 'model.safetensors.index.json'),
 +                          ('pytorch_model.bin', 'pytorch_model.bin.index.json')):
 +        found = hub.file(repo, single)
@@ -14221,9 +14520,10 @@ index 0000000000000000000000000000000000000000..dc0a08db84aff8592ddf705f2430719d
 +
 +def preflight_neutts(opts: dict[str, Any], hub: Any, pkg: Optional[Path], perth: Optional[Path],
 +                     version: tuple = sys.version_info[:2]) -> dict[str, Any]:
-+    """NeuTTS 1.4.1 (Requires-Python <3.14): a local GGUF backbone (neutts.py:227-228, never ``from_pretrained``), the
-+    stock Torch codec with its nested w2v-bert encoder and feature extractor, the bundled espeak, the reference files
-+    and — when Perth is installed — its complete bundled checkpoint (it would otherwise write into the package)."""
++    """NeuTTS 1.4.1 (Requires-Python <3.14; transformers 5.1.0 loads its nested encoder): a local GGUF backbone
++    (neutts.py:227-228, never ``from_pretrained``), the stock Torch codec with its nested w2v-bert encoder and feature
++    extractor, the bundled espeak, the reference files and — when Perth is installed — its complete bundled checkpoint
++    (it would otherwise write into the package)."""
 +    if version >= (3, 14):
 +        raise Unavailable('runtime_unsupported')
 +    if pkg is None:
@@ -14321,7 +14621,7 @@ index 0000000000000000000000000000000000000000..dc0a08db84aff8592ddf705f2430719d
 +    else:
 +        if sys.version_info[:2] >= (3, 14):
 +            raise Unavailable('runtime_unsupported')  # before ANY engine import (NeuTTS 1.4.1 Requires-Python <3.14)
-+        require_packages(CHAINS['neutts'], _installed)
++        require_neutts_packages(_installed)
 +        resolved = preflight_neutts(req['neutts'], HubCache(), package_dir('neutts'), optional_perth(package_dir('perth')))
 +        rate = _synthesize_neutts(req, resolved)
 +    size = os.path.getsize(req['wav_path']) if os.path.isfile(req['wav_path']) else 0
