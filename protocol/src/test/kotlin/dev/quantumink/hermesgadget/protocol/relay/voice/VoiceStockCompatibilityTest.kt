@@ -126,6 +126,11 @@ class VoiceStockCompatibilityTest {
         )
         // the voice codec never added a capability: relay negotiation stays exactly {"version":1}
         assertFalse(RelayNegotiation.capability().toString().contains("voice"))
-        assertEquals(22, RelayMethod.entries.count { !it.isVoice })
+        assertEquals(
+            22,
+            RelayMethod.entries.count {
+                !it.isVoice && it != RelayMethod.TURN_RECEIPT_OWN
+            }
+        )
     }
 }
