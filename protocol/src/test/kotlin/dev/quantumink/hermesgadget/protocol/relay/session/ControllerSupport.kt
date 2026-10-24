@@ -106,6 +106,7 @@ internal class MemoryStore(var log: MutableList<String>? = null) : RelayStore {
     /** When set, this many further commits succeed and every later one fails (a failure at an exact step). */
     var allowCommits: Int? = null
     var lastDocument: RelayDocument? = null
+    var afterCommit: () -> Unit = {}
 
     override fun load(): StoreLoad {
         unreadable?.let { return StoreLoad.Unreadable(it) }
@@ -155,6 +156,7 @@ internal class MemoryStore(var log: MutableList<String>? = null) : RelayStore {
                 sequence++
                 commits++
                 lastDocument = document
+                afterCommit()
                 StoreCommit.Committed(sequence)
             }
         }
@@ -429,7 +431,9 @@ internal class ControllerFixture(
     val inbox: InboxRepository? = null,
     val requestEntropy: RequestIdEntropy? = null,
     val retainedHistory: RetainedHistory? = null,
-    val inboxAlerts: (List<InboxCopy>) -> Unit = {}
+    val inboxAlerts: (List<InboxCopy>) -> Unit = {},
+    val writerEpoch: () -> Long = { 0L },
+    val inboxUpdates: (InboxSnapshot?, String) -> Unit = { _, _ -> }
 ) {
     val log = ArrayList<String>().also { store.log = it }
     val scheduler = ManualScheduler()
@@ -454,6 +458,8 @@ internal class ControllerFixture(
         retainedHistory = retainedHistory,
         inbox = inbox,
         inboxAlerts = inboxAlerts,
+        writerEpoch = writerEpoch,
+        inboxUpdates = inboxUpdates,
         localMillis = { Dto.SERVER_TIME + scheduler.now }
     ) { states.add(it) }
 

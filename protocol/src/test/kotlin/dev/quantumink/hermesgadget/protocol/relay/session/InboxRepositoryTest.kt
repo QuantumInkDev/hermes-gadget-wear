@@ -86,7 +86,7 @@ class InboxRepositoryTest {
         r.accept(other, listOf(item()), 2000)
         assertEquals(2, r.snapshot().copies.size)
         assertEquals(2, r.snapshot().copies.map { it.handle }.toSet().size)
-        r.evict(owner, Dto.conversation.value)
+        r.evict(owner, null)
         assertEquals(other, r.snapshot().copies.single().namespace)
     }
 

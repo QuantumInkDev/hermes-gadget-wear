@@ -525,3 +525,17 @@ No durable answer retry journal or automatic paid retry is created; loss is unce
 Recorded JVM/Peer/software-key tests and registered synthetic producer captures support scoped source work.
 Android UI, notification permission/lock screen, job/Doze/assigned network, real Keystore/Looper/fsync/power loss,
 near-cap device latency and native/physical/live/provider/billing acceptance remain separate OPEN gates.
+
+Writer handover qualification: foreground selection first reserves a generation and synchronously withdraws the
+old transport/callback/timer authority. Actual foreground preparation is a serialized barrier before connection
+or actions, so an already-running old file commit can physically settle before prepared replacement admission.
+Its returned complete aggregate remains in the same runtime/sequence; old writer publication, new writes, paced
+SEND and completion callbacks refuse after withdrawal. Delayed tasks also capture writer epoch, not only serial.
+The old bounded job wait is released by preemption. This is not cancellation of an in-progress filesystem write,
+not a stale-document merge and not a promise of uncommitted observation recovery after process loss.
+
+Canonical exact-target deletion fences/removes canonical change copies and task/history projections only.
+Opaque final conversation/event/message references are never reclassified by UUID shape or string equality.
+They remain read-only and survive an unrelated exact canonical deletion, while genuine whole namespace
+revocation and local retention still apply. Current delivery refresh kinds are HISTORY and TASKS; clearing
+both still requires the complete bounded conversation enumeration/history/task and opted-in source joins.

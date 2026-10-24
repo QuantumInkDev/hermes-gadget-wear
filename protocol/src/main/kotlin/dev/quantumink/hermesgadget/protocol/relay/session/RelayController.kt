@@ -194,7 +194,7 @@ class RelayController(
                 HistoryNamespace.from(it) == route.namespace &&
                     it.enabled && it.standing == Standing.ACTIVE
             } ||
-            removalOwed(route.namespace, route.conversation)
+            inboxRemovalOwed(route.namespace, route.canonicalConversation)
         ) {
             return null
         }
@@ -558,7 +558,7 @@ class RelayController(
                                 }
                             )
                 } &&
-                    !removalOwed(c.namespace, c.conversation)
+                    !inboxRemovalOwed(c.namespace, c.canonicalConversation)
             },
             tasks = s.tasks.filter { t ->
                 s.profiles.any {
@@ -1007,6 +1007,9 @@ class RelayController(
             (it.conversationId == null || (!wholeScopeOnly && it.conversationId == conversation))
     }
 
+    private fun inboxRemovalOwed(owner: HistoryNamespace, canonical: String?): Boolean =
+        removalOwed(owner, canonical, wholeScopeOnly = canonical == null)
+
     private fun blocked(conversation: String): Boolean =
         namespace()?.let { removalOwed(it, conversation) } == true
 
@@ -1425,13 +1428,11 @@ class RelayController(
                         task()
                     } catch (_: InboxFailure) {
                         inboxEpoch.incrementAndGet()
-                        val active = inboxRun
-                        if (active != null) {
-                            active.finish("Inbox storage unavailable")
-                        } else {
-                            withdrawInboxObserver()
+                        withdrawInboxObserver()
+                        if (admittedWriter == writerEpoch()) {
                             inboxStatus = "Inbox storage unavailable"
                             publish()
+                            inboxCompleted(inboxStatus)
                         }
                     }
                 }
@@ -1441,10 +1442,11 @@ class RelayController(
 
     private fun later(delayMs: Long, task: () -> Unit): Cancelable {
         val expected = serial
+        val writer = writerEpoch()
         return scheduler.postDelayed(
             delayMs,
             Runnable {
-                if (expected == serial) task()
+                if (expected == serial && writer == writerEpoch()) task()
             }
         )
     }
@@ -1531,6 +1533,7 @@ class RelayController(
      * stored aggregate is carried over UNCHANGED (never replaced by an empty one); an empty store gets the first document.
      */
     private fun commitSection(section: ControllerSection): Boolean {
+        if (admittedWriter != writerEpoch()) return false
         val rt = runtime
         if (rt != null) return adopt(rt.copy(section = section))
         val snapshot = (stored as? Stored.Doc)?.document?.snapshot ?: emptySnapshot()
@@ -1555,6 +1558,7 @@ class RelayController(
     }
 
     private fun tryCommit(next: RelayRuntime, observed: Boolean = false): Boolean {
+        if (admittedWriter != writerEpoch()) return false
         val at = now()
         if (at == null) {
             notice = RelayNotice.CLOCK_UNAVAILABLE
@@ -1956,6 +1960,7 @@ class RelayController(
                 } ?: rt
             }
             inboxRun = null
+            if (!permit()) return
             inboxStatus = status
             publish()
             inboxCompleted(status)
@@ -2120,7 +2125,7 @@ class RelayController(
             if (planned.ref.ids.any { id ->
                     bodies.none {
                         it.item.deliveryId == id &&
-                            !removalOwed(owner, it.conversation) &&
+                            !inboxRemovalOwed(owner, it.canonicalConversation) &&
                             (
                                 !it.existing || profile.existingTasks &&
                                     profile.existingAvailable &&
@@ -2219,12 +2224,9 @@ class RelayController(
                             val batch = value.batch
                             val all = batch.items + batch.duplicates
                             if (all.any {
-                                    removalOwed(
+                                    inboxRemovalOwed(
                                         owner,
-                                        when (it) {
-                                            is OutboxItem.Change -> it.conversationId.value
-                                            is OutboxItem.Final -> it.conversationRef.value
-                                        }
+                                        (it as? OutboxItem.Change)?.conversationId?.value
                                     )
                                 }
                             ) {
@@ -4312,6 +4314,7 @@ class RelayController(
     }
 
     private fun publish() {
+        if (admittedWriter != writerEpoch()) return
         val record = record()
         val enabled = record?.enabled == true
         val problem = (stored as? Stored.Problem)?.problem

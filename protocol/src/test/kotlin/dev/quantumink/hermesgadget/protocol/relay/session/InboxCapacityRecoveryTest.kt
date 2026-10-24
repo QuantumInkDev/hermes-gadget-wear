@@ -126,11 +126,16 @@ class InboxCapacityRecoveryTest {
         }
         val full = DeliverySnapshot(own.scope, 37, seen, own.obligations, emptyList())
         val s = seed.snapshot
+        val pending = if (fullSections) {
+            Seeds.sentTurn(f.identity, "unrelated typed obligation").document.snapshot.ledger
+        } else {
+            s.ledger
+        }
         val initial = RelayDocument(
             section,
             RelayStateSnapshot(
                 s.version,
-                s.ledger,
+                pending,
                 s.histories,
                 s.deliveries + full,
                 s.captures
@@ -181,6 +186,11 @@ class InboxCapacityRecoveryTest {
         assertEquals(64, r.before.section.evictions.size)
         assertNotNull(r.before.section.emergencyDeletion)
         assertEquals(15, r.before.section.enrollments.count { it.selectionDeleted })
+        assertEquals(1, r.before.snapshot.ledger.turns.size)
+        assertEquals("unrelated typed obligation", r.before.snapshot.ledger.turns.single().text)
+        assertTrue(r.before.snapshot.ledger.turns.single().sent)
+        assertEquals(1, r.before.snapshot.captures.records.size)
+        assertTrue(r.before.snapshot.histories.isNotEmpty())
         f.answer("relay.outbox.read", OutboxPage(listOf(item()), 37).toWire())
         val after = f.store.reread()
         val own = after.snapshot.deliveries.single {

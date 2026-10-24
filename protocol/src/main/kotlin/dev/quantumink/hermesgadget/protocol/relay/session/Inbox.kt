@@ -844,7 +844,7 @@ class InboxRepository(private val file: InboxFile) {
             old.copy(
                 copies = old.copies.filterNot {
                     it.namespace == namespace &&
-                        (conversation == null || it.conversation == conversation)
+                        (conversation == null || it.canonicalConversation == conversation)
                 },
                 tasks = old.tasks.filterNot {
                     it.namespace == namespace &&

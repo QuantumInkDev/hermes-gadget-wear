@@ -72,6 +72,8 @@ internal class PhoneInboxOwner(private val app: Application) {
         return controller
     }
 
+    // This reserves the replacement generation. Prepared foreground authority waits for the
+    // controller barrier, after any already-running old IO has settled and teardown serialized.
     @Synchronized fun foreground(withdraw: () -> Unit): Long {
         val id = leases.foreground(withdraw)
         foreground = id
@@ -153,6 +155,7 @@ internal class PhoneInboxOwner(private val app: Application) {
             var link: DirectConnection? = null
             var client: OkHttpClient? = null
             var lease: Long? = null
+            var completion: CountDownLatch? = null
             try {
                 SetupTransferGate.ensureRecovered()
                 if (!alive()) return@execute
@@ -173,6 +176,7 @@ internal class PhoneInboxOwner(private val app: Application) {
                     actor = epochs.incrementAndGet()
                     controller.attachTransport(null)
                     link?.close()
+                    completion?.countDown()
                 }
                     ?: run {
                         statusMutable.value = "Foreground connection owns updates"
@@ -225,6 +229,7 @@ internal class PhoneInboxOwner(private val app: Application) {
                         continue
                     }
                     val complete = CountDownLatch(1)
+                    completion = complete
                     controller.observeInboxOnly(true) { complete.countDown() }
                     client = OkHttpClient.Builder().socketFactory(assigned.socketFactory).build()
                     val current =
@@ -274,13 +279,18 @@ internal class PhoneInboxOwner(private val app: Application) {
                     client.connectionPool.evictAll()
                     client =
                         null
-                    mutable.value = controller.inboxBlocking()
-                    statusMutable.value = controller.inboxStatus
+                    val latest = controller.inboxBlocking()
+                    if (leases.current(id)) {
+                        mutable.value = latest
+                        statusMutable.value = controller.inboxStatus
+                    }
                 }
             } catch (
                 _: Exception
             ) {
-                statusMutable.value = "Partial / updates unavailable"
+                if (lease?.let(leases::current) != false) {
+                    statusMutable.value = "Partial / updates unavailable"
+                }
             } finally {
                 link?.relayTransport?.invalidatePending()
                 link?.close()
