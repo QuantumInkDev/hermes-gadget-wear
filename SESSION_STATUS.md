@@ -20,12 +20,17 @@ Server code lives outside this repo:
 `./gradlew check :wear:assembleDebug :mobile:assembleDebug`: 1,234 tests pass, 1 skipped,
 0 failed; both debug APKs build.
 
+## Devices
+
+Phone (S25 Ultra) and watch (Galaxy Watch Ultra) updated in place to `relay/delivery`
+debug builds on 2026-10-24; app and data backups in `.local/expansion/device-baselines/`.
+
 ## Feature status (spec: docs/superpowers/specs/2026-10-18-relay-expansion-design.md)
 
 | Feature | State |
 |---|---|
 | N8 diagnostics, N4 quick actions | Built; installed on phone Oct 18 |
-| N6 structured replies, N10 QR/migration | Built; not installed |
+| N6 structured replies, N10 QR/migration | Built; installed Oct 24 |
 | O1 pets, O2 expressions | Watch side built; server pet delivery not live |
 | O3 Opus | Client built; server patch not live; battery measurement open |
 | O4 ElevenLabs | Phone settings built; full voice path present but off |
@@ -37,7 +42,6 @@ Server code lives outside this repo:
 
 ## Next
 
-1. Install current phone and watch builds.
-2. Deploy server SDK/core changes to one box and smoke test.
-3. Build the missing pieces: watch history/inbox, N3, N5, N7, N9 client.
-4. One physical test pass with the owner.
+1. Deploy server SDK/core changes to one box and smoke test.
+2. Build the missing pieces: watch history/inbox, N3, N5, N7, N9 client.
+3. One physical test pass with the owner.
