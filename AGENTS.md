@@ -9,4 +9,5 @@ This is a fresh Kotlin Wear OS and Android companion project. The authoritative 
 - Keep server extensions upstreamable and track proposed changes in `docs/upstream.md`.
 - Never commit personal endpoints, tailnet details, credentials, signing keys, or personal pet art. Maintainer setup belongs in the ignored `.local/` directory.
 - Do not infer a local Hermes endpoint. Ask for the server URL and pairing approval when M2 reaches hardware testing.
-- Keep `SESSION_STATUS.md` current so another session can continue from verified progress.
+- Keep `SESSION_STATUS.md` short and current (state, next step, blockers) so another session can continue. No receipts, hash ledgers or review packages; history lives in git.
+- Work on one branch in this repo. Never keep source in nested repos under `.local/`.
