@@ -311,6 +311,46 @@ class PhoneCanonicalHistoryTest {
         assertTrue(h.ui.historyIncomplete)
     }
 
+    @Test fun retainedSelectionRefusesTypedSendUntilTheAuthenticatedConversationViewIsRestored() {
+        val h = Harness(temp.newFolder())
+        h.begin()
+        h.page(message(1))
+        h.controller.openRetained(h.summary.conversationId.value)
+        h.run()
+        assertFalse(h.ui.canSend)
+        var accepted = true
+        h.controller.send("must stay read only") { accepted = it }
+        h.run()
+        assertFalse(accepted)
+        assertTrue(h.link.requests.none { it.method == "relay.turn.submit" })
+        h.controller.closeRetained()
+        h.run()
+        assertTrue(h.ui.canSend)
+        h.controller.send("deliberate continuation") { accepted = it }
+        h.run()
+        assertTrue(accepted)
+        val sent = h.link.next("relay.turn.submit")
+        assertEquals(
+            h.result("relay.conversation.attach")["binding_id"]!!.jsonPrimitive.content,
+            sent.params["binding_id"]!!.jsonPrimitive.content
+        )
+    }
+
+    @Test fun disablingRelayClearsTheRetainedViewAndRestoresStockInputRoutes() {
+        val h = Harness(temp.newFolder())
+        h.begin()
+        h.page(message(1))
+        h.controller.openRetained(h.summary.conversationId.value)
+        h.run()
+        assertEquals(InputRoute.UNAVAILABLE, PhoneRelay.typedRoute(h.ui))
+        h.controller.setEnabled(false)
+        h.run()
+        assertEquals(null, h.ui.retainedSelected)
+        assertTrue(h.ui.retained.isEmpty())
+        assertEquals(InputRoute.STOCK, PhoneRelay.typedRoute(h.ui))
+        assertEquals(InputRoute.STOCK, PhoneRelay.voiceRoute(h.ui))
+    }
+
     @Test fun failedAggregateCommitAfterCacheWriteDoesNotAdvanceDurableResume() {
         val h = Harness(temp.newFolder())
         h.begin()

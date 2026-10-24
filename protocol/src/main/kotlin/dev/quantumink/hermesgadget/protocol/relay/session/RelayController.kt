@@ -305,6 +305,10 @@ class RelayController(
             endSession(attachAgain = false)
             transcript.clear()
             conversations.clear()
+            retained = emptyList()
+            retainedSelected = null
+            selectedSummary = null
+            cacheReview = null
         }
         unavailable = null
         notice = RelayNotice.NONE
@@ -2051,7 +2055,8 @@ class RelayController(
         val rt = runtime
         val bound = token
         val link = transport
-        if (rt == null || bound == null || link == null || !isReady() || attaching ||
+        if (retainedSelected != null || rt == null || bound == null || link == null ||
+            !isReady() || attaching ||
             !supports(RelayMethod.TURN_SUBMIT)
         ) {
             publish()

@@ -159,6 +159,19 @@ class PhoneRelayRoutingTest {
         assertEquals(listOf(RelayChannelState.NotOffered, RelayChannelState.Closed), reported)
     }
 
+    @Test fun retainedProblemsDescribeRecoveryAndPreservation() {
+        for (problem in dev.quantumink.hermesgadget.protocol.relay.session.HistoryProblem.entries) {
+            val text = retainedProblemText(problem)
+            assertTrue(text.isNotBlank())
+            assertFalse(text.contains(problem.name))
+        }
+        assertTrue(
+            retainedProblemText(
+                dev.quantumink.hermesgadget.protocol.relay.session.HistoryProblem.KEY_UNAVAILABLE
+            ).contains("preserved")
+        )
+    }
+
     @Test fun storageAndEvictionNoticesDoNotOverstateDurableOutcomes() {
         assertFalse(relayNoticeText(RelayNotice.OBSERVATION_UNSAVED).contains("Nothing was sent"))
         assertTrue(relayNoticeText(RelayNotice.OBSERVATION_UNSAVED).contains("server"))

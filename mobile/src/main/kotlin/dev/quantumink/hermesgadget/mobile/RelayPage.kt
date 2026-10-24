@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.quantumink.hermesgadget.protocol.relay.HistoryRole
 import dev.quantumink.hermesgadget.protocol.relay.session.ConversationItem
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryProblem
 import dev.quantumink.hermesgadget.protocol.relay.session.MetadataStatus
 import dev.quantumink.hermesgadget.protocol.relay.session.RelayNotice
 import dev.quantumink.hermesgadget.protocol.relay.session.RelayPhase
@@ -61,6 +62,29 @@ internal class RelayActions(
 
         fun of(model: PhoneConversation) = model.relayActions()
     }
+}
+
+internal fun retainedProblemText(problem: HistoryProblem): String = when (problem) {
+    HistoryProblem.LOCAL_REVISION, HistoryProblem.STALE_REVIEW ->
+        "Retained history changed. Review the current bytes again."
+    HistoryProblem.STALE_METADATA, HistoryProblem.METADATA_CONFLICT ->
+        "The canonical title or bookmark changed. Refresh before retaining it."
+    HistoryProblem.MISSING_ANCHOR, HistoryProblem.SEQUENCE_CONFLICT,
+    HistoryProblem.REBUILD_REQUIRED ->
+        "Only a fragment is retained. Review a cache-only rebuild before refetching."
+    HistoryProblem.CAPACITY -> "Retained history is full. Review local bytes before freeing space."
+    HistoryProblem.KEY_UNAVAILABLE ->
+        "The history encryption key is unavailable. Bytes are preserved."
+    HistoryProblem.UNREADABLE -> "Retained history cannot be read. Bytes are preserved for review."
+    HistoryProblem.RECORD_MISSING ->
+        "The history record is missing. No empty replacement was made."
+    HistoryProblem.UNSUPPORTED, HistoryProblem.LEGACY_UNBOUND ->
+        "Older or unsupported retained history needs an explicit review. Bytes are preserved."
+    HistoryProblem.STORAGE -> "Retained history storage is unavailable. Removal is not confirmed."
+    HistoryProblem.WRITE_UNCERTAIN ->
+        "Saving retained history is unconfirmed. Durable progress was not advanced."
+    HistoryProblem.INVALID_VALUE -> "Canonical text or metadata could not be retained exactly."
+    HistoryProblem.UNBOUND_PROVENANCE -> "This cache has no reviewed server provenance for export."
 }
 
 internal fun relayNoticeText(notice: RelayNotice): String = when (notice) {
@@ -482,7 +506,7 @@ private fun RetainedHistoryControls(relay: RelayUiState, actions: RelayActions) 
     TextButton({ actions.searchRetained(query) }) { Text("Search this phone") }
     relay.retainedProblem?.let {
         Text(
-            "Retained text unavailable: $it. Existing bytes are preserved.",
+            retainedProblemText(it),
             color = MaterialTheme.colorScheme.error
         )
     }

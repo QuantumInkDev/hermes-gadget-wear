@@ -200,7 +200,7 @@ Selection stores only the conversation identity, then `relay.conversation.attach
 (`RelayAuthority`), starts the event session, and is followed, in this order, by: receipt lookups of unresolved turns, the
 advertised history (≤ 24 pages of 50, ≤ 64 total requests including retries/restarts, `HistoryAssembly`), the advertised
 task snapshot (enrollment-wide pages of 25, ≤ 24 pages with ≤ 6 retries per page, ≤ 100 selected tasks), then
-event polling from the binding's baseline (1.5 s while a turn is awaited, 8 s idle). Full 90-day cache, browser, inbox and
+event polling from the binding's baseline (1.5 s while a turn is awaited, 8 s idle). Task4 now adds retained cache/browsing below; inbox and
 notifications are Tasks 4–5 — a refresh obligation is not proof they exist. After a **process restore nothing attaches by
 itself**: the stored selection is offered as "Resume". A reconnect inside the same foreground session re-attaches to the
 selection the user already chose.
@@ -244,8 +244,7 @@ recovery is claimed. SDK production is unchanged in this Task3 stage; this limit
 `stale_binding`/`stale_epoch`/`snapshot_required` and every gap (a gap event is part of NORMAL operation — every captured turn's
 events carry one): `relay.info` is read again, the session attaches again and history is read again; nothing is resubmitted.
 `permission_denied`: durable `STOPPED`, authority retired, then the eviction obligation — turn texts, delivery state and history
-resume points — **stays owed in memory and on disk until the eviction itself is stored**; downstream history caches are Task4
-(Task3 populates none). `profile_changed`: durable `REVIEW_REQUIRED`.
+resume points and the Task4 retained cache — **stays owed in memory and on disk until confirmed removal is stored**. `profile_changed`: durable `REVIEW_REQUIRED`.
 
 ### 5.7 Reconnect request ordering
 
@@ -276,7 +275,7 @@ real controller/file store; AndroidViewModel construction, Compose lifecycle and
 
 Storage notices distinguish a pre-send refusal from an unsaved server observation (requests may already have reached the
 server). STOPPED exposes pending versus confirmed durable ledger-content eviction; failed eviction never claims content
-is gone. Native persistence and broader Task4 caches remain outside this evidence.
+is gone. Native persistence remains outside this evidence; Task4 JVM cache ordering is described below.
 
 ## 6. Carried OPEN to V5 (not changed here)
 
@@ -366,3 +365,8 @@ Minor1 check; the frozen old generations remain unchanged. Android tests are com
 only. Task5 inbox/O5, Task6 watch, Task7 SAF/delete acceptance, Task8 native/physical/
 live/battery and full15 remain open. Canonical microphone remains OFF. Original
 Task3 raw evidence and N6/N10 recovery requirements remain unrestored and unwaived.
+
+Retained-view routing also gates the controller's typed-send entry itself. Closing
+the local view restores deliberate continuation using the existing authenticated
+binding; turning Relay off clears the local selection and restores stock input.
+These paths are covered separately from socket acceptance and from native UI tests.
