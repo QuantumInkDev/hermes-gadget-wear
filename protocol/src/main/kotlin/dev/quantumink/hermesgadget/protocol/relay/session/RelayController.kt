@@ -311,6 +311,10 @@ class RelayController(
                 return@post
             }
             request(RelayCalls.existingPrompt(binding.bindingId), permit = ::permit) { result ->
+                if (inboxInputError(result, route)) {
+                    done(null)
+                    return@request
+                }
                 val value =
                     ((result as? RelayCallResult.Outcome)?.outcome as? RelayOutcome.Success)?.value
                 accept(value?.prompt)
@@ -322,6 +326,10 @@ class RelayController(
                 return@post
             }
             request(RelayCalls.task(task.taskId), permit = ::permit) { result ->
+                if (inboxInputError(result, route)) {
+                    done(null)
+                    return@request
+                }
                 val value =
                     ((result as? RelayCallResult.Outcome)?.outcome as? RelayOutcome.Success)?.value
                 if (value?.taskId != task.taskId || value.conversationId != task.conversationId ||
@@ -342,12 +350,13 @@ class RelayController(
      */
     fun answerInboxInput(issued: InboxInput, answer: PromptAnswer, done: (Boolean) -> Unit) = post {
         val marker: Any? = if (existingInboxBinding != null) existingInboxBinding else token
+        val route = localInboxRoute(issued.route)
         if (inboxInput !== issued || !issued.canAnswer || issued.serial != serial ||
             issued.flow != flow ||
             issued.writer != writerEpoch() || issued.observer != inboxEpoch.get() ||
             issued.inputGeneration != inputEpoch.get() || issued.owner != namespace() ||
             issued.boundToken !== marker ||
-            !isReady() || inboxOnly || localInboxRoute(issued.route) == null ||
+            !isReady() || inboxOnly || route == null ||
             (
                 issued.prompt.expiresAtMs != null &&
                     issued.prompt.expiresAtMs <= (now()?.serverMs ?: Long.MAX_VALUE)
@@ -388,8 +397,31 @@ class RelayController(
                 issued.observer == inboxEpoch.get() &&
                 issued.inputGeneration == inputEpoch.get()
         }) { result ->
-            done((result as? RelayCallResult.Outcome)?.outcome is RelayOutcome.Success)
+            val failed = inboxInputError(result, route)
+            done(!failed && (result as? RelayCallResult.Outcome)?.outcome is RelayOutcome.Success)
         }
+    }
+
+    /** Apply correlated authority before completing a deliberate input action; never retry it. */
+    private fun inboxInputError(result: RelayCallResult<*>, route: InboxRoute): Boolean {
+        val error = ((result as? RelayCallResult.Outcome)?.outcome as? RelayOutcome.Failed)?.error
+            ?: return false
+        when (error.action) {
+            RelayErrorAction.STOP_AND_EVICT_SCOPE -> stopScope()
+            RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW -> requireReview()
+            else -> {
+                // Exact existing-target absence is not enrollment-wide withdrawal.
+                if (route.existing && error.code == RelayErrorCode.NOT_FOUND) {
+                    try {
+                        inbox?.sourceUnavailable(route.namespace, route.conversation, false, true)
+                    } catch (_: InboxFailure) {
+                        inboxStatus = "Partial / existing source unavailable"
+                    }
+                    publish()
+                }
+            }
+        }
+        return true
     }
 
     private var inboxOnly = false
@@ -406,12 +438,24 @@ class RelayController(
         }
     }
     fun refreshInbox(done: (String) -> Unit = {}) = post {
-        inboxCompleted = done
+        var completed = false
+        val finishOnce: (String) -> Unit = { status ->
+            if (!completed) {
+                completed = true
+                done(status)
+            }
+        }
+        inboxCompleted = finishOnce
+        if (inboxRun?.current() == false) {
+            withdrawInboxObserver()
+            inboxStatus = "Partial / fresh authority required"
+        }
         if (inboxRun != null || !isReady()) {
-            done(inboxStatus)
+            finishOnce(inboxStatus)
             return@post
         }
         startInbox()
+        if (inboxRun == null) finishOnce(inboxStatus)
     }
     private var inboxTargetKey: String? = null
     private var inboxTargetLabel = "Relay profile"
@@ -1891,6 +1935,7 @@ class RelayController(
 
     private fun startInbox() {
         val repository = inbox ?: return
+        if (inboxRun?.current() == false) withdrawInboxObserver()
         if (!isReady() || inboxRun != null) return
         val owner = namespace() ?: return
         val scope = scope() ?: return
@@ -1942,6 +1987,8 @@ class RelayController(
     ) {
         val writer = writerEpoch()
         val observer = inboxEpoch.get()
+        private val authority = InboxAuthorityLease.capture(info, clock, monotonicNanos())
+        private fun ackPermit(): Boolean = permit() && authority?.allows(monotonicNanos()) == true
         fun permit(): Boolean = writer == writerEpoch() && observer == inboxEpoch.get()
         val deadline = monotonicNanos() + 20_000_000_000L
         var requests = 0
@@ -1951,7 +1998,7 @@ class RelayController(
         fun current(): Boolean =
             inboxRun === this && generation == serial && permit() && isReady() &&
                 namespace() == owner && info?.profileId?.value == owner.profileId &&
-                (now()?.serverMs ?: Long.MAX_VALUE) < (info?.expiresAtMs ?: 0)
+                authority?.allows(monotonicNanos()) == true
         fun finish(status: String) {
             if (inboxRun !== this) return
             runtime = runtime?.let { rt ->
@@ -2152,7 +2199,7 @@ class RelayController(
             }
             transient(plan.delivery)
             if (!budget()) return
-            request(planned.call, planned.ref.correlation, ::permit) { result ->
+            request(planned.call, planned.ref.correlation, ::ackPermit) { result ->
                 if (!current()) return@request
                 val error =
                     ((result as? RelayCallResult.Outcome)?.outcome as? RelayOutcome.Failed)?.error
@@ -2525,19 +2572,23 @@ class RelayController(
                 ack { outbox() }
                 return
             }
+            // Clearing debt is a proposal: failed persistence retains the old runtime and owed work.
             if (!incomplete &&
-                !commit(
-                    delivery().refreshed(
-                        null,
-                        RefreshKind.entries.toSet()
-                    ).delivery
-                )
+                (
+                    !adopt(
+                        requireNotNull(runtime).withDelivery(
+                            delivery().refreshed(null, RefreshKind.entries.toSet()).delivery
+                        )
+                    ) || !current()
+                    )
             ) {
                 finish("Partial / refresh unsaved")
                 return
             }
-            repository.synced(owner, localMillis())
             repository.sweep(owner, localMillis(), delivery().acknowledgementsOwed.map { it.value })
+            if (!incomplete && delivery().refreshOwed.isEmpty() && !unsaved && current()) {
+                repository.synced(owner, localMillis())
+            }
             finish(
                 if (incomplete ||
                     delivery().refreshOwed.isNotEmpty()

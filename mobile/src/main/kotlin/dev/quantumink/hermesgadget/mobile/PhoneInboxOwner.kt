@@ -210,122 +210,136 @@ internal class PhoneInboxOwner(private val app: Application) {
                 val snapshot = controller.inboxBlocking() ?: return@execute
                 if (background && !snapshot.background) return@execute
                 val connectivity = app.getSystemService(ConnectivityManager::class.java)
-                val assigned = network ?: connectivity.activeNetwork ?: return@execute
-                if (connectivity.activeNetwork != assigned) return@execute
-                val id = leases.background {
-                    link?.relayTransport?.invalidatePending()
+                val admitted = InboxNetworkOwner.run(
+                    background,
+                    network,
+                    { connectivity.activeNetwork }
+                ) { assigned ->
+                    val id = leases.background {
+                        link?.relayTransport?.invalidatePending()
+                        actor = epochs.incrementAndGet()
+                        controller.attachTransport(null)
+                        link?.close()
+                        completion?.countDown()
+                    }
+                        ?: run {
+                            statusMutable.value = "Foreground connection owns updates"
+                            return@execute
+                        }
+                    lease = id
                     actor = epochs.incrementAndGet()
-                    controller.attachTransport(null)
-                    link?.close()
-                    completion?.countDown()
-                }
-                    ?: run {
-                        statusMutable.value = "Foreground connection owns updates"
-                        return@execute
-                    }
-                lease = id
-                actor = epochs.incrementAndGet()
-                val catalog = CatalogRepository.get(app)
-                catalog.savedPages()
-                val eligible = controller.inboxBackgroundTargetsBlocking()
-                val targets = snapshot.profiles.filter {
-                    it.enabled && it.namespace in eligible
-                }.take(16)
-                val cursor = controller.nextInboxRoundRobinBlocking() ?: return@execute
-                val start = if (targets.isEmpty()) 0 else cursor % targets.size
-                val deadline = SystemClock.elapsedRealtime() + 55_000
-                for (p in targets.drop(start) + targets.take(start)) {
-                    if (!alive() || !leases.current(
-                            id
-                        ) || SystemClock.elapsedRealtime() >= deadline ||
-                        connectivity.activeNetwork != assigned
-                    ) {
-                        break
-                    }
-                    val found = catalog.currentProfile(p.key) ?: continue
-                    if (found.first.status == CatalogStatus.WITHDRAWN ||
-                        found.second.endpoint.url != p.namespace.endpointUrl
-                    ) {
-                        continue
-                    }
-                    val identity =
-                        (
-                            ConversationVault(
-                                app
-                            ).lookup(found.second.endpoint) as? PhoneIdentityLookup.Known
-                            )?.identity
-                            ?: continue
-                    val who = EnrollmentIdentity(
-                        found.second.endpoint.url,
-                        "phone:" + identity.deviceId
-                    )
-                    if (who.enrollmentLabel != p.namespace.enrollmentLabel) continue
-                    controller.observeInboxOnly(true)
-                    controller.prepare(who, id)
-                    if (!controller.preparedBlocking(who, id) || !controller.enabledBlocking() ||
-                        !controller.inboxAdmissionBlocking(p.namespace) ||
-                        !leases.current(id) ||
-                        !alive()
-                    ) {
-                        continue
-                    }
-                    val complete = CountDownLatch(1)
-                    completion = complete
-                    controller.observeInboxOnly(true) { complete.countDown() }
-                    client = OkHttpClient.Builder().socketFactory(assigned.socketFactory).build()
-                    val current =
-                        DirectConnection(
-                            found.second.endpoint,
-                            identity,
-                            object : ConnectionObserver {
-                                override fun stateChanged(state: ConnectionState) {}
-                                override fun effect(effect: ConversationEffect, generation: Long) {}
-                            },
-                            accessToken = found.second.accessToken,
-                            httpClient = client,
-                            relay = RelayOptIn({ state, generation ->
-                                if (alive() &&
-                                    leases.current(id)
-                                ) {
-                                    controller.onChannel(state, generation)
-                                }
-                            }, SystemClock::elapsedRealtimeNanos),
-                            dns = object : Dns {
-                                override fun lookup(hostname: String): List<java.net.InetAddress> {
-                                    if (!leases.current(id) ||
-                                        connectivity.activeNetwork != assigned
-                                    ) {
-                                        throw java.net.UnknownHostException()
-                                    }
-                                    return assigned.getAllByName(hostname).toList()
-                                }
-                            }
+                    val catalog = CatalogRepository.get(app)
+                    catalog.savedPages()
+                    val eligible = controller.inboxBackgroundTargetsBlocking()
+                    val targets = snapshot.profiles.filter {
+                        it.enabled && it.namespace in eligible
+                    }.take(16)
+                    val cursor = controller.nextInboxRoundRobinBlocking() ?: return@execute
+                    val start = if (targets.isEmpty()) 0 else cursor % targets.size
+                    val deadline = SystemClock.elapsedRealtime() + 55_000
+                    for (p in targets.drop(start) + targets.take(start)) {
+                        if (!alive() || !leases.current(
+                                id
+                            ) || SystemClock.elapsedRealtime() >= deadline ||
+                            connectivity.activeNetwork != assigned
+                        ) {
+                            break
+                        }
+                        val found = catalog.currentProfile(p.key) ?: continue
+                        if (found.first.status == CatalogStatus.WITHDRAWN ||
+                            found.second.endpoint.url != p.namespace.endpointUrl
+                        ) {
+                            continue
+                        }
+                        val identity =
+                            (
+                                ConversationVault(
+                                    app
+                                ).lookup(found.second.endpoint) as? PhoneIdentityLookup.Known
+                                )?.identity
+                                ?: continue
+                        val who = EnrollmentIdentity(
+                            found.second.endpoint.url,
+                            "phone:" + identity.deviceId
                         )
-                    link = current
-                    if (!alive() || !leases.current(id)) {
+                        if (who.enrollmentLabel != p.namespace.enrollmentLabel) continue
+                        controller.observeInboxOnly(true)
+                        controller.prepare(who, id)
+                        if (!controller.preparedBlocking(
+                                who,
+                                id
+                            ) || !controller.enabledBlocking() ||
+                            !controller.inboxAdmissionBlocking(p.namespace) ||
+                            !leases.current(id) ||
+                            !alive()
+                        ) {
+                            continue
+                        }
+                        val complete = CountDownLatch(1)
+                        completion = complete
+                        controller.observeInboxOnly(true) { complete.countDown() }
+                        client =
+                            OkHttpClient.Builder().socketFactory(assigned.socketFactory).build()
+                        val current =
+                            DirectConnection(
+                                found.second.endpoint,
+                                identity,
+                                object : ConnectionObserver {
+                                    override fun stateChanged(state: ConnectionState) {}
+                                    override fun effect(
+                                        effect: ConversationEffect,
+                                        generation: Long
+                                    ) {}
+                                },
+                                accessToken = found.second.accessToken,
+                                httpClient = client,
+                                relay = RelayOptIn({ state, generation ->
+                                    if (alive() &&
+                                        leases.current(id)
+                                    ) {
+                                        controller.onChannel(state, generation)
+                                    }
+                                }, SystemClock::elapsedRealtimeNanos),
+                                dns = object : Dns {
+                                    override fun lookup(
+                                        hostname: String
+                                    ): List<java.net.InetAddress> {
+                                        if (!leases.current(id) ||
+                                            connectivity.activeNetwork != assigned
+                                        ) {
+                                            throw java.net.UnknownHostException()
+                                        }
+                                        return assigned.getAllByName(hostname).toList()
+                                    }
+                                }
+                            )
+                        link = current
+                        if (!alive() || !leases.current(id)) {
+                            current.close()
+                            break
+                        }
+                        controller.attachTransport(current.relayTransport)
+                        current.connect()
+                        complete.await(
+                            minOf(22_000L, maxOf(1L, deadline - SystemClock.elapsedRealtime())),
+                            TimeUnit.MILLISECONDS
+                        )
+                        current.relayTransport?.invalidatePending()
                         current.close()
-                        break
-                    }
-                    controller.attachTransport(current.relayTransport)
-                    current.connect()
-                    complete.await(
-                        minOf(22_000L, maxOf(1L, deadline - SystemClock.elapsedRealtime())),
-                        TimeUnit.MILLISECONDS
-                    )
-                    current.relayTransport?.invalidatePending()
-                    current.close()
-                    link = null
-                    if (leases.current(id)) controller.attachTransport(null)
-                    client.dispatcher.executorService.shutdown()
-                    client.connectionPool.evictAll()
-                    client =
-                        null
-                    val latest = controller.inboxBlocking()
-                    if (leases.current(id)) {
-                        mutable.value = latest
-                        statusMutable.value = controller.inboxStatus
+                        link = null
+                        if (leases.current(id)) controller.attachTransport(null)
+                        client.dispatcher.executorService.shutdown()
+                        client.connectionPool.evictAll()
+                        client =
+                            null
+                        val latest = controller.inboxBlocking()
+                        if (leases.current(id)) {
+                            mutable.value = latest
+                            statusMutable.value = controller.inboxStatus
+                        }
                     }
                 }
+                if (!admitted) statusMutable.value = "Partial / assigned network unavailable"
             } catch (
                 _: Exception
             ) {

@@ -35,7 +35,7 @@ class InboxPacedAckTest {
             return InboxWrite.Committed
         }
     }
-    private class Owner : AutoCloseable {
+    private class Owner(private val shortLease: Boolean = false) : AutoCloseable {
         val net = RelayConnectionHarness(RelaySocketFixture())
         val scheduler = ManualScheduler()
         val store = MemoryStore()
@@ -53,11 +53,24 @@ class InboxPacedAckTest {
             it["device"] ==
                 JsonPrimitive("watch")
         }
-        val info = Info.decode(
+        private val capturedInfo = Info.decode(
             steps.last {
                 method(it) == "relay.info"
             }["response"]!!.jsonObject["result"]!!.jsonObject
         )
+        val info = if (shortLease) {
+            Info.decode(
+                JsonObject(
+                    capturedInfo.toWire() + (
+                        "expires_at_ms" to
+                            JsonPrimitive(requireNotNull(capturedInfo.serverTimeMs) + 500)
+                        )
+                )
+            )
+        } else {
+            capturedInfo
+        }
+        lateinit var ready: RelayChannelState.Ready
         val page = steps.last {
             method(it) == "relay.outbox.read" &&
                 it["response"]!!.jsonObject["result"]!!.jsonObject["items"]!!.jsonArray.isNotEmpty()
@@ -129,7 +142,8 @@ class InboxPacedAckTest {
             net.connection.connect()
             net.awaitConnected()
             reply(next("relay.info"), info.toWire())
-            controller.onChannel(net.awaitState<RelayChannelState.Ready>(), 1)
+            ready = net.awaitState<RelayChannelState.Ready>()
+            controller.onChannel(ready, 1)
             val outbox = next("relay.outbox.read")
             while (peer.relayTexts.size < 15) {
                 val done = CountDownLatch(1)
@@ -161,6 +175,26 @@ class InboxPacedAckTest {
                         JsonPrimitive(sentinel.value)
                 }
             }
+            val barrier = peer.relayRequests.single { it["id"] == JsonPrimitive(sentinel.value) }
+            assertTrue(peer.relayRequests.remove(barrier))
+            reply(barrier, Dto.page().toWire())
+        }
+        fun freshInfo() {
+            val fresh = Info.decode(
+                JsonObject(
+                    capturedInfo.toWire() + (
+                        "server_time_ms" to
+                            JsonPrimitive(requireNotNull(capturedInfo.serverTimeMs) + 1000)
+                        )
+                )
+            )
+            net.transport.refreshInfo {}
+            reply(next("relay.info"), fresh.toWire())
+            ready = net.awaitState<RelayChannelState.Ready>()
+            controller.onChannel(ready, 1)
+            run()
+            controller.refreshInbox()
+            run()
         }
         override fun close() = net.close()
     }
@@ -188,6 +222,43 @@ class InboxPacedAckTest {
             )
             assertTrue(h.store.reread().snapshot.deliveries.single().pendingAcks.isNotEmpty())
             assertTrue(h.disk.load().copies.isNotEmpty())
+            assertTrue(h.failures.toString(), h.failures.isEmpty())
+        }
+    }
+
+    @Test fun expiredInfoCannotReleaseQueuedAckWithUnchangedEpochSocketAndReadySerial() {
+        Owner(shortLease = true).use { h ->
+            h.staged()
+            val generation = h.net.transport.generation
+            val ready = h.ready
+            val owed = h.store.reread().snapshot.deliveries.single().pendingAcks
+            val bodies = InboxCodec.encode(h.disk.load())
+            h.releasePacing()
+            assertEquals("Expired Info cannot release a queued ACK", 0, h.acknowledgements)
+            assertEquals(generation, h.net.transport.generation)
+            assertTrue(ready === h.ready)
+            assertEquals(owed, h.store.reread().snapshot.deliveries.single().pendingAcks)
+            assertTrue(bodies.contentEquals(InboxCodec.encode(h.disk.load())))
+            assertTrue(h.failures.toString(), h.failures.isEmpty())
+        }
+    }
+
+    @Test fun freshActualInfoAdmitsDeliberateSameIdAckAfterExpiry() {
+        Owner(shortLease = true).use { h ->
+            h.staged()
+            val owed = h.store.reread().snapshot.deliveries.single().pendingAcks
+            val received = h.disk.load().copies.map { it.receivedAtMs }
+            h.releasePacing()
+            assertEquals("No old ACK before fresh actual authority", 0, h.acknowledgements)
+            h.freshInfo()
+            val ack = h.next("relay.outbox.ack")
+            assertEquals(
+                owed,
+                ack["params"]!!.jsonObject["delivery_ids"]!!
+                    .jsonArray.map { it.jsonPrimitive.content }
+            )
+            assertEquals(1, h.acknowledgements)
+            assertEquals(received, h.disk.load().copies.map { it.receivedAtMs })
             assertTrue(h.failures.toString(), h.failures.isEmpty())
         }
     }

@@ -488,9 +488,25 @@ object InboxCodec {
 /** Used exclusively by the controller's application-lifetime serial owner. */
 class InboxRepository(private val file: InboxFile) {
     @Volatile private var displayed: InboxSnapshot? = null
+
+    // A failed timestamp promotion is not a confirmed publication in this owner lifetime.
+    private val unconfirmedSync = HashMap<HistoryNamespace, Long>()
     fun peek(): InboxSnapshot? = displayed
     fun snapshot(): InboxSnapshot = try {
-        file.load().also { displayed = it }
+        val loaded = file.load()
+        unconfirmedSync.keys.retainAll(loaded.profiles.map { it.namespace }.toSet())
+        val confirmed = if (unconfirmedSync.isEmpty()) {
+            loaded
+        } else {
+            loaded.copy(
+                profiles = loaded.profiles.map { profile ->
+                    unconfirmedSync[profile.namespace]?.let {
+                        profile.copy(lastSyncMs = minOf(profile.lastSyncMs, it))
+                    } ?: profile
+                }
+            )
+        }
+        confirmed.also { displayed = it }
     } catch (
         e: InboxFailure
     ) {
@@ -744,6 +760,12 @@ class InboxRepository(private val file: InboxFile) {
     }
     fun synced(namespace: HistoryNamespace, at: Long) {
         val old = snapshot()
+        unconfirmedSync.putIfAbsent(
+            namespace,
+            old.profiles.single {
+                it.namespace == namespace
+            }.lastSyncMs
+        )
         save(
             old,
             old.copy(
@@ -759,6 +781,7 @@ class InboxRepository(private val file: InboxFile) {
                 }
             )
         )
+        unconfirmedSync.remove(namespace)
     }
 
     /**

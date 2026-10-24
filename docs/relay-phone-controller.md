@@ -435,8 +435,8 @@ The Inbox tab shows Relay tasks across saved reviewed phone profiles, exact box/
 conversation, outcomes and retained replies. Foreground refresh is deliberate. Last full sync is retained per
 profile; missing rows/pages, offline boxes and partial traversal do not imply completion or deletion. Existing
 Hermes tasks and history have separate per-profile opt-ins and current method/grant/task-purpose delegation.
-A target getter denial is exact target/source unavailability: encrypted copies remain, routes refuse, other
-Relay authority remains ACTIVE. Empty O5/missing rows alone create no revocation. A successful exact current
+Exact existing-target NOT_FOUND is target/source unavailability: encrypted copies remain, routes refuse,
+and other Relay authority remains ACTIVE. Temporary source unavailability is not global revocation. Empty O5/missing rows alone create no revocation. A successful exact current
 getter clears the availability fence. Actual permission/profile errors retain their registered authority action.
 
 ### Separate authenticated display format
@@ -548,3 +548,32 @@ Keystore execution is still a separate unexecuted acceptance gate.
 A replacement onStartJob withdraws the prior active background lease before installing its own generation;
 changing a service alive predicate alone is not transport/controller withdrawal. Old completion cannot finish
 the replacement job. Actual platform callback ordering/Doze/permission behavior still requires native acceptance.
+
+### Task5 FIX1 authority, network and full-sync corrections
+
+Current canonical task and existing prompt getters, and the separate deliberate answer callback, apply correlated
+permission_denied / profile_changed before UI completion, including snapshot_required combinations. Their existing
+STOP/review owners synchronously invalidate pending transport before any fallible aggregate/cache write. These
+deliberate input paths never attach, resubmit, answer or retry automatically. Exact existing NOT_FOUND remains a
+target-only availability fence; temporary unavailable is neither deletion nor enrollment-wide withdrawal.
+
+An InboxRun captures the immutable Info expiry and immutable anchored ServerClock that admitted its read. Final
+guarded ACK SEND requires that lease alongside writer/observer atomics and existing transport socket/Ready/method/
+scope checks. Transport threads read no actor-owned current()/Info/runtime fields. A thread-safe monotonic high
+water and sticky refusal reject rollback, null/invalid samples, checked estimate overflow and expiry. The estimate
+uses the upper millisecond to refuse conservatively at fractional boundaries; it is not proof of server acceptance.
+Expired authority retains exact confirmed bodies and owed delivery IDs. Only fresh actual Info plus a deliberate
+new refresh can retry those same IDs under a new lease; an expired lease never revives.
+
+Background network admission invokes downstream DNS/socket/transport construction only with the non-null Network
+assigned to that job and matching the effective active network. Null assignment finishes through the existing
+finally/generation path, without activeNetwork fallback. Explicit manual foreground work may select activeNetwork;
+the prepared foreground-connection lease path and all later mismatch/network-loss checks remain unchanged.
+The portable mobile admission owner is used by PhoneInboxOwner itself, not a second model of that branch.
+
+Last full sync advances only after every required refresh chain completes, the complete aggregate debt-clear
+proposal commits, and no refresh obligation remains. Missing/partial/unavailable sources keep the old timestamp
+and debt. Failed/refused/stale/uncertain aggregate proposals retain their prior runtime. Timestamp publication
+itself also requires a Committed display write. This owner masks an unconfirmed timestamp promotion until a later
+complete refresh confirms it; physical rollback, restart durability and fsync/power-loss behavior are not claimed.
+No schema, attempt timestamp or UI label change is introduced. Native/platform/job routing acceptance remains OPEN.
