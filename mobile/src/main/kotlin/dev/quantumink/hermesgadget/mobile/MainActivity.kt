@@ -229,6 +229,11 @@ class MainActivity : ComponentActivity() {
     private var quickActionLaunch by mutableStateOf(0L)
     private var quickActionNotice by mutableStateOf("")
     private val quickActionStore by lazy { QuickActionStore(this) }
+    private var incomingShare: String? = null
+    private var pendingShare by mutableStateOf<String?>(null)
+    private var shareToken by mutableStateOf<String?>(null)
+    private var shareLaunch by mutableStateOf(0L)
+    private var shareNotice by mutableStateOf("")
     private var incomingWidget: WidgetLaunchRequest? = null
     private var pendingWidget by mutableStateOf<WidgetLaunchRequest?>(null)
     private var widgetUnavailable by mutableStateOf(false)
@@ -320,12 +325,14 @@ class MainActivity : ComponentActivity() {
                 setOf(
                     "profiles", "conversation", "watch", "settings", "tiles", "boxes",
                     "manual", "speech", "appearance", "home-widgets", "quick-actions",
-                    "setup-transfer", "inbox"
+                    "setup-transfer", "inbox", "share"
                 )
         } ?: "profiles"
         speechProfileKey = savedInstanceState?.getString("speech_profile_key")
         if (savedInstanceState == null) {
-            if (!receiveInbox(intent) && !receiveAction(intent)) receiveWidget(intent)
+            if (!receiveInbox(intent) && !receiveAction(intent) && !receiveShare(intent)) {
+                receiveWidget(intent)
+            }
         } else {
             inboxHandle =
                 savedInstanceState.getString("inbox_handle")?.takeIf {
@@ -335,10 +342,13 @@ class MainActivity : ComponentActivity() {
             incomingAction = savedInstanceState.getString("incoming_action")
             pendingAction = savedInstanceState.getString("pending_action")
             quickActionId = savedInstanceState.getString("quick_action_id")
+            shareToken = savedInstanceState.getString("share_token")
+            pendingShare = savedInstanceState.getString("pending_share")
         }
         lifecycleScope.launch {
             lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
                 consumeAction()
+                consumeShare()
                 consumeWidget()
                 consumeInbox()
                 if (destination == "speech" && speechProfileKey != null && speechTarget == null) {
@@ -399,6 +409,7 @@ class MainActivity : ComponentActivity() {
                     incomingAction = null
                     quickActionId = null
                     quickActionNotice = ""
+                    discardShare()
                     pendingWidget = null
                     widgetUnavailable = false
                     widgetEditId = null
@@ -410,7 +421,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     navigate(
                         when (destination) {
-                            "conversation", "watch", "settings" -> "profiles"
+                            "conversation", "watch", "settings", "share" -> "profiles"
                             "speech" -> if (speechProfileKey == null) "settings" else "profiles"
                             "tiles" -> "watch"
                             else -> "settings"
@@ -459,6 +470,33 @@ class MainActivity : ComponentActivity() {
                             }
                             androidx.compose.material3.TextButton({ pendingAction = null }) {
                                 androidx.compose.material3.Text("Dismiss action")
+                            }
+                        }
+                        if (pendingShare != null) {
+                            androidx.compose.material3.Text(
+                                androidx.compose.ui.res.stringResource(R.string.share_waiting),
+                                Modifier.padding(horizontal = 20.dp)
+                            )
+                            androidx.compose.material3.TextButton({
+                                incomingShare = pendingShare
+                                pendingShare = null
+                                consumeShare()
+                            }, enabled = !phoneSelectionLocked(phone)) {
+                                androidx.compose.material3.Text(
+                                    androidx.compose.ui.res.stringResource(
+                                        R.string.share_open_waiting
+                                    )
+                                )
+                            }
+                            androidx.compose.material3.TextButton({
+                                ShareHandoff.store.remove(pendingShare)
+                                pendingShare = null
+                            }) {
+                                androidx.compose.material3.Text(
+                                    androidx.compose.ui.res.stringResource(
+                                        R.string.share_dismiss_waiting
+                                    )
+                                )
                             }
                         }
                         if (quickActionNotice.isNotBlank()) {
@@ -537,6 +575,16 @@ class MainActivity : ComponentActivity() {
                                     phoneSelectionLocked(phone),
                                     ::requestQuickAction,
                                     { navigate("settings") },
+                                    Modifier.weight(1f)
+                                )
+                            }
+                            "share" -> androidx.compose.runtime.key(shareLaunch, shareToken) {
+                                ShareReviewPage(
+                                    ShareHandoff.store.get(shareToken),
+                                    shareNotice,
+                                    phoneSelectionLocked(phone),
+                                    ::requestShare,
+                                    { navigate("profiles") },
                                     Modifier.weight(1f)
                                 )
                             }
@@ -643,9 +691,12 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (!receiveInbox(intent) && !receiveAction(intent)) receiveWidget(intent)
+        if (!receiveInbox(intent) && !receiveAction(intent) && !receiveShare(intent)) {
+            receiveWidget(intent)
+        }
         window.decorView.post {
             consumeAction()
+            consumeShare()
             consumeWidget()
             consumeInbox()
         }
@@ -661,6 +712,8 @@ class MainActivity : ComponentActivity() {
         outState.putString("incoming_action", incomingAction)
         outState.putString("pending_action", pendingAction)
         outState.putString("quick_action_id", quickActionId)
+        outState.putString("share_token", shareToken)
+        outState.putString("pending_share", pendingShare)
         pendingWidget?.let { outState.putBundle("pending_widget", HomeWidgetLaunch.bundle(it)) }
         super.onSaveInstanceState(outState)
     }
@@ -736,6 +789,86 @@ class MainActivity : ComponentActivity() {
                 conversation.draft(prompt)
                 quickActionId = null
                 quickActionNotice = ""
+                destination = "conversation"
+            }
+        }
+    }
+
+    private fun receiveShare(value: Intent): Boolean {
+        if (value.action != ShareHandoff.ACTION_REVIEW) return false
+        inboxActionVersion++
+        inboxNavigation.cancel()
+        inboxHandle = null
+        pendingInbox = null
+        inboxInput =
+            null
+        navigation.cancel()
+        incomingAction = null
+        pendingAction = null
+        incomingWidget = null
+        pendingWidget = null
+        widgetUnavailable = false
+        widgetEditId = null
+        // A newer share replaces any unsent one; each share needs its own recipient choice.
+        ShareHandoff.store.remove(incomingShare)
+        incomingShare = ShareHandoff.token(value)
+        return true
+    }
+
+    private fun consumeShare() {
+        if (!started ||
+            !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        ) {
+            return
+        }
+        val token = incomingShare ?: return
+        incomingShare = null
+        if (token != pendingShare) ShareHandoff.store.remove(pendingShare)
+        if (phoneSelectionLocked(conversation.state.value)) {
+            pendingShare = token
+            return
+        }
+        navigation.cancel()
+        conversation.hide()
+        pendingShare = null
+        if (token != shareToken) ShareHandoff.store.remove(shareToken)
+        shareToken = token
+        shareNotice = ""
+        shareLaunch++
+        destination = "share"
+    }
+
+    private fun discardShare() {
+        ShareHandoff.store.remove(incomingShare)
+        ShareHandoff.store.remove(pendingShare)
+        ShareHandoff.store.remove(shareToken)
+        incomingShare = null
+        pendingShare = null
+        shareToken = null
+        shareNotice = ""
+    }
+
+    private fun requestShare(key: String, text: String, reviewIsCurrent: () -> Boolean) {
+        if (!reviewIsCurrent()) return
+        if (phoneSelectionLocked(conversation.state.value)) {
+            shareNotice = getString(R.string.share_locked)
+            return
+        }
+        val token = shareToken
+        navigation.request(key, null, {
+            reviewIsCurrent() && started && destination == "share" && shareToken == token &&
+                lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        }) { resolved ->
+            if (!reviewIsCurrent()) return@request
+            val accepted = ShareIntake.accept(key, text, resolved, conversation.state.value)
+            if (accepted == null) {
+                shareNotice = getString(R.string.share_changed)
+            } else {
+                conversation.open(accepted.second, accepted.first)
+                conversation.draft(text)
+                ShareHandoff.store.remove(token)
+                shareToken = null
+                shareNotice = ""
                 destination = "conversation"
             }
         }

@@ -2,6 +2,7 @@ package dev.quantumink.hermesgadget.mobile
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
@@ -124,6 +125,11 @@ internal fun ConnectionHealthDialog(
                                         Intent.createChooser(
                                             PhoneConnectionReport.share(selected),
                                             "Share connection report"
+                                        ).putExtra(
+                                            Intent.EXTRA_EXCLUDE_COMPONENTS,
+                                            arrayOf(
+                                                ComponentName(context, ShareActivity::class.java)
+                                            )
                                         )
                                     )
                                     notice = ""
