@@ -53,7 +53,9 @@ internal class RelayActions(
     val openRetained: (String) -> Unit = {},
     val closeRetained: () -> Unit = {},
     val reviewCache: (String?) -> Unit = {},
-    val confirmCacheReview: () -> Unit = {},
+    val confirmCacheReview: (
+        dev.quantumink.hermesgadget.protocol.relay.session.CacheReviewConfirmation
+    ) -> Unit = {},
     val cancelCacheReview: () -> Unit = {},
     val retention: (Int) -> Unit = {}
 ) {
@@ -571,7 +573,8 @@ private fun RetainedHistoryControls(relay: RelayUiState, actions: RelayActions) 
             days.toIntOrNull() in 0..365
         ) { Text("Review retention change") }
     }
-    relay.cacheReview?.let { review ->
+    relay.cacheReviewConfirmation?.let { rendered ->
+        val review = rendered.review
         Text(
             if (review.allProfiles) {
                 "This affects ALL retained profiles on this phone."
@@ -596,7 +599,7 @@ private fun RetainedHistoryControls(relay: RelayUiState, actions: RelayActions) 
                     )
         )
         Row {
-            Button(actions.confirmCacheReview) { Text("Confirm reviewed change") }
+            Button({ actions.confirmCacheReview(rendered) }) { Text("Confirm reviewed change") }
             TextButton(actions.cancelCacheReview) { Text("Cancel") }
         }
     }

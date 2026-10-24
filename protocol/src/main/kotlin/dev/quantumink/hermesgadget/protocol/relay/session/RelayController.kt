@@ -205,11 +205,36 @@ class RelayController(
     private var retainedProblem: HistoryProblem? = null
     private var retentionDays: Int? = null
     private var localQuery = ""
+    private var cacheReviewOperation = 0L
+    private var cacheReviewConfirmation: CacheReviewConfirmation? = null
     private var cacheReview: HistoryEraseReview? = null
+        set(value) {
+            field = value
+            cacheReviewOperation++
+            cacheReviewConfirmation = value?.let { review ->
+                namespace()?.let { owner ->
+                    CacheReviewConfirmation(
+                        review,
+                        owner,
+                        foregroundSession,
+                        serial,
+                        flow,
+                        cacheReviewOperation
+                    )
+                }
+            }
+        }
+    private val stoppedRemovalConfirmed = HashSet<HistoryNamespace>()
+
+    /** A refused exact deletion is fenced in this process, but is explicitly NOT durable. No erase uses it. */
+    private var undurableDeletion: HistoryEviction? = null
     private var historyAnchor: HistoryAnchor = HistoryAnchor.Beginning
     private var historyChainStarted = false
     private var historyListing = ""
     private var metadataSending: RequestId? = null
+
+    /** Last retired outcome for this foreground only; it is not a pending operation or removal authority. */
+    private var retiredMetadataOutcome: MetadataIntent? = null
     private var listing = false
     private val transcript = Transcript()
     private var historyIncomplete = false
@@ -220,6 +245,7 @@ class RelayController(
     private var notice = RelayNotice.NONE
     private var pollTimer: Cancelable? = null
     private var retryTimer: Cancelable? = null
+    private var listRetryTimer: Cancelable? = null
     private var pollInFlight = false
     private var progressCursor = 0
 
@@ -388,11 +414,11 @@ class RelayController(
         val rt = runtime
         if (rt != null && unsaved) {
             if (tryCommit(rt)) unsaved = false
-            evictOwed()
         } else if (stored is Stored.Problem && runtime == null) {
             stored = Stored.NotLoaded
             load()
         }
+        evictOwed()
         publish()
     }
 
@@ -417,6 +443,45 @@ class RelayController(
     val currentState: RelayUiState get() = ui
 
     private fun namespace(): HistoryNamespace? = record()?.let(HistoryNamespace::from)
+
+    private fun boundedSection(build: () -> ControllerSection): ControllerSection? = try {
+        build()
+    } catch (failure: HistoryFailure) {
+        retainedProblem = failure.problem
+        notice =
+            if (failure.problem ==
+                HistoryProblem.CAPACITY
+            ) {
+                RelayNotice.STORAGE_FULL_PENDING_ITEMS
+            } else {
+                RelayNotice.STORAGE_WRITE_FAILED
+            }
+        null
+    }
+
+    /** RETIRED is already durable immutable exact-target evidence even if an extra eviction slot was refused. */
+    private fun durableRemovals(section: ControllerSection = baseSection()): List<HistoryEviction> =
+        (
+            section.removals + section.intents.filter { it.status == MetadataStatus.RETIRED }.map {
+                HistoryEviction(it.namespace, it.conversationId.value, EvictionKind.DELETED)
+            } + section.enrollments.filter { it.standing == Standing.STOPPED }.mapNotNull {
+                HistoryNamespace.from(it)?.takeUnless { owner ->
+                    owner in stoppedRemovalConfirmed
+                }?.let { owner -> HistoryEviction(owner, null) }
+            }
+            ).distinct()
+
+    private fun removalOwed(
+        owner: HistoryNamespace,
+        conversation: String?,
+        wholeScopeOnly: Boolean = false
+    ): Boolean = (durableRemovals() + listOfNotNull(undurableDeletion)).any {
+        it.namespace == owner &&
+            (it.conversationId == null || (!wholeScopeOnly && it.conversationId == conversation))
+    }
+
+    private fun blocked(conversation: String): Boolean =
+        namespace()?.let { removalOwed(it, conversation) } == true
 
     private fun itemView(summary: ConversationSummary) = ConversationItem(
         summary.conversationId.value,
@@ -454,7 +519,8 @@ class RelayController(
 
     fun editMetadata(conversationId: String, title: String?, bookmarked: Boolean?) = post {
         val namespace = namespace() ?: return@post
-        if (!isReady() || !supports(RelayMethod.CONVERSATION_UPDATE) || unsaved ||
+        if (!isReady() || blocked(conversationId) || !supports(RelayMethod.CONVERSATION_UPDATE) ||
+            unsaved ||
             metadataSending != null
         ) {
             return@post
@@ -492,7 +558,8 @@ class RelayController(
             notice = RelayNotice.NAME_INVALID
             return@post publish()
         }
-        if (!commitSection(baseSection().withIntent(intent))) return@post publish()
+        val section = boundedSection { baseSection().withIntent(intent) } ?: return@post publish()
+        if (!commitSection(section)) return@post publish()
         sendMetadata(intent)
         publish()
     }
@@ -509,20 +576,43 @@ class RelayController(
     }
 
     fun abandonMetadata(requestId: String) = post {
+        if (retiredMetadataOutcome?.let {
+                it.namespace == namespace() &&
+                    it.requestId.value == requestId
+            } ==
+            true
+        ) {
+            retiredMetadataOutcome = null
+        }
         val intent =
             baseSection().intents.firstOrNull {
                 it.namespace == namespace() &&
                     it.requestId.value == requestId
             }
-                ?: return@post
+                ?: return@post publish()
+        val section = boundedSection {
+            val base = if (intent.status == MetadataStatus.RETIRED) {
+                baseSection().owing(
+                    HistoryEviction(
+                        intent.namespace,
+                        intent.conversationId.value,
+                        EvictionKind.DELETED
+                    )
+                )
+            } else {
+                baseSection()
+            }
+            base.withoutIntent(intent)
+        } ?: return@post publish()
         transport?.invalidatePending()
         metadataSending = null
-        commitSection(baseSection().withoutIntent(intent))
+        if (commitSection(section) && intent.status == MetadataStatus.RETIRED) evictOwed()
         publish()
     }
 
     private fun sendMetadata(intent: MetadataIntent) {
-        if (!isReady() || unsaved || !supports(RelayMethod.CONVERSATION_UPDATE) ||
+        if (!isReady() || blocked(intent.conversationId.value) || unsaved ||
+            !supports(RelayMethod.CONVERSATION_UPDATE) ||
             intent.namespace != namespace() ||
             metadataSending != null
         ) {
@@ -543,15 +633,19 @@ class RelayController(
             }
         )
         if (!adopt(next)) return
+        retiredMetadataOutcome = null
         // A possibly executed mutation invalidates its old cursors, even if its reply is lost.
-        flow++
+        if (record()?.selectedConversationId == intent.conversationId) {
+            flow++
+            historyComplete = false
+            historyIncomplete = true
+            historyChainStarted = false
+            historyAnchor = HistoryAnchor.Beginning
+        }
         listOperation++
         listCursor = null
         listing = false
-        historyComplete = false
-        historyIncomplete = true
-        historyChainStarted = false
-        historyAnchor = HistoryAnchor.Beginning
+        cacheReview = null
         metadataSending = intent.requestId
         request(intent.call()) { result ->
             if (baseSection().intents.none {
@@ -606,23 +700,19 @@ class RelayController(
                 }
                 else -> Unit
             }
-            val next = baseSection().withIntent(
-                intent.copy(status = status, coreCommitted = committed)
-            )
+            val observed = intent.copy(status = status, coreCommitted = committed)
+            if (status == MetadataStatus.RETIRED) retiredMetadataOutcome = observed
+            val next = baseSection().withIntent(observed)
             runtime?.let { advance(it.copy(section = next)) }
             // Any mutation outcome invalidates old public list/history cursor chains.
             listOperation++
             listCursor = null
             cacheReview = null
-            if (status == MetadataStatus.RETIRED &&
-                record()?.selectedConversationId == intent.conversationId
-            ) {
-                conversationDeleted()
+            if (status == MetadataStatus.RETIRED) {
+                conversationDeleted(intent.namespace, intent.conversationId)
             } else if (fresh && isReady()) {
                 val selected = record()?.selectedConversationId
-                if (selected != null &&
-                    token != null
-                ) {
+                if (selected == intent.conversationId && token != null) {
                     attach(selected, refreshListBeforeAttach = true)
                 } else {
                     refreshList()
@@ -634,7 +724,9 @@ class RelayController(
 
     private fun loadRetained() {
         val owner = namespace()
-        if (owner == null || record()?.enabled != true || record()?.standing != Standing.ACTIVE) {
+        if (owner == null || record()?.enabled != true || record()?.standing != Standing.ACTIVE ||
+            removalOwed(owner, null, wholeScopeOnly = true)
+        ) {
             retained = emptyList()
             retainedSelected = null
             return
@@ -645,11 +737,14 @@ class RelayController(
             val needle = localQuery.lowercase(java.util.Locale.ROOT)
             retained =
                 snapshot.threads.filter {
-                    it.title.lowercase(java.util.Locale.ROOT).contains(needle) ||
-                        it.messages.any { message ->
-                            message.text.lowercase(java.util.Locale.ROOT).contains(needle)
-                        }
+                    !removalOwed(owner, it.id) && (
+                        it.title.lowercase(java.util.Locale.ROOT).contains(needle) ||
+                            it.messages.any { message ->
+                                message.text.lowercase(java.util.Locale.ROOT).contains(needle)
+                            }
+                        )
                 }.take(50)
+            if (retainedSelected?.let { removalOwed(owner, it.id) } == true) retainedSelected = null
             retainedProblem = null
         } catch (failure: HistoryFailure) {
             retainedProblem = failure.problem
@@ -676,11 +771,13 @@ class RelayController(
     }
 
     fun closeRetained() = post {
+        cacheReview = null
         retainedSelected = null
         publish()
     }
 
     fun reviewCache(conversationId: String?) = post {
+        cacheReview = null
         val owner = namespace() ?: return@post
         try {
             cacheReview = retainedHistory?.review(owner, conversationId)
@@ -697,9 +794,16 @@ class RelayController(
         publish()
     }
 
-    fun confirmCacheReview() = post {
-        val review = cacheReview ?: return@post
+    fun confirmCacheReview(rendered: CacheReviewConfirmation) = post {
         val owner = namespace() ?: return@post
+        if (rendered !== cacheReviewConfirmation || rendered.review != cacheReview ||
+            rendered.namespace != owner || rendered.foreground != foregroundSession ||
+            rendered.session != serial || rendered.flow != flow ||
+            rendered.operation != cacheReviewOperation
+        ) {
+            return@post
+        }
+        val review = rendered.review
         val cache = retainedHistory ?: return@post
         // Exact reviewed scope is durable before deletion. Unreadable bytes affect ALL profiles.
         var section = baseSection()
@@ -710,20 +814,24 @@ class RelayController(
         } else {
             listOf(owner)
         }
-        for (namespace in owners) {
-            if (review.retentionDays ==
-                null
-            ) {
-                section = section.owing(
-                    HistoryEviction(
-                        namespace,
-                        if (review.allProfiles) null else review.conversationId,
-                        EvictionKind.CACHE_ONLY
+        section = boundedSection {
+            var next = section
+            for (namespace in owners) {
+                if (review.retentionDays == null) {
+                    next = next.owing(
+                        HistoryEviction(
+                            namespace,
+                            if (review.allProfiles) null else review.conversationId,
+                            EvictionKind.CACHE_ONLY
+                        )
                     )
-                )
+                }
             }
-        }
+            next
+        } ?: return@post publish()
         if (!commitSection(section)) return@post publish()
+        // Consume before erase, so a duplicate cannot reuse the confirmation.
+        cacheReview = null
         transport?.invalidatePending()
         flow++
         token = null
@@ -982,6 +1090,8 @@ class RelayController(
         flow++
         pollTimer?.cancel()
         retryTimer?.cancel()
+        listRetryTimer?.cancel()
+        listRetryTimer = null
         createTimer?.cancel()
         createTimer = null
         pollTimer = null
@@ -992,6 +1102,7 @@ class RelayController(
         listOperation++
         listCursor = null
         metadataSending = null
+        retiredMetadataOutcome = null
         cacheReview = null
         infoRefreshing = false
         val scope = scope()
@@ -1019,7 +1130,10 @@ class RelayController(
         info = state.info
         clock = state.clock
         infoRefreshing = false
-        if (refresh) return // a plain refresh of an unchanged grant disturbs nothing
+        if (refresh) {
+            evictOwed()
+            return
+        } // still recover independently authorized removals
         serial++
         flow++
         readyGeneration = generation
@@ -1028,6 +1142,7 @@ class RelayController(
         val granted = infoDigest != null && infoDigest != digest
         infoDigest = digest
         if (!ensureRuntime()) return
+        evictOwed()
         var record = record() ?: return
         if (!record.enabled) return
         val offered = state.info.profileId
@@ -1137,6 +1252,13 @@ class RelayController(
 
     private fun refreshList() {
         if (supports(RelayMethod.CONVERSATIONS_LIST)) {
+            listRetryTimer?.cancel()
+            listRetryTimer = null
+            if (notice == RelayNotice.HISTORY_INCOMPLETE ||
+                notice == RelayNotice.BUSY_TRY_AGAIN
+            ) {
+                notice = RelayNotice.NONE
+            }
             listOperation++
             listPages = 0
             listRestarts = 0
@@ -1169,7 +1291,14 @@ class RelayController(
     private fun canList(): Boolean = isReady() && supports(RelayMethod.CONVERSATIONS_LIST)
 
     private fun isReady(): Boolean = channel is RelayChannelState.Ready && runtime != null &&
-        record()?.let { it.enabled && it.standing == Standing.ACTIVE } == true
+        record()?.let {
+            it.enabled && it.standing == Standing.ACTIVE &&
+                HistoryNamespace.from(it)?.let { owner ->
+                    !removalOwed(owner, null, wholeScopeOnly = true)
+                } !=
+                false
+        } ==
+        true
 
     /** A local refusal that only means "not now": the same step is tried again later, never given up as a link failure. */
     private fun busyLocally(result: RelayCallResult<*>): Boolean =
@@ -1244,68 +1373,66 @@ class RelayController(
     }
 
     private fun stopScope() {
-        transport?.invalidatePending()
-        val record = record() ?: return
-        val rt = runtime ?: return
-        val scope = record.scope()
-        val namespace = HistoryNamespace.from(record)
-        var section = rt.section.with(record.copy(standing = Standing.STOPPED))
-        if (namespace != null) section = section.owing(HistoryEviction(namespace, null))
-        var stopped = rt.copy(section = section)
-        if (scope != null) stopped = stopped.copy(authority = stopped.authority.retireScope(scope))
+        endSession(attachAgain = false)
+        token = null
         transcript.clear()
         conversations.clear()
         tasks.clear()
         retained = emptyList()
         retainedSelected = null
         cacheReview = null
-        token = null
-        serial++
-        flow++
-        attaching = false
-        advance(stopped)
+        val record = record() ?: return
+        val rt = runtime ?: return
+        val owner = HistoryNamespace.from(record)
+        if (owner != null) stoppedRemovalConfirmed.remove(owner)
+        val stoppedSection = rt.section.with(record.copy(standing = Standing.STOPPED))
+        // STOPPED itself is durable scope-wide REVOKED authority if the ordinary64 list is full.
+        val section = if (owner != null && stoppedSection.evictions.size < 64) {
+            stoppedSection.owing(HistoryEviction(owner, null))
+        } else {
+            stoppedSection
+        }
+        advance(rt.copy(section = section))
         notice = RelayNotice.PERMISSION_DENIED
         evictOwed()
         publish()
     }
 
-    /**
-     * The content-eviction obligation of a stopped scope: the ledger's turn texts, the delivery state and the history
-     * resume points of the scope. It stays owed — in memory and on disk — until the eviction itself is STORED.
-     */
+    /** Confirm obligation durability, remove only its authorized target, then confirm final aggregate clearance. */
     private fun evictOwed() {
         var rt = runtime ?: return
-        val record = record() ?: return
-        val namespace = HistoryNamespace.from(record)
-        if (record.standing == Standing.STOPPED && namespace != null &&
-            rt.section.evictions.none { it.namespace == namespace && it.conversationId == null }
-        ) {
-            val next = rt.copy(section = rt.section.owing(HistoryEviction(namespace, null)))
-            if (!adopt(next)) {
-                runtime = next
-                unsaved = true
-                return
+        // A previous exact-target construction refusal may become representable after other obligations complete.
+        val held = undurableDeletion
+        if (held != null) {
+            val section = boundedSection { rt.section.owing(held) }
+            if (section != null) {
+                val next = rt.copy(section = section)
+                advance(next)
+                rt = requireNotNull(runtime)
+                undurableDeletion = null
             }
-            rt = requireNotNull(runtime)
         }
-        // No deletion before the obligation itself is CONFIRMED durable.
         if (unsaved && !tryCommit(rt)) return
         unsaved = false
-        for (obligation in rt.section.evictions) {
+        // Destructive independent authority first. A stale cache-only review can confirm absence only.
+        val removals = durableRemovals(rt.section).sortedBy { it.kind == EvictionKind.CACHE_ONLY }
+        for (obligation in removals) {
+            rt = requireNotNull(runtime)
+            if (unsaved && !tryCommit(rt)) continue
+            unsaved = false
             try {
                 if (obligation.kind == EvictionKind.CACHE_ONLY) {
-                    // A stale/failed reviewed erase never becomes permission to erase changed bytes on restart.
                     if (retainedHistory?.absent(obligation.namespace, obligation.conversationId) ==
                         false
                     ) {
-                        return
+                        continue
                     }
                 } else {
                     retainedHistory?.evict(obligation.namespace, obligation.conversationId)
                 }
             } catch (failure: HistoryFailure) {
                 retainedProblem = failure.problem
-                return
+                continue
             }
             val owner = EnrollmentScope(
                 RelayScope(
@@ -1334,17 +1461,25 @@ class RelayController(
                     ).ledger
                 )
             }
-            if (obligation.kind == EvictionKind.REVOKED) {
+            if (obligation.kind ==
+                EvictionKind.REVOKED
+            ) {
                 rt.delivery(owner)?.evictScopeContent()?.let {
-                    next = next.withDelivery(it.delivery)
+                    next =
+                        next.withDelivery(it.delivery)
                 }
             }
             if (!adopt(next)) {
                 unsaved = true
-                return
+                continue
             }
-            rt = requireNotNull(runtime)
+            if (obligation.kind == EvictionKind.REVOKED &&
+                obligation.conversationId == null
+            ) {
+                stoppedRemovalConfirmed.add(obligation.namespace)
+            }
         }
+        loadRetained()
     }
 
     private fun requireReview() {
@@ -1432,8 +1567,15 @@ class RelayController(
 
     private fun reauthorized() {
         val record = record() ?: return
-        val rt = runtime ?: return
         if (record.standing != Standing.STOPPED) return publish()
+        evictOwed()
+        val owner = HistoryNamespace.from(record)
+        if (unsaved ||
+            (owner != null && removalOwed(owner, null, wholeScopeOnly = true))
+        ) {
+            return publish()
+        }
+        val rt = runtime ?: return
         val scope = record.scope()
         var next = rt
         if (scope != null && next.ledger.scopeRecord(scope)?.status == ScopeStatus.STOPPED) {
@@ -1459,19 +1601,41 @@ class RelayController(
 
     // -- listing -----------------------------------------------------------------------------------------------
 
+    private fun finishListPartial() {
+        listOperation++
+        listRetryTimer?.cancel()
+        listRetryTimer = null
+        listCursor = null
+        listing = false
+        notice = RelayNotice.HISTORY_INCOMPLETE
+    }
+
+    private fun retryList(cursor: String?, attempt: Int, operation: Long) {
+        if (attempt >= timing.maxRetries || listRequests >= timing.maxHistoryRequests) {
+            finishListPartial()
+        } else {
+            notice = RelayNotice.BUSY_TRY_AGAIN
+            listRetryTimer = later(backoff(attempt)) { listPage(cursor, attempt + 1, operation) }
+        }
+    }
+
     private fun listPage(cursor: String?, attempt: Int, operation: Long = listOperation) {
-        if (operation != listOperation || !canList() || attempt > timing.maxRetries ||
-            listPages >= timing.maxHistoryPages ||
+        if (operation != listOperation || !canList()) return
+        if (attempt > timing.maxRetries || listPages >= timing.maxHistoryPages ||
             listRequests >= timing.maxHistoryRequests
         ) {
+            finishListPartial()
+            publish()
             return
         }
         listRequests++
         listing = true
         val call = try {
             RelayCalls.conversations(cursor, timing.listPageItems, onlineQuery, bookmarkFilter)
-        } catch (_: IllegalArgumentException) {
-            listing = false
+        } catch (
+            _: IllegalArgumentException
+        ) {
+            finishListPartial()
             return
         }
         request(call) { result ->
@@ -1482,47 +1646,46 @@ class RelayController(
                     is RelayOutcome.Success -> {
                         listPages++
                         onListed(outcome.value, cursor == null)
-                        if (outcome.value.items.isEmpty() && listCursor != null &&
-                            listPages < timing.maxHistoryPages
+                        if (outcome.value.items.isEmpty() &&
+                            listCursor != null
                         ) {
                             listPage(listCursor, 0, operation)
                         }
                     }
                     is RelayOutcome.Failed -> {
-                        if (outcome.error.needsFreshView && cursor != null &&
-                            attempt < timing.maxRetries &&
-                            listRestarts < MAX_HISTORY_RESTARTS
+                        if (outcome.error.needsFreshView && cursor != null) {
+                            if (attempt >= timing.maxRetries ||
+                                listRestarts >= MAX_HISTORY_RESTARTS
+                            ) {
+                                finishListPartial()
+                            } else {
+                                listRestarts++
+                                listCursors.clear()
+                                listPages = 0
+                                listPage(null, attempt + 1, operation)
+                            }
+                        } else if (outcome.error.action ==
+                            RelayErrorAction.RETRY_SAME_REQUEST
                         ) {
-                            listRestarts++
-                            listCursors.clear()
-                            listPages = 0
-                            listPage(null, attempt + 1, operation)
-                        } else if (!commonError(outcome.error, {
-                                listPage(cursor, attempt + 1, operation)
-                            }, attempt)
-                        ) {
-                            notice = RelayNotice.SERVER_ERROR
+                            retryList(cursor, attempt, operation)
+                        } else if (!commonError(outcome.error, null, attempt)) {
+                            notice =
+                                RelayNotice.SERVER_ERROR
                         }
                     }
-                    is RelayOutcome.Uncorrelated, is RelayOutcome.Invalid ->
-                        notice =
-                            RelayNotice.LINK_FAILED
-                }
-                RelayCallResult.TimedOut -> {
-                    notice = RelayNotice.BUSY_TRY_AGAIN
-                    if (attempt < timing.maxRetries) {
-                        retryTimer =
-                            later(backoff(attempt)) { listPage(cursor, attempt + 1, operation) }
+                    is RelayOutcome.Uncorrelated, is RelayOutcome.Invalid -> {
+                        finishListPartial()
                     }
                 }
+                RelayCallResult.TimedOut -> retryList(cursor, attempt, operation)
                 RelayCallResult.Closed -> Unit
-                is RelayCallResult.Refused -> if (busyLocally(result) &&
-                    attempt < timing.maxRetries
+                is RelayCallResult.Refused -> if (busyLocally(
+                        result
+                    )
                 ) {
-                    retryTimer =
-                        later(backoff(attempt)) { listPage(cursor, attempt + 1, operation) }
+                    retryList(cursor, attempt, operation)
                 } else {
-                    notice = RelayNotice.LINK_FAILED
+                    finishListPartial()
                 }
             }
             publish()
@@ -1533,6 +1696,7 @@ class RelayController(
     private fun onListed(page: ConversationPage, first: Boolean) {
         if (first) conversations.clear()
         for (item in page.items) {
+            if (blocked(item.conversationId.value)) continue
             if (conversations.size >= MAX_LISTED) break
             val view = itemView(item)
             conversations.removeAll { it.id == view.id }
@@ -1544,6 +1708,7 @@ class RelayController(
         listCursor =
             next?.takeIf {
                 conversations.size < MAX_LISTED && listPages < timing.maxHistoryPages &&
+                    listRequests < timing.maxHistoryRequests &&
                     listCursors.add(it)
             }
         if (next != null && listCursor == null) notice = RelayNotice.HISTORY_INCOMPLETE
@@ -1553,6 +1718,12 @@ class RelayController(
     // -- create ------------------------------------------------------------------------------------------------
 
     private fun createConversation(title: String?) {
+        if (undurableDeletion !=
+            null
+        ) {
+            notice = RelayNotice.STORAGE_FULL_PENDING_ITEMS
+            return publish()
+        }
         if (!isReady() || !supports(RelayMethod.CONVERSATION_CREATE)) return publish()
         val record = record() ?: return
         if (record.createIntent != null) {
@@ -1699,6 +1870,17 @@ class RelayController(
     private fun selectConversation(id: ConversationId) {
         val record = record() ?: return
         if (!isReady() || !supports(RelayMethod.CONVERSATION_ATTACH)) return publish()
+        if (blocked(id.value) || undurableDeletion != null) {
+            notice =
+                if (undurableDeletion !=
+                    null
+                ) {
+                    RelayNotice.STORAGE_FULL_PENDING_ITEMS
+                } else {
+                    RelayNotice.HISTORY_INCOMPLETE
+                }
+            return publish()
+        }
         val item =
             conversations.firstOrNull { it.id == id.value }
                 ?: selectedSummary?.takeIf { it.id == id.value }
@@ -1728,7 +1910,7 @@ class RelayController(
         attempt: Int = 0,
         refreshListBeforeAttach: Boolean = false
     ) {
-        if (record()?.selectedConversationId != id || !isReady()) return
+        if (record()?.selectedConversationId != id || !isReady() || blocked(id.value)) return
         transport?.invalidatePending()
         flow++
         val mine = flow
@@ -1862,6 +2044,7 @@ class RelayController(
     }
 
     private fun leaveConversation() {
+        cacheReview = null
         transport?.invalidatePending()
         val record = record() ?: return
         val bound = token
@@ -2056,6 +2239,7 @@ class RelayController(
         val bound = token
         val link = transport
         if (retainedSelected != null || rt == null || bound == null || link == null ||
+            blocked(bound.conversationId.value) ||
             !isReady() || attaching ||
             !supports(RelayMethod.TURN_SUBMIT)
         ) {
@@ -2109,6 +2293,7 @@ class RelayController(
 
     /** The SAME request (id, text, expiry) is written again; never a new turn and never after the deadline. */
     private fun resubmit(key: TurnKey, deliberate: Boolean) {
+        if (!isReady() || blocked(key.conversation.conversationId.value)) return publish()
         val rt = runtime ?: return
         val bound = token ?: return
         val link = transport ?: return
@@ -2160,6 +2345,7 @@ class RelayController(
     // -- history and tasks --------------------------------------------------------------------------------------
 
     private fun loadHistory(bound: BindingToken, mine: Long, then: () -> Unit) {
+        if (blocked(bound.conversationId.value)) return then()
         historyComplete = false
         historyIncomplete = true
         historyRequests = 0
@@ -2218,6 +2404,11 @@ class RelayController(
                     }
                     val record = record() ?: return@request
                     val namespace = HistoryNamespace.from(record)
+                    if (namespace != null &&
+                        removalOwed(namespace, current.scope.conversation.conversationId.value)
+                    ) {
+                        return@request then()
+                    }
                     val metadata =
                         selectedSummary?.takeIf {
                             it.id ==
@@ -2613,34 +2804,52 @@ class RelayController(
         }
     }
 
-    private fun conversationDeleted() {
+    private fun conversationDeleted(
+        owner: HistoryNamespace? = namespace(),
+        target: ConversationId? = record()?.selectedConversationId
+    ) {
+        if (owner == null || target == null) return
+        val rt = runtime ?: return
         val record = record() ?: return
-        val selected = record.selectedConversationId
-        pollTimer?.cancel()
-        flow++
-        token = null
-        attaching = false
-        attachedOnce = false
-        transcript.clear()
-        tasks.clear()
-        conversations.removeAll { it.id == selected?.value }
-        if (selected != null) {
-            val rt = runtime
-            val namespace = HistoryNamespace.from(record)
-            if (rt != null && namespace != null) {
-                advance(
-                    rt.copy(
-                        section = withRecord(record.copy(selectedConversationId = null))
-                            .owing(HistoryEviction(namespace, selected.value, EvictionKind.DELETED))
-                    )
-                )
-                evictOwed()
-            }
+        val selected = owner == namespace() && record.selectedConversationId == target
+        if (selected) {
+            transport?.invalidatePending()
+            pollTimer?.cancel()
+            flow++
+            token = null
+            attaching = false
+            attachedOnce = false
+            transcript.clear()
+            tasks.clear()
+            selectedSummary = null
         }
-        selectedSummary = null
-        retainedSelected = null
-        retained = emptyList()
-        notice = RelayNotice.CONVERSATION_DELETED
+        conversations.removeAll { it.id == target.value && owner == namespace() }
+        val obligation = HistoryEviction(owner, target.value, EvictionKind.DELETED)
+        val base = if (selected) {
+            rt.section.with(
+                record.copy(selectedConversationId = null)
+            )
+        } else {
+            rt.section
+        }
+        val section = boundedSection { base.owing(obligation) }
+        if (section != null) {
+            advance(rt.copy(section = section))
+        } else if (base.intents.any {
+                it.namespace == owner && it.conversationId == target &&
+                    it.status == MetadataStatus.RETIRED
+            }
+        ) {
+            // The immutable RETIRED intent is already the durable exact-target deletion evidence.
+            advance(rt.copy(section = base))
+        } else {
+            // No safe durable representation: preserve all old bytes/obligations, fence only this exact target.
+            undurableDeletion = obligation
+        }
+        if (retainedSelected?.id == target.value && owner == namespace()) retainedSelected = null
+        retained = retained.filterNot { it.id == target.value && owner == namespace() }
+        evictOwed()
+        if (section != null) notice = RelayNotice.CONVERSATION_DELETED
     }
 
     // -- the user interface state ------------------------------------------------------------------------------
@@ -2661,15 +2870,30 @@ class RelayController(
             val inConversation =
                 bound != null && entry.key.conversation.conversationId == bound.conversationId
             if (mine && !inConversation && bound != null) continue
-            val idle = entry.phase != TurnPhase.SUBMITTING && entry.phase != TurnPhase.LOOKING_UP
+            val contentBlocked = (durableRemovals() + listOfNotNull(undurableDeletion)).any {
+                it.namespace.endpointKey == owner.relay.endpointKey &&
+                    it.namespace.profileId == owner.relay.profileId.value &&
+                    it.namespace.enrollmentLabel == owner.enrollmentKey &&
+                    it.namespace.reviewEpoch == owner.reviewEpoch &&
+                    (
+                        it.conversationId == null ||
+                            it.conversationId == entry.key.conversation.conversationId.value
+                        )
+            }
+            val idle =
+                !contentBlocked && entry.phase != TurnPhase.SUBMITTING &&
+                    entry.phase != TurnPhase.LOOKING_UP
             val canCheck = mine && inConversation && idle && unresolved(entry)
-            val canResend = mine && inConversation && entry.phase == TurnPhase.ABSENT_SO_FAR &&
-                entry.hold == null && entry.text != null && at != null && !entry.deadlinePassed(at)
+            val canResend =
+                !contentBlocked && mine && inConversation &&
+                    entry.phase == TurnPhase.ABSENT_SO_FAR &&
+                    entry.hold == null && entry.text != null && at != null &&
+                    !entry.deadlinePassed(at)
             views.add(
                 TurnView(
                     entry.key.requestId.value,
                     entry.status,
-                    entry.text?.take(PREVIEW_CHARS).orEmpty(),
+                    if (contentBlocked) "" else entry.text?.take(PREVIEW_CHARS).orEmpty(),
                     entry.expiresAtMs,
                     canCheck,
                     canResend,
@@ -2690,7 +2914,12 @@ class RelayController(
         val record = record()
         val enabled = record?.enabled == true
         val problem = (stored as? Stored.Problem)?.problem
-        val selectedId = record?.selectedConversationId
+        val owner = namespace()
+        if (owner != null) {
+            retained = retained.filterNot { removalOwed(owner, it.id) }
+            if (retainedSelected?.let { removalOwed(owner, it.id) } == true) retainedSelected = null
+        }
+        val selectedId = record?.selectedConversationId?.takeUnless { blocked(it.value) }
         val selectedItem = selectedId?.let { id ->
             conversations.firstOrNull { it.id == id.value }
                 ?: selectedSummary?.takeIf { it.id == id.value }
@@ -2730,7 +2959,17 @@ class RelayController(
             onlineQuery = onlineQuery.orEmpty(),
             bookmarkFilter = bookmarkFilter,
             listUnavailableCount = listUnavailable,
-            metadataIntents = baseSection().intents.filter { it.namespace == namespace() },
+            metadataIntents = baseSection().intents.filter { it.namespace == namespace() } +
+                listOfNotNull(
+                    retiredMetadataOutcome?.takeIf { outcome ->
+                        outcome.namespace ==
+                            namespace() &&
+                            baseSection().intents.none {
+                                it.namespace == outcome.namespace &&
+                                    it.requestId == outcome.requestId
+                            }
+                    }
+                ),
             canEditMetadata =
             isReady() && supports(RelayMethod.CONVERSATION_UPDATE) && !unsaved &&
                 metadataSending == null,
@@ -2739,6 +2978,7 @@ class RelayController(
             retainedProblem = retainedProblem,
             retentionDays = retentionDays,
             cacheReview = cacheReview,
+            cacheReviewConfirmation = cacheReviewConfirmation,
             pendingCreate = pending?.let { PendingCreate(it.title) },
             selected = if (phase == RelayPhase.SELECTED ||
                 phase == RelayPhase.ATTACHING
@@ -2767,14 +3007,16 @@ class RelayController(
             unsaved = unsaved,
             contentEvictionPending = evictionPending(phase, scope),
             busy = attaching || listing,
-            canSend = retainedSelected == null && phase == RelayPhase.SELECTED && token != null,
+            canSend =
+            retainedSelected == null && phase == RelayPhase.SELECTED && token != null &&
+                selectedId != null,
             micAvailable = false
         )
         listener(ui)
     }
 
     private fun evictionPending(phase: RelayPhase, scope: EnrollmentScope?): Boolean {
-        if (baseSection().evictions.any {
+        if ((durableRemovals() + listOfNotNull(undurableDeletion)).any {
                 it.namespace.endpointKey == identity?.endpointKey &&
                     it.namespace.enrollmentLabel == identity?.enrollmentLabel
             }

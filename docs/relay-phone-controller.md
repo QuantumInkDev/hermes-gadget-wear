@@ -110,34 +110,54 @@ after authentication. Separate from the identity vault (alias `quantumink.relay.
 `PhoneHistoryCache`. Files: `state.v1`, `state.pending`, `initialized` (the marker proves a vanished record is **not** an empty
 store). One store serves Task3, V5 and Tasks 4/5.
 
-### 4.2 Plaintext (`SnapshotCodec`, format 1)
+### 4.2 Plaintext (`SnapshotCodec`, document format 3; reads legacy formats 1 and 2)
 
-Big-endian scalars, a `u16` count per collection, an `i32` length per string, no recursion and no JSON:
-`"RS3\0" · u16 format=1 · u16 snapshotVersion(1|2)` · controller section · ledger turns · scope decisions · histories ·
-deliveries · (version 2) capture section (`i32` version, `u16` count, records) · `"END\0"`. The aggregate always carries its
-capture section explicitly: **every write passes the current captures with the turns, histories and deliveries**
-(`RelayRuntime.build`); `RelayStateSnapshot.of`'s empty default is never relied on. A version 1 value (no captures) decodes and
-restores unchanged, so UNCERTAIN and EXPIRED_REPORTED turns survive the bump (tested).
+Big-endian scalars, a `u16` count per collection, an `i32` UTF-8 length per string, no recursion and no JSON:
+
+`"RS3\0" · u16 documentFormat=3 · u16 snapshotVersion(1|2)` · controller enrollments · ledger turns · scope decisions ·
+histories · deliveries · (aggregate version2 only) capture section (`i32` captureSectionVersion=1, `u16` count, records) ·
+metadata intents (`u16` count, records) · ordinary history evictions (`u16` count, records) ·
+`u8 emergencyDeletionPresent` · optional ONE exact DELETED eviction · `"END\0"`.
+
+The aggregate always carries current captures explicitly (`RelayRuntime.build`). Aggregate1 has no capture section;
+aggregate2 has capture-section1. Legacy document1 omits metadata/evictions and the emergency flag; document2 includes the
+two feature counts/records but omits only the emergency flag/record. They decode with missing features empty, preserving
+every aggregate section. Older readers fail closed on document3. Cache plaintext schema3, the state container1,
+capture-section1 and HistoryArchive1 are separate version domains and are unchanged by this document-format correction.
 
 ### 4.3 Bounds, derived from the actual fields
 
-Strings are capped in UTF-8 bytes (identifiers 36, fingerprint 64, enumerations 64, cursors 512, opaque conversation 128,
-opaque event 256, scope keys 128 characters × 3, URL 2,048, create title 512, **turn text 16,384**); counts are the state
-layer's policy limits (16 enrollments, 128 turns / 1 MiB of turn text in total, 64 scope decisions, 16 histories with
-≤ 2,048 known + ≤ 64 refused messages, 16 deliveries with ≤ 4,096 seen keys + ≤ 128 obligations + ≤ 256 acks, 64 captures).
-Encoded maxima (bytes; tested to be exact): scope record 824, turn (without text) 1,337, scope decision 893, history
-254,673, delivery 1,950,663, capture 1,237, enrollment 3,594, empty document 28.
+UTF-8 byte caps: scope keys384 (128 UTF-16 characters ×3), URL2048, UUID36, fingerprint64, enum64, cursor512,
+opaque conversation128/event256, create title512, raw metadata title4096, turn text16384. Counts:16 enrollments,
+128 turns with1MiB text total,64 scope decisions,16 histories (2048 known/64 refused each),16 deliveries
+(4096 seen/128 obligations/256 ACKs each),64 captures,16 metadata intents and64 ordinary history evictions.
 
-* **Full capacity** (every collection at its limit, every string at its cap): **36,699,452 bytes ≈ 35.0 MiB**.
-* **Deliberate storage cap: 8 MiB** of plaintext (`StoreBounds.PLAINTEXT_CAP_BYTES`). The cap is **below** the full capacity
-  (`capIsBelowFullCapacity`); a document above it is refused as `EncodeRefusal.STORAGE_CAP` — named LOCAL backpressure, not
-  full capacity. Example: sixteen delivery tables of opaque keys at their caps exceed it; eight tables of canonical keys
-  (≈ 3.3 MB) fit.
-* A count above its limit is `TOO_MANY(path)`, a longer string `FIELD_TOO_LONG(path)`, an unencodable one `INVALID_VALUE`.
-  Nothing is truncated, dropped or silently shortened, and a decode checks every count and length **before** allocating.
-* Before any commit the runtime proves the state layer can restore exactly what is about to be stored
-  (`RelayStateRestore.restore` dry run); a restore-refused aggregate is never serialised. `RelayStateSnapshot.of` supplies the
-  typed `TooMany`. All of this runs before a frame is written.
+One separate emergency deletion slot is reserved for exact canonical DELETED namespace/conversation evidence at the
+ordinary64 limit. It cannot contain CACHE_ONLY, REVOKED or a null conversation; a second distinct overflow is typed
+CAPACITY. No ordinary cap is increased. RETIRED immutable metadata intents also remain exact durable deletion evidence
+until confirmed removal. Genuine permission denial may use durable STOPPED itself as scope-wide REVOKED authority at
+capacity. STOPPED never authorizes wider erasure for DELETED or CACHE_ONLY. Unrepresentable observations remain explicitly
+non-durable with an exact in-process fence/backpressure; failed disk writes are not a power-loss guarantee.
+
+Let `S(n)=4+n` and `N(n)=1+S(n)` for required/nullable strings. Field-cap upper bounds (bytes, computed/tested) are:
+scope824; turn fixed1337 (excluding its text length/data); scope decision893; history254673; delivery1950663;
+capture1237; enrollment3594. Namespace=`2*S(384)+S(2048)+S(36)+8`=2876.
+Metadata intent=`namespace+2*S(36)+8+N(4096)+2+8+S(64)+2`=7145.
+History eviction=`namespace+N(36)+S(64)`=2985 (the reserved slot uses that same bounded encoding).
+
+Empty document3/aggregate2=`header8+trailer4+fiveCounts10+captureVersion4+captureCount2+featureCounts4+emergencyFlag1`
+=**33 bytes**. Legacy document2/aggregate2 empty=32; legacy document1/aggregate2 empty=28. Aggregate1 omits the6 capture bytes.
+
+Full field-cap upper bound=`33+16*3594+128*1337+1048576+128*4+64*893+16*254673+16*1950663+64*1237+16*7145+65*2985`
+=**37,007,802 bytes**. The last65 is64 ordinary records plus ONE reserved exact deletion, not a widened ordinary quota.
+Document2's corresponding bound was37,004,816. These are structural field-cap upper bounds: actual enum spellings and
+validated namespace values can be shorter, so no legal maximum-size writer or device latency claim follows.
+
+The deliberate plaintext cap remains **8MiB** (`StoreBounds.PLAINTEXT_CAP_BYTES`), below the structural bound.
+Above it: `EncodeRefusal.STORAGE_CAP`, explicit local backpressure. File cap remains8MiB+38 container bytes.
+Count/string/encoding refusals remain `TOO_MANY(path)`/`FIELD_TOO_LONG(path)`/`INVALID_VALUE`; nothing is truncated.
+The decoder checks counts and lengths before allocation. Runtime commits still dry-run exact restoration with captures
+explicitly supplied. Extra metadata/cache-review edits catch construction CAPACITY at the owner before any SEND/erase.
 
 ### 4.4 Commit contract and failure handling
 
@@ -348,10 +368,10 @@ transient, expired and denied states stay distinct. Returned sanitized metadata 
 shown exactly, without an optimistic Saved title/bookmark. Stop tracking is explicit;
 it cannot undo a server mutation. No metadata retry submits a turn or replays speech.
 
-SnapshotCodec format 2 adds bounded metadata intents and history eviction obligations
-to the same aggregate. Format 1 remains readable without inventing either section;
+SnapshotCodec document format 3 retains bounded metadata intents and history eviction obligations
+in the same aggregate and adds the reserved exact deletion slot. Format 1 remains readable without inventing either section;
 voice captures and all pre-existing sections are carried explicitly on every write.
-An old format-1 build fails closed on format 2. Text cache schema 3 and reviewed legacy
+Older document-format1/2 readers fail closed on document3; formats1/2 remain readable by this writer. Text cache schema 3 and reviewed legacy
 handling are documented in history-export-format.md. No server production, protocol
 method, permission or transport implementation change was needed for Task4.
 

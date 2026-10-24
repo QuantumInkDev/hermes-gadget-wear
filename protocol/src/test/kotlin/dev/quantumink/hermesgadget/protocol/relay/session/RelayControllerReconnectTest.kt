@@ -317,7 +317,9 @@ class RelayControllerReconnectTest {
         // 1 first attempt + maxRetries retries, then it stops by itself: the user retries.
         assertEquals(1 + fx.timing.maxRetries, calls)
         assertEquals(listOf(1000L, 2000L, 4000L, 8000L, 16000L, 30000L), delays)
-        assertEquals(RelayNotice.BUSY_TRY_AGAIN, fx.ui.notice)
+        assertEquals(RelayNotice.HISTORY_INCOMPLETE, fx.ui.notice)
+        assertFalse(fx.ui.hasMore)
+        assertFalse(fx.ui.listing)
     }
 
     @Test fun permissionDeniedStopsEvictsAndSurvivesARestartUntilTheUserReauthorises() {

@@ -84,7 +84,7 @@ sealed interface DecodeResult {
 object SnapshotCodec {
     const val MAGIC = 0x52533300
     const val TRAILER = 0x454E4400
-    const val FORMAT_VERSION = 2
+    const val FORMAT_VERSION = 3
 
     fun encode(document: RelayDocument): EncodeResult = try {
         EncodeResult.Encoded(Writer.run(document))
@@ -208,6 +208,10 @@ object SnapshotCodec {
                     throw EncodeFailure(EncodeRefusal.INVALID_VALUE, "captures")
                 }
                 w.features(document.section)
+                w.bool(document.section.emergencyDeletion != null)
+                document.section.emergencyDeletion?.let {
+                    w.eviction(it, "history.emergencyDeletion")
+                }
                 w.i32(TRAILER)
                 return w.result()
             }
@@ -278,10 +282,14 @@ object SnapshotCodec {
             count(section.evictions.size, 64, "history.evictions")
             section.evictions.forEachIndexed { index, item ->
                 val path = "history.evictions[$index]"
-                namespace(item.namespace, path)
-                nullableString(item.conversationId, StoreBounds.UUID_BYTES, path)
-                string(item.kind.name, StoreBounds.ENUM_BYTES, path)
+                eviction(item, path)
             }
+        }
+
+        private fun eviction(item: HistoryEviction, path: String) {
+            namespace(item.namespace, path)
+            nullableString(item.conversationId, StoreBounds.UUID_BYTES, path)
+            string(item.kind.name, StoreBounds.ENUM_BYTES, path)
         }
 
         private fun ledger(ledger: TurnLedgerSnapshot) {
@@ -503,7 +511,24 @@ object SnapshotCodec {
             } else {
                 CaptureLedgerSnapshot.EMPTY
             }
-            val completeSection = if (format == 2) features(section) else section
+            val featured = if (format >= 2) features(section) else section
+            val emergency = if (format >= 3 &&
+                bool("history.emergencyDeletion")
+            ) {
+                eviction("history.emergencyDeletion")
+            } else {
+                null
+            }
+            val completeSection = try {
+                ControllerSection(
+                    featured.enrollments,
+                    featured.intents,
+                    featured.evictions,
+                    emergency
+                )
+            } catch (_: IllegalArgumentException) {
+                corrupt("history.emergencyDeletion")
+            }
             if (i32("trailer") != TRAILER) corrupt("trailer")
             if (position != bytes.size) corrupt("trailing")
             return RelayDocument(
@@ -589,6 +614,16 @@ object SnapshotCodec {
             corrupt(path)
         }
 
+        private fun eviction(path: String): HistoryEviction {
+            val namespace = namespace(path)
+            val conversation = nullableString(StoreBounds.UUID_BYTES, path)
+            if (conversation != null && ConversationId.of(conversation) == null) corrupt(path)
+            val kind = string(StoreBounds.ENUM_BYTES, path).let { name ->
+                EvictionKind.entries.firstOrNull { it.name == name } ?: corrupt(path)
+            }
+            return HistoryEviction(namespace, conversation, kind)
+        }
+
         private fun features(section: ControllerSection): ControllerSection {
             val intents = List(count(16, "metadata.intents")) { index ->
                 val path = "metadata.intents[$index]"
@@ -617,13 +652,7 @@ object SnapshotCodec {
             }
             val evictions = List(count(64, "history.evictions")) { index ->
                 val path = "history.evictions[$index]"
-                val namespace = namespace(path)
-                val conversation = nullableString(StoreBounds.UUID_BYTES, path)
-                if (conversation != null && ConversationId.of(conversation) == null) corrupt(path)
-                val kind = string(StoreBounds.ENUM_BYTES, path).let { name ->
-                    EvictionKind.entries.firstOrNull { it.name == name } ?: corrupt(path)
-                }
-                HistoryEviction(namespace, conversation, kind)
+                eviction(path)
             }
             return try {
                 ControllerSection(section.enrollments, intents, evictions)

@@ -149,6 +149,7 @@ data class RelayUiState(
     val retainedProblem: HistoryProblem? = null,
     val retentionDays: Int? = null,
     val cacheReview: HistoryEraseReview? = null,
+    val cacheReviewConfirmation: CacheReviewConfirmation? = null,
     val pendingCreate: PendingCreate? = null,
     val selected: ConversationItem? = null,
     val resumable: ConversationItem? = null,

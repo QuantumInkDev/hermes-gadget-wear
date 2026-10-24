@@ -141,3 +141,15 @@ interface RetainedHistory {
     fun erase(review: HistoryEraseReview, namespace: HistoryNamespace)
     fun retention(namespace: HistoryNamespace, days: Int): RetainedSnapshot
 }
+
+/** Owner-issued identity of the exact review rendered in one foreground operation. It is never persisted. */
+class CacheReviewConfirmation internal constructor(
+    val review: HistoryEraseReview,
+    internal val namespace: HistoryNamespace,
+    internal val foreground: Long,
+    internal val session: Long,
+    internal val flow: Long,
+    internal val operation: Long
+) {
+    override fun toString(): String = "CacheReviewConfirmation(redacted)"
+}

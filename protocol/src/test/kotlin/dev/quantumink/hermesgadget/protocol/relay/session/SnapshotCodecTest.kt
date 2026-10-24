@@ -177,9 +177,9 @@ class SnapshotCodecTest {
 
     @Test fun originalFormatOneBytesRetainEveryAggregateSectionWithoutInventingTask4Intents() {
         val bytes = encoded(full())
-        assertArrayEquals(ByteArray(4), bytes.copyOfRange(bytes.size - 8, bytes.size - 4))
+        assertArrayEquals(ByteArray(5), bytes.copyOfRange(bytes.size - 9, bytes.size - 4))
         val legacy = (
-            bytes.copyOfRange(0, bytes.size - 8) +
+            bytes.copyOfRange(0, bytes.size - 9) +
                 bytes.copyOfRange(bytes.size - 4, bytes.size)
             ).also { it[5] = 1 }
         val decoded = (SnapshotCodec.decode(legacy) as DecodeResult.Decoded).document
@@ -573,8 +573,11 @@ class SnapshotCodecTest {
         assertEquals(1_950_663L, StoreBounds.deliveryMax)
         assertEquals(1_237L, StoreBounds.captureMax)
         assertEquals(3_594L, StoreBounds.enrollmentMax)
-        assertEquals(32L, StoreBounds.emptyDocumentBytes())
-        assertEquals(37_004_816L, StoreBounds.theoreticalMaxPlaintextBytes())
+        assertEquals(2_876L, StoreBounds.historyNamespaceMax)
+        assertEquals(7_145L, StoreBounds.metadataIntentMax)
+        assertEquals(2_985L, StoreBounds.historyEvictionMax)
+        assertEquals(33L, StoreBounds.emptyDocumentBytes())
+        assertEquals(37_007_802L, StoreBounds.theoreticalMaxPlaintextBytes())
         assertEquals(8L * 1024 * 1024, StoreBounds.PLAINTEXT_CAP_BYTES.toLong())
         assertEquals(8L * 1024 * 1024 + 38, StoreBounds.MAX_FILE_BYTES.toLong())
     }

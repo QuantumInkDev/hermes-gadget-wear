@@ -13,7 +13,7 @@ import dev.quantumink.hermesgadget.protocol.relay.voice.VoiceLimits
  *
  * Two different numbers live here and are never mixed:
  *  - [theoreticalMaxPlaintextBytes]: the size of a document in which EVERY collection is at its policy limit and every
- *    string at its field cap. It is the full capacity the state layer itself would accept, tens of megabytes.
+ *    string at its field cap. It is a structural upper bound; valid enum spellings and namespaces can be shorter.
  *  - [PLAINTEXT_CAP_BYTES]: the DELIBERATELY SMALLER local storage cap. A document above it is refused with
  *    [EncodeRefusal.STORAGE_CAP]: that is local backpressure (nothing is sent, nothing is truncated or dropped), not a
  *    claim that the cap equals the state layer's full capacity.
@@ -96,7 +96,7 @@ object StoreBounds {
     const val HEADER_BYTES = 4L + 2 + 2
     const val TRAILER_BYTES = 4L
 
-    /** The five u16 counts of the document plus the capture section's version and count. */
+    /** Five aggregate counts, capture version/count and two feature counts; the emergency flag is separate. */
     const val COUNTS_BYTES = 2L * 5 + 4 + 2 + 2 + 2
 
     val historyNamespaceMax: Long =
@@ -108,8 +108,8 @@ object StoreBounds {
     val historyEvictionMax: Long =
         historyNamespaceMax + nullableString(UUID_BYTES) + string(ENUM_BYTES)
 
-    /** The size of a version 2 document with every collection empty. */
-    fun emptyDocumentBytes(): Long = HEADER_BYTES + TRAILER_BYTES + COUNTS_BYTES
+    /** The size of a format 3 / aggregate version 2 document with every collection empty. */
+    fun emptyDocumentBytes(): Long = HEADER_BYTES + TRAILER_BYTES + COUNTS_BYTES + 1
 
     /** Every collection at its limit and every string at its cap; turn text bounded by the ledger-wide total. */
     fun theoreticalMaxPlaintextBytes(): Long = emptyDocumentBytes() +
@@ -118,7 +118,8 @@ object StoreBounds {
         SCOPE_DECISIONS * scopeDecisionMax +
         HISTORIES * historyMax +
         DELIVERIES * deliveryMax +
-        CAPTURES * captureMax + 16 * metadataIntentMax + 64 * historyEvictionMax
+        CAPTURES * captureMax + 16 * metadataIntentMax + 64 * historyEvictionMax +
+        historyEvictionMax
 
     /** True: the deliberate cap is below the full capacity the state layer itself would accept. */
     val capIsBelowFullCapacity: Boolean get() = theoreticalMaxPlaintextBytes() > PLAINTEXT_CAP_BYTES

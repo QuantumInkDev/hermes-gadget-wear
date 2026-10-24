@@ -150,7 +150,9 @@ class EnrollmentRecord(
 class ControllerSection(
     enrollments: List<EnrollmentRecord>,
     intents: List<MetadataIntent> = emptyList(),
-    evictions: List<HistoryEviction> = emptyList()
+    evictions: List<HistoryEviction> = emptyList(),
+    /** Reserved for ONE exact canonical deletion at the ordinary eviction limit; never cache-only or scope-wide. */
+    val emergencyDeletion: HistoryEviction? = null
 ) {
     val intents: List<MetadataIntent> = ownHistoryItems(intents, 16)
     val evictions: List<HistoryEviction> = ownHistoryItems(evictions, 64)
@@ -158,15 +160,13 @@ class ControllerSection(
         enrollments,
         StateLimits.MAX_ENROLLMENTS + 1
     )
+    val removals: List<HistoryEviction> get() = evictions + listOfNotNull(emergencyDeletion)
 
     init {
-        require(this.enrollments.size <= StateLimits.MAX_ENROLLMENTS + 1) {
-            "Too many enrollments."
-        }
         require(
             this.enrollments.map { it.endpointKey to it.enrollmentKey }.toSet().size ==
                 this.enrollments.size
-        ) { "Duplicate enrollment." }
+        )
         require(
             this.intents.map {
                 it.namespace to it.conversationId
@@ -174,19 +174,24 @@ class ControllerSection(
         )
         require(this.intents.map { it.namespace to it.requestId }.toSet().size == this.intents.size)
         require(this.evictions.toSet().size == this.evictions.size)
+        require(
+            emergencyDeletion == null || (
+                emergencyDeletion.kind == EvictionKind.DELETED &&
+                    emergencyDeletion.conversationId != null && emergencyDeletion !in this.evictions
+                )
+        )
     }
 
     fun find(endpointKey: String, enrollmentKey: String): EnrollmentRecord? =
         enrollments.firstOrNull { it.sameEnrollment(endpointKey, enrollmentKey) }
 
-    /** Replaces (or appends) [record]; the caller checks the count bound through the codec/commit refusal. */
     fun with(record: EnrollmentRecord): ControllerSection {
-        val index = enrollments.indexOfFirst {
+        val next = ArrayList(enrollments)
+        val index = next.indexOfFirst {
             it.sameEnrollment(record.endpointKey, record.enrollmentKey)
         }
-        val next = ArrayList(enrollments)
         if (index >= 0) next[index] = record else next.add(record)
-        return ControllerSection(next, intents, evictions)
+        return ControllerSection(next, intents, evictions, emergencyDeletion)
     }
 
     fun withIntent(intent: MetadataIntent): ControllerSection = ControllerSection(
@@ -196,7 +201,8 @@ class ControllerSection(
                 it.conversationId == intent.conversationId
         } +
             intent,
-        evictions
+        evictions,
+        emergencyDeletion
     )
 
     fun withoutIntent(intent: MetadataIntent): ControllerSection = ControllerSection(
@@ -205,20 +211,29 @@ class ControllerSection(
             it.requestId == intent.requestId &&
                 it.namespace == intent.namespace
         },
-        evictions
+        evictions,
+        emergencyDeletion
     )
 
-    fun owing(eviction: HistoryEviction): ControllerSection = ControllerSection(
-        enrollments,
-        intents,
-        if (eviction in
-            evictions
+    fun owing(eviction: HistoryEviction): ControllerSection {
+        if (eviction in removals) return this
+        if (evictions.size <
+            64
         ) {
-            evictions
-        } else {
-            evictions + eviction
+            return ControllerSection(
+                enrollments,
+                intents,
+                evictions + eviction,
+                emergencyDeletion
+            )
         }
-    )
+        if (eviction.kind == EvictionKind.DELETED && eviction.conversationId != null &&
+            emergencyDeletion == null
+        ) {
+            return ControllerSection(enrollments, intents, evictions, eviction)
+        }
+        throw HistoryFailure(HistoryProblem.CAPACITY)
+    }
 
     fun cleared(eviction: HistoryEviction): ControllerSection = ControllerSection(
         enrollments,
@@ -230,18 +245,16 @@ class ControllerSection(
                         it.conversationId.value == eviction.conversationId
                     )
         },
-        evictions.filterNot { it == eviction }
+        evictions.filterNot { it == eviction },
+        emergencyDeletion?.takeUnless { it == eviction }
     )
 
     override fun equals(other: Any?): Boolean =
         other is ControllerSection && other.enrollments == enrollments &&
-            other.intents == intents &&
-            other.evictions == evictions
-
+            other.intents == intents && other.evictions == evictions &&
+            other.emergencyDeletion == emergencyDeletion
     override fun hashCode(): Int = enrollments.hashCode()
-
     override fun toString(): String = "ControllerSection(enrollments=${enrollments.size})"
-
     companion object {
         val EMPTY = ControllerSection(emptyList())
     }

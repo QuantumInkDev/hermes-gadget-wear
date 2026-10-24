@@ -844,7 +844,7 @@ class PhoneConversation @JvmOverloads constructor(
             openRetained = { id -> run { it.openRetained(id) } },
             closeRetained = { run { it.closeRetained() } },
             reviewCache = { id -> run { it.reviewCache(id) } },
-            confirmCacheReview = { run { it.confirmCacheReview() } },
+            confirmCacheReview = { rendered -> run { it.confirmCacheReview(rendered) } },
             cancelCacheReview = { run { it.cancelCacheReview() } },
             retention = { days -> run { it.setHistoryRetention(days) } }
         )
