@@ -418,3 +418,110 @@ reply/read, and readiness after a same-effective Info refresh resumes current po
 Mixed terminal pages are rejected as current producer-shape hardening (registered tombstone backlog has ONE event), not
 as a newly registered producer capture or universal new wire requirement; existing single tombstones without the snapshot
 flag retain their contract. Snapshot/format4/legacy1/2/3, ordinary16/64 and emergency representation stay unchanged.
+
+
+## Phone task inbox (Task5 source candidate)
+
+The companion application owns one application-lifetime controller and aggregate writer. Foreground connections
+and bounded headless observers share that runtime, including applied unsaved observations and all pending typed,
+voice, capture, history, metadata and delivery sections. A different identity defers while unsaved evidence or an
+undurable exact-removal fence remains. Same-identity handover retains those values. A new foreground lifetime
+must confirm its own selected reservation; no binding, held canonical reply or prepared identity is transferred.
+Foreground claim withdraws the prior connection synchronously, then controller teardown/preparation runs on its
+serial executor. Atomic writer/observer/input generations fence late callbacks, timers and paced final SEND.
+The path lock and sequence CAS protect replacement, never merge independently held documents.
+
+The Inbox tab shows Relay tasks across saved reviewed phone profiles, exact box/profile/review/source and
+conversation, outcomes and retained replies. Foreground refresh is deliberate. Last full sync is retained per
+profile; missing rows/pages, offline boxes and partial traversal do not imply completion or deletion. Existing
+Hermes tasks and history have separate per-profile opt-ins and current method/grant/task-purpose delegation.
+A target getter denial is exact target/source unavailability: encrypted copies remain, routes refuse, other
+Relay authority remains ACTIVE. Empty O5/missing rows alone create no revocation. A successful exact current
+getter clears the availability fence. Actual permission/profile errors retain their registered authority action.
+
+### Separate authenticated display format
+
+The aggregate remains document4/aggregate2, including fixed selected-deletion markers and the fixed nullable
+metadata-result reservation. No admitted old byte is reinterpreted or migrated. New display-only schema1 uses
+`phone-inbox/inbox.v1`, one-byte `initialized=1`, distinct alias `quantumink.relay.phone.inbox.v1` and AES-GCM.
+Its container is `[1][12][iv12][revision i64][ciphertext + tag16]`, plaintext plus38 bytes. AAD is
+`hermes-gadget|phone-inbox|container1|<alias>|<revision>`. Authenticate before decode. Unknown version, malformed
+UTF8/data, missing marker/record, unresolved pending bytes and absent existing key refuse without reset/repair.
+Writes sync pending bytes, atomically replace, then sync marker/directory. Promotion uncertainty is never success.
+Real Keystore, filesystem and power-loss durability remain native acceptance gates.
+
+Plaintext schema1 is big-endian: magic H G I B, i32 version1, i64 revision, u8 background, i32 retention days;
+i32 profile count followed by namespace and bounded key/label/box, seven strict u8 booleans, high-water and
+last-sync i64; i32 copy count followed by namespace, exact existing OutboxItem wire JSON, receipt i64, handle
+and attempt/suppression u8 and unread u8; i32 task count followed by namespace, existing u8, current task wire JSON with no
+prompt, receipt i64 and handle; i32 history count followed by namespace/conversation/existing u8/receipt i64,
+i32 messages and each id/role u8/created i64/text; i32 suppression count with namespace/event/receipt; i32
+unavailable count with namespace/conversation/history u8; i32 round-robin cursor0..15; reverse magic B I G H.
+Every string is an i32 UTF8 byte length plus strict bytes. Namespace is endpoint key, canonical TLS endpoint,
+public enrollment label, profile UUID, review i64. Existing DTO decoders retain wire/null/provenance bounds.
+There is no pending action/voice/ACK shadow journal. Local route handles are random256-bit opaque hints.
+
+Limits: 8MiB plaintext;16 profiles;4096 copies plus event suppression rows together;512 current task projections;
+64 complete retained histories with256 assembled messages each;128 exact source-unavailability markers.
+Generic string cap65536 bytes; namespace/key/label/box decode caps512/8192/512/64 and2048 as appropriate;
+history text cap1MiB, still within aggregate display byte cap. Constructor character limits and existing wire
+field bounds also apply. At capacity nothing is silently dropped; retention/confirmed seven-day seen pruning
+or deliberate settings changes may free room. The legal4096-row/16-profile test reaches within4096 bytes of
+8MiB and refuses the next legal row-size, separately from structural-count rejection.
+
+Default text retention90 days, configurable0..365. First receipt age and exact server created/expiry remain
+separate. Duplicate rereads and lost-ACK retries preserve age, identity, route and server expiry. Persisted local
+high water prevents backward-clock renewal after writes/pruning; forward expiry can remove local text. Reads
+do not renew it. Bodies still owed to aggregate ACKs are protected from local retention. Expired server debt
+can retire only from exact retained bodies, under fresh server time and confirmed full aggregate replacement;
+this is local expiry, never server ACK success. Seven-day event suppressions share the copy bound.
+
+### Copy, aggregate, ACK and notification order
+
+Actual stageOutbox fresh AND duplicate bodies enter the authenticated display cache first. Then commitOutbox
+facts enter the complete aggregate. A seen key alone never proves a payload copy. Before ACK, authenticate and
+confirm every exact owed body, then confirm the current complete aggregate again. Fresh Info, enabled ACTIVE
+reviewed namespace, effective removal, source opt-in/method and current observer/transport lease all remain
+required at final SEND. Same-ID retry after lost response is deliberate/idempotent; no new identity or expiry.
+Failed/refused/stale/uncertain writes retain truthful copies/debt and cannot ACK. Callback IO failure withdraws
+observer authority. Full4096 seen and256 pending ACK quotas remain; no terminal-event capacity exemption is
+borrowed. One bounded reply may be restaged only after a confirmed eligible seven-day prune within that run.
+No room or failed prune ends partial without no-op commits/spin; deliberate later refresh obtains a new read.
+A gap/superseded copy clears its refresh debt only after all bounded permitted canonical task/conversation/
+history and opted-in existing chains complete. Partial paging or unavailable targets leave debt owed.
+
+Per-profile quiet completion/input controls default off. One event-specific attempt/suppression decision is
+persisted before OS publication. This provides at-most-one attempted alert, with possible lost alert on crash
+between decision and OS call, never exactly once. OS permission/channel/publication failure retains unread
+content and has no ACK authority. Each copy has a durable unread bit; deliberate Mark read changes only that
+local bit through the serial exact-route owner. A tap/launch does not mark read or perform a server action. Notifications use a quiet low channel, generic private/public lock-screen
+wording, stable exact-identity/event tag and immutable PendingIntent carrying only the opaque local handle.
+There is no automatic speech, playback, answer, attach, retry or provider call from refresh or tap.
+
+### Jobs and actual routes
+
+One stable persisted inexact periodic JobScheduler job uses15-minute interval/5-minute flex and network ANY,
+only with global background updates plus reviewed enabled targets. Unchanged configuration is not rescheduled.
+Scheduling failure and Android delay are separate status. Setup-transfer recovery completes off main before
+state or identity access. Typed read-only phone identity lookup never uses AtomicFile recovery, marker repair,
+key generation, enrollment or watch keys. Headless Info admission cannot pin an unknown profile, reauthorize,
+attach/create, resubmit or retry metadata. Sequential durable round-robin work is bounded by16 targets,55s
+job time,22s wait per target and controller20s/64requests/24pages per chain. Stop/replacement/network loss use
+one completion generation. Assigned Network owns both DNS and sockets; a different effective active VPN/
+tailnet refuses work. Default DirectConnection DNS and private cleartext-host policy remain unchanged.
+No process network binding, VPN bypass, push account, FGS, alarm or power exemption is added.
+
+Notification cold/warm/onNewIntent routes resolve the exact durable scope/event/target after current catalog
+and non-mutating identity lookup; no current/default-bot fallback. Same-profile other-conversation opens its
+actual read-only detail, independently of profile-only widget IGNORE. Busy recording/selection/input retains
+only the intended handle and repeats lookup on release. Lifecycle/intent replacement invalidates old lookups.
+A distinct Continue action selects/attaches the exact canonical conversation through the prepared foreground
+controller. Opaque final refs remain read-only, including UUID-looking strings. Existing current-input attach
+uses its registered owner without enabling the stock composer. Get current input uses only fresh registered
+task/current-prompt getter; list/events/O5/saved callbacks remain display only. A separate deliberate Answer
+consumes one exact current binding/generation/prompt token, commits the complete aggregate and sends once.
+No durable answer retry journal or automatic paid retry is created; loss is uncertain and requires fresh input.
+
+Recorded JVM/Peer/software-key tests and registered synthetic producer captures support scoped source work.
+Android UI, notification permission/lock screen, job/Doze/assigned network, real Keystore/Looper/fsync/power loss,
+near-cap device latency and native/physical/live/provider/billing acceptance remain separate OPEN gates.

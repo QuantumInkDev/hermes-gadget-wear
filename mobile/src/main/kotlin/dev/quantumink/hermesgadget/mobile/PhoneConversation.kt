@@ -8,6 +8,7 @@ import dev.quantumink.hermesgadget.client.OpusSupport
 import dev.quantumink.hermesgadget.client.PcmCapture
 import dev.quantumink.hermesgadget.client.PcmPlayback
 import dev.quantumink.hermesgadget.client.RecordingCues
+import dev.quantumink.hermesgadget.protocol.CatalogPage
 import dev.quantumink.hermesgadget.protocol.ClientSpeech
 import dev.quantumink.hermesgadget.protocol.ConnectionObserver
 import dev.quantumink.hermesgadget.protocol.ConnectionState
@@ -21,8 +22,11 @@ import dev.quantumink.hermesgadget.protocol.EndpointProfile
 import dev.quantumink.hermesgadget.protocol.Protocol
 import dev.quantumink.hermesgadget.protocol.RecordingFeedback
 import dev.quantumink.hermesgadget.protocol.SpeechRequest
+import dev.quantumink.hermesgadget.protocol.relay.PromptAnswer
 import dev.quantumink.hermesgadget.protocol.relay.session.EnrollmentIdentity
+import dev.quantumink.hermesgadget.protocol.relay.session.InboxInput
 import dev.quantumink.hermesgadget.protocol.relay.session.RelayController
+import dev.quantumink.hermesgadget.protocol.relay.session.RelayPhase
 import dev.quantumink.hermesgadget.protocol.relay.session.RelayUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,7 +42,7 @@ data class PhoneConversationState(
     val sessionVersion: Long = 0,
     val playbackVersion: Long = 0,
     val profile: EndpointProfile? = null,
-    val page: dev.quantumink.hermesgadget.protocol.CatalogPage? = null,
+    val page: CatalogPage? = null,
     val connection: ConnectionState = ConnectionState(),
     val draft: String = "",
     val sending: Boolean = false,
@@ -110,18 +114,58 @@ class PhoneConversation @JvmOverloads constructor(
     /** Built on first use: construction opens no key, store or socket. */
     private val relaySession =
         PhoneRelaySession({ listener -> relayFactory(application, listener) }) { ui ->
+            val pending = inboxPending
+            if (pending != null && ui.foregroundSession == relayForeground &&
+                ui.phase in
+                setOf(
+                    RelayPhase.READY,
+                    RelayPhase.SELECTED
+                )
+            ) {
+                inboxPending = null
+                if (pending.second) {
+                    relay.continueInbox(pending.first)
+                } else {
+                    relay.getInboxInput(pending.first) { input -> inboxInputResult?.invoke(input) }
+                }
+            }
             mutable.update { if (it.visible) it.copy(relay = ui) else it }
+        }.apply { setLeaseGuard { PhoneRelay.current(application, relayForeground) } }
+    private var inboxPending: Pair<String, Boolean>? = null
+    private var inboxInputResult: (
+        (InboxInput?) -> Unit
+    )? = null
+
+    @Synchronized fun inboxAction(
+        handle: String,
+        continueTarget: Boolean,
+        done: (InboxInput?) -> Unit = {
         }
+    ) {
+        inboxPending = handle to continueTarget
+        inboxInputResult = done
+        val ui = relay.currentState
+        if (ui.foregroundSession == relayForeground && ui.phase in setOf(
+                RelayPhase.READY,
+                RelayPhase.SELECTED
+            )
+        ) {
+            inboxPending = null
+            if (continueTarget) relay.continueInbox(handle) else relay.getInboxInput(handle, done)
+        }
+    }
+    fun inboxAnswer(token: InboxInput, answer: PromptAnswer, done: (Boolean) -> Unit) {
+        relaySession.perform(state.value.profile?.endpoint?.url ?: return, relayForeground) {
+            it.answerInboxInput(token, answer, done)
+        }
+    }
     private var relayForeground = 0L
     private val relay: RelayController get() = relaySession.controller
     private val relayPrepare = java.util.concurrent.Executors.newSingleThreadExecutor {
         Thread(it, "phone-relay-prepare").apply { isDaemon = true }
     }
 
-    @Synchronized fun open(
-        profile: EndpointProfile,
-        page: dev.quantumink.hermesgadget.protocol.CatalogPage? = null
-    ) {
+    @Synchronized fun open(profile: EndpointProfile, page: CatalogPage? = null) {
         hide()
         if (profile.endpoint.url !in saved && saved.size >= 32) saved.remove(saved.keys.first())
         val previous = saved.getOrPut(profile.endpoint.url) { Saved() }
@@ -135,20 +179,22 @@ class PhoneConversation @JvmOverloads constructor(
             connection = ConnectionState(conversation = ConversationState(reply = previous.reply)),
             relayRequested = false
         )
-        relayForeground = epoch
+        relayForeground = PhoneRelay.foreground(getApplication()) { hide() }
         relaySession.open(profile.endpoint.url, relayForeground)
         // An enrolled phone shows its saved Relay setting right away. Nothing is enrolled, created or connected here.
         if (PhoneRelay.hasState(getApplication())) {
             val version = epoch
+            val foreground = relayForeground
             relayPrepare.execute {
                 val known = runCatching {
-                    vault.identity(profile.endpoint, create = false)
+                    SetupTransferGate.ensureRecovered()
+                    (vault.lookup(profile.endpoint) as? PhoneIdentityLookup.Known)?.identity
                 }.getOrNull()
                 if (known != null && profile.endpoint.isTls) {
                     synchronized(this) { if (!active(version)) return@execute }
                     relaySession.prepare(
                         profile.endpoint.url,
-                        version,
+                        foreground,
                         relayIdentity(profile, known)
                     )
                 }
@@ -214,10 +260,30 @@ class PhoneConversation @JvmOverloads constructor(
             }
             val identity = runCatching { vault.identity(profile.endpoint, create = true) }
             // Relay is a deliberate, per-profile opt-in: it is advertised on this socket only when the saved setting is on.
-            val relayOn =
+            val relayAttempt = runCatching {
                 identity.getOrNull()?.let { prepareRelay(profile, relayVersion, it) } ?: false
+            }
+            if (relayAttempt.isFailure) {
+                synchronized(this) {
+                    if (active(version)) {
+                        mutable.update {
+                            it.copy(
+                                connection = ConnectionState(),
+                                error = "Profile handover deferred. " +
+                                    "Unsaved Relay state is retained."
+                            )
+                        }
+                    }
+                }
+                return@submit
+            }
+            val relayOn = relayAttempt.getOrThrow()
             synchronized(this) {
-                if (!active(version) || mutable.value.profile != profile) return@submit
+                if (!active(version) || mutable.value.profile != profile ||
+                    !PhoneRelay.current(getApplication(), relayVersion)
+                ) {
+                    return@submit
+                }
                 identity.fold({
                     startConnection(profile, version, it, opus, clientSpeech, notice, relayOn)
                 }, {
@@ -239,7 +305,25 @@ class PhoneConversation @JvmOverloads constructor(
         identity: DeviceIdentity
     ): Boolean {
         if (!profile.endpoint.isTls) return false
-        return relaySession.prepare(profile.endpoint.url, version, relayIdentity(profile, identity))
+        val page = mutable.value.page
+        relay.inboxTarget(
+            page?.key ?: "manual:" + ClientSpeech.endpointId(profile.endpoint),
+            profile.label,
+            page?.sourceLabel ?: "Saved on phone"
+        )
+        check(
+            (getApplication<Application>() as? CompanionApplication)?.inbox?.current(version) !=
+                false
+        ) {
+            "Foreground lease replaced"
+        }
+        val on = relaySession.prepare(
+            profile.endpoint.url,
+            version,
+            relayIdentity(profile, identity)
+        )
+        check(PhoneRelay.current(getApplication(), version)) { "Foreground lease replaced" }
+        return on
     }
 
     private fun startConnection(
@@ -740,6 +824,8 @@ class PhoneConversation @JvmOverloads constructor(
     }
 
     @Synchronized fun hide() {
+        inboxPending = null
+        inboxInputResult = null
         ++epoch // Invalidate observers before stopping adapters or closing the socket.
         recordingToken = null
         recordingRequested = false
@@ -753,7 +839,9 @@ class PhoneConversation @JvmOverloads constructor(
         speech?.close()
         speech = null
         relaySession.hide()
+        connection?.relayTransport?.invalidatePending()
         connection?.close()
+        PhoneRelay.release(getApplication(), relayForeground)
         capture = null
         playback = null
         connection = null

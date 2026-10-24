@@ -1,0 +1,44 @@
+[
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r0\",\"result\":{\"items\":[{\"delivery_id\":\"32db2325-2002-4501-83a3-f93952300e1b\",\"conversation_id\":\"21db4edb-0bb7-5c4a-9695-72ab57ae3fff\",\"event_id\":\"2b59788b-b8e1-51f2-a160-a45895aa70cb\",\"created_at_ms\":1792300000000,\"expires_at_ms\":1792386400000,\"payload\":{\"kind\":\"task_change\",\"origin\":\"existing\",\"task\":{\"task_id\":\"0754f921-4e83-598c-9ffe-cd91c5b04a56\",\"conversation_id\":\"21db4edb-0bb7-5c4a-9695-72ab57ae3fff\",\"admission_id\":\"6637ede3-d53e-47cd-b3eb-f3d6dae9268a\",\"run_id\":\"b669d72e-bd9a-5ee9-9a66-56d8ba549b4b\",\"execution_generation\":1,\"state\":\"finished\",\"outcome\":\"completed\",\"origin\":\"existing\",\"source\":\"local\",\"provenance\":null},\"reference\":\"current\"}}],\"next_cursor\":null,\"gap_generation\":0}}",
+    "sha256": "cda36c1e6b50da1a9b10f7c449b5f4122c47e19f4eb8a8fb0c70d581214c0be9",
+    "accepted": true
+  },
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r1\",\"result\":{\"items\":[],\"next_cursor\":null,\"gap_generation\":0}}",
+    "sha256": "d72c571e6205c70f532d962adf8be48a18bb573102b0c3a0b2aa5bd82607e167",
+    "accepted": true
+  },
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r2\",\"error\":{\"code\":\"not_found\"}}",
+    "sha256": "55033829306662b5ede994f8371c3103fb5e1c0b48b41a78df13ac12077a6961",
+    "accepted": true
+  },
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r3\",\"result\":{\"profile_id\":\"9e8af651-47eb-411f-b28c-ed292bbfd305\",\"grant_generation\":2,\"expires_at_ms\":1794892000000,\"server_time_ms\":1792300000000,\"methods\":[\"relay.info\",\"relay.conversation.create\",\"relay.conversation.attach\",\"relay.conversation.detach\",\"relay.turn.submit\",\"relay.turn.receipt\",\"relay.turn.receipt.own\",\"relay.history.page\",\"relay.events.read\",\"relay.conversations.list\",\"relay.existing.tasks.list\",\"relay.outbox.read\",\"relay.outbox.ack\"],\"limits\":{\"outbox_cursor\":false,\"page_items\":50,\"text_bytes\":16384,\"dto_bytes\":8192,\"dto_depth\":6,\"history_page_bytes\":65536,\"history_text_bytes\":32768,\"outbox_payloads\":[\"final_text\",\"task_change\"]}}}",
+    "sha256": "31dc3f241587dbf7ead8b09acedffb9aede5be5c66444efefab727a941c532f1",
+    "accepted": true
+  },
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r4\",\"result\":{\"items\":[],\"next_cursor\":null,\"gap_generation\":0}}",
+    "sha256": "7e6fd3dd8c8a80983023e1166f4da252aa9c3b7068028ac9598bb9f85bd62ae7",
+    "accepted": true
+  },
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r5\",\"result\":{\"items\":[],\"next_cursor\":null}}",
+    "sha256": "1fd28ec3797b324c1bc524832b3c4ab58d6d399a4d2f1e70587758d588dc9219",
+    "accepted": true
+  },
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r6\",\"error\":{\"code\":\"not_found\"}}",
+    "sha256": "2ea4f34141ac8f3ab9f07f3b0f8fb2abbada33df53c62417246cba5c3d1d6746",
+    "accepted": true
+  }
+]

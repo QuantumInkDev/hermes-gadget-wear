@@ -1,0 +1,80 @@
+[
+  {
+    "device": "phone",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r0\",\"result\":{\"conversation_id\":\"30f104e3-87bb-4946-b291-19e03e273434\",\"title\":null,\"revision\":1,\"bookmarked\":false,\"updated_at_ms\":1792300000000,\"can_continue\":true}}",
+    "sha256": "b33d91658ae6e11e7e355d52296efc8e853c03e052e424b763fcdb18729fb02b",
+    "accepted": true
+  },
+  {
+    "device": "phone",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r1\",\"result\":{\"binding_id\":\"d4da921c-81dc-4f39-a9b9-3c317bf60f9f\",\"conversation_id\":\"30f104e3-87bb-4946-b291-19e03e273434\",\"authority_epoch\":1,\"execution_generation\":0,\"revision\":0,\"replay_epoch\":\"4032e72c-e246-4e17-bcf6-1356050d4a44\",\"last_sequence\":0,\"execution_state\":\"idle\"}}",
+    "sha256": "db3954819ccd83cd155414eded8cbd364b90779b6b860bdfc1256c3305ab8422",
+    "accepted": true
+  },
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r0\",\"result\":{\"binding_id\":\"62c134f4-f223-4836-a712-3f880c8f5289\",\"conversation_id\":\"30f104e3-87bb-4946-b291-19e03e273434\",\"authority_epoch\":1,\"execution_generation\":0,\"revision\":0,\"replay_epoch\":\"d9e9653d-2943-4550-9cc0-d970550210a8\",\"last_sequence\":0,\"execution_state\":\"idle\"}}",
+    "sha256": "ba196704dff9e88c9e49c6b25d8fd54112dd4b9178fc13e7661c82d14311ee2b",
+    "accepted": true
+  },
+  {
+    "device": "phone",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r2\",\"result\":{\"request_id\":\"01a14d67-a300-7000-a97d-b4aad60ae996\",\"admission_id\":\"ad71c06e-85bf-42a0-a0e3-c16e3fa36a9e\",\"conversation_id\":\"30f104e3-87bb-4946-b291-19e03e273434\",\"status\":\"started\",\"outcome\":null,\"authority_epoch\":1,\"execution_generation\":1}}",
+    "sha256": "0992384b4b02dfe21b25393da1a6a82b2f85dfeea868d1923bfaeba2662c9977",
+    "accepted": true
+  },
+  {
+    "device": "phone",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r3\",\"result\":{\"items\":[{\"task_id\":\"d7b96f15-ff9f-5d5c-932c-3df0ddc9735c\",\"conversation_id\":\"30f104e3-87bb-4946-b291-19e03e273434\",\"admission_id\":\"ad71c06e-85bf-42a0-a0e3-c16e3fa36a9e\",\"run_id\":\"2e218a22-29e2-50ba-a7ff-20145ebe376d\",\"state\":\"unknown\",\"outcome\":null,\"updated_at_ms\":1792300000000}],\"next_cursor\":null}}",
+    "sha256": "c9363ecac01d3995d6d9f8f91507f69e688f6b4e2adb5a0b382683ec0e99e380",
+    "accepted": true
+  },
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r1\",\"result\":{\"task_id\":\"d7b96f15-ff9f-5d5c-932c-3df0ddc9735c\",\"conversation_id\":\"30f104e3-87bb-4946-b291-19e03e273434\",\"admission_id\":\"ad71c06e-85bf-42a0-a0e3-c16e3fa36a9e\",\"run_id\":\"2e218a22-29e2-50ba-a7ff-20145ebe376d\",\"state\":\"unknown\",\"outcome\":null,\"updated_at_ms\":1792300000000}}",
+    "sha256": "864cc10d3649544a2b85b33520ef99d2511a7528edde6ef30bd3b50d3fab8d51",
+    "accepted": true
+  },
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r2\",\"result\":{\"profile_id\":\"9e8af651-47eb-411f-b28c-ed292bbfd305\",\"grant_generation\":2,\"expires_at_ms\":1794892000000,\"server_time_ms\":1792300000000,\"methods\":[\"relay.info\",\"relay.conversation.create\",\"relay.conversation.attach\",\"relay.conversation.detach\",\"relay.turn.submit\",\"relay.turn.receipt\",\"relay.turn.receipt.own\",\"relay.history.page\",\"relay.events.read\",\"relay.tasks.list\",\"relay.task.get\",\"relay.conversations.list\",\"relay.conversation.delete\",\"relay.outbox.read\",\"relay.outbox.ack\"],\"limits\":{\"outbox_cursor\":false,\"page_items\":50,\"text_bytes\":16384,\"dto_bytes\":8192,\"dto_depth\":6,\"history_page_bytes\":65536,\"history_text_bytes\":32768,\"outbox_payloads\":[\"final_text\",\"task_change\"]}}}",
+    "sha256": "3dd61b3e212a05f44e863fc85ac05fc878e18e31a0c2d8c46c023a2163a0e5e1",
+    "accepted": true
+  },
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r3\",\"result\":{\"items\":[{\"delivery_id\":\"2fd0f370-18a5-44f3-b5a2-83737004071e\",\"conversation_id\":\"30f104e3-87bb-4946-b291-19e03e273434\",\"event_id\":\"85a301f7-af1f-5162-a6a3-211046bb11ec\",\"created_at_ms\":1792300000000,\"expires_at_ms\":1792386400000,\"payload\":{\"kind\":\"task_change\",\"origin\":\"relay\",\"task\":{\"admission_id\":\"ad71c06e-85bf-42a0-a0e3-c16e3fa36a9e\",\"conversation_id\":\"30f104e3-87bb-4946-b291-19e03e273434\",\"outcome\":null,\"run_id\":null,\"state\":\"working\",\"task_id\":\"d7b96f15-ff9f-5d5c-932c-3df0ddc9735c\",\"updated_at_ms\":1792300000000},\"reference\":\"superseded\"}},{\"delivery_id\":\"e634cc29-1cd3-4bb1-a0dd-a7e54dfcd4a8\",\"conversation_id\":\"30f104e3-87bb-4946-b291-19e03e273434\",\"event_id\":\"18734115-1606-5465-be1d-6be06fae92f9\",\"created_at_ms\":1792300000000,\"expires_at_ms\":1792386400000,\"payload\":{\"kind\":\"task_change\",\"origin\":\"relay\",\"task\":{\"admission_id\":\"ad71c06e-85bf-42a0-a0e3-c16e3fa36a9e\",\"conversation_id\":\"30f104e3-87bb-4946-b291-19e03e273434\",\"outcome\":null,\"run_id\":\"2e218a22-29e2-50ba-a7ff-20145ebe376d\",\"state\":\"working\",\"task_id\":\"d7b96f15-ff9f-5d5c-932c-3df0ddc9735c\",\"updated_at_ms\":1792300000000},\"reference\":\"superseded\"}},{\"delivery_id\":\"c856f83b-807b-4948-886a-058110fedfb6\",\"conversation_id\":\"30f104e3-87bb-4946-b291-19e03e273434\",\"event_id\":\"22035725-06f8-5eb4-b754-7d9260d438a5\",\"created_at_ms\":1792300000000,\"expires_at_ms\":1792386400000,\"payload\":{\"kind\":\"task_change\",\"origin\":\"relay\",\"task\":{\"admission_id\":\"ad71c06e-85bf-42a0-a0e3-c16e3fa36a9e\",\"conversation_id\":\"30f104e3-87bb-4946-b291-19e03e273434\",\"outcome\":null,\"run_id\":\"2e218a22-29e2-50ba-a7ff-20145ebe376d\",\"state\":\"unknown\",\"task_id\":\"d7b96f15-ff9f-5d5c-932c-3df0ddc9735c\",\"updated_at_ms\":1792300000000},\"reference\":\"current\"}}],\"next_cursor\":null,\"gap_generation\":0}}",
+    "sha256": "dcee4d7394d576c61af0632ed4f0a0ab4d59ce752b83a7c8162cd02bd2035135",
+    "accepted": true
+  },
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r4\",\"result\":{\"acknowledged\":[\"2fd0f370-18a5-44f3-b5a2-83737004071e\",\"e634cc29-1cd3-4bb1-a0dd-a7e54dfcd4a8\",\"c856f83b-807b-4948-886a-058110fedfb6\"]}}",
+    "sha256": "eb2b783eaa01b541a2e21b8a56fffabaf936823b9b2a57a24769969bc22bcb65",
+    "accepted": true
+  },
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r5\",\"result\":{\"items\":[],\"next_cursor\":null,\"gap_generation\":0}}",
+    "sha256": "39bfd7cab8cf7d64a002edc85268448c0b95ba5eb5383aeec045904e78b80a73",
+    "accepted": true
+  },
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r6\",\"result\":{\"items\":[{\"task_id\":\"d7b96f15-ff9f-5d5c-932c-3df0ddc9735c\",\"conversation_id\":\"30f104e3-87bb-4946-b291-19e03e273434\",\"admission_id\":\"ad71c06e-85bf-42a0-a0e3-c16e3fa36a9e\",\"run_id\":\"2e218a22-29e2-50ba-a7ff-20145ebe376d\",\"state\":\"unknown\",\"outcome\":null,\"updated_at_ms\":1792300000000}],\"next_cursor\":null}}",
+    "sha256": "6031836da7567567e6f89a7283045351cdd4df980c2b3831948e454783cc447d",
+    "accepted": true
+  },
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r7\",\"result\":{\"items\":[{\"conversation_id\":\"30f104e3-87bb-4946-b291-19e03e273434\",\"title\":null,\"revision\":2,\"bookmarked\":false,\"updated_at_ms\":1792829766961,\"can_continue\":true}],\"next_cursor\":null}}",
+    "sha256": "f4973f6bbcbf62f9cab80bfc81cf6f6ae8903e7e011610727fba55a69e3f5b83",
+    "accepted": true
+  },
+  {
+    "device": "watch",
+    "raw": "{\"type\":\"relay.response\",\"v\":1,\"id\":\"r8\",\"result\":{\"items\":[{\"message_id\":\"c149685e-6443-5c0d-908b-4c80aeeac47b\",\"role\":\"user\",\"text\":\"ordinary question\",\"created_at_ms\":1792829766961,\"attachment_ids\":[],\"segment_index\":0,\"segment_count\":1},{\"message_id\":\"2d642e2b-fa8b-577d-aa6a-53457041eff6\",\"role\":\"assistant\",\"text\":\"equal answer\",\"created_at_ms\":1792829766961,\"attachment_ids\":[],\"segment_index\":0,\"segment_count\":1},{\"message_id\":\"53ab5e3e-e694-582f-bb76-6a60228618c2\",\"role\":\"assistant\",\"text\":\"equal answer\",\"created_at_ms\":1792829766961,\"attachment_ids\":[],\"segment_index\":0,\"segment_count\":1}],\"next_cursor\":null}}",
+    "sha256": "b1e4723dffba142953daa93420478913261dc7cd64d718a55b75bf1fc49f7474",
+    "accepted": true
+  }
+]

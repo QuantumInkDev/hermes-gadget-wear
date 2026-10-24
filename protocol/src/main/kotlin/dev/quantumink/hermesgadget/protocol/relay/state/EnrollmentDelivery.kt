@@ -1002,6 +1002,9 @@ class EnrollmentDelivery private constructor(
         )
     }
 
+    /** Withdraw an observer lifetime without changing a single durable fact. */
+    fun withdrawOutbox(): EnrollmentDelivery = copy(outbox = OutboxFlight(null, null, null))
+
     // -- obligations and housekeeping ----------------------------------------------------------------------
 
     /**
@@ -1021,6 +1024,17 @@ class EnrollmentDelivery private constructor(
             listOf(DeliveryEffect.PersistDelivery)
         )
     }
+
+    /**
+     * Local expiry only. The aggregate owner must confirm exact body provenance and its elapsed
+     * server expiry first.
+     */
+    internal fun retireAcknowledgements(expired: Set<DeliveryId>): EnrollmentDelivery = copy(
+        pendingAcks = pendingAcks.filterNot {
+            it in expired
+        },
+        outbox = OutboxFlight(null, null, null)
+    )
 
     /**
      * `permission_denied`: forgets everything cached for this enrollment (identities, owed refreshes, the O5 baseline,

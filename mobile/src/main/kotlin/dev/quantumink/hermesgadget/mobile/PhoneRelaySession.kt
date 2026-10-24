@@ -12,6 +12,10 @@ internal class PhoneRelaySession(
     factory: ((RelayUiState) -> Unit) -> RelayController,
     private val listener: (RelayUiState) -> Unit
 ) {
+    private var live: () -> Boolean = { true }
+    fun setLeaseGuard(guard: () -> Boolean) {
+        live = guard
+    }
     private data class Lease(val endpoint: String, val session: Long)
     private data class Pending(val lease: Lease, val identity: EnrollmentIdentity?, val on: Boolean)
     private var lease: Lease? = null
@@ -27,14 +31,16 @@ internal class PhoneRelaySession(
     }
 
     @Synchronized fun hide() {
+        val previous = lease
         lease = null // withdraw callbacks/settings before controller teardown
         prepared = null
         pending = null
-        if (holder.isInitialized()) controller.hide()
+        if (holder.isInitialized()) controller.hide(previous?.session)
     }
 
     @Synchronized
     fun enable(on: Boolean, endpoint: String? = lease?.endpoint, session: Long? = lease?.session) {
+        if (!live()) return
         val current = lease ?: return
         if (current.endpoint != endpoint || current.session != session) return
         val identity = prepared
@@ -50,6 +56,7 @@ internal class PhoneRelaySession(
 
     fun prepare(endpoint: String, session: Long, identity: EnrollmentIdentity): Boolean {
         synchronized(this) {
+            if (!live()) return false
             val current = lease ?: return false
             if (current != Lease(endpoint, session) ||
                 identity.endpointUrl != endpoint
@@ -67,15 +74,17 @@ internal class PhoneRelaySession(
                 controller.setEnabled(wanted.on)
             }
         }
+        val accepted = controller.preparedBlocking(identity, session)
+        check(accepted) { "Relay identity handover deferred: unsaved state is retained." }
         val enabled = controller.enabledBlocking()
         return synchronized(this) {
-            lease == Lease(endpoint, session) && prepared == identity &&
+            live() && lease == Lease(endpoint, session) && prepared == identity &&
                 enabled
         }
     }
 
     @Synchronized fun perform(endpoint: String, session: Long, action: (RelayController) -> Unit) {
-        if (lease == Lease(endpoint, session) &&
+        if (live() && lease == Lease(endpoint, session) &&
             prepared?.endpointUrl == endpoint
         ) {
             action(controller)
@@ -83,6 +92,7 @@ internal class PhoneRelaySession(
     }
 
     @Synchronized private fun onUi(ui: RelayUiState) {
+        if (!live()) return
         val current = lease ?: return
         if (ui.foregroundSession == current.session && ui.identity == prepared &&
             prepared?.endpointUrl == current.endpoint

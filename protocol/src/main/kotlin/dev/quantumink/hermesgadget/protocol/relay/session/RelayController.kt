@@ -7,10 +7,15 @@ import dev.quantumink.hermesgadget.protocol.relay.ConversationSummary
 import dev.quantumink.hermesgadget.protocol.relay.CorrelationId
 import dev.quantumink.hermesgadget.protocol.relay.EventPayload
 import dev.quantumink.hermesgadget.protocol.relay.EventsPage
+import dev.quantumink.hermesgadget.protocol.relay.ExistingBinding
+import dev.quantumink.hermesgadget.protocol.relay.HistoryRole
 import dev.quantumink.hermesgadget.protocol.relay.Info
 import dev.quantumink.hermesgadget.protocol.relay.MetadataState
 import dev.quantumink.hermesgadget.protocol.relay.MutationOutcome
+import dev.quantumink.hermesgadget.protocol.relay.OutboxItem
 import dev.quantumink.hermesgadget.protocol.relay.ProfileId
+import dev.quantumink.hermesgadget.protocol.relay.Prompt
+import dev.quantumink.hermesgadget.protocol.relay.PromptAnswer
 import dev.quantumink.hermesgadget.protocol.relay.Receipt
 import dev.quantumink.hermesgadget.protocol.relay.RelayCall
 import dev.quantumink.hermesgadget.protocol.relay.RelayCallResult
@@ -23,6 +28,7 @@ import dev.quantumink.hermesgadget.protocol.relay.RelayFailure
 import dev.quantumink.hermesgadget.protocol.relay.RelayInvalid
 import dev.quantumink.hermesgadget.protocol.relay.RelayJson
 import dev.quantumink.hermesgadget.protocol.relay.RelayLimits
+import dev.quantumink.hermesgadget.protocol.relay.RelayListener
 import dev.quantumink.hermesgadget.protocol.relay.RelayMethod
 import dev.quantumink.hermesgadget.protocol.relay.RelayOutcome
 import dev.quantumink.hermesgadget.protocol.relay.RelayRefusal
@@ -30,9 +36,11 @@ import dev.quantumink.hermesgadget.protocol.relay.RelayScope
 import dev.quantumink.hermesgadget.protocol.relay.RelayTransport
 import dev.quantumink.hermesgadget.protocol.relay.RequestId
 import dev.quantumink.hermesgadget.protocol.relay.TaskState
+import dev.quantumink.hermesgadget.protocol.relay.state.AckOutcome
 import dev.quantumink.hermesgadget.protocol.relay.state.BindingToken
 import dev.quantumink.hermesgadget.protocol.relay.state.CallKind
 import dev.quantumink.hermesgadget.protocol.relay.state.CallRef
+import dev.quantumink.hermesgadget.protocol.relay.state.ConversationScope
 import dev.quantumink.hermesgadget.protocol.relay.state.DeliveryEffect
 import dev.quantumink.hermesgadget.protocol.relay.state.DiscardMode
 import dev.quantumink.hermesgadget.protocol.relay.state.EnrollmentDelivery
@@ -42,9 +50,13 @@ import dev.quantumink.hermesgadget.protocol.relay.state.HistoryAssembly
 import dev.quantumink.hermesgadget.protocol.relay.state.HistoryInvalidation
 import dev.quantumink.hermesgadget.protocol.relay.state.HistoryPlanOutcome
 import dev.quantumink.hermesgadget.protocol.relay.state.HistoryScope
+import dev.quantumink.hermesgadget.protocol.relay.state.HistorySource
 import dev.quantumink.hermesgadget.protocol.relay.state.InstantRead
 import dev.quantumink.hermesgadget.protocol.relay.state.LedgerStep
 import dev.quantumink.hermesgadget.protocol.relay.state.MintResult
+import dev.quantumink.hermesgadget.protocol.relay.state.OutboxCommit
+import dev.quantumink.hermesgadget.protocol.relay.state.OutboxPlanOutcome
+import dev.quantumink.hermesgadget.protocol.relay.state.OutboxStageOutcome
 import dev.quantumink.hermesgadget.protocol.relay.state.PageOutcome
 import dev.quantumink.hermesgadget.protocol.relay.state.PlanOutcome
 import dev.quantumink.hermesgadget.protocol.relay.state.PlanRefusal
@@ -152,6 +164,11 @@ class RelayController(
     private val entropy: RequestIdEntropy,
     private val timing: RelayTiming = RelayTiming(),
     private val retainedHistory: RetainedHistory? = null,
+    private val writerEpoch: () -> Long = { 0L },
+    private val inbox: InboxRepository? = null,
+    private val localMillis: () -> Long = System::currentTimeMillis,
+    private val inboxUpdates: (InboxSnapshot?, String) -> Unit = { _, _ -> },
+    private val inboxAlerts: (List<InboxCopy>) -> Unit = {},
     private val listener: (RelayUiState) -> Unit
 ) {
     // -- state (scheduler thread only) -------------------------------------------------------------------------
@@ -161,6 +178,429 @@ class RelayController(
         data object Empty : Stored
         class Doc(val document: RelayDocument) : Stored
         class Problem(val problem: StoreProblem) : Stored
+    }
+
+    private val inboxEpoch = java.util.concurrent.atomic.AtomicLong()
+    private val inputEpoch = java.util.concurrent.atomic.AtomicLong()
+    private var admittedWriter = writerEpoch()
+    private var inboxInput: InboxInput? = null
+    private var existingInboxBinding: ExistingBinding? = null
+    private fun localInboxRoute(handle: String): InboxRoute? {
+        val repository = inbox ?: return null
+        if (stored is Stored.NotLoaded) load()
+        if (stored is Stored.Problem) return null
+        val route = InboxRoute.resolve(repository.snapshot(), handle) ?: return null
+        if (baseSection().enrollments.none {
+                HistoryNamespace.from(it) == route.namespace &&
+                    it.enabled && it.standing == Standing.ACTIVE
+            } ||
+            removalOwed(route.namespace, route.conversation)
+        ) {
+            return null
+        }
+        return route
+    }
+    fun inboxRouteBlocking(handle: String): InboxRoute? {
+        val latch = CountDownLatch(1)
+        var result: InboxRoute? = null
+        post {
+            try {
+                result = localInboxRoute(handle)
+            } catch (_: InboxFailure) { }
+            latch.countDown()
+        }
+        return if (latch.await(5, TimeUnit.SECONDS)) result else null
+    }
+
+    fun markInboxRead(handle: String) = post {
+        val route = localInboxRoute(handle) ?: return@post
+        inbox?.markRead(route.namespace, handle)
+        publish()
+    }
+
+    /** Deliberate continuation only. A notification read never calls this. */
+    fun continueInbox(handle: String) = post {
+        val route = try {
+            localInboxRoute(handle)
+        } catch (_: InboxFailure) {
+            null
+        } ?: return@post
+        if (inboxOnly || namespace() != route.namespace || !isReady()) return@post
+        val conversation = route.canonicalConversation?.let(ConversationId::of) ?: return@post
+        if (!route.existing) {
+            selectConversation(conversation)
+            return@post
+        }
+        if (!supports(RelayMethod.EXISTING_ATTACH)) return@post
+        endSession(attachAgain = false)
+        val mine = flow
+        request(RelayCalls.existingAttach(conversation)) { result ->
+            if (mine != flow || namespace() != route.namespace || !isReady()) return@request
+            val binding =
+                ((result as? RelayCallResult.Outcome)?.outcome as? RelayOutcome.Success)?.value
+            if (binding?.conversationId == conversation &&
+                binding.canContinue
+            ) {
+                existingInboxBinding = binding
+            }
+            publish()
+        }
+    }
+
+    /** The registered CURRENT getter is the sole source of an eligible one-shot input token. */
+    fun getInboxInput(handle: String, done: (InboxInput?) -> Unit) = post {
+        inboxInput = null
+        val inputGeneration = inputEpoch.incrementAndGet()
+        val route = try {
+            localInboxRoute(handle)
+        } catch (_: InboxFailure) {
+            null
+        }
+        if (route == null || inboxOnly || !isReady() || namespace() != route.namespace ||
+            route.canonicalConversation == null
+        ) {
+            done(null)
+            return@post
+        }
+        val mine = flow
+        val observer = inboxEpoch.get()
+        val writer = writerEpoch()
+        fun permit() = observer == inboxEpoch.get() && writer == writerEpoch() &&
+            inputGeneration == inputEpoch.get()
+        fun accept(prompt: Prompt?) {
+            if (!permit() || mine != flow || !isReady() || namespace() != route.namespace ||
+                localInboxRoute(handle) == null || prompt?.asActionable() == null ||
+                (
+                    prompt.expiresAtMs != null &&
+                        prompt.expiresAtMs <= (now()?.serverMs ?: Long.MAX_VALUE)
+                    )
+            ) {
+                done(null)
+                return
+            }
+            val bound = if (route.existing) {
+                existingInboxBinding?.takeIf {
+                    it.conversationId.value == route.conversation && it.canContinue
+                }?.ref
+            } else {
+                token?.takeIf {
+                    it.conversationId.value == route.conversation &&
+                        runtime?.authority?.isCurrent(it) == true
+                }?.ref
+            }
+            val marker: Any? = if (route.existing) existingInboxBinding else token
+            val issued =
+                InboxInput(
+                    prompt, handle, route.namespace, serial, mine, writerEpoch(),
+                    observer, inputGeneration, bound,
+                    marker, bound != null && supports(RelayMethod.PROMPT_RESPOND)
+                )
+            inboxInput = issued
+            done(issued)
+        }
+        if (route.existing) {
+            val binding = existingInboxBinding?.takeIf {
+                it.conversationId.value ==
+                    route.conversation &&
+                    it.canContinue
+            }
+            if (binding == null ||
+                !supports(RelayMethod.EXISTING_PROMPT_GET)
+            ) {
+                done(null)
+                return@post
+            }
+            request(RelayCalls.existingPrompt(binding.bindingId), permit = ::permit) { result ->
+                val value =
+                    ((result as? RelayCallResult.Outcome)?.outcome as? RelayOutcome.Success)?.value
+                accept(value?.prompt)
+            }
+        } else {
+            val task = route.relayTask
+            if (task == null || !supports(RelayMethod.TASK_GET)) {
+                done(null)
+                return@post
+            }
+            request(RelayCalls.task(task.taskId), permit = ::permit) { result ->
+                val value =
+                    ((result as? RelayCallResult.Outcome)?.outcome as? RelayOutcome.Success)?.value
+                if (value?.taskId != task.taskId || value.conversationId != task.conversationId ||
+                    value.admissionId != task.admissionId ||
+                    value.state != TaskState.NEEDS_INPUT
+                ) {
+                    done(null)
+                } else {
+                    accept(value.prompt)
+                }
+            }
+        }
+    }
+
+    /**
+     * No stored callback, list, O5 copy or notification can be supplied as this token. No
+     * automatic answer retry.
+     */
+    fun answerInboxInput(issued: InboxInput, answer: PromptAnswer, done: (Boolean) -> Unit) = post {
+        val marker: Any? = if (existingInboxBinding != null) existingInboxBinding else token
+        if (inboxInput !== issued || !issued.canAnswer || issued.serial != serial ||
+            issued.flow != flow ||
+            issued.writer != writerEpoch() || issued.observer != inboxEpoch.get() ||
+            issued.inputGeneration != inputEpoch.get() || issued.owner != namespace() ||
+            issued.boundToken !== marker ||
+            !isReady() || inboxOnly || localInboxRoute(issued.route) == null ||
+            (
+                issued.prompt.expiresAtMs != null &&
+                    issued.prompt.expiresAtMs <= (now()?.serverMs ?: Long.MAX_VALUE)
+                )
+        ) {
+            done(false)
+            return@post
+        }
+        val actionable = issued.prompt.asActionable() ?: run {
+            done(false)
+            return@post
+        }
+        val at = now() ?: run {
+            done(false)
+            return@post
+        }
+        val id =
+            (RequestIds.mint(at, entropy) as? MintResult.Minted)?.id
+                ?: run {
+                    done(false)
+                    return@post
+                }
+        val call = try {
+            RelayCalls.respond(requireNotNull(issued.binding), actionable, answer, id)
+        } catch (
+            _: IllegalArgumentException
+        ) {
+            done(false)
+            return@post
+        }
+        if (!tryCommit(requireNotNull(runtime))) {
+            done(false)
+            return@post
+        }
+        inboxInput = null
+        request(call, permit = {
+            issued.writer == writerEpoch() &&
+                issued.observer == inboxEpoch.get() &&
+                issued.inputGeneration == inputEpoch.get()
+        }) { result ->
+            done((result as? RelayCallResult.Outcome)?.outcome is RelayOutcome.Success)
+        }
+    }
+
+    private var inboxOnly = false
+    private var inboxRun: InboxRun? = null
+
+    @Volatile var inboxStatus: String = "Retained / offline"
+        private set
+    private var inboxCompleted: (String) -> Unit = {}
+    fun observeInboxOnly(on: Boolean, done: (String) -> Unit = {}) = post {
+        inboxCompleted = done
+        if (inboxOnly != on) {
+            endSession(attachAgain = false)
+            inboxOnly = on
+        }
+    }
+    fun refreshInbox(done: (String) -> Unit = {}) = post {
+        inboxCompleted = done
+        if (inboxRun != null || !isReady()) {
+            done(inboxStatus)
+            return@post
+        }
+        startInbox()
+    }
+    private var inboxTargetKey: String? = null
+    private var inboxTargetLabel = "Relay profile"
+    private var inboxTargetBox = "Relay box"
+    fun inboxTarget(key: String, label: String, box: String) = post {
+        if (key.length !in 1..512 || label.length > 512 || box.length > 512) return@post
+        inboxTargetKey = key
+        inboxTargetLabel = label
+        inboxTargetBox = box
+    }
+    fun configureInbox(profile: InboxProfile) {
+        inboxEpoch.incrementAndGet() // synchronous final-SEND fence, before serialized settings IO
+        post {
+            withdrawInboxObserver()
+            if (baseSection().enrollments.none {
+                    HistoryNamespace.from(it) == profile.namespace
+                }
+            ) {
+                return@post
+            }
+            try {
+                inbox?.configure(profile)
+                inboxStatus = "Retained / offline"
+            } catch (
+                _: InboxFailure
+            ) {
+                inboxStatus = "Inbox storage unavailable"
+            }
+            publish()
+        }
+    }
+    private fun withdrawInboxObserver() {
+        inboxRun = null
+        runtime =
+            runtime?.let { rt -> rt.copy(deliveries = rt.deliveries.map { it.withdrawOutbox() }) }
+    }
+    fun inboxRetention(days: Int) {
+        inboxEpoch.incrementAndGet()
+        post {
+            withdrawInboxObserver()
+            try {
+                inbox?.retention(days)
+                publish()
+            } catch (
+                _: InboxFailure
+            ) {
+                inboxStatus = "Inbox storage unavailable"
+            }
+        }
+    }
+
+    /**
+     * Reviewed durable targets only; JobScheduler configuration never borrows a prepared
+     * identity.
+     */
+    fun inboxBackgroundTargetsBlocking(): Set<HistoryNamespace> {
+        val latch = CountDownLatch(1)
+        var result = emptySet<HistoryNamespace>()
+        post {
+            if (stored is Stored.NotLoaded) load()
+            if (stored !is Stored.Problem) {
+                result = baseSection().enrollments.filter {
+                    it.enabled && it.standing == Standing.ACTIVE
+                }.mapNotNull(HistoryNamespace::from).filterNot {
+                    removalOwed(it, null, wholeScopeOnly = true)
+                }.toSet()
+            }
+            latch.countDown()
+        }
+        return if (latch.await(5, TimeUnit.SECONDS)) result else emptySet()
+    }
+    fun nextInboxRoundRobinBlocking(): Int? {
+        val latch = CountDownLatch(1)
+        var result: Int? = null
+        post {
+            try {
+                result = inbox?.nextRoundRobin()
+            } catch (_: InboxFailure) { }
+            latch.countDown()
+        }
+        return if (latch.await(5, TimeUnit.SECONDS)) result else null
+    }
+    fun inboxBackground(on: Boolean) = post {
+        try {
+            inbox?.background(on)
+        } catch (_: InboxFailure) {
+            inboxStatus =
+                "Inbox storage unavailable"
+        }
+    }
+
+    /** Called off main. Exact current removals also fence offline local routes. */
+    fun inboxBlocking(timeoutMs: Long = 5000): InboxSnapshot? {
+        val latch = CountDownLatch(1)
+        var result: InboxSnapshot? = null
+        post {
+            try {
+                if (stored is Stored.NotLoaded) load()
+                if (stored is Stored.Problem) return@post latch.countDown()
+                val repository = inbox
+                val initial = repository?.snapshot()
+                val protected =
+                    runtime?.deliveries?.flatMap { it.acknowledgementsOwed.map { it.value } }
+                        ?: (stored as? Stored.Doc)?.document?.snapshot?.deliveries?.flatMap {
+                            it.pendingAcks
+                        }
+                        ?: emptyList()
+                for (p in initial?.profiles ?: emptyList()) {
+                    repository?.sweep(
+                        p.namespace,
+                        localMillis(),
+                        protected
+                    )
+                }
+                result = filteredInbox(repository?.peek())
+            } catch (_: InboxFailure) {
+                inboxStatus = "Inbox storage unavailable"
+            }
+            latch.countDown()
+        }
+        return if (latch.await(timeoutMs, TimeUnit.MILLISECONDS)) result else null
+    }
+
+    private fun filteredInbox(s: InboxSnapshot?): InboxSnapshot? = s?.takeIf {
+        stored !is Stored.Problem &&
+            stored !is Stored.NotLoaded
+    }?.let { s ->
+        s.copy(
+            copies = s.copies.filter { c ->
+                s.profiles.any {
+                    baseSection().enrollments.any { r ->
+                        HistoryNamespace.from(r) ==
+                            it.namespace &&
+                            r.enabled && r.standing == Standing.ACTIVE
+                    } && it.namespace == c.namespace &&
+                        it.enabled &&
+                        (
+                            !c.existing ||
+                                it.existingTasks && it.existingAvailable &&
+                                s.unavailable.none { u ->
+                                    u.namespace == c.namespace &&
+                                        u.conversation == c.conversation &&
+                                        !u.history
+                                }
+                            )
+                } &&
+                    !removalOwed(c.namespace, c.conversation)
+            },
+            tasks = s.tasks.filter { t ->
+                s.profiles.any {
+                    baseSection().enrollments.any { r ->
+                        HistoryNamespace.from(r) ==
+                            it.namespace &&
+                            r.enabled && r.standing == Standing.ACTIVE
+                    } && it.namespace == t.namespace &&
+                        it.enabled &&
+                        (
+                            t.existing == null ||
+                                it.existingTasks && it.existingAvailable &&
+                                s.unavailable.none { u ->
+                                    u.namespace == t.namespace &&
+                                        u.conversation == t.conversation &&
+                                        !u.history
+                                }
+                            )
+                } &&
+                    !removalOwed(t.namespace, t.conversation)
+            },
+            histories = s.histories.filter { h ->
+                s.profiles.any {
+                    baseSection().enrollments.any { r ->
+                        HistoryNamespace.from(r) ==
+                            it.namespace &&
+                            r.enabled && r.standing == Standing.ACTIVE
+                    } && it.namespace == h.namespace &&
+                        it.enabled &&
+                        (
+                            !h.existing ||
+                                it.existingHistory && it.existingHistoryAvailable &&
+                                s.unavailable.none { u ->
+                                    u.namespace == h.namespace &&
+                                        u.conversation == h.conversation &&
+                                        u.history
+                                }
+                            )
+                } &&
+                    !removalOwed(h.namespace, h.conversation)
+            }
+        )
     }
 
     private var identity: EnrollmentIdentity? = null
@@ -186,14 +626,22 @@ class RelayController(
     /** Bumped by everything that invalidates in-flight callbacks: socket change, session end, hide, profile review. */
     private var serial = 0L
         set(value) {
+            inputEpoch.incrementAndGet()
+            inboxEpoch.incrementAndGet()
+            withdrawInboxObserver()
             discardDeferredEvents()
+            inboxInput = null
+            existingInboxBinding = null
             field = value
         }
 
     /** Bumped by every attach flow and every selection change. */
     private var flow = 0L
         set(value) {
+            inputEpoch.incrementAndGet()
             discardDeferredEvents()
+            inboxInput = null
+            existingInboxBinding = null
             field = value
         }
     private var token: BindingToken? = null
@@ -287,7 +735,18 @@ class RelayController(
     // -- public API (thread-safe) ------------------------------------------------------------------------------
 
     fun prepare(identity: EnrollmentIdentity, foregroundSession: Long = 0) = post {
+        if (foregroundSession > 0 && this.foregroundSession > foregroundSession) return@post
+        //  An ordinary actor/identity handover is not process loss. Keep applied unsaved evidence
+        // and fences.
+        if (this.identity != null && this.identity != identity &&
+            (unsaved || undurableDeletion != null)
+        ) {
+            notice = RelayNotice.OBSERVATION_UNSAVED
+            return@post publish()
+        }
+        admittedWriter = writerEpoch()
         if (this.foregroundSession != foregroundSession) {
+            selectionReservation = null
             endSession(attachAgain = false)
             this.foregroundSession = foregroundSession
         }
@@ -313,6 +772,37 @@ class RelayController(
         if (stored is Stored.NotLoaded) load()
         loadRetained()
         publish()
+    }
+
+    fun inboxAdmissionBlocking(owner: HistoryNamespace): Boolean {
+        val latch = CountDownLatch(1)
+        var valid = false
+        post {
+            valid =
+                namespace() == owner &&
+                record()?.let { it.enabled && it.standing == Standing.ACTIVE } == true &&
+                !removalOwed(owner, null, wholeScopeOnly = true)
+            latch.countDown()
+        }
+        return latch.await(5, TimeUnit.SECONDS) && valid
+    }
+
+    /**
+     * Barrier for an actor handover: a refused prepare cannot lend the prior identity's enabled
+     * setting.
+     */
+    fun preparedBlocking(
+        expected: EnrollmentIdentity,
+        session: Long,
+        timeoutMs: Long = 5000
+    ): Boolean {
+        val latch = CountDownLatch(1)
+        var accepted = false
+        post {
+            accepted = identity == expected && foregroundSession == session
+            latch.countDown()
+        }
+        return latch.await(timeoutMs, TimeUnit.MILLISECONDS) && accepted
     }
 
     /** Blocks the CALLER (never the controller thread): true when Relay is enabled and usable for the prepared profile. */
@@ -372,6 +862,7 @@ class RelayController(
 
     /** The connection just built (or closed: null) for the prepared profile. */
     fun attachTransport(transport: RelayTransport?) = post {
+        admittedWriter = writerEpoch()
         if (this.transport === transport) return@post
         endSession(attachAgain = false)
         this.transport = transport
@@ -452,7 +943,8 @@ class RelayController(
     }
 
     /** The screen is hidden or replaced: transient work stops; the stored state stays; nothing re-attaches by itself. */
-    fun hide() = post {
+    fun hide(expectedSession: Long? = null) = post {
+        if (expectedSession != null && foregroundSession != expectedSession) return@post
         endSession(attachAgain = false)
         transport = null
         channel = RelayChannelState.Closed
@@ -924,7 +1416,28 @@ class RelayController(
 
     // -- scheduling ----------------------------------------------------------------------------------------------
 
-    private fun post(task: () -> Unit) = scheduler.post(Runnable { task() })
+    private fun post(task: () -> Unit) {
+        val epoch = writerEpoch()
+        scheduler.post(
+            Runnable {
+                if (epoch == writerEpoch()) {
+                    try {
+                        task()
+                    } catch (_: InboxFailure) {
+                        inboxEpoch.incrementAndGet()
+                        val active = inboxRun
+                        if (active != null) {
+                            active.finish("Inbox storage unavailable")
+                        } else {
+                            withdrawInboxObserver()
+                            inboxStatus = "Inbox storage unavailable"
+                            publish()
+                        }
+                    }
+                }
+            }
+        )
+    }
 
     private fun later(delayMs: Long, task: () -> Unit): Cancelable {
         val expected = serial
@@ -1051,12 +1564,20 @@ class RelayController(
             is DocumentBuild.Built -> built.document
             is DocumentBuild.TooMany -> {
                 notice = RelayNotice.STORAGE_FULL_PENDING_ITEMS
-                if (observed && (token != null || attaching)) endSession(attachAgain = false)
+                if (observed &&
+                    (token != null || attaching || inboxRun != null)
+                ) {
+                    endSession(attachAgain = false)
+                }
                 return false
             }
             is DocumentBuild.Unrestorable -> {
                 notice = RelayNotice.STORAGE_WRITE_FAILED
-                if (observed && (token != null || attaching)) endSession(attachAgain = false)
+                if (observed &&
+                    (token != null || attaching || inboxRun != null)
+                ) {
+                    endSession(attachAgain = false)
+                }
                 return false
             }
         }
@@ -1065,7 +1586,7 @@ class RelayController(
             noticeFor(result)
             // A deterministic representation refusal cannot leave an active observer with no storable aggregate.
             if (observed && result is StoreCommit.Refused &&
-                (token != null || attaching)
+                (token != null || attaching || inboxRun != null)
             ) {
                 endSession(attachAgain = false)
             }
@@ -1147,6 +1668,10 @@ class RelayController(
      */
     private fun endSession(attachAgain: Boolean) {
         transport?.invalidatePending()
+        inboxRun = null
+        runtime =
+            runtime?.let { rt -> rt.copy(deliveries = rt.deliveries.map { it.withdrawOutbox() }) }
+        inboxStatus = "Retained / offline"
         serial++
         flow++
         pollTimer?.cancel()
@@ -1209,6 +1734,7 @@ class RelayController(
         if (!record.enabled) return
         val offered = state.info.profileId
         var rt = requireNotNull(runtime)
+        if (inboxOnly && record.pinnedProfileId == null) return
         // The pin: first use after the user's explicit enable; every later negotiation must match it.
         if (record.pinnedProfileId == null) {
             record = record.copy(pinnedProfileId = offered, observedProfileId = null)
@@ -1252,6 +1778,34 @@ class RelayController(
             }
             advance(rt.copy(section = withRecord(record.copy(standing = standing))))
             if (standing == Standing.STOPPED) evictOwed()
+            return
+        }
+        if (inbox != null && !inboxOnly && inboxTargetKey != null) {
+            val n = namespace()
+            if (n != null) {
+                try {
+                    val old = inbox.snapshot().profiles.firstOrNull { it.namespace == n }
+                    inbox.configure(
+                        old?.copy(
+                            key = requireNotNull(inboxTargetKey),
+                            label = inboxTargetLabel,
+                            box = inboxTargetBox
+                        )
+                            ?: InboxProfile(
+                                n,
+                                requireNotNull(inboxTargetKey),
+                                inboxTargetLabel,
+                                inboxTargetBox
+                            )
+                    )
+                } catch (_: InboxFailure) {
+                    inboxStatus = "Inbox storage unavailable"
+                }
+            }
+        }
+        if (inboxOnly) {
+            if (record.pinnedProfileId != offered) return
+            startInbox()
             return
         }
         if (REQUIRED.any { !state.info.advertises(it) }) {
@@ -1331,22 +1885,689 @@ class RelayController(
         }
     }
 
+    private fun startInbox() {
+        val repository = inbox ?: return
+        if (!isReady() || inboxRun != null) return
+        val owner = namespace() ?: return
+        val scope = scope() ?: return
+        val at = now() ?: return
+        if (info?.profileId?.value != owner.profileId ||
+            at.serverMs >= (info?.expiresAtMs ?: 0)
+        ) {
+            return
+        }
+        try {
+            val profile = repository.snapshot().profiles.firstOrNull { it.namespace == owner }
+            if (profile == null) {
+                repository.configure(
+                    InboxProfile(
+                        owner,
+                        owner.endpointKey,
+                        "Relay profile",
+                        "Relay box"
+                    )
+                )
+            }
+            if (profile?.enabled == false) return
+            if (unsaved) {
+                if (!tryCommit(requireNotNull(runtime))) return
+                unsaved = false
+            }
+            val rt = requireNotNull(runtime)
+            runtime =
+                rt.withDelivery(
+                    (rt.delivery(scope) ?: EnrollmentDelivery.begin(scope)).withdrawOutbox()
+                )
+            InboxRun(owner, scope, serial).also {
+                inboxRun = it
+                it.begin()
+            }
+        } catch (_: InboxFailure) {
+            inboxStatus = "Inbox storage unavailable"
+        }
+    }
+
+    /**
+     * One bounded read-only observer. All callbacks, cache IO and full aggregate writes share
+     * this controller thread.
+     */
+    private inner class InboxRun(
+        val owner: HistoryNamespace,
+        val enrollment: EnrollmentScope,
+        val generation: Long
+    ) {
+        val writer = writerEpoch()
+        val observer = inboxEpoch.get()
+        fun permit(): Boolean = writer == writerEpoch() && observer == inboxEpoch.get()
+        val deadline = monotonicNanos() + 20_000_000_000L
+        var requests = 0
+        var pages = 0
+        val cursors = HashSet<String>()
+        val repository = requireNotNull(inbox)
+        fun current(): Boolean =
+            inboxRun === this && generation == serial && permit() && isReady() &&
+                namespace() == owner && info?.profileId?.value == owner.profileId &&
+                (now()?.serverMs ?: Long.MAX_VALUE) < (info?.expiresAtMs ?: 0)
+        fun finish(status: String) {
+            if (inboxRun !== this) return
+            runtime = runtime?.let { rt ->
+                rt.delivery(enrollment)?.let {
+                    rt.withDelivery(it.withdrawOutbox())
+                } ?: rt
+            }
+            inboxRun = null
+            inboxStatus = status
+            publish()
+            inboxCompleted(status)
+        }
+        fun budget(): Boolean {
+            if (!current()) return false
+            if (++requests > 64 || monotonicNanos() >= deadline) {
+                finish("Partial / refresh budget reached")
+                return false
+            }
+            return true
+        }
+        fun delivery(): EnrollmentDelivery = requireNotNull(runtime?.delivery(enrollment))
+        fun transient(d: EnrollmentDelivery) {
+            runtime = requireNotNull(runtime).withDelivery(d)
+        }
+        fun commit(d: EnrollmentDelivery): Boolean {
+            advance(requireNotNull(runtime).withDelivery(d))
+            publish()
+            return current() && !unsaved
+        }
+        fun <T : Any> read(call: RelayCall<T>, target: String? = null, done: (T) -> Unit) {
+            if (!budget()) return
+            request(call, permit = ::permit) { result ->
+                if (!current()) return@request
+                val outcome = (result as? RelayCallResult.Outcome)?.outcome
+                if (outcome is RelayOutcome.Success) {
+                    try {
+                        done(outcome.value)
+                    } catch (
+                        _: InboxFailure
+                    ) {
+                        finish("Inbox storage unavailable")
+                    }
+                } else {
+                    val error = (outcome as? RelayOutcome.Failed)?.error
+                    if (call.method in
+                        setOf(
+                            RelayMethod.EXISTING_LIST,
+                            RelayMethod.EXISTING_TASKS_LIST,
+                            RelayMethod.EXISTING_HISTORY_PAGE
+                        )
+                    ) {
+                        if (target != null &&
+                            error?.code in
+                            setOf(RelayErrorCode.NOT_FOUND, RelayErrorCode.PERMISSION_DENIED)
+                        ) {
+                            repository.sourceUnavailable(
+                                owner,
+                                target,
+                                call.method == RelayMethod.EXISTING_HISTORY_PAGE,
+                                true
+                            )
+                        } else if (target == null &&
+                            error?.code == RelayErrorCode.PERMISSION_DENIED
+                        ) {
+                            val p = repository.snapshot().profiles.single { it.namespace == owner }
+                            repository.configure(
+                                p.copy(existingAvailable = false, existingHistoryAvailable = false)
+                            )
+                        }
+                        if (error?.action != RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW) {
+                            finish("Partial / existing source unavailable")
+                            return@request
+                        }
+                    }
+                    when (error?.action) {
+                        RelayErrorAction.STOP_AND_EVICT_SCOPE -> stopScope()
+                        RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW -> requireReview()
+                        else -> Unit
+                    }
+                    finish("Partial / source unavailable")
+                }
+            }
+        }
+        var refreshBeforeAck = false
+        fun begin() {
+            inboxStatus = "Refreshing"
+            val profile = repository.snapshot().profiles.single { it.namespace == owner }
+            val available = profile.existingTasks && supports(RelayMethod.EXISTING_TASKS_LIST)
+            val historyAvailable = profile.existingHistory && supports(RelayMethod.EXISTING_LIST) &&
+                supports(RelayMethod.EXISTING_HISTORY_PAGE)
+            if (available != profile.existingAvailable ||
+                historyAvailable != profile.existingHistoryAvailable
+            ) {
+                repository.configure(
+                    profile.copy(
+                        existingAvailable = available,
+                        existingHistoryAvailable = historyAvailable
+                    )
+                )
+            }
+            repository.sweep(owner, localMillis(), delivery().acknowledgementsOwed.map { it.value })
+            val snapshot = repository.snapshot()
+            val expired = snapshot.copies.filter {
+                it.namespace == owner &&
+                    it.item.deliveryId in delivery().acknowledgementsOwed &&
+                    it.item.expiresAtMs <= requireNotNull(now()).serverMs
+            }.map { it.item.deliveryId }.toSet()
+            if (expired.isNotEmpty() &&
+                (
+                    !repository.confirmCopies(owner, expired.map { it.value }) ||
+                        !adopt(
+                            requireNotNull(
+                                runtime
+                            ).withDelivery(delivery().retireAcknowledgements(expired))
+                        )
+                    )
+            ) {
+                finish("Partial / expiry unsaved")
+                return
+            }
+            if (snapshot.unavailable.any { it.namespace == owner }) {
+                refreshBeforeAck = true
+                tasks()
+            } else {
+                ack { outbox() }
+            }
+        }
+        fun ack(next: () -> Unit) {
+            if (!current()) return
+            if (delivery().acknowledgementsOwed.isEmpty()) {
+                next()
+                return
+            }
+            if (!supports(RelayMethod.OUTBOX_ACK)) {
+                finish("Partial / acknowledgement unavailable")
+                return
+            }
+            val retained = repository.snapshot().copies.filter { it.namespace == owner }
+            val at = requireNotNull(now()).serverMs
+            val expired = retained.filter {
+                it.item.expiresAtMs <= at &&
+                    it.item.deliveryId in delivery().acknowledgementsOwed
+            }.map { it.item.deliveryId }.toSet()
+            if (expired.isNotEmpty()) {
+                if (!repository.confirmCopies(owner, expired.map { it.value }) ||
+                    !adopt(
+                        requireNotNull(
+                            runtime
+                        ).withDelivery(delivery().retireAcknowledgements(expired))
+                    )
+                ) {
+                    finish("Partial / expiry unsaved")
+                    return
+                }
+                if (delivery().acknowledgementsOwed.isEmpty()) {
+                    next()
+                    return
+                }
+            }
+            val plan = delivery().planAck(requireNotNull(transport).correlation())
+            val planned =
+                (plan.result as? OutboxPlanOutcome.Planned)?.plan
+                    ?: run {
+                        finish("Partial / acknowledgement pending")
+                        return
+                    }
+            val confirmation = repository.snapshot()
+            val profile = confirmation.profiles.single { it.namespace == owner }
+            val bodies = confirmation.copies.filter { it.namespace == owner }
+            if (planned.ref.ids.any { id ->
+                    bodies.none {
+                        it.item.deliveryId == id &&
+                            !removalOwed(owner, it.conversation) &&
+                            (
+                                !it.existing || profile.existingTasks &&
+                                    profile.existingAvailable &&
+                                    supports(RelayMethod.EXISTING_TASKS_LIST) &&
+                                    confirmation.unavailable.none { u ->
+                                        u.namespace == owner &&
+                                            u.conversation == it.conversation && !u.history
+                                    }
+                                )
+                    }
+                } ||
+                !repository.confirmCopies(owner, planned.ref.ids.map { it.value }) || unsaved
+            ) {
+                finish("Partial / payload copy required")
+                return
+            }
+            //  Confirm the complete aggregate again under THIS lease before the actual transport
+            // call.
+            if (!tryCommit(requireNotNull(runtime)) ||
+                !current()
+            ) {
+                finish("Partial / acknowledgement pending")
+                return
+            }
+            transient(plan.delivery)
+            if (!budget()) return
+            request(planned.call, planned.ref.correlation, ::permit) { result ->
+                if (!current()) return@request
+                val error =
+                    ((result as? RelayCallResult.Outcome)?.outcome as? RelayOutcome.Failed)?.error
+                if (error?.action == RelayErrorAction.STOP_AND_EVICT_SCOPE) {
+                    stopScope()
+                    finish("Access withdrawn")
+                    return@request
+                }
+                if (error?.action == RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW) {
+                    requireReview()
+                    finish("Profile review required")
+                    return@request
+                }
+                val step = (result as? RelayCallResult.Outcome)?.let {
+                    delivery().onAckReply(planned.ref, it.outcome)
+                } ?: delivery().onAckTimeout(planned.ref)
+                if (!commit(step.delivery)) {
+                    finish("Partial / acknowledgement pending")
+                    return@request
+                }
+                if (step.result is AckOutcome.Confirmed) {
+                    ack(next)
+                } else {
+                    finish("Partial / acknowledgement pending")
+                }
+            }
+        }
+        fun outbox() {
+            if (!supports(RelayMethod.OUTBOX_READ)) {
+                tasks()
+                return
+            }
+            if (++pages > 24 || !budget()) {
+                finish("Partial / page limit")
+                return
+            }
+            val plan = delivery().planOutboxRead(requireNotNull(transport).correlation(), 50)
+            val planned =
+                (plan.result as? OutboxPlanOutcome.Planned)?.plan
+                    ?: run {
+                        finish("Partial / outbox pending")
+                        return
+                    }
+            transient(plan.delivery)
+            request(planned.call, planned.ref.correlation, ::permit) { result ->
+                if (!current()) return@request
+                val outcome = (result as? RelayCallResult.Outcome)?.outcome
+                if (outcome == null) {
+                    finish("Partial / outbox unavailable")
+                    return@request
+                }
+                val authorityError = (outcome as? RelayOutcome.Failed)?.error
+                if (authorityError?.action == RelayErrorAction.STOP_AND_EVICT_SCOPE) {
+                    stopScope()
+                    finish("Access withdrawn")
+                    return@request
+                }
+                if (authorityError?.action == RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW) {
+                    requireReview()
+                    finish("Profile review required")
+                    return@request
+                }
+                fun stage(): Boolean {
+                    val staged = delivery().stageOutbox(planned.ref, outcome)
+                    transient(staged.delivery)
+                    when (val value = staged.result) {
+                        is OutboxStageOutcome.Backpressure -> return false
+                        is OutboxStageOutcome.Staged -> {
+                            val batch = value.batch
+                            val all = batch.items + batch.duplicates
+                            if (all.any {
+                                    removalOwed(
+                                        owner,
+                                        when (it) {
+                                            is OutboxItem.Change -> it.conversationId.value
+                                            is OutboxItem.Final -> it.conversationRef.value
+                                        }
+                                    )
+                                }
+                            ) {
+                                finish("Content removal pending")
+                                return true
+                            }
+                            val accepted = try {
+                                repository.accept(
+                                    owner,
+                                    all,
+                                    localMillis(),
+                                    requireNotNull(now()).serverMs
+                                )
+                            } catch (
+                                _: InboxFailure
+                            ) {
+                                finish("Inbox storage unavailable")
+                                return true
+                            }
+                            if (!current()) return true
+                            val committed = delivery().commitOutbox(
+                                batch.batchId,
+                                requireNotNull(now())
+                            )
+                            if (committed.result !is OutboxCommit.Committed ||
+                                !commit(committed.delivery)
+                            ) {
+                                finish("Partial / delivery unsaved")
+                                return true
+                            }
+                            runCatching { inboxAlerts(accepted.filter { it.alert }) }
+                            ack { if (all.size == 50) outbox() else tasks() }
+                            return true
+                        }
+                        else -> {
+                            finish("Partial / outbox unavailable")
+                            return true
+                        }
+                    }
+                }
+                if (!stage() && current()) {
+                    //  The held immutable answer belongs only to this serial lifetime. No new read
+                    // or no-op commit.
+                    val pruned = delivery().retireOlderThan(
+                        requireNotNull(now()).serverMs - 7 * 86_400_000L
+                    )
+                    if (pruned.result > 0 &&
+                        adopt(requireNotNull(runtime).withDelivery(pruned.delivery))
+                    ) {
+                        if (!stage()) finish("Partial / outbox capacity")
+                    } else {
+                        finish("Partial / outbox capacity")
+                    }
+                }
+            }
+        }
+        fun tasks(cursor: String? = null) {
+            if (!supports(RelayMethod.TASKS_LIST)) {
+                incomplete = true
+                conversations()
+                return
+            }
+            if (cursor == null) {
+                pages = 0
+                cursors.clear()
+            }
+            if (++pages > 24 || (cursor != null && !cursors.add(cursor))) {
+                finish("Partial / task listing incomplete")
+                return
+            }
+            read(RelayCalls.tasks(cursor, 50)) { page ->
+                if (page.items.any { removalOwed(owner, it.conversationId.value) }) {
+                    finish("Content removal pending")
+                    return@read
+                }
+                repository.project(owner, relay = page.items, at = localMillis())
+                if (page.nextCursor != null) {
+                    tasks(page.nextCursor)
+                } else {
+                    conversations()
+                }
+            }
+        }
+        val relayConversations =
+            ArrayList<ConversationSummary>()
+        val existingConversations = ArrayList<ConversationId>()
+        var incomplete = false
+        fun chain(cursor: String?): Boolean {
+            if (cursor == null) {
+                pages = 0
+                cursors.clear()
+            }
+            if (++pages > 24 || (cursor != null && !cursors.add(cursor))) {
+                finish("Partial / listing incomplete")
+                return false
+            }
+            return true
+        }
+        fun conversations(cursor: String? = null) {
+            if (!supports(RelayMethod.CONVERSATIONS_LIST) || !chain(cursor)) {
+                finish("Partial / conversations unavailable")
+                return
+            }
+            read(RelayCalls.conversations(cursor, 50)) { page ->
+                if ((page.unavailableCount ?: 0) > 0) incomplete = true
+                if (relayConversations.size + page.items.size > 64) {
+                    finish("Partial / conversation capacity")
+                    return@read
+                }
+                relayConversations.addAll(page.items)
+                if (page.nextCursor != null) {
+                    conversations(page.nextCursor)
+                } else {
+                    relayHistory(0)
+                }
+            }
+        }
+        fun relayHistory(index: Int) {
+            val c = relayConversations.getOrNull(index)
+            if (c == null) {
+                existingList()
+                return
+            }
+            if (!supports(RelayMethod.HISTORY_PAGE)) {
+                finish("Partial / history unavailable")
+                return
+            }
+            history(c.conversationId, false) { relayHistory(index + 1) }
+        }
+        fun history(id: ConversationId, existing: Boolean, then: () -> Unit) {
+            if (removalOwed(owner, id.value)) {
+                finish("Content removal pending")
+                return
+            }
+            val scope = HistoryScope(
+                ConversationScope(enrollment, id),
+                if (existing) {
+                    HistorySource.EXISTING
+                } else {
+                    HistorySource.RELAY
+                }
+            )
+            var assembly = HistoryAssembly.begin(scope)
+            var count = 0
+            fun page() {
+                if (++count > 24) {
+                    finish("Partial / history page limit")
+                    return
+                }
+                val planned = assembly.planPage(50)
+                val plan = (planned.result as? HistoryPlanOutcome.Planned)?.plan
+                    ?: run {
+                        finish("Partial / history capacity")
+                        return
+                    }
+                assembly = planned.assembly
+                read(plan.call, if (existing) id.value else null) { value ->
+                    val accepted = assembly.accept(plan.request, value)
+                    assembly = accepted.assembly
+                    val result = accepted.result as? PageOutcome.Accepted
+                        ?: run {
+                            finish("Partial / history incomplete")
+                            return@read
+                        }
+                    if (result.listingComplete) {
+                        if (result.refusedInListing !=
+                            0
+                        ) {
+                            finish("Partial / history too large")
+                            return@read
+                        }
+                        repository.history(
+                            owner,
+                            id.value,
+                            existing,
+                            assembly.stagedMessages.map {
+                                RetainedMessage(
+                                    it.messageId.value,
+                                    if (it.role ==
+                                        HistoryRole.USER
+                                    ) {
+                                        RetainedRole.USER
+                                    } else {
+                                        RetainedRole.ASSISTANT
+                                    },
+                                    it.text,
+                                    it.createdAtMs
+                                )
+                            },
+                            localMillis()
+                        )
+                        if (existing) repository.sourceUnavailable(owner, id.value, true, false)
+                        then()
+                    } else {
+                        page()
+                    }
+                }
+            }
+            page()
+        }
+        fun existingList(cursor: String? = null) {
+            val p = repository.snapshot().profiles.single { it.namespace == owner }
+            if (!p.existingTasks && !p.existingHistory) {
+                complete()
+                return
+            }
+            if (cursor == null) {
+                val snapshot = repository.snapshot()
+                val known =
+                    snapshot.copies.filter {
+                        it.namespace == owner && it.existing
+                    }.mapNotNull { it.canonicalConversation } +
+                        snapshot.tasks.filter {
+                            it.namespace == owner && it.existing != null
+                        }.map { it.conversation }
+                for (id in known.distinct()) {
+                    if (existingConversations.size >=
+                        64
+                    ) {
+                        finish("Partial / existing source capacity")
+                        return
+                    }
+                    existingConversations.add(requireNotNull(ConversationId.of(id)))
+                }
+            }
+            // Existing task-purpose access is independent of the history/list grant.
+            if (!p.existingHistory) {
+                existing(0)
+                return
+            }
+            if (!supports(RelayMethod.EXISTING_LIST) || !chain(cursor)) {
+                finish("Partial / existing source unavailable")
+                return
+            }
+            read(RelayCalls.existingList(cursor, 50)) { page ->
+                if (existingConversations.size + page.items.size > 64) {
+                    finish("Partial / existing conversation capacity")
+                    return@read
+                }
+                for (item in page.items) {
+                    if (item.conversationId !in existingConversations) {
+                        existingConversations.add(item.conversationId)
+                    }
+                }
+                if (page.nextCursor != null) existingList(page.nextCursor) else existing(0)
+            }
+        }
+        fun existing(index: Int) {
+            val c = existingConversations.getOrNull(index) ?: run {
+                complete()
+                return
+            }
+            val p = repository.snapshot().profiles.single { it.namespace == owner }
+            fun afterTasks() {
+                if (p.existingHistory) {
+                    if (!supports(RelayMethod.EXISTING_HISTORY_PAGE)) {
+                        finish("Partial / existing history unavailable")
+                        return
+                    }
+                    history(c, true) { existing(index + 1) }
+                } else {
+                    existing(index + 1)
+                }
+            }
+            if (!p.existingTasks) {
+                afterTasks()
+                return
+            }
+            if (!supports(RelayMethod.EXISTING_TASKS_LIST)) {
+                finish("Partial / existing tasks unavailable")
+                return
+            }
+            fun taskPage(cursor: String? = null) {
+                if (!chain(cursor)) return
+                read(RelayCalls.existingTasks(c, cursor, 50), c.value) { page ->
+                    if (page.items.any { it.conversationId != c }) {
+                        finish("Partial / existing scope mismatch")
+                        return@read
+                    }
+                    repository.sourceUnavailable(owner, c.value, false, false)
+                    repository.project(owner, existing = page.items, at = localMillis())
+                    if (page.nextCursor != null) taskPage(page.nextCursor) else afterTasks()
+                }
+            }
+            taskPage()
+        }
+        fun complete() {
+            if (!current()) return
+            if (repository.snapshot().unavailable.any { it.namespace == owner }) incomplete = true
+            if (refreshBeforeAck) {
+                refreshBeforeAck = false
+                if (incomplete) {
+                    finish("Partial / exact existing source unavailable")
+                    return
+                }
+                ack { outbox() }
+                return
+            }
+            if (!incomplete &&
+                !commit(
+                    delivery().refreshed(
+                        null,
+                        RefreshKind.entries.toSet()
+                    ).delivery
+                )
+            ) {
+                finish("Partial / refresh unsaved")
+                return
+            }
+            repository.synced(owner, localMillis())
+            repository.sweep(owner, localMillis(), delivery().acknowledgementsOwed.map { it.value })
+            finish(
+                if (incomplete ||
+                    delivery().refreshOwed.isNotEmpty()
+                ) {
+                    "Partial / refresh owed"
+                } else {
+                    "Current"
+                }
+            )
+        }
+    }
+
     // -- request plumbing --------------------------------------------------------------------------------------
 
     private fun <R : Any> request(
         call: RelayCall<R>,
         correlation: CorrelationId? = null,
+        permit: () -> Boolean = { true },
         done: (RelayCallResult<R>) -> Unit
     ) {
         val link = transport
-        if (link == null || channel !is RelayChannelState.Ready) {
+        if (link == null || channel !is RelayChannelState.Ready ||
+            admittedWriter != writerEpoch()
+        ) {
             done(RelayCallResult.Refused(RelayRefusal.NOT_READY))
             return
         }
         val expected = serial
+        val epoch = writerEpoch()
         val id = correlation ?: link.correlation()
-        link.call(id, call, timing.requestTimeoutMs) { result ->
-            post { if (expected == serial) done(result) }
+        link.callGuarded(id, call, timing.requestTimeoutMs, permit) { result ->
+            post { if (expected == serial && epoch == writerEpoch() && permit()) done(result) }
         }
     }
 
@@ -1491,7 +2712,11 @@ class RelayController(
                     }
                 } else {
                     retainedHistory?.evict(obligation.namespace, obligation.conversationId)
+                    inbox?.evict(obligation.namespace, obligation.conversationId)
                 }
+            } catch (_: InboxFailure) {
+                inboxStatus = "Content removal pending"
+                continue
             } catch (failure: HistoryFailure) {
                 retainedProblem = failure.problem
                 continue
@@ -2516,7 +3741,7 @@ class RelayController(
                             RetainedMessage(
                                 it.messageId.value,
                                 if (it.role ==
-                                    dev.quantumink.hermesgadget.protocol.relay.HistoryRole.USER
+                                    HistoryRole.USER
                                 ) {
                                     RetainedRole.USER
                                 } else {
@@ -3188,6 +4413,7 @@ class RelayController(
                 selectedId != null,
             micAvailable = false
         )
+        inboxUpdates(filteredInbox(inbox?.peek()), inboxStatus)
         listener(ui)
     }
 

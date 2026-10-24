@@ -94,14 +94,15 @@ class DirectConnection(
     private val now: () -> Long = { TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) },
     private val idleMillis: Long = 90000,
     relay: RelayOptIn? = null,
-    private val webSockets: WebSocket.Factory? = null
+    private val webSockets: WebSocket.Factory? = null,
+    dns: Dns = Dns.SYSTEM
 ) : AutoCloseable {
     private class Work(val block: () -> Unit, val rejected: () -> Unit) : Runnable {
         override fun run() = block()
     }
     private val ownsClient = httpClient == null
     private val client = (httpClient ?: OkHttpClient()).newBuilder()
-        .dns(EndpointDns(endpoint))
+        .dns(EndpointDns(endpoint, dns))
         .proxy(connectionProxy)
         .followRedirects(false)
         .followSslRedirects(false)
@@ -137,6 +138,16 @@ class DirectConnection(
                 timeoutMs: Long,
                 handler: (RelayCallResult<R>) -> Unit
             ) {
+                callGuarded(correlation, call, timeoutMs, { true }, handler)
+            }
+
+            override fun <R : Any> callGuarded(
+                correlation: CorrelationId,
+                call: RelayCall<R>,
+                timeoutMs: Long,
+                permit: () -> Boolean,
+                handler: (RelayCallResult<R>) -> Unit
+            ) {
                 val scope = relayScope.get()
                 submit(
                     {
@@ -147,11 +158,11 @@ class DirectConnection(
                             now(),
                             { text ->
                                 synchronized(relayScopeLock) {
-                                    scope == relayScope.get() &&
+                                    scope == relayScope.get() && permit() &&
                                         relaySend(text)
                                 }
                             },
-                            { scope == relayScope.get() },
+                            { scope == relayScope.get() && permit() },
                             handler
                         )
                     },

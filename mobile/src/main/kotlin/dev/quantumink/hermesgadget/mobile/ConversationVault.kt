@@ -22,6 +22,19 @@ class ConversationVault(
 ) {
     private val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
 
+    /**
+     * Off-main background lookup. A legacy record missing its known marker is refused unchanged.
+     */
+    @Synchronized internal fun lookup(endpoint: Endpoint): PhoneIdentityLookup {
+        SetupTransferGate.ensureRecovered()
+        if (!endpoint.isTls) return PhoneIdentityLookup.Refused
+        val id = MessageDigest.getInstance("SHA-256").digest(endpoint.url.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        return PhoneIdentityLookup.read(directory, id) {
+            store.getKey(alias, null) as? SecretKey ?: error("Existing phone key unavailable")
+        }
+    }
+
     @Synchronized fun identity(endpoint: Endpoint, create: Boolean = false): DeviceIdentity {
         require(endpoint.isTls) { "Phone conversations require TLS (wss)." }
         val id = MessageDigest.getInstance("SHA-256").digest(endpoint.url.toByteArray())

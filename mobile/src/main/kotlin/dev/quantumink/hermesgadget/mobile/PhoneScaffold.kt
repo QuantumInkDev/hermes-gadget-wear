@@ -27,7 +27,12 @@ internal fun PhoneScaffold(
 @Composable
 internal fun PhoneNavigationBar(destination: String, onNavigate: (String) -> Unit) {
     androidx.compose.material3.NavigationBar {
-        listOf("profiles" to "Profiles", "watch" to "Watch", "settings" to "Settings")
+        listOf(
+            "profiles" to "Profiles",
+            "inbox" to "Inbox",
+            "watch" to "Watch",
+            "settings" to "Settings"
+        )
             .forEach { (route, label) ->
                 NavigationBarItem(
                     selected = destination == route,

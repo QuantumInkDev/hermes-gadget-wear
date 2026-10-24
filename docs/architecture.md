@@ -442,3 +442,5 @@ keys or authorizes a connection. A bounded authenticated passphrase-encrypted ar
 transfers allowlisted configuration/art/actions/widget templates, with native import
 journaling and collision review. Device identity and launcher placement stay local.
 This is a planned boundary, not an implemented or activated capability.
+
+Task5 source candidate: CompanionApplication owns one PhoneInboxOwner/controller/serial aggregate runtime. Foreground and headless leases share pending state; atomic generations withdraw callbacks and paced SEND. A separate bounded encrypted display-only InboxSnapshot preserves exact O5 bodies before document4 ACK facts and holds no pending-action journal. JobService uses assigned network DNS+sockets after setup recovery and non-mutating phone identity lookup. MainActivity resolves authenticated opaque inbox handles to exact read-only targets; fresh input remains under the prepared controller. See `relay-phone-controller.md` for the complete format, capacity, failure and native-acceptance contract.

@@ -23,12 +23,14 @@ import dev.quantumink.hermesgadget.protocol.relay.ReceiptStatus
 import dev.quantumink.hermesgadget.protocol.relay.RelayCall
 import dev.quantumink.hermesgadget.protocol.relay.RelayCallResult
 import dev.quantumink.hermesgadget.protocol.relay.RelayChannelState
+import dev.quantumink.hermesgadget.protocol.relay.RelayEncoded
 import dev.quantumink.hermesgadget.protocol.relay.RelayEnvelope
 import dev.quantumink.hermesgadget.protocol.relay.RelayEvent
 import dev.quantumink.hermesgadget.protocol.relay.RelayMethod
 import dev.quantumink.hermesgadget.protocol.relay.RelayTransport
 import dev.quantumink.hermesgadget.protocol.relay.RelayVectors
 import dev.quantumink.hermesgadget.protocol.relay.RequestId
+import dev.quantumink.hermesgadget.protocol.relay.TaskPage
 import dev.quantumink.hermesgadget.protocol.relay.state.ClockFix
 import dev.quantumink.hermesgadget.protocol.relay.state.RequestIdEntropy
 import dev.quantumink.hermesgadget.protocol.relay.state.ServerClock
@@ -183,6 +185,7 @@ internal class ScriptedTransport(val log: MutableList<String>) : RelayTransport 
     override var generation = 1L
     private var counter = 0L
     val sent = ArrayList<Sent>()
+    var onSend: (Sent) -> Unit = {}
     var refreshes = 0
     var refreshHandler: ((RelayCallResult<Info>) -> Unit)? = null
 
@@ -218,6 +221,7 @@ internal class ScriptedTransport(val log: MutableList<String>) : RelayTransport 
                 }
             )
         )
+        onSend(sent.last())
     }
 
     override fun refreshInfo(handler: (RelayCallResult<Info>) -> Unit) {
@@ -279,7 +283,7 @@ internal class ScriptedTransport(val log: MutableList<String>) : RelayTransport 
     companion object {
         fun paramsOf(call: RelayCall<*>): JsonObject {
             val frame = RelayEnvelope.encodeRequest(CorrelationId.of("p")!!, call)
-            val text = (frame as dev.quantumink.hermesgadget.protocol.relay.RelayEncoded.Frame).text
+            val text = (frame as RelayEncoded.Frame).text
             return kotlinx.serialization.json.Json.parseToJsonElement(
                 text
             ).jsonObject["params"]!!.jsonObject
@@ -421,7 +425,11 @@ internal class ControllerFixture(
         "phone:hg-0011223344556677"
     ),
     val store: MemoryStore = MemoryStore(),
-    val timing: RelayTiming = RelayTiming()
+    val timing: RelayTiming = RelayTiming(),
+    val inbox: InboxRepository? = null,
+    val requestEntropy: RequestIdEntropy? = null,
+    val retainedHistory: RetainedHistory? = null,
+    val inboxAlerts: (List<InboxCopy>) -> Unit = {}
 ) {
     val log = ArrayList<String>().also { store.log = it }
     val scheduler = ManualScheduler()
@@ -436,12 +444,17 @@ internal class ControllerFixture(
         store,
         scheduler,
         nanos::get,
-        { bytes ->
-            Dto.scriptedEntropy.fill(bytes)
-            bytes[1] =
-                (entropySeed.getAndIncrement()).toByte()
-        },
-        timing
+        requestEntropy
+            ?: RequestIdEntropy { bytes ->
+                Dto.scriptedEntropy.fill(bytes)
+                bytes[1] =
+                    (entropySeed.getAndIncrement()).toByte()
+            },
+        timing,
+        retainedHistory = retainedHistory,
+        inbox = inbox,
+        inboxAlerts = inboxAlerts,
+        localMillis = { Dto.SERVER_TIME + scheduler.now }
     ) { states.add(it) }
 
     val ui: RelayUiState get() = controller.currentState
@@ -522,7 +535,7 @@ internal class ControllerFixture(
         if (withTasks) {
             answer(
                 "relay.tasks.list",
-                dev.quantumink.hermesgadget.protocol.relay.TaskPage(emptyList(), null).toWire()
+                TaskPage(emptyList(), null).toWire()
             )
         }
     }

@@ -44,13 +44,162 @@ import dev.quantumink.hermesgadget.mobile.widgets.WidgetLaunchNotice
 import dev.quantumink.hermesgadget.mobile.widgets.WidgetLaunchRequest
 import dev.quantumink.hermesgadget.mobile.widgets.decideLaunch
 import dev.quantumink.hermesgadget.mobile.widgets.phoneSelectionLocked
+import dev.quantumink.hermesgadget.protocol.CatalogPage
 import dev.quantumink.hermesgadget.protocol.CatalogStatus
+import dev.quantumink.hermesgadget.protocol.ConnectionStatus
+import dev.quantumink.hermesgadget.protocol.QuickAction
+import dev.quantumink.hermesgadget.protocol.relay.session.InboxInput
+import dev.quantumink.hermesgadget.protocol.relay.session.InboxRoute
+import dev.quantumink.hermesgadget.protocol.relay.session.RelayPhase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
+    private val inboxOwner get() = (application as CompanionApplication).inbox
+    private var inboxHandle: String? = null
+    private var pendingInbox by mutableStateOf<String?>(null)
+    private var inboxRoute by mutableStateOf<InboxRoute?>(
+        null
+    )
+    private var inboxInput by mutableStateOf<InboxInput?>(
+        null
+    )
+    private var inboxNotice by mutableStateOf("")
+    private var inboxActionVersion = 0L
+    private val inboxNavigation: PhoneInboxNavigation<PhoneInboxOwner.Resolved> by lazy {
+        PhoneInboxNavigation<PhoneInboxOwner.Resolved> { handle, done ->
+            lifecycleScope.launch {
+                val result =
+                    withContext(Dispatchers.IO) {
+                        runCatching { inboxOwner.resolve(handle) }.getOrNull()
+                    }
+                done(result)
+                pendingInbox = inboxNavigation.pending
+            }
+        }
+    }
+    private fun inboxAnswerNotice(accepted: Boolean) = if (accepted) {
+        "Answer accepted. Refresh for current progress."
+    } else {
+        "Answer not confirmed. Fetch current input before any further action."
+    }
+    private fun inboxReady() =
+        lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+    private fun inboxLocked() =
+        phoneSelectionLocked(conversation.state.value) || inboxInput != null ||
+            conversation.state.value.relay.phase ==
+            RelayPhase.ATTACHING
+    private fun showInbox(result: PhoneInboxOwner.Resolved?) {
+        inboxRoute = result?.route
+        inboxNotice =
+            if (result ==
+                null
+            ) {
+                "Inbox item unavailable. Refresh or open its reviewed profile."
+            } else {
+                "Read-only retained detail"
+            }
+        inboxInput = null
+        destination = "inbox"
+        inboxOwner.load()
+    }
+    private val notifications =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { inboxOwner.load() }
+    private fun receiveInbox(intent: Intent): Boolean {
+        if (intent.action != InboxNotifications.ACTION) return false
+        inboxActionVersion++
+        inboxNavigation.cancel()
+        navigation.cancel()
+        speechNavigation.cancel()
+        incomingWidget = null
+        pendingWidget = null
+        incomingAction = null
+        pendingAction = null
+        inboxHandle = InboxNotifications.handle(intent)
+        pendingInbox = null
+        if (!inboxLocked()) {
+            inboxRoute = null
+            inboxInput = null
+        }
+        inboxNotice = if (inboxHandle == null) "Inbox item unavailable." else ""
+        return true
+    }
+    private fun consumeInbox() {
+        val handle = inboxHandle ?: return
+        inboxHandle = null
+        if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+            pendingInbox = handle
+            return
+        }
+        if (inboxLocked()) {
+            pendingInbox = handle
+            return
+        }
+        inboxNavigation.request(handle, ::inboxReady, ::inboxLocked, ::showInbox)
+        pendingInbox = inboxNavigation.pending
+    }
+
+    private fun inboxAction(continueTarget: Boolean) {
+        val route = inboxRoute ?: return
+        val handle = route.copy?.handle ?: route.task?.handle ?: return
+        if (phoneSelectionLocked(conversation.state.value)) {
+            pendingInbox = handle
+            return
+        }
+        val generation = ++inboxActionVersion
+        lifecycleScope.launch {
+            val result =
+                withContext(Dispatchers.IO) {
+                    runCatching { inboxOwner.resolve(handle) }.getOrNull()
+                }
+            if (generation != inboxActionVersion || result == null ||
+                !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) ||
+                phoneSelectionLocked(conversation.state.value)
+            ) {
+                return@launch
+            }
+            val current = conversation.state.value
+            if (current.profile != result.profile || current.page?.key != result.page.key ||
+                !current.visible
+            ) {
+                conversation.open(result.profile, result.page)
+            }
+            conversation.inboxAction(handle, continueTarget) { input ->
+                runOnUiThread {
+                    if (generation == inboxActionVersion) {
+                        inboxInput = input
+                        inboxNotice =
+                            if (input ==
+                                null
+                            ) {
+                                "Current input unavailable. Continue the exact " +
+                                    "conversation before fetching again."
+                            } else {
+                                "Fresh current input"
+                            }
+                    }
+                }
+            }
+            if (conversation.state.value.connection.status !in
+                setOf(
+                    ConnectionStatus.PAIRED,
+                    ConnectionStatus.CONNECTING
+                )
+            ) {
+                connectPhone()
+            }
+            inboxNotice =
+                if (continueTarget) {
+                    "Connecting to the exact conversation. " +
+                        "Fetch current input deliberately after it is attached."
+                } else {
+                    "Fetching current input"
+                }
+        }
+    }
+
     private val catalogNetwork = object : android.net.ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: android.net.Network) {
             if (RelaySettings.enabled(this@MainActivity)) {
@@ -99,6 +248,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        inboxActionVersion++
+        inboxNavigation.suspend()
+        pendingInbox = inboxNavigation.pending
+        inboxInput = null
         navigation.cancel()
         speechNavigation.cancel()
         started = false
@@ -167,13 +320,17 @@ class MainActivity : ComponentActivity() {
                 setOf(
                     "profiles", "conversation", "watch", "settings", "tiles", "boxes",
                     "manual", "speech", "appearance", "home-widgets", "quick-actions",
-                    "setup-transfer"
+                    "setup-transfer", "inbox"
                 )
         } ?: "profiles"
         speechProfileKey = savedInstanceState?.getString("speech_profile_key")
         if (savedInstanceState == null) {
-            if (!receiveAction(intent)) receiveWidget(intent)
+            if (!receiveInbox(intent) && !receiveAction(intent)) receiveWidget(intent)
         } else {
+            inboxHandle =
+                savedInstanceState.getString("inbox_handle")?.takeIf {
+                    it.matches(Regex("[0-9a-f]{64}"))
+                }
             pendingWidget = HomeWidgetLaunch.restore(savedInstanceState.getBundle("pending_widget"))
             incomingAction = savedInstanceState.getString("incoming_action")
             pendingAction = savedInstanceState.getString("pending_action")
@@ -183,6 +340,7 @@ class MainActivity : ComponentActivity() {
             lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
                 consumeAction()
                 consumeWidget()
+                consumeInbox()
                 if (destination == "speech" && speechProfileKey != null && speechTarget == null) {
                     withContext(Dispatchers.IO) {
                         CatalogRepository.get(this@MainActivity).savedPages()
@@ -196,6 +354,23 @@ class MainActivity : ComponentActivity() {
             val mode by appearance.mode.collectAsStateWithLifecycle()
             PhoneAppearance(mode) {
                 val phone by conversation.state.collectAsStateWithLifecycle()
+                val inboxSnapshot by inboxOwner.state.collectAsStateWithLifecycle()
+                androidx.compose.runtime.LaunchedEffect(inboxSnapshot?.revision) {
+                    val handle = inboxRoute?.copy?.handle ?: inboxRoute?.task?.handle
+                    if (handle != null &&
+                        inboxSnapshot?.let {
+                            InboxRoute.resolve(
+                                it,
+                                handle
+                            )
+                        } == null
+                    ) {
+                        inboxInput = null
+                        inboxRoute = null
+                        inboxNotice =
+                            "Inbox item unavailable."
+                    }
+                }
                 val status by RelaySettings.status.collectAsStateWithLifecycle()
                 androidx.compose.runtime.LaunchedEffect(started, destination) {
                     if (destination == "conversation" && started && !phone.visible) {
@@ -211,6 +386,11 @@ class MainActivity : ComponentActivity() {
                     ) {
                         return
                     }
+                    inboxActionVersion++
+                    inboxNavigation.cancel()
+                    inboxInput = null
+                    pendingInbox = null
+                    inboxHandle = null
                     speechNavigation.cancel()
                     speechTarget = null
                     speechProfileKey = null
@@ -222,7 +402,7 @@ class MainActivity : ComponentActivity() {
                     pendingWidget = null
                     widgetUnavailable = false
                     widgetEditId = null
-                    if (destination == "conversation") conversation.hide()
+                    if (destination in setOf("conversation", "inbox")) conversation.hide()
                     destination = value
                 }
                 androidx.activity.compose.BackHandler(
@@ -305,7 +485,40 @@ class MainActivity : ComponentActivity() {
                                 navigation.cancel()
                             }
                         )
+                        androidx.compose.runtime.LaunchedEffect(inboxLocked(), pendingInbox) {
+                            if (!inboxLocked() && pendingInbox != null) {
+                                inboxHandle = pendingInbox
+                                pendingInbox = null
+                                consumeInbox()
+                            }
+                        }
                         when (destination) {
+                            "inbox" -> PhoneInboxPage(
+                                inboxOwner, inboxRoute, phoneSelectionLocked(phone),
+                                inboxInput, inboxNotice,
+                                {
+                                    inboxHandle = it
+                                    consumeInbox()
+                                }, { inboxAction(true) }, { inboxAction(false) },
+                                { answer ->
+                                    inboxInput?.let { token ->
+                                        inboxInput = null
+                                        conversation.inboxAnswer(token, answer) { accepted ->
+                                            runOnUiThread {
+                                                inboxNotice = inboxAnswerNotice(accepted)
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    if (Build.VERSION.SDK_INT >=
+                                        33
+                                    ) {
+                                        notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                },
+                                Modifier.weight(1f)
+                            )
                             "profiles" -> directoryState.SaveableStateProvider("profiles") {
                                 DirectoryPage(
                                     this@MainActivity,
@@ -430,14 +643,19 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (!receiveAction(intent)) receiveWidget(intent)
+        if (!receiveInbox(intent) && !receiveAction(intent)) receiveWidget(intent)
         window.decorView.post {
             consumeAction()
             consumeWidget()
+            consumeInbox()
         }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString(
+            "inbox_handle",
+            pendingInbox ?: inboxRoute?.copy?.handle ?: inboxRoute?.task?.handle
+        )
         outState.putString("phone_destination", destination)
         outState.putString("speech_profile_key", speechProfileKey)
         outState.putString("incoming_action", incomingAction)
@@ -449,6 +667,12 @@ class MainActivity : ComponentActivity() {
 
     private fun receiveAction(value: Intent): Boolean {
         if (value.action != QuickActionShortcuts.ACTION_OPEN) return false
+        inboxActionVersion++
+        inboxNavigation.cancel()
+        inboxHandle = null
+        pendingInbox = null
+        inboxInput =
+            null
         navigation.cancel()
         incomingWidget = null
         pendingWidget = null
@@ -480,7 +704,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestQuickAction(
-        reviewed: dev.quantumink.hermesgadget.protocol.QuickAction,
+        reviewed: QuickAction,
         inputs: Map<String, String>,
         previewIsCurrent: () -> Boolean
     ) {
@@ -519,6 +743,12 @@ class MainActivity : ComponentActivity() {
 
     private fun receiveWidget(value: Intent) {
         if (value.action != HomeWidgets.ACTION_OPEN) return
+        inboxActionVersion++
+        inboxNavigation.cancel()
+        inboxHandle = null
+        pendingInbox = null
+        inboxInput =
+            null
         pendingAction = null
         incomingAction = null
         navigation.cancel()
@@ -541,10 +771,7 @@ class MainActivity : ComponentActivity() {
         requestProfile(request.key, request)
     }
 
-    private fun requestSpeech(
-        mounted: dev.quantumink.hermesgadget.protocol.CatalogPage?,
-        restoredKey: String? = null
-    ) {
+    private fun requestSpeech(mounted: CatalogPage?, restoredKey: String? = null) {
         if (speechSettingsLocked(conversation.state.value)) return
         val key = mounted?.key ?: restoredKey ?: return
         navigation.cancel()
@@ -557,7 +784,7 @@ class MainActivity : ComponentActivity() {
                 resolved.first.status != CatalogStatus.WITHDRAWN && resolved.second.endpoint.isTls
             ) {
                 navigation.cancel()
-                if (destination == "conversation") conversation.hide()
+                if (destination in setOf("conversation", "inbox")) conversation.hide()
                 speechProfileKey = key
                 speechTarget = SpeechSettingsTarget(resolved.first, resolved.second.endpoint)
                 destination = "speech"

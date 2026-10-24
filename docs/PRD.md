@@ -138,3 +138,5 @@ withdrawn or stale targets offer editing rather than an index-based substitute.
 Five-column presets require a suitable launcher grid. Physical placement/theme and
 older-runtime acceptance are recorded separately in [release preparation](release.md).
 See the [approved widget specification](superpowers/specs/2026-10-13-phone-home-widgets-design.md).
+
+Task5 source candidate adds the integrated phone Inbox for exact reviewed Relay profiles, separate existing-task/history opt-ins, retained replies, explicit refresh, private quiet notifications and bounded background updates. Notification detail is read-only; Continue, fresh current-input fetch and Answer are distinct deliberate actions. Source/JVM/capture evidence does not admit native/job/notification/live behavior. See `relay-phone-controller.md` for durable copy-before-ACK, lifecycle and bounds.

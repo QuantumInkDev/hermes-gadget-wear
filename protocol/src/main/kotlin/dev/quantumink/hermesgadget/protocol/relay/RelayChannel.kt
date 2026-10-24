@@ -1,5 +1,6 @@
 package dev.quantumink.hermesgadget.protocol.relay
 
+import dev.quantumink.hermesgadget.protocol.DirectConnection
 import dev.quantumink.hermesgadget.protocol.Message
 import dev.quantumink.hermesgadget.protocol.relay.state.ClockFix
 import dev.quantumink.hermesgadget.protocol.relay.state.ServerClock
@@ -125,6 +126,21 @@ interface RelayTransport {
         timeoutMs: Long,
         handler: (RelayCallResult<R>) -> Unit
     )
+
+    /** Pure nonblocking observer permit, rechecked at final SEND by the production transport. */
+    fun <R : Any> callGuarded(
+        correlation: CorrelationId,
+        call: RelayCall<R>,
+        timeoutMs: Long,
+        permit: () -> Boolean,
+        handler: (RelayCallResult<R>) -> Unit
+    ) {
+        if (permit()) {
+            call(correlation, call, timeoutMs, handler)
+        } else {
+            handler(RelayCallResult.Refused(RelayRefusal.SCOPE_REPLACED))
+        }
+    }
 
     /**
      * Re-reads `relay.info` (grant or method changes): the answer replaces the channel's state and clock fix, and is also

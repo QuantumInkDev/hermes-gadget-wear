@@ -52,15 +52,17 @@ internal enum class InputRoute { STOCK, RELAY, UNAVAILABLE }
 internal object PhoneRelay {
     /** The production controller: its own encrypted store, the real monotonic clock and a cryptographic id source. */
     fun controller(application: Application, listener: (RelayUiState) -> Unit): RelayController =
-        RelayController(
-            EncryptedRelayStore.android(application),
-            ExecutorRelayScheduler(),
-            SystemClock::elapsedRealtimeNanos,
-            SecureRequestIdEntropy(),
-            RelayTiming(),
-            retainedHistory = PhoneHistoryCache(application).retained(),
-            listener = listener
-        )
+        (application as CompanionApplication).inbox.listener(listener)
+
+    private val testSessions = java.util.concurrent.atomic.AtomicLong()
+    fun foreground(application: Application, withdraw: () -> Unit = {}): Long =
+        (application as? CompanionApplication)?.inbox?.foreground(withdraw)
+            ?: testSessions.incrementAndGet()
+    fun current(application: Application, id: Long): Boolean =
+        (application as? CompanionApplication)?.inbox?.current(id) != false
+    fun release(application: Application, id: Long) {
+        (application as? CompanionApplication)?.inbox?.release(id)
+    }
 
     /** Typed text: the Relay composer owns it once a Relay conversation is selected; otherwise the stock chat as before. */
     fun typedRoute(relay: RelayUiState): InputRoute = if (relay.retainedSelected != null) {
