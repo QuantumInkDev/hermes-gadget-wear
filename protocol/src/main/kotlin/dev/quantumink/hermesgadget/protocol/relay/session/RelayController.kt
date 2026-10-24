@@ -269,20 +269,33 @@ class RelayController(
             return@post
         }
         val mine = flow
+        val generation = serial
         val observer = inboxEpoch.get()
         val writer = writerEpoch()
         fun permit() = observer == inboxEpoch.get() && writer == writerEpoch() &&
             inputGeneration == inputEpoch.get()
+        fun currentInput(epoch: Long = observer) =
+            generation == serial && mine == flow && writer == writerEpoch() &&
+                inputGeneration == inputEpoch.get() && epoch == inboxEpoch.get() &&
+                isReady() && !inboxOnly && namespace() == route.namespace
         fun sendPermit() = permit() && authority.allows(monotonicNanos())
         fun accept(prompt: Prompt?) {
-            if (!permit() || mine != flow || !isReady() || namespace() != route.namespace ||
-                localInboxRoute(handle) == null || prompt?.asActionable() == null
-            ) {
+            if (!currentInput()) return
+            val currentRoute = try {
+                localInboxRoute(handle)
+            } catch (_: InboxFailure) {
+                if (!currentInput()) return
+                inboxInput = null
+                val withdrawn = inboxStorageUnavailable()
+                if (currentInput(withdrawn)) done(null)
+                return
+            }
+            // Route IO and storage publication may reenter cancellation or a new action.
+            if (!currentInput()) return
+            if (currentRoute == null || prompt?.asActionable() == null) {
                 done(null)
                 return
             }
-            // Storage may have crossed expiry or a replacement fence after the first check.
-            if (!permit()) return
             val promptDeadline: Long? = when (prompt.deadline) {
                 PromptDeadline.BOUNDED -> prompt.expiresAtMs ?: run {
                     done(null)
@@ -395,8 +408,20 @@ class RelayController(
             done(false)
             return@post
         }
-        val route = localInboxRoute(issued.route)
-        if (!permit()) return@post
+        fun currentInput(epoch: Long = issued.observer) =
+            issued.serial == serial && issued.flow == flow && issued.writer == writerEpoch() &&
+                issued.inputGeneration == inputEpoch.get() && epoch == inboxEpoch.get() &&
+                issued.owner == namespace() && isReady() && !inboxOnly
+        val route = try {
+            localInboxRoute(issued.route)
+        } catch (_: InboxFailure) {
+            if (!currentInput()) return@post
+            inboxInput = null
+            val withdrawn = inboxStorageUnavailable()
+            if (currentInput(withdrawn)) done(false)
+            return@post
+        }
+        if (!currentInput()) return@post
         if (route == null) {
             done(false)
             return@post
@@ -1516,17 +1541,30 @@ class RelayController(
                     try {
                         task()
                     } catch (_: InboxFailure) {
-                        inboxEpoch.incrementAndGet()
-                        withdrawInboxObserver()
-                        if (admittedWriter == writerEpoch()) {
-                            inboxStatus = "Inbox storage unavailable"
-                            publish()
-                            inboxCompleted(inboxStatus)
-                        }
+                        inboxStorageUnavailable()
                     }
                 }
             }
         )
+    }
+
+    /** The returned epoch distinguishes this fault's withdrawal from a real replacement. */
+    private fun inboxStorageUnavailable(): Long {
+        val observer = inboxEpoch.incrementAndGet()
+        val writer = writerEpoch()
+        val generation = serial
+        val completed = inboxCompleted
+        withdrawInboxObserver()
+        if (admittedWriter == writer) {
+            inboxStatus = "Inbox storage unavailable"
+            publish()
+            if (writer == writerEpoch() && generation == serial &&
+                observer == inboxEpoch.get() && inboxCompleted === completed
+            ) {
+                completed("Inbox storage unavailable")
+            }
+        }
+        return observer
     }
 
     private fun later(delayMs: Long, task: () -> Unit): Cancelable {
@@ -2093,25 +2131,7 @@ class RelayController(
                     }
                 } else {
                     val error = (outcome as? RelayOutcome.Failed)?.error
-                    if (error?.action in setOf(
-                            RelayErrorAction.STOP_AND_EVICT_SCOPE,
-                            RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW
-                        )
-                    ) {
-                        val completed = inboxCompleted
-                        when (error?.action) {
-                            RelayErrorAction.STOP_AND_EVICT_SCOPE -> stopScope()
-                            RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW -> requireReview()
-                            else -> Unit
-                        }
-                        // Withdrawal retired this observer synchronously, before fallible persistence.
-                        if (writer == writerEpoch()) {
-                            inboxStatus = "Partial / source authority withdrawn"
-                            publish()
-                            completed(inboxStatus)
-                        }
-                        return@request
-                    }
+                    if (withdrawAuthority(error)) return@request
                     if (!current()) {
                         finish("Partial / fresh authority required")
                         return@request
@@ -2138,6 +2158,36 @@ class RelayController(
                 }
             }
         }
+
+        /** Authority verdicts survive local time expiry, but never a replaced observer. */
+        fun withdrawAuthority(error: RelayError?): Boolean {
+            if (error?.action !in setOf(
+                    RelayErrorAction.STOP_AND_EVICT_SCOPE,
+                    RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW
+                )
+            ) {
+                return false
+            }
+            val completed = inboxCompleted
+            // Both existing withdrawal owners advance serial/observer exactly once.
+            val withdrawnSerial = generation + 1
+            val withdrawnObserver = observer + 1
+            fun currentWithdrawal() = writer == writerEpoch() && serial == withdrawnSerial &&
+                inboxEpoch.get() == withdrawnObserver && namespace() == owner &&
+                inboxCompleted === completed
+            when (error?.action) {
+                RelayErrorAction.STOP_AND_EVICT_SCOPE -> stopScope()
+                RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW -> requireReview()
+                else -> Unit
+            }
+            if (currentWithdrawal()) {
+                inboxStatus = "Partial / source authority withdrawn"
+                publish()
+                if (currentWithdrawal()) completed("Partial / source authority withdrawn")
+            }
+            return true
+        }
+
         var refreshBeforeAck = false
         fun begin() {
             inboxStatus = "Refreshing"
@@ -2259,18 +2309,13 @@ class RelayController(
             }
             transient(plan.delivery)
             if (!budget()) return
-            request(planned.call, planned.ref.correlation, ::ackPermit) { result ->
-                if (!current()) return@request
+            request(planned.call, planned.ref.correlation, ::ackPermit, ::permit) { result ->
+                if (!currentLifetime()) return@request
                 val error =
                     ((result as? RelayCallResult.Outcome)?.outcome as? RelayOutcome.Failed)?.error
-                if (error?.action == RelayErrorAction.STOP_AND_EVICT_SCOPE) {
-                    stopScope()
-                    finish("Access withdrawn")
-                    return@request
-                }
-                if (error?.action == RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW) {
-                    requireReview()
-                    finish("Profile review required")
+                if (withdrawAuthority(error)) return@request
+                if (!current()) {
+                    finish("Partial / fresh authority required")
                     return@request
                 }
                 val step = (result as? RelayCallResult.Outcome)?.let {
@@ -2305,21 +2350,15 @@ class RelayController(
                     }
             transient(plan.delivery)
             request(planned.call, planned.ref.correlation, ::permit) { result ->
-                if (!current()) return@request
+                if (!currentLifetime()) return@request
                 val outcome = (result as? RelayCallResult.Outcome)?.outcome
+                if (withdrawAuthority((outcome as? RelayOutcome.Failed)?.error)) return@request
+                if (!current()) {
+                    finish("Partial / fresh authority required")
+                    return@request
+                }
                 if (outcome == null) {
                     finish("Partial / outbox unavailable")
-                    return@request
-                }
-                val authorityError = (outcome as? RelayOutcome.Failed)?.error
-                if (authorityError?.action == RelayErrorAction.STOP_AND_EVICT_SCOPE) {
-                    stopScope()
-                    finish("Access withdrawn")
-                    return@request
-                }
-                if (authorityError?.action == RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW) {
-                    requireReview()
-                    finish("Profile review required")
                     return@request
                 }
                 fun stage(): Boolean {

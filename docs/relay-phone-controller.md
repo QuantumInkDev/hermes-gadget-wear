@@ -616,3 +616,28 @@ writes. The owner-local uncertain timestamp mask is preserved; no physical rollb
 Source demo: explicitly refresh the Inbox, inspect retained progress and Partial/Last full sync, then use deliberate
 Continue, Get current input and Answer as separate actions. Expired input refuses without automatic replacement.
 Native UI, jobs, storage, network and physical acceptance remain separate open gates.
+
+### Task5 FIX3 O5/ACK authority and current action completion
+
+O5 and ACK callbacks use the same lifetime-first registered authority handling as the common observer reader.
+A correlated permission denial posted under the current observer, writer, controller, namespace and transport
+lifetime still withdraws that exact scope when actor delay crosses local Info expiry. Synchronous STOP/review
+precedes fallible persistence, publication and refresh completion. Completion remains tied to that observer's
+withdrawal transition and callback identity across reentrancy. An actual replacement suppresses the old callback.
+The unchanged O5 producer supplies permission_denied; these controls claim no new profile_changed producer case.
+
+ACK retains its immutable Info/clock expiry predicate at final paced SEND after exact body and aggregate
+confirmation. Its callback permit is separately lifetime-based. Expired successful or ordinary O5/ACK results
+finish Partial / fresh authority required without consuming a page or clearing ACK debt. A fresh deliberate
+refresh still needs fresh authority. Final-SEND expiry refusal differs from denial after a valid SEND.
+
+Eligible current-input acceptance and deliberate Answer handle authenticated route-read failure locally. They
+retain observer withdrawal and storage-unavailable publication, consume/refuse the transient input conservatively,
+and complete the still-current action once with null/false. The fault's own observer-epoch change is distinguished
+from cancellation, a new input action, writer replacement or other lifetime change, including during publication.
+Eligibility still precedes answer route IO. There is no reset, automatic getter, answer, attach, remint or retry.
+
+Source demo: explicitly refresh; a current denial withdraws access even after local lease expiry. Get current input
+and Answer remain separate deliberate actions; a storage fault reports an unavailable/unconfirmed current action.
+Peer/JVM controls establish local owner ordering only. Native UI, storage, jobs, network, physical and full15
+acceptance remain OPEN. The terminal FIX2 report's incomplete COMPLETE-review gate is not retrospectively closed.

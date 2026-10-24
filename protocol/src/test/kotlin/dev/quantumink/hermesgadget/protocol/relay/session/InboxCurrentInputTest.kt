@@ -26,8 +26,10 @@ class InboxCurrentInputTest {
         var saved = InboxSnapshot()
         var unavailable = false
         var reads = 0
+        var beforeRead: () -> Unit = {}
         override fun load(): InboxSnapshot {
             reads++
+            beforeRead()
             if (unavailable) throw InboxFailure(InboxProblem.STORAGE)
             return InboxCodec.decode(InboxCodec.encode(saved))
         }
@@ -69,7 +71,14 @@ class InboxCurrentInputTest {
         }
         val disk = Disk()
         val repository = InboxRepository(disk)
-        val f = ControllerFixture(inbox = repository, requestEntropy = entropy)
+        var writer = 0L
+        var onUpdate: (String) -> Unit = {}
+        val f = ControllerFixture(
+            inbox = repository,
+            requestEntropy = entropy,
+            writerEpoch = { writer },
+            inboxUpdates = { _, status -> onUpdate(status) }
+        )
         val namespace = HistoryNamespace.from(Seeds.record(f.identity, pinned = info.profileId))!!
         val handle: String
         init {
@@ -211,4 +220,127 @@ class InboxCurrentInputTest {
         assertEquals(reads, h.disk.reads)
         assertTrue(h.f.frames("relay.prompt.respond").isEmpty())
     }
+
+    private fun eligibleStorageFailure(
+        answer: Boolean,
+        replacement: Boolean = false,
+        cancel: Boolean = false,
+        writerReplacement: Boolean = false
+    ) {
+        val h = Owner()
+        val f = h.f
+        h.attach()
+        val input = h.get()!!
+        assertTrue("Control requires an actual eligible bound input", input.canAnswer)
+        var refreshes = 0
+        f.controller.refreshInbox {
+            refreshes++
+            assertEquals("Inbox storage unavailable", it)
+        }
+        f.run()
+        val heldObserver = f.transport.next("relay.outbox.read")
+        var completed = 0
+        var newActionCompleted = 0
+        if (replacement) {
+            h.onUpdate = { status ->
+                if (status == "Inbox storage unavailable") {
+                    h.onUpdate = {}
+                    // An actual new action reenters publication under the same writer.
+                    f.controller.getInboxInput(h.handle) {
+                        newActionCompleted++
+                        assertNull(it)
+                    }
+                    f.run()
+                }
+            }
+        }
+        if (writerReplacement) {
+            h.onUpdate = { status ->
+                if (status == "Inbox storage unavailable") {
+                    h.onUpdate = {}
+                    h.writer++
+                }
+            }
+        }
+        fun cancelOnRead() {
+            h.disk.beforeRead = {
+                h.disk.beforeRead = {}
+                f.controller.hide()
+                f.run()
+            }
+        }
+        val reads = h.disk.reads
+        if (answer) {
+            if (cancel) cancelOnRead()
+            h.disk.unavailable = true
+            f.controller.answerInboxInput(input, PromptAnswer.Choice("Continue")) {
+                completed++
+                assertFalse(it)
+            }
+            f.run()
+        } else {
+            f.controller.getInboxInput(h.handle) {
+                completed++
+                assertNull(it)
+            }
+            f.run()
+            val getter = f.transport.next("relay.task.get")
+            assertTrue("Getter admission route read already succeeded", h.disk.reads > reads)
+            if (cancel) cancelOnRead()
+            h.disk.unavailable = true
+            f.transport.reply(getter, h.result(h.promptGets.last()))
+            f.run()
+        }
+        assertEquals(
+            "Eligible invocation completes once unless an actual new action or cancellation replaced it",
+            if (replacement || cancel || writerReplacement) 0 else 1,
+            completed
+        )
+        assertTrue("Fault reached the eligible route read", h.disk.reads > reads)
+        assertEquals(if (replacement) 1 else 0, newActionCompleted)
+        if (!cancel) {
+            assertEquals("Inbox storage unavailable", f.controller.inboxStatus)
+            assertEquals(if (writerReplacement) 0 else 1, refreshes)
+        }
+        assertTrue(f.frames("relay.prompt.respond").isEmpty())
+        h.disk.unavailable = false
+        val outbox = h.steps.first {
+            h.method(it) == "relay.outbox.read" &&
+                h.result(it)["items"]!!.jsonArray.isNotEmpty()
+        }
+        f.transport.reply(heldObserver, h.result(outbox))
+        f.run()
+        assertTrue(
+            "Withdrawn observer cannot acknowledge a late page",
+            f.frames("relay.outbox.ack").isEmpty()
+        )
+        f.controller.answerInboxInput(input, PromptAnswer.Choice("Continue")) { assertFalse(it) }
+        f.run()
+        assertTrue(f.frames("relay.prompt.respond").isEmpty())
+        assertEquals(if (replacement || cancel || writerReplacement) 0 else 1, completed)
+    }
+
+    @Test fun eligibleGetterAcceptanceStorageFailureCompletesCurrentInvocationOnce() =
+        eligibleStorageFailure(answer = false)
+
+    @Test fun eligibleBoundAnswerStorageFailureCompletesCurrentInvocationOnce() =
+        eligibleStorageFailure(answer = true)
+
+    @Test fun getterStoragePublicationNewActionSuppressesOldCompletion() =
+        eligibleStorageFailure(answer = false, replacement = true)
+
+    @Test fun answerStoragePublicationNewActionSuppressesOldCompletion() =
+        eligibleStorageFailure(answer = true, replacement = true)
+
+    @Test fun getterRouteReadCancellationSuppressesOldCompletion() =
+        eligibleStorageFailure(answer = false, cancel = true)
+
+    @Test fun answerRouteReadCancellationSuppressesOldCompletion() =
+        eligibleStorageFailure(answer = true, cancel = true)
+
+    @Test fun getterStoragePublicationWriterReplacementSuppressesOldCompletion() =
+        eligibleStorageFailure(answer = false, writerReplacement = true)
+
+    @Test fun answerStoragePublicationWriterReplacementSuppressesOldCompletion() =
+        eligibleStorageFailure(answer = true, writerReplacement = true)
 }

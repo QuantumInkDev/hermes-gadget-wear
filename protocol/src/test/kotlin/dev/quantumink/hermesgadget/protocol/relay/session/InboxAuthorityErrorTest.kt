@@ -957,4 +957,123 @@ class InboxAuthorityErrorTest {
             assertEquals(0, h.count("relay.prompt.respond"))
         }
     }
+
+    private fun outboxAuthority(
+        ack: Boolean,
+        replacement: Boolean = false,
+        ordinary: Boolean = false
+    ) {
+        Owner(infoTtlMs = 500).use { h ->
+            h.attach()
+            var completed = 0
+            var completionStatus = ""
+            h.controller.refreshInbox {
+                completed++
+                completionStatus = it
+            }
+            var request = h.next("relay.outbox.read")
+            if (ack) {
+                val page = h.steps.first {
+                    h.method(it) == "relay.outbox.read" &&
+                        h.result(it)["items"]!!.jsonArray.isNotEmpty()
+                }
+                h.reply(request, h.result(page))
+                request = h.next("relay.outbox.ack")
+                assertTrue(
+                    "ACK was actually sent under a valid Info lease after exact copy/aggregate confirmation",
+                    h.memory.reread().snapshot.deliveries.single().pendingAcks.isNotEmpty()
+                )
+            }
+            val before = h.queueTyped()
+            val debt = h.memory.reread().snapshot.deliveries.single().pendingAcks
+            val bodies = InboxCodec.encode(h.disk.load())
+            val generation = h.net.transport.generation
+            val ready = h.ready
+            val delivered = CountDownLatch(1)
+            val method = if (ack) "relay.outbox.ack" else "relay.outbox.read"
+            h.afterDelivered = { if (it == method) delivered.countDown() }
+            if (ordinary) {
+                h.reply(
+                    request,
+                    if (ack) {
+                        buildJsonObject {
+                            put("acknowledged", JsonArray(debt.map(::JsonPrimitive)))
+                        }
+                    } else {
+                        OutboxPage(emptyList(), 0).toWire()
+                    }
+                )
+            } else {
+                h.fail(request, "permission_denied")
+            }
+            check(delivered.await(5, TimeUnit.SECONDS))
+            assertEquals("Denial is posted while typed work is still paced", before, h.typedCount())
+            assertEquals(0, completed)
+            // Response delivery and posting precede expiry. The controller actor has not run.
+            h.net.advance(1000)
+            if (replacement) {
+                h.controller.configureInbox(h.disk.load().profiles.single().copy(enabled = false))
+            }
+            var checkedWrite = false
+            if (!replacement && !ordinary) {
+                val firstWrite: () -> Unit = {
+                    h.beforePersist = {}
+                    h.disk.beforeCommit = {}
+                    h.release()
+                    assertEquals("Withdrawal precedes first fallible write", before, h.typedCount())
+                    checkedWrite = true
+                }
+                h.beforePersist = firstWrite
+                h.disk.beforeCommit = firstWrite
+                h.memory.failAll = StoreCommit.Failed(StoreProblem.STORAGE_UNAVAILABLE, true)
+            }
+            h.run()
+            h.release()
+            assertEquals(
+                "Current O5/ACK denial must withdraw queued typed SEND after local expiry",
+                before + if (replacement || ordinary) 1 else 0,
+                h.typedCount()
+            )
+            assertEquals(generation, h.net.transport.generation)
+            assertTrue(ready === h.ready)
+            if (replacement) {
+                assertEquals(0, completed)
+                assertFalse(h.disk.load().profiles.single().enabled)
+                assertFalse(h.ui!!.phase == RelayPhase.STOPPED)
+            } else if (ordinary) {
+                assertEquals(1, completed)
+                assertEquals("Partial / fresh authority required", completionStatus)
+                assertFalse(h.ui!!.phase == RelayPhase.STOPPED)
+            } else {
+                assertTrue("First fallible persistence was reached", checkedWrite)
+                assertEquals(RelayPhase.STOPPED, h.ui!!.phase)
+                assertTrue(h.ui!!.unsaved)
+                assertEquals(1, completed)
+                assertEquals("Partial / source authority withdrawn", completionStatus)
+                assertEquals("Partial / source authority withdrawn", h.controller.inboxStatus)
+            }
+            assertEquals(debt, h.memory.reread().snapshot.deliveries.single().pendingAcks)
+            if (!replacement) assertTrue(bodies.contentEquals(InboxCodec.encode(h.disk.load())))
+            h.run()
+            assertEquals(if (replacement) 0 else 1, completed)
+        }
+    }
+
+    @Test fun outboxPermissionPostedBeforeExpiryWithdrawsTypedQueueBeforeStorage() =
+        outboxAuthority(ack = false)
+
+    @Test fun validSentAckPermissionPostedBeforeExpiryWithdrawsTypedQueueBeforeStorage() =
+        outboxAuthority(ack = true)
+
+    @Test fun replacedOutboxObserverSuppressesPostedDenial() =
+        outboxAuthority(ack = false, replacement = true)
+
+    @Test fun replacedAckObserverSuppressesPostedDenial() =
+        outboxAuthority(ack = true, replacement = true)
+
+    @Test fun expiredOutboxSuccessFinishesPartialWithoutIngestionOrRevocation() =
+        outboxAuthority(ack = false, ordinary = true)
+
+    @Test fun expiredAckSuccessRetainsExactCopyAndDebtWithoutRevocation() =
+        outboxAuthority(ack = true, ordinary = true)
 }
