@@ -398,3 +398,23 @@ Retained-view routing also gates the controller's typed-send entry itself. Closi
 the local view restores deliberate continuation using the existing authenticated
 binding; turning Relay off clears the local selection and restores stock input.
 These paths are covered separately from socket acceptance and from native UI tests.
+
+
+### Event admission at the seen-table bound (Task4 FIX3)
+
+The complete correlated current event page is checked before terminal classification: current Info, endpoint/enrollment/
+profile/review scope and flow, authority token, replay epoch, every binding/conversation/sequence, and nested payload target.
+A validated single selected tombstone reaches the existing format4 selected deletion flag before ordinary dedup admission
+can reject it. Every old seen ID/age, pending ACK and delivery obligation remains exact. No event accounting is committed
+for this deletion; durable marker confirmation still precedes cache/ledger removal and confirmed final clearance. Failure
+keeps the represented removal fence. DELETED and CACHE_ONLY do not confer STOPPED authority.
+
+Ordinary capacity uses one bounded transient decoded reply, owned by its exact outstanding read and current controller
+lifetime. Pruning only age-eligible keys is a proposed aggregate commit; after confirmation the actual poll owner restages
+the original answer. Failed/refused pruning keeps all old keys and the held answer. No-room remains explicit capacity,
+with no repeated no-op commits, extra read, synthetic ACK, create/submit/reattach or discarded pending work. Wakes use the
+existing seven-day ages and Info maintenance rather than tight polling. Flow/session replacement clears the transient
+reply/read, and readiness after a same-effective Info refresh resumes current polling. No unlimited progress is claimed.
+Mixed terminal pages are rejected as current producer-shape hardening (registered tombstone backlog has ONE event), not
+as a newly registered producer capture or universal new wire requirement; existing single tombstones without the snapshot
+flag retain their contract. Snapshot/format4/legacy1/2/3, ordinary16/64 and emergency representation stay unchanged.

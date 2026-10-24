@@ -92,7 +92,10 @@ enum class RejectReason {
     FOREIGN_EVENT,
 
     /** An event is not after the committed cursor. */
-    STALE_SEQUENCE
+    STALE_SEQUENCE,
+
+    /** The registered canonical tombstone replaces the backlog with ONE event, never a mixed page. */
+    MIXED_TERMINAL_PAGE
 }
 
 enum class SessionRefusal {
@@ -355,7 +358,9 @@ class DeliveryStep<out R>(
  * ONLY on a commit that the consumer issues after it durably stored the content, so a failed store can be aborted and
  * the same page read again; a gap, `snapshot_required`, a larger O5 `gap_generation` or an unknown O5 baseline produce
  * refresh obligations and never an execution effect; stale or foreign callbacks are rejected before any state change.
- * The dedup table is bounded (policy): a full table refuses a page, and only an explicit [retireOlderThan] relaxes it.
+ * The dedup table is bounded (policy): a full table refuses ordinary pages; a fully validated single tombstone can
+ * be staged for exact durable deletion without committing new keys. [commitEvents] never exceeds the bound, and only
+ * an explicit [retireOlderThan] relaxes duplicate detection.
  */
 class EnrollmentDelivery private constructor(
     val enrollment: EnrollmentScope,
@@ -368,6 +373,9 @@ class EnrollmentDelivery private constructor(
     private val nextSerial: Long
 ) {
     val seenCount: Int get() = seen.size
+
+    /** Only for pacing the consumer's existing explicit age retirement; never additional deletion authority. */
+    internal val oldestSeenAtMs: Long? get() = seen.values.minOrNull()
 
     /** Refreshes owed before the local view may be called current. */
     val refreshOwed: List<RefreshObligation> get() = Collections.unmodifiableList(obligations)
@@ -442,6 +450,13 @@ class EnrollmentDelivery private constructor(
             nextSerial = Math.addExact(nextSerial, 1L)
         )
         return DeliveryStep(next, ReadPlanOutcome.Planned(ReadPlan(ref, call)))
+    }
+
+    /** Aborts exactly one transient read on consumer replacement; nothing is consumed, acknowledged or persisted. */
+    internal fun abortRead(ref: ReadRef): DeliveryStep<Boolean> {
+        val session = live
+        if (session == null || session.outstanding !== ref) return DeliveryStep(this, false)
+        return DeliveryStep(copy(live = session.copy(outstanding = null)), true)
     }
 
     /** The read named by [ref] got no answer in time: the cursor is unchanged, so the same read can be repeated. */
@@ -570,7 +585,12 @@ class EnrollmentDelivery private constructor(
             val ours = event.conversationId == token.conversationId &&
                 event.bindingId == token.bindingId &&
                 event.replayEpoch == token.replayEpoch
-            if (!ours) {
+            val payloadConversation = when (val payload = event.payload) {
+                is EventPayload.ConversationChanged -> payload.conversation.conversationId
+                is EventPayload.TaskChanged -> payload.task.conversationId
+                else -> event.conversationId
+            }
+            if (!ours || payloadConversation != token.conversationId) {
                 return DeliveryStep(
                     copy(live = session),
                     StageOutcome.Rejected(RejectReason.FOREIGN_EVENT)
@@ -586,6 +606,15 @@ class EnrollmentDelivery private constructor(
         if (hasDiscontinuity(page, session.committedSequence)) {
             return dropSession(session, RefreshCause.SEQUENCE_DISCONTINUITY)
         }
+        val deleted = page.events.any {
+            (it.payload as? EventPayload.ConversationChanged)?.deleted == true
+        }
+        if (deleted && page.events.size != 1) {
+            return DeliveryStep(
+                copy(live = session),
+                StageOutcome.Rejected(RejectReason.MIXED_TERMINAL_PAGE)
+            )
+        }
         val fresh = ArrayList<RelayEvent>()
         val batchKeys = HashSet<DedupKey>()
         var duplicates = 0
@@ -593,16 +622,12 @@ class EnrollmentDelivery private constructor(
             val key = DedupKey.Canonical(event.conversationId, event.eventId)
             if (key in seen || !batchKeys.add(key)) duplicates++ else fresh.add(event)
         }
-        if (seen.size + fresh.size > StateLimits.MAX_SEEN_KEYS) {
+        if (!deleted && seen.size + fresh.size > StateLimits.MAX_SEEN_KEYS) {
             // Not consumed: the read stays outstanding so the SAME answer can be applied after room was made.
             return DeliveryStep(
                 copy(live = original),
                 StageOutcome.Backpressure(DeliveryLimit.SEEN_KEYS)
             )
-        }
-        val deleted = page.events.any {
-            (it.payload as? EventPayload.ConversationChanged)?.deleted ==
-                true
         }
         val gap = page.events.any { it.payload is EventPayload.Gap }
         val changed = page.events.any { it.payload is EventPayload.Changed }

@@ -6,6 +6,7 @@ import dev.quantumink.hermesgadget.protocol.relay.ConversationPage
 import dev.quantumink.hermesgadget.protocol.relay.ConversationSummary
 import dev.quantumink.hermesgadget.protocol.relay.CorrelationId
 import dev.quantumink.hermesgadget.protocol.relay.EventPayload
+import dev.quantumink.hermesgadget.protocol.relay.EventsPage
 import dev.quantumink.hermesgadget.protocol.relay.Info
 import dev.quantumink.hermesgadget.protocol.relay.MetadataState
 import dev.quantumink.hermesgadget.protocol.relay.MutationOutcome
@@ -50,6 +51,7 @@ import dev.quantumink.hermesgadget.protocol.relay.state.PlanRefusal
 import dev.quantumink.hermesgadget.protocol.relay.state.PrepareOutcome
 import dev.quantumink.hermesgadget.protocol.relay.state.Reactivation
 import dev.quantumink.hermesgadget.protocol.relay.state.ReadPlanOutcome
+import dev.quantumink.hermesgadget.protocol.relay.state.ReadRef
 import dev.quantumink.hermesgadget.protocol.relay.state.ReceiptLookup
 import dev.quantumink.hermesgadget.protocol.relay.state.RefreshKind
 import dev.quantumink.hermesgadget.protocol.relay.state.RelayAuthority
@@ -183,9 +185,17 @@ class RelayController(
 
     /** Bumped by everything that invalidates in-flight callbacks: socket change, session end, hide, profile review. */
     private var serial = 0L
+        set(value) {
+            discardDeferredEvents()
+            field = value
+        }
 
     /** Bumped by every attach flow and every selection change. */
     private var flow = 0L
+        set(value) {
+            discardDeferredEvents()
+            field = value
+        }
     private var token: BindingToken? = null
     private var attaching = false
     private var attachedOnce = false
@@ -250,6 +260,16 @@ class RelayController(
     private var retryTimer: Cancelable? = null
     private var listRetryTimer: Cancelable? = null
     private var pollInFlight = false
+
+    /** At most ONE already decoded/validated bounded reply, still owned by its original outstanding read. */
+    private class DeferredEvents(
+        val session: Long,
+        val flow: Long,
+        val bound: BindingToken,
+        val ref: ReadRef,
+        val page: EventsPage
+    )
+    private var deferredEvents: DeferredEvents? = null
     private var progressCursor = 0
 
     /** Turns written in THIS process may be written again by themselves (same id) after a fresh attach and `not_found`. */
@@ -1173,6 +1193,7 @@ class RelayController(
         infoRefreshing = false
         if (refresh) {
             evictOwed()
+            schedulePoll()
             return
         } // still recover independently authorized removals
         serial++
@@ -2696,11 +2717,50 @@ class RelayController(
 
     // -- polling and events ------------------------------------------------------------------------------------
 
+    private fun discardDeferredEvents() {
+        val held = deferredEvents ?: return
+        deferredEvents = null
+        val rt = runtime ?: return
+        val delivery = rt.delivery(held.bound.scope) ?: return
+        runtime = rt.withDelivery(delivery.abortRead(held.ref).delivery)
+    }
+
+    private fun currentDeferred(held: DeferredEvents): Boolean =
+        held.session == serial && held.flow == flow && token === held.bound &&
+            held.bound.scope == scope() && isReady() && supports(RelayMethod.EVENTS_READ) &&
+            runtime?.authority?.isCurrent(held.bound) == true
+
+    /** No new event reads or no-op commits while full. Existing Info and real pending-turn work still have their owners. */
+    private fun capacityPollDelay(): Long? {
+        val held = deferredEvents ?: return null
+        if (!currentDeferred(held)) {
+            discardDeferredEvents()
+            return null
+        }
+        val retry = maxOf(timing.pollIdleMs, timing.backoffMaxMs, 1L)
+        val at = now() ?: return retry
+        val oldest = runtime?.delivery(held.bound.scope)?.oldestSeenAtMs ?: return retry
+        val roomAt = if (oldest > Long.MAX_VALUE - StateLimits.ID_RETENTION_MS - 1) {
+            Long.MAX_VALUE
+        } else {
+            oldest + StateLimits.ID_RETENTION_MS + 1
+        }
+        val roomDelay = if (roomAt > at.serverMs) roomAt - at.serverMs else retry
+        val refreshAt = info?.expiresAtMs?.minus(timing.infoRefreshLeadMs)
+        val maintenance = if (!infoRefreshing && refreshAt != null) {
+            if (refreshAt > at.serverMs) refreshAt - at.serverMs else retry
+        } else {
+            roomDelay
+        }
+        return minOf(roomDelay, maintenance).coerceAtLeast(timing.pollIdleMs)
+    }
+
     private fun schedulePoll() {
         pollTimer?.cancel()
         val bound = token ?: return
         val active = runtime?.ledger?.entriesFor(bound.scope)?.any { awaiting(it) } == true
-        pollTimer = later(if (active) timing.pollActiveMs else timing.pollIdleMs) { pollOnce() }
+        val delay = if (active) timing.pollActiveMs else capacityPollDelay() ?: timing.pollIdleMs
+        pollTimer = later(delay) { pollOnce() }
     }
 
     private fun pollOnce() {
@@ -2739,10 +2799,19 @@ class RelayController(
         val rt = runtime
         val link = transport
         val delivery = rt?.delivery(bound.scope)
-        if (rt == null || link == null || delivery == null || mine != flow ||
+        if (rt == null || link == null || delivery == null || mine != flow || token !== bound ||
+            bound.scope != scope() || !isReady() || !rt.authority.isCurrent(bound) ||
             !supports(RelayMethod.EVENTS_READ)
         ) {
             pollInFlight = false
+            return
+        }
+        val held = deferredEvents
+        if (held != null) {
+            pollInFlight = false
+            retryDeferredEvents(held)
+            publish()
+            if (mine == flow && token === bound) schedulePoll()
             return
         }
         val step = delivery.planRead(rt.authority, link.correlation(), timing.listPageItems)
@@ -2754,14 +2823,23 @@ class RelayController(
         runtime = rt.withDelivery(step.delivery)
         request(plan.call, plan.ref.correlation) { result ->
             pollInFlight = false
-            if (mine != flow) return@request
+            if (mine != flow || token !== bound || deferredEvents?.ref === plan.ref) return@request
             val current = runtime ?: return@request
             val now = current.delivery(bound.scope) ?: return@request
             when (result) {
                 is RelayCallResult.Outcome -> {
-                    val staged = now.stageEvents(current.authority, plan.ref, result.outcome)
+                    val answer = result.outcome
+                    val staged = now.stageEvents(current.authority, plan.ref, answer)
                     runtime = current.withDelivery(staged.delivery)
-                    onStaged(staged.result, staged.effects, bound)
+                    if (staged.result is StageOutcome.Backpressure &&
+                        answer is RelayOutcome.Success
+                    ) {
+                        val deferred = DeferredEvents(serial, mine, bound, plan.ref, answer.value)
+                        deferredEvents = deferred
+                        retryDeferredEvents(deferred)
+                    } else {
+                        onStaged(staged.result, staged.effects, bound)
+                    }
                 }
                 RelayCallResult.TimedOut, is RelayCallResult.Refused ->
                     runtime = current.withDelivery(now.onReadTimeout(plan.ref).delivery)
@@ -2781,7 +2859,7 @@ class RelayController(
             is StageOutcome.Staged -> applyBatch(outcome, bound)
             is StageOutcome.NeedsReattach -> reattach()
             is StageOutcome.Rejected -> notice = RelayNotice.ANOMALY
-            is StageOutcome.Backpressure -> relaxDedup(bound)
+            is StageOutcome.Backpressure -> notice = RelayNotice.STORAGE_FULL_PENDING_ITEMS
             is StageOutcome.RetrySameRead -> notice = RelayNotice.BUSY_TRY_AGAIN
             is StageOutcome.Failed -> notice = RelayNotice.SERVER_ERROR
             is StageOutcome.Ignored -> Unit
@@ -2795,19 +2873,49 @@ class RelayController(
         }
     }
 
-    private fun relaxDedup(bound: BindingToken) {
+    private fun retryDeferredEvents(held: DeferredEvents) {
+        if (!currentDeferred(held)) {
+            discardDeferredEvents()
+            return
+        }
         val rt = runtime ?: return
         val at = now() ?: return
-        val delivery = rt.delivery(bound.scope) ?: return
-        advance(
-            rt.withDelivery(
-                delivery.retireOlderThan(at.serverMs - StateLimits.ID_RETENTION_MS).delivery
-            )
+        val delivery = rt.delivery(held.bound.scope) ?: return
+        val pruned = delivery.retireOlderThan(at.serverMs - StateLimits.ID_RETENTION_MS)
+        if (pruned.result == 0) {
+            notice = RelayNotice.STORAGE_FULL_PENDING_ITEMS
+            return
+        }
+        // This is a proposal, not a newly observed server fact: a refused prune keeps the old runtime and answer.
+        if (!adopt(rt.withDelivery(pruned.delivery))) return
+        val current = runtime ?: return
+        val staged = pruned.delivery.stageEvents(
+            current.authority,
+            held.ref,
+            RelayOutcome.Success(held.page)
         )
+        if (staged.result !is StageOutcome.Backpressure) deferredEvents = null
+        runtime = current.withDelivery(staged.delivery)
+        if (staged.result is StageOutcome.Staged &&
+            notice == RelayNotice.STORAGE_FULL_PENDING_ITEMS
+        ) {
+            notice = RelayNotice.NONE
+        }
+        onStaged(staged.result, staged.effects, held.bound)
     }
 
     private fun applyBatch(staged: StageOutcome.Staged, bound: BindingToken) {
         val batch = staged.batch
+        if (token !== bound || bound.scope != scope() || !isReady() ||
+            runtime?.authority?.isCurrent(bound) != true
+        ) {
+            return
+        }
+        // Fully validated page-level evidence, including a seen terminal identity. Never allocate dedup/ACK facts for it.
+        if (batch.conversationDeleted) {
+            conversationDeleted()
+            return
+        }
         var deleted = false
         for (event in batch.events) {
             when (val payload = event.payload) {

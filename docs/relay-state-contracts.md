@@ -122,7 +122,20 @@ local client choice, not a server rule.
 * O5 copies are display only. Stored deliveries are owed an acknowledgement only after `commitOutbox`; `planAck` carries
   at most 50 and repeating it is safe; only acknowledged ids that the request carried are removed.
 * Local limits (POLICY): 4,096 identities, 256 unacknowledged ids, 128 refresh obligations (widened to enrollment-wide,
-  never dropped). A full table is `Backpressure`; only an explicit `retireOlderThan` relaxes duplicate detection.
+  never dropped). An ordinary full table is `Backpressure`; only an explicit `retireOlderThan` relaxes duplicate detection.
+  After complete current-page validation, a single exact conversation tombstone can stage its existing deletion signal
+  even at that bound. `commitEvents` still refuses any accounting growth above 4,096; the controller consumes the signal
+  through its already durable selected identity, without committing new seen IDs, cursor or ACK facts. Seen duplicate
+  terminal identities retain the existing page-level meaning. Nested conversation/task payload targets must match their
+  event scope. Mixed terminal pages are rejected as producer-shape hardening: the current registered producer replaces
+  its backlog with ONE tombstone. This does not add a new wire field or require `snapshot_required` for legacy singles.
+* The controller owns at most one validated ordinary capacity reply and its exact read/token/session/flow. Zero eligible
+  keys leaves explicit unconsumed capacity, without repeated no-op writes or another event read. Existing seven-day age
+  policy makes room through a confirmed aggregate proposal, then the same reply is restaged by the polling owner. A
+  refused/failed proposal retains the original answer and all keys. Wake timing follows existing key ages and Info
+  maintenance; pending-turn reconciliation remains separate. Session/flow replacement discards the held page and aborts
+  only its exact transient read (no cursor/seen/ACK change). Same-effective Info readiness schedules a fresh current read
+  after LoadingInfo has invalidated the old one. No progress is promised while no safe room exists.
 * Event DTOs carry no execution or authority generation, so the generation guards implemented are the listing generation
   (history), the O5 gap generation, and the binding token's identity and replay epoch.
 
