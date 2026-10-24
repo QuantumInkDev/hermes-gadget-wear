@@ -350,13 +350,18 @@ class RelayController(
      */
     fun answerInboxInput(issued: InboxInput, answer: PromptAnswer, done: (Boolean) -> Unit) = post {
         val marker: Any? = if (existingInboxBinding != null) existingInboxBinding else token
-        val route = localInboxRoute(issued.route)
         if (inboxInput !== issued || !issued.canAnswer || issued.serial != serial ||
             issued.flow != flow ||
             issued.writer != writerEpoch() || issued.observer != inboxEpoch.get() ||
             issued.inputGeneration != inputEpoch.get() || issued.owner != namespace() ||
             issued.boundToken !== marker ||
-            !isReady() || inboxOnly || route == null ||
+            !isReady() || inboxOnly
+        ) {
+            done(false)
+            return@post
+        }
+        val route = localInboxRoute(issued.route)
+        if (route == null ||
             (
                 issued.prompt.expiresAtMs != null &&
                     issued.prompt.expiresAtMs <= (now()?.serverMs ?: Long.MAX_VALUE)

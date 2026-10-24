@@ -24,7 +24,13 @@ import org.junit.Test
 class InboxCurrentInputTest {
     private class Disk : InboxFile {
         var saved = InboxSnapshot()
-        override fun load() = InboxCodec.decode(InboxCodec.encode(saved))
+        var unavailable = false
+        var reads = 0
+        override fun load(): InboxSnapshot {
+            reads++
+            if (unavailable) throw InboxFailure(InboxProblem.STORAGE)
+            return InboxCodec.decode(InboxCodec.encode(saved))
+        }
         override fun commit(next: InboxSnapshot, base: Long): InboxWrite {
             if (base != saved.revision) return InboxWrite.Stale
             saved = InboxCodec.decode(InboxCodec.encode(next))
@@ -187,5 +193,22 @@ class InboxCurrentInputTest {
         assertTrue(f.frames("relay.conversation.attach").isEmpty())
         assertFalse(h.disk.load().profiles.single().enabled)
         assertTrue(h.disk.load().copies.isNotEmpty())
+    }
+
+    @Test fun unanswerableTokenRefusesBeforeUnavailableRouteStorage() {
+        val h = Owner()
+        val unbound = h.get()!!
+        assertFalse(unbound.canAnswer)
+        val reads = h.disk.reads
+        h.disk.unavailable = true
+        var completed = false
+        h.f.controller.answerInboxInput(unbound, PromptAnswer.Choice("Continue")) {
+            assertFalse(it)
+            completed = true
+        }
+        h.f.run()
+        assertTrue(completed)
+        assertEquals(reads, h.disk.reads)
+        assertTrue(h.f.frames("relay.prompt.respond").isEmpty())
     }
 }
