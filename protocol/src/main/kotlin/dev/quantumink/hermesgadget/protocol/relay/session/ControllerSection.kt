@@ -63,7 +63,9 @@ class EnrollmentRecord(
     /** What the last changed `relay.info` showed, for the review screen only. */
     val observedProfileId: ProfileId?,
     val selectedConversationId: ConversationId?,
-    val createIntent: CreateIntent?
+    val createIntent: CreateIntent?,
+    /** The already reserved selected identity is exact deletion evidence until confirmed removal. */
+    val selectionDeleted: Boolean = false
 ) {
     init {
         require(
@@ -77,6 +79,10 @@ class EnrollmentRecord(
         )
         require(endpointUrl.length in 1..MAX_URL_CHARS)
         require(reviewEpoch >= 0)
+        require(
+            !selectionDeleted ||
+                (selectedConversationId != null && HistoryNamespace.from(this) != null)
+        )
     }
 
     /** The scope of this enrollment's state, or null before any profile was pinned. */
@@ -95,7 +101,8 @@ class EnrollmentRecord(
         standing: Standing = this.standing,
         observedProfileId: ProfileId? = this.observedProfileId,
         selectedConversationId: ConversationId? = this.selectedConversationId,
-        createIntent: CreateIntent? = this.createIntent
+        createIntent: CreateIntent? = this.createIntent,
+        selectionDeleted: Boolean = this.selectionDeleted
     ): EnrollmentRecord = EnrollmentRecord(
         endpointKey,
         endpointUrl,
@@ -106,7 +113,8 @@ class EnrollmentRecord(
         standing,
         observedProfileId,
         selectedConversationId,
-        createIntent
+        createIntent,
+        selectionDeleted
     )
 
     override fun equals(other: Any?): Boolean = other is EnrollmentRecord &&
@@ -114,7 +122,9 @@ class EnrollmentRecord(
         enrollmentKey == other.enrollmentKey && enabled == other.enabled &&
         pinnedProfileId == other.pinnedProfileId && reviewEpoch == other.reviewEpoch &&
         standing == other.standing && observedProfileId == other.observedProfileId &&
-        selectedConversationId == other.selectedConversationId && createIntent == other.createIntent
+        selectedConversationId == other.selectedConversationId &&
+        createIntent == other.createIntent &&
+        selectionDeleted == other.selectionDeleted
 
     override fun hashCode(): Int = 31 * endpointKey.hashCode() + enrollmentKey.hashCode()
 
@@ -236,7 +246,19 @@ class ControllerSection(
     }
 
     fun cleared(eviction: HistoryEviction): ControllerSection = ControllerSection(
-        enrollments,
+        enrollments.map { record ->
+            if (record.selectionDeleted && eviction.kind != EvictionKind.CACHE_ONLY &&
+                HistoryNamespace.from(record) == eviction.namespace &&
+                (
+                    eviction.conversationId == null ||
+                        record.selectedConversationId?.value == eviction.conversationId
+                    )
+            ) {
+                record.copy(selectedConversationId = null, selectionDeleted = false)
+            } else {
+                record
+            }
+        },
         intents.filterNot {
             eviction.kind != EvictionKind.CACHE_ONLY &&
                 it.namespace == eviction.namespace &&

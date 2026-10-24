@@ -110,19 +110,19 @@ after authentication. Separate from the identity vault (alias `quantumink.relay.
 `PhoneHistoryCache`. Files: `state.v1`, `state.pending`, `initialized` (the marker proves a vanished record is **not** an empty
 store). One store serves Task3, V5 and Tasks 4/5.
 
-### 4.2 Plaintext (`SnapshotCodec`, document format 3; reads legacy formats 1 and 2)
+### 4.2 Plaintext (`SnapshotCodec`, document format 4; reads legacy formats 1, 2 and 3)
 
 Big-endian scalars, a `u16` count per collection, an `i32` UTF-8 length per string, no recursion and no JSON:
 
-`"RS3\0" · u16 documentFormat=3 · u16 snapshotVersion(1|2)` · controller enrollments · ledger turns · scope decisions ·
+`"RS3\0" · u16 documentFormat=4 · u16 snapshotVersion(1|2)` · controller enrollments · ledger turns · scope decisions ·
 histories · deliveries · (aggregate version2 only) capture section (`i32` captureSectionVersion=1, `u16` count, records) ·
 metadata intents (`u16` count, records) · ordinary history evictions (`u16` count, records) ·
-`u8 emergencyDeletionPresent` · optional ONE exact DELETED eviction · `"END\0"`.
+`u8 emergencyDeletionPresent` · optional ONE exact DELETED eviction · one `u8 selectionDeleted` per controller enrollment (same order) · `"END\0"`.
 
 The aggregate always carries current captures explicitly (`RelayRuntime.build`). Aggregate1 has no capture section;
 aggregate2 has capture-section1. Legacy document1 omits metadata/evictions and the emergency flag; document2 includes the
 two feature counts/records but omits only the emergency flag/record. They decode with missing features empty, preserving
-every aggregate section. Older readers fail closed on document3. Cache plaintext schema3, the state container1,
+every aggregate section. Legacy document3 includes the emergency flag/record but omits the per-enrollment deletion flags; formats1/2/3 decode those flags as false, never guessed deletion evidence. Older readers fail closed on document4. Cache plaintext schema3, the state container1,
 capture-section1 and HistoryArchive1 are separate version domains and are unchanged by this document-format correction.
 
 ### 4.3 Bounds, derived from the actual fields
@@ -135,22 +135,29 @@ opaque conversation128/event256, create title512, raw metadata title4096, turn t
 One separate emergency deletion slot is reserved for exact canonical DELETED namespace/conversation evidence at the
 ordinary64 limit. It cannot contain CACHE_ONLY, REVOKED or a null conversation; a second distinct overflow is typed
 CAPACITY. No ordinary cap is increased. RETIRED immutable metadata intents also remain exact durable deletion evidence
-until confirmed removal. Genuine permission denial may use durable STOPPED itself as scope-wide REVOKED authority at
-capacity. STOPPED never authorizes wider erasure for DELETED or CACHE_ONLY. Unrepresentable observations remain explicitly
-non-durable with an exact in-process fence/backpressure; failed disk writes are not a power-loss guarantee.
+until confirmed removal. Format4 reserves both coreCommitted presence/value bytes even while the result is absent (false padding); formats2/3 retain conditional presence/value decoding. PENDING/UNKNOWN to RETIRED therefore does not grow its existing immutable intent. Genuine permission denial may use durable STOPPED itself as scope-wide REVOKED authority at
+capacity. STOPPED never authorizes wider erasure for DELETED or CACHE_ONLY.
+
+Every admitted attach first confirms a format4 record with its exact selected identity and a fixed deletion flag. A current
+attach/bound deletion flips that byte while keeping the same namespace and selected ID: no new slot, target string or
+aggregate bytes are allocated. Until confirmed removal clears both ID and flag, selection/create/retry/review replacement
+refuse; Leave/disable preserve the marker. Other eviction/metadata/cache-review allocations cannot consume this pre-encoded
+representation. Metadata results have their already durable immutable intent target. Terminal events record deletion before
+expanding seen-event accounting. Deterministic aggregate representation refusals withdraw the observer; actual unconfirmed
+disk writes stay honestly unsaved and do not establish power-loss durability.
 
 Let `S(n)=4+n` and `N(n)=1+S(n)` for required/nullable strings. Field-cap upper bounds (bytes, computed/tested) are:
 scope824; turn fixed1337 (excluding its text length/data); scope decision893; history254673; delivery1950663;
-capture1237; enrollment3594. Namespace=`2*S(384)+S(2048)+S(36)+8`=2876.
+capture1237; enrollment3595 (including its fixed deletion flag). Namespace=`2*S(384)+S(2048)+S(36)+8`=2876.
 Metadata intent=`namespace+2*S(36)+8+N(4096)+2+8+S(64)+2`=7145.
 History eviction=`namespace+N(36)+S(64)`=2985 (the reserved slot uses that same bounded encoding).
 
-Empty document3/aggregate2=`header8+trailer4+fiveCounts10+captureVersion4+captureCount2+featureCounts4+emergencyFlag1`
-=**33 bytes**. Legacy document2/aggregate2 empty=32; legacy document1/aggregate2 empty=28. Aggregate1 omits the6 capture bytes.
+Empty document4/aggregate2=`header8+trailer4+fiveCounts10+captureVersion4+captureCount2+featureCounts4+emergencyFlag1`
+=**33 bytes**. Legacy document3/aggregate2 empty=33; legacy document2/aggregate2 empty=32; legacy document1/aggregate2 empty=28. Aggregate1 omits the6 capture bytes.
 
-Full field-cap upper bound=`33+16*3594+128*1337+1048576+128*4+64*893+16*254673+16*1950663+64*1237+16*7145+65*2985`
-=**37,007,802 bytes**. The last65 is64 ordinary records plus ONE reserved exact deletion, not a widened ordinary quota.
-Document2's corresponding bound was37,004,816. These are structural field-cap upper bounds: actual enum spellings and
+Full field-cap upper bound=`33+16*3595+128*1337+1048576+128*4+64*893+16*254673+16*1950663+64*1237+16*7145+65*2985`
+=**37,007,818 bytes**. The last65 is64 ordinary records plus ONE reserved exact deletion, not a widened ordinary quota.
+Document3's corresponding bound was37,007,802; document2 was37,004,816. These are structural field-cap upper bounds: actual enum spellings and
 validated namespace values can be shorter, so no legal maximum-size writer or device latency claim follows.
 
 The deliberate plaintext cap remains **8MiB** (`StoreBounds.PLAINTEXT_CAP_BYTES`), below the structural bound.
@@ -264,7 +271,8 @@ recovery is claimed. SDK production is unchanged in this Task3 stage; this limit
 `stale_binding`/`stale_epoch`/`snapshot_required` and every gap (a gap event is part of NORMAL operation — every captured turn's
 events carry one): `relay.info` is read again, the session attaches again and history is read again; nothing is resubmitted.
 `permission_denied`: durable `STOPPED`, authority retired, then the eviction obligation — turn texts, delivery state and history
-resume points and the Task4 retained cache — **stays owed in memory and on disk until confirmed removal is stored**. `profile_changed`: durable `REVIEW_REQUIRED`.
+resume points and the Task4 retained cache — **stays owed in memory and on disk until confirmed removal is stored**. `profile_changed`: durable `REVIEW_REQUIRED`. These effective authority actions take precedence even when an error also carries
+`snapshot_required`; only an effective refresh action may restart a cursored listing. Review withdraws the cursor/retry owner.
 
 ### 5.7 Reconnect request ordering
 
@@ -368,10 +376,10 @@ transient, expired and denied states stay distinct. Returned sanitized metadata 
 shown exactly, without an optimistic Saved title/bookmark. Stop tracking is explicit;
 it cannot undo a server mutation. No metadata retry submits a turn or replays speech.
 
-SnapshotCodec document format 3 retains bounded metadata intents and history eviction obligations
+SnapshotCodec document format 4 retains bounded metadata intents and history eviction obligations
 in the same aggregate and adds the reserved exact deletion slot. Format 1 remains readable without inventing either section;
 voice captures and all pre-existing sections are carried explicitly on every write.
-Older document-format1/2 readers fail closed on document3; formats1/2 remain readable by this writer. Text cache schema 3 and reviewed legacy
+Older document-format1/2/3 readers fail closed on document4; formats1/2/3 remain readable by this writer. Text cache schema 3 and reviewed legacy
 handling are documented in history-export-format.md. No server production, protocol
 method, permission or transport implementation change was needed for Task4.
 

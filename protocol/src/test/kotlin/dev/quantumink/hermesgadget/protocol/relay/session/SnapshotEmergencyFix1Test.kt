@@ -48,9 +48,12 @@ class SnapshotEmergencyFix1Test {
     @Test fun legacyDocumentTwoDecodesAllOriginalFeaturesWithoutAnEmergency() {
         val section = ControllerSection(listOf(record), evictions = old)
         val current = encoded(section)
-        val oldBytes = (
-            current.copyOfRange(0, current.size - 5) +
+        val legacy3 =
+            current.copyOfRange(0, current.size - 4 - section.enrollments.size) +
                 current.copyOfRange(current.size - 4, current.size)
+        val oldBytes = (
+            legacy3.copyOfRange(0, legacy3.size - 5) +
+                legacy3.copyOfRange(legacy3.size - 4, legacy3.size)
             ).also { it[5] = 2 }
         val restored = (SnapshotCodec.decode(oldBytes) as DecodeResult.Decoded).document.section
         assertEquals(section, restored)

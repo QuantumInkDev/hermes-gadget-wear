@@ -84,7 +84,7 @@ sealed interface DecodeResult {
 object SnapshotCodec {
     const val MAGIC = 0x52533300
     const val TRAILER = 0x454E4400
-    const val FORMAT_VERSION = 3
+    const val FORMAT_VERSION = 4
 
     fun encode(document: RelayDocument): EncodeResult = try {
         EncodeResult.Encoded(Writer.run(document))
@@ -212,6 +212,7 @@ object SnapshotCodec {
                 document.section.emergencyDeletion?.let {
                     w.eviction(it, "history.emergencyDeletion")
                 }
+                document.section.enrollments.forEach { w.bool(it.selectionDeleted) }
                 w.i32(TRAILER)
                 return w.result()
             }
@@ -277,7 +278,7 @@ object SnapshotCodec {
                 i64(item.preparedAtMs)
                 string(item.status.name, StoreBounds.ENUM_BYTES, path)
                 bool(item.coreCommitted != null)
-                item.coreCommitted?.let(::bool)
+                bool(item.coreCommitted ?: false) // fixed reserved result byte, even before a reply
             }
             count(section.evictions.size, 64, "history.evictions")
             section.evictions.forEachIndexed { index, item ->
@@ -511,7 +512,7 @@ object SnapshotCodec {
             } else {
                 CaptureLedgerSnapshot.EMPTY
             }
-            val featured = if (format >= 2) features(section) else section
+            val featured = if (format >= 2) features(section, format) else section
             val emergency = if (format >= 3 &&
                 bool("history.emergencyDeletion")
             ) {
@@ -520,8 +521,21 @@ object SnapshotCodec {
                 null
             }
             val completeSection = try {
+                val records = featured.enrollments.mapIndexed { index, record ->
+                    if (format >=
+                        4
+                    ) {
+                        record.copy(
+                            selectionDeleted = bool(
+                                "section.enrollments[$index].selectionDeleted"
+                            )
+                        )
+                    } else {
+                        record
+                    }
+                }
                 ControllerSection(
-                    featured.enrollments,
+                    records,
                     featured.intents,
                     featured.evictions,
                     emergency
@@ -624,7 +638,7 @@ object SnapshotCodec {
             return HistoryEviction(namespace, conversation, kind)
         }
 
-        private fun features(section: ControllerSection): ControllerSection {
+        private fun features(section: ControllerSection, format: Int): ControllerSection {
             val intents = List(count(16, "metadata.intents")) { index ->
                 val path = "metadata.intents[$index]"
                 val namespace = namespace(path)
@@ -638,7 +652,10 @@ object SnapshotCodec {
                 val status = string(StoreBounds.ENUM_BYTES, path).let { name ->
                     MetadataStatus.entries.firstOrNull { it.name == name } ?: corrupt(path)
                 }
-                val core = if (bool(path)) bool(path) else null
+                val hasCore = bool(path)
+                val coreValue = if (hasCore || format >= 4) bool(path) else false
+                if (!hasCore && coreValue) corrupt(path)
+                val core = if (hasCore) coreValue else null
                 try {
                     MetadataIntent(
                         namespace, conversation, request, revision, title, bookmark,

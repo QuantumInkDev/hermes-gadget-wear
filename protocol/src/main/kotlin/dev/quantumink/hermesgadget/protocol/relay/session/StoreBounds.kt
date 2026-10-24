@@ -91,7 +91,8 @@ object StoreBounds {
     val enrollmentMax: Long =
         string(SCOPE_KEY_BYTES) + string(URL_BYTES) + string(SCOPE_KEY_BYTES) +
             1 + nullableString(UUID_BYTES) + 8 + string(ENUM_BYTES) + nullableString(UUID_BYTES) +
-            nullableString(UUID_BYTES) + 1 + string(UUID_BYTES) + nullableString(TITLE_BYTES) + 8
+            nullableString(UUID_BYTES) + 1 + string(UUID_BYTES) + nullableString(TITLE_BYTES) + 8 +
+            1
 
     const val HEADER_BYTES = 4L + 2 + 2
     const val TRAILER_BYTES = 4L
@@ -108,7 +109,7 @@ object StoreBounds {
     val historyEvictionMax: Long =
         historyNamespaceMax + nullableString(UUID_BYTES) + string(ENUM_BYTES)
 
-    /** The size of a format 3 / aggregate version 2 document with every collection empty. */
+    /** The size of a format 4 / aggregate version 2 document with every collection empty. */
     fun emptyDocumentBytes(): Long = HEADER_BYTES + TRAILER_BYTES + COUNTS_BYTES + 1
 
     /** Every collection at its limit and every string at its cap; turn text bounded by the ledger-wide total. */

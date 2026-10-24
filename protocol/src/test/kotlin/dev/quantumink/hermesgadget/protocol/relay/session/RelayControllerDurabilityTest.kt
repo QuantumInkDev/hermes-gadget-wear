@@ -102,7 +102,28 @@ class RelayControllerDurabilityTest {
         store.initialised = true
         store.sequence = 1
         fx.prepare()
-        selected(fx)
+        fx.connect()
+        fx.listAnd(Dto.summary())
+        fx.controller.select(Dto.conversation.value)
+        fx.run()
+        fx.answer("relay.conversation.attach", Dto.binding(1).toWire())
+        assertFalse("an unstorable observed binding cannot retain an active token", fx.ui.canSend)
+        assertTrue(fx.frames("relay.history.page").isEmpty())
+        val preserved = store.reread()
+        val expected = RelayDocument(
+            preserved.section,
+            RelayStateSnapshot(
+                2,
+                preserved.snapshot.ledger,
+                preserved.snapshot.histories,
+                foreign,
+                preserved.snapshot.captures
+            )
+        )
+        assertArrayEquals(
+            (SnapshotCodec.encode(expected) as EncodeResult.Encoded).bytes,
+            store.bytes
+        )
         assertEquals(RelayNotice.STORAGE_FULL_PENDING_ITEMS, fx.ui.notice)
         assertTrue(fx.ui.unsaved)
         val before = store.commits

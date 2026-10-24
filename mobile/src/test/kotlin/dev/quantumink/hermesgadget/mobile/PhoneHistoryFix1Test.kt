@@ -403,7 +403,11 @@ class PhoneHistoryFix1Test {
         h.evictionFailure = true
         deleteSelected(h)
         assertEquals(Standing.ACTIVE, h.document.section.enrollments.single().standing)
-        assertEquals(EvictionKind.DELETED, h.document.section.evictions.single().kind)
+        assertTrue(h.document.section.enrollments.single().selectionDeleted)
+        assertEquals(
+            h.summary.conversationId,
+            h.document.section.enrollments.single().selectedConversationId
+        )
         assertArrayEquals(before, bytes(h))
         h.controller.hide()
         h.run()
@@ -846,7 +850,7 @@ class PhoneHistoryFix1Test {
         val typedBefore = h.document.snapshot.ledger.turns
         val voiceBefore = h.document.snapshot.captures.records
         h.fail = { doc ->
-            if (doc.section.emergencyDeletion != null) {
+            if (doc.section.enrollments.any { it.selectionDeleted }) {
                 if (land) {
                     check(
                         h.disk.commit(doc, h.disk.currentSequence()) is StoreCommit.Committed
@@ -918,9 +922,9 @@ class PhoneHistoryFix1Test {
         h.page(message(1))
         var owed = false
         h.fail = { doc ->
-            if (doc.section.emergencyDeletion != null) owed = true
+            if (doc.section.enrollments.any { it.selectionDeleted }) owed = true
             if (owed &&
-                doc.section.emergencyDeletion == null
+                doc.section.enrollments.none { it.selectionDeleted }
             ) {
                 StoreCommit.Failed(StoreProblem.STORAGE_UNAVAILABLE, false)
             } else {
@@ -929,7 +933,7 @@ class PhoneHistoryFix1Test {
         }
         deleteSelected(h)
         assertTrue(h.cache.absent(h.namespace, h.summary.conversationId.value))
-        assertTrue(h.document.section.emergencyDeletion != null)
+        assertTrue(h.document.section.enrollments.single().selectionDeleted)
         assertTrue(h.ui.contentEvictionPending)
         h.controller.hide()
         h.run()
@@ -1044,7 +1048,13 @@ class PhoneHistoryFix1Test {
         val before = bytes(h)
         val aggregate = h.document.snapshot
         deleteSelected(h)
+        assertEquals(RelayNotice.CONVERSATION_DELETED, h.ui.notice)
+        assertTrue(h.document.section.enrollments.single().selectionDeleted)
+        val admitted = h.link.requests.count { it.method == "relay.conversation.attach" }
+        h.controller.select(id(700))
+        h.run()
         assertEquals(RelayNotice.STORAGE_FULL_PENDING_ITEMS, h.ui.notice)
+        assertEquals(admitted, h.link.requests.count { it.method == "relay.conversation.attach" })
         assertEquals(Standing.ACTIVE, h.document.section.enrollments.single().standing)
         assertEquals(old, h.document.section.evictions)
         assertEquals(emergency, h.document.section.emergencyDeletion)

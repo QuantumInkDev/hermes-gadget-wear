@@ -168,6 +168,9 @@ class RelayController(
     private var runtime: RelayRuntime? = null
     private var unsaved = false
 
+    /** Confirmed by THIS controller's format4 writer before admitting the selected attach/subscription. */
+    private var selectionReservation: HistoryEviction? = null
+
     private var transport: RelayTransport? = null
     private var channel: RelayChannelState = RelayChannelState.Closed
     private var info: Info? = null
@@ -324,7 +327,13 @@ class RelayController(
             )
             ).copy(
             enabled = on,
-            selectedConversationId = if (on) existing?.selectedConversationId else null
+            selectedConversationId = if (on ||
+                existing?.selectionDeleted == true
+            ) {
+                existing?.selectedConversationId
+            } else {
+                null
+            }
         )
         if (!commitSection(section.with(record))) return@post publish()
         if (!on) {
@@ -462,7 +471,13 @@ class RelayController(
     /** RETIRED is already durable immutable exact-target evidence even if an extra eviction slot was refused. */
     private fun durableRemovals(section: ControllerSection = baseSection()): List<HistoryEviction> =
         (
-            section.removals + section.intents.filter { it.status == MetadataStatus.RETIRED }.map {
+            section.removals + section.enrollments.filter { it.selectionDeleted }.map { record ->
+                HistoryEviction(
+                    requireNotNull(HistoryNamespace.from(record)),
+                    requireNotNull(record.selectedConversationId).value,
+                    EvictionKind.DELETED
+                )
+            } + section.intents.filter { it.status == MetadataStatus.RETIRED }.map {
                 HistoryEviction(it.namespace, it.conversationId.value, EvictionKind.DELETED)
             } + section.enrollments.filter { it.standing == Standing.STOPPED }.mapNotNull {
                 HistoryNamespace.from(it)?.takeUnless { owner ->
@@ -482,6 +497,21 @@ class RelayController(
 
     private fun blocked(conversation: String): Boolean =
         namespace()?.let { removalOwed(it, conversation) } == true
+
+    private fun selectionTarget(section: ControllerSection): HistoryEviction? {
+        val who = identity ?: return null
+        val record = section.find(who.endpointKey, who.enrollmentLabel) ?: return null
+        val owner = HistoryNamespace.from(record) ?: return null
+        val id = record.selectedConversationId ?: return null
+        return HistoryEviction(owner, id.value, EvictionKind.DELETED)
+    }
+
+    private fun selectionReplaceable(): Boolean {
+        if (record()?.selectionDeleted != true && undurableDeletion == null) return true
+        retainedProblem = HistoryProblem.CAPACITY
+        notice = RelayNotice.STORAGE_FULL_PENDING_ITEMS
+        return false
+    }
 
     private fun itemView(summary: ConversationSummary) = ConversationItem(
         summary.conversationId.value,
@@ -895,6 +925,7 @@ class RelayController(
     // -- store -----------------------------------------------------------------------------------------------
 
     private fun load() {
+        selectionReservation = null
         stored = when (val result = store.load()) {
             StoreLoad.Empty -> Stored.Empty
             is StoreLoad.Loaded -> {
@@ -978,6 +1009,7 @@ class RelayController(
         }
         storeSequence = result.sequence
         stored = Stored.Doc(document)
+        selectionReservation = selectionTarget(document.section)
         return true
     }
 
@@ -989,7 +1021,7 @@ class RelayController(
         return true
     }
 
-    private fun tryCommit(next: RelayRuntime): Boolean {
+    private fun tryCommit(next: RelayRuntime, observed: Boolean = false): Boolean {
         val at = now()
         if (at == null) {
             notice = RelayNotice.CLOCK_UNAVAILABLE
@@ -999,27 +1031,36 @@ class RelayController(
             is DocumentBuild.Built -> built.document
             is DocumentBuild.TooMany -> {
                 notice = RelayNotice.STORAGE_FULL_PENDING_ITEMS
+                if (observed && (token != null || attaching)) endSession(attachAgain = false)
                 return false
             }
             is DocumentBuild.Unrestorable -> {
                 notice = RelayNotice.STORAGE_WRITE_FAILED
+                if (observed && (token != null || attaching)) endSession(attachAgain = false)
                 return false
             }
         }
         val result = store.commit(document, storeSequence)
         if (result !is StoreCommit.Committed) {
             noticeFor(result)
+            // A deterministic representation refusal cannot leave an active observer with no storable aggregate.
+            if (observed && result is StoreCommit.Refused &&
+                (token != null || attaching)
+            ) {
+                endSession(attachAgain = false)
+            }
             return false
         }
         storeSequence = result.sequence
         stored = Stored.Doc(document)
+        selectionReservation = selectionTarget(document.section)
         return true
     }
 
     /** A server answer or a retired binding changed the state: it is applied; a failed commit only marks it unsaved. */
     private fun advance(next: RelayRuntime) {
         runtime = next
-        unsaved = !tryCommit(next)
+        unsaved = !tryCommit(next, observed = true)
         if (unsaved) {
             notice = when (notice) {
                 RelayNotice.STORAGE_UNCERTAIN -> RelayNotice.OBSERVATION_UNCERTAIN
@@ -1484,6 +1525,11 @@ class RelayController(
 
     private fun requireReview() {
         transport?.invalidatePending()
+        listOperation++
+        listCursor = null
+        listing = false
+        listRetryTimer?.cancel()
+        listRetryTimer = null
         val record = record() ?: return
         val rt = runtime ?: return
         val scope = record.scope()
@@ -1513,6 +1559,8 @@ class RelayController(
     // -- review and re-authorisation ----------------------------------------------------------------------------
 
     private fun reviewAccepted() {
+        evictOwed()
+        if (!selectionReplaceable()) return publish()
         val record = record() ?: return
         val rt = runtime ?: return
         val offered = info?.profileId
@@ -1566,9 +1614,10 @@ class RelayController(
     }
 
     private fun reauthorized() {
-        val record = record() ?: return
-        if (record.standing != Standing.STOPPED) return publish()
+        if (record()?.standing != Standing.STOPPED) return publish()
         evictOwed()
+        if (!selectionReplaceable()) return publish()
+        val record = record() ?: return
         val owner = HistoryNamespace.from(record)
         if (unsaved ||
             (owner != null && removalOwed(owner, null, wholeScopeOnly = true))
@@ -1653,7 +1702,13 @@ class RelayController(
                         }
                     }
                     is RelayOutcome.Failed -> {
-                        if (outcome.error.needsFreshView && cursor != null) {
+                        if (outcome.error.action == RelayErrorAction.STOP_AND_EVICT_SCOPE ||
+                            outcome.error.action == RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW
+                        ) {
+                            commonError(outcome.error, null, attempt)
+                        } else if (outcome.error.action == RelayErrorAction.REATTACH_AND_REFRESH &&
+                            outcome.error.needsFreshView && cursor != null
+                        ) {
                             if (attempt >= timing.maxRetries ||
                                 listRestarts >= MAX_HISTORY_RESTARTS
                             ) {
@@ -1718,6 +1773,7 @@ class RelayController(
     // -- create ------------------------------------------------------------------------------------------------
 
     private fun createConversation(title: String?) {
+        if (!selectionReplaceable()) return publish()
         if (undurableDeletion !=
             null
         ) {
@@ -1767,6 +1823,7 @@ class RelayController(
         operation == createOperation && record()?.createIntent == intent
 
     private fun sendCreate(intent: CreateIntent, operation: Long = createOperation) {
+        if (!selectionReplaceable()) return publish()
         if (createHalted || !currentCreate(intent, operation) || !isReady()) return
         val at = now()
         if (at != null && at.serverMs - intent.preparedAtMs >= timing.createRetryWindowMs) {
@@ -1837,6 +1894,7 @@ class RelayController(
     }
 
     private fun onCreated(intent: CreateIntent, summary: ConversationSummary) {
+        if (!selectionReplaceable()) return publish()
         val record = record() ?: return
         if (record.createIntent != intent) return
         val chosen = record.copy(
@@ -1868,6 +1926,7 @@ class RelayController(
     // -- select, attach, leave --------------------------------------------------------------------------------
 
     private fun selectConversation(id: ConversationId) {
+        if (!selectionReplaceable()) return publish()
         val record = record() ?: return
         if (!isReady() || !supports(RelayMethod.CONVERSATION_ATTACH)) return publish()
         if (blocked(id.value) || undurableDeletion != null) {
@@ -1910,7 +1969,15 @@ class RelayController(
         attempt: Int = 0,
         refreshListBeforeAttach: Boolean = false
     ) {
+        if (!selectionReplaceable()) return publish()
         if (record()?.selectedConversationId != id || !isReady() || blocked(id.value)) return
+        // Legacy/restored selections must first reserve their fixed format4 flag on disk. New selection/create already did.
+        val target = selectionTarget(baseSection()) ?: return
+        if ((selectionReservation != target || unsaved) &&
+            !commitSection(baseSection())
+        ) {
+            return publish()
+        }
         transport?.invalidatePending()
         flow++
         val mine = flow
@@ -2007,6 +2074,7 @@ class RelayController(
             return
         }
         advance(rt.copy(authority = step.authority).withDelivery(delivery.delivery))
+        if (mine != flow) return publish()
         token = step.token
         // Receipt first, then history, then the task snapshot; only then is the view current and events are pulled.
         reconcileAll(step.token, mine) {
@@ -2068,7 +2136,7 @@ class RelayController(
         attachedOnce = false
         transcript.clear()
         tasks.clear()
-        if (record.selectedConversationId != null) {
+        if (record.selectedConversationId != null && !record.selectionDeleted) {
             commitSection(withRecord(record.copy(selectedConversationId = null)))
         }
         publish()
@@ -2779,10 +2847,12 @@ class RelayController(
             }
         }
         if (committed.result is EventCommit.Backpressure) notice = RelayNotice.SERVER_ERROR
-        advance(rt.withDelivery(committed.delivery))
         if (deleted) {
             conversationDeleted()
-        } else if (again) {
+        } else {
+            advance(rt.withDelivery(committed.delivery))
+        }
+        if (!deleted && again) {
             // A gap or a snapshot requirement: history and tasks are read again from a fresh attach. Nothing is resent.
             reattach()
         }
@@ -2825,25 +2895,23 @@ class RelayController(
         }
         conversations.removeAll { it.id == target.value && owner == namespace() }
         val obligation = HistoryEviction(owner, target.value, EvictionKind.DELETED)
-        val base = if (selected) {
-            rt.section.with(
-                record.copy(selectedConversationId = null)
-            )
+        val section = if (selected) {
+            // The exact selected identity was committed before attach. Flipping its reserved byte needs no new slot/bytes.
+            rt.section.with(record.copy(selectionDeleted = true))
         } else {
-            rt.section
+            boundedSection { rt.section.owing(obligation) }
         }
-        val section = boundedSection { base.owing(obligation) }
         if (section != null) {
             advance(rt.copy(section = section))
-        } else if (base.intents.any {
+        } else if (rt.section.intents.any {
                 it.namespace == owner && it.conversationId == target &&
                     it.status == MetadataStatus.RETIRED
             }
         ) {
-            // The immutable RETIRED intent is already the durable exact-target deletion evidence.
-            advance(rt.copy(section = base))
+            // An unselected metadata target is already represented by its immutable RETIRED intent.
+            advance(rt)
         } else {
-            // No safe durable representation: preserve all old bytes/obligations, fence only this exact target.
+            // Defensive only: current bound/attach deletions use their reserved identity; metadata has its durable intent.
             undurableDeletion = obligation
         }
         if (retainedSelected?.id == target.value && owner == namespace()) retainedSelected = null
