@@ -1,6 +1,10 @@
 package dev.quantumink.hermesgadget.mobile
 
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.quantumink.hermesgadget.protocol.relay.session.EnrollmentRecord
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryAnchor
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryFailure
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryProblem
 import java.io.File
 import java.security.KeyStore
 import java.util.UUID
@@ -21,13 +25,14 @@ class PhoneHistoryCacheNativeTest {
     }
 
     @Test fun nativeSelectionsAndCacheDtosOwnExposedArrays() {
-        val scope = HistoryScope(
-            "fixture",
-            "wss://example.invalid/gadget",
-            "00000000-0000-4000-8000-000000000001",
-            "00000000-0000-4000-8000-000000000002",
-            "a".repeat(64)
-        )
+        val scope =
+            HistoryScope(
+                EnrollmentRecord.endpointKey("wss://example.invalid/gadget"),
+                "wss://example.invalid/gadget",
+                "a".repeat(64),
+                "00000000-0000-4000-8000-000000000002",
+                0L
+            )
         val first = "00000000-0000-4000-8000-000000000003"
         val second = "00000000-0000-4000-8000-000000000004"
         val ids = arrayOf<Any?>(first, second)
@@ -53,13 +58,14 @@ class PhoneHistoryCacheNativeTest {
         val keys = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         check(!directory.exists() && !keys.containsAlias(alias))
         try {
-            val scope = HistoryScope(
-                "synthetic:profile",
-                "wss://example.invalid/gadget",
-                "00000000-0000-4000-8000-000000000001",
-                "00000000-0000-4000-8000-000000000002",
-                "a".repeat(64)
-            )
+            val scope =
+                HistoryScope(
+                    EnrollmentRecord.endpointKey("wss://example.invalid/gadget"),
+                    "wss://example.invalid/gadget",
+                    "a".repeat(64),
+                    "00000000-0000-4000-8000-000000000002",
+                    0L
+                )
             val cache = PhoneHistoryCache(context, directory, alias)
             val entry = HistoryThread(
                 "00000000-0000-4000-8000-000000000003",
@@ -68,7 +74,12 @@ class PhoneHistoryCacheNativeTest {
                 false,
                 listOf(HistoryMessage("m1", HistoryRole.USER, "Fixture-only text", 123))
             )
-            cache.put(scope, entry, 0)
+            cache.put(
+                scope,
+                entry,
+                0,
+                HistoryAnchor.Beginning
+            )
             assertTrue(keys.containsAlias(alias))
             assertEquals(
                 "Fixture-only text",
@@ -78,7 +89,9 @@ class PhoneHistoryCacheNativeTest {
             val record = File(directory, "history.v1")
             val before = record.readBytes()
             keys.deleteEntry(alias)
-            assertTrue(runCatching { cache.read(scope) }.isFailure)
+            val failure = runCatching { cache.read(scope) }.exceptionOrNull()
+            assertTrue(failure is HistoryFailure)
+            assertEquals(HistoryProblem.KEY_UNAVAILABLE, (failure as HistoryFailure).problem)
             assertFalse(keys.containsAlias(alias))
             assertTrue(before.contentEquals(record.readBytes()))
         } finally {

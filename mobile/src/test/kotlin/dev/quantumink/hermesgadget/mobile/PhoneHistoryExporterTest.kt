@@ -2,6 +2,10 @@ package dev.quantumink.hermesgadget.mobile
 
 import dev.quantumink.hermesgadget.protocol.HistoryArchive
 import dev.quantumink.hermesgadget.protocol.HistoryArchiveReadResult
+import dev.quantumink.hermesgadget.protocol.relay.session.EnrollmentRecord
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryAnchor
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryFailure
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryProblem
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 import java.util.concurrent.CountDownLatch
@@ -19,13 +23,14 @@ import org.junit.rules.TemporaryFolder
 
 class PhoneHistoryExporterTest {
     @get:Rule val temporary = TemporaryFolder()
-    private val scope = HistoryScope(
-        "example:profile",
-        "wss://example.invalid/gadget",
-        "00000000-0000-4000-8000-000000000001",
-        "00000000-0000-4000-8000-000000000002",
-        "a".repeat(64)
-    )
+    private val scope =
+        HistoryScope(
+            EnrollmentRecord.endpointKey("wss://example.invalid/gadget"),
+            "wss://example.invalid/gadget",
+            "a".repeat(64),
+            "00000000-0000-4000-8000-000000000002",
+            0L
+        )
     private val first = "00000000-0000-4000-8000-000000000003"
     private val second = "00000000-0000-4000-8000-000000000004"
     private val password get() = "a-private-export-password".toCharArray()
@@ -45,16 +50,53 @@ class PhoneHistoryExporterTest {
                     index == 0,
                     listOf(
                         HistoryMessage("m$index", HistoryRole.USER, "Private thought $index", 123)
-                    )
+                    ),
+                    complete = true
                 ),
-                index.toLong()
+                index.toLong(),
+                HistoryAnchor.Beginning
             )
         }
         return cache
     }
 
-    private fun review(revision: Long = 2, ids: List<String> = listOf(first)) =
-        HistoryExportReview(scope, revision, ids, "Example / Profile")
+    private fun review(revision: Long = 2, ids: List<String> = listOf(first)) = HistoryExportReview(
+        scope,
+        revision,
+        ids,
+        "Example / Profile",
+        serverId = "00000000-0000-4000-8000-000000000001"
+    )
+
+    @Test fun partialHistoryAndUnboundExportProvenanceAreDistinctTypedRefusals() = runBlocking {
+        val cache = fixture()
+        val output = ByteArrayOutputStream()
+        val unbound = HistoryExportReview(scope, 2, listOf(first), "Fixture")
+        val missing = runCatching {
+            PhoneHistoryExporter(cache).write(unbound, password, output)
+        }.exceptionOrNull()
+        assertTrue(missing is HistoryFailure)
+        assertEquals(HistoryProblem.UNBOUND_PROVENANCE, (missing as HistoryFailure).problem)
+        val partialId = "00000000-0000-4000-8000-000000000005"
+        cache.put(
+            scope,
+            HistoryThread(
+                partialId,
+                1,
+                "Notes",
+                false,
+                listOf(HistoryMessage("m0", HistoryRole.USER, "Private thought", 123))
+            ),
+            2,
+            HistoryAnchor.Beginning
+        )
+        val partial = runCatching {
+            PhoneHistoryExporter(cache).write(review(3, listOf(partialId)), password, output)
+        }.exceptionOrNull()
+        assertTrue(partial is HistoryFailure)
+        assertEquals(HistoryProblem.REBUILD_REQUIRED, (partial as HistoryFailure).problem)
+        assertEquals(0, output.size())
+    }
 
     @Test fun reviewedIdsNeverUseTheCallersBulkArrayConversion() {
         val backing = arrayOf(first, second)
@@ -74,7 +116,7 @@ class PhoneHistoryExporterTest {
             override fun get(index: Int) = HistoryMessage("m$index", HistoryRole.USER, "Text", 123)
             override fun toArray(): Array<Any?> = error("Caller array must never be retained")
         }
-        val entry = HistoryThread(first, 1, "Title", false, messages)
+        val entry = HistoryThread(first, 1, "Title", false, messages, complete = true)
         assertEquals(listOf("m0", "m1"), entry.messages.map { it.id })
         val threads = object : java.util.AbstractList<HistoryThread>() {
             override val size: Int get() = 2
@@ -91,7 +133,12 @@ class PhoneHistoryExporterTest {
             HistoryMessage("z-user", HistoryRole.USER, "Question", 123),
             HistoryMessage("a-answer", HistoryRole.ASSISTANT, "Answer", 123)
         )
-        cache.put(scope, HistoryThread(third, 1, "Ordered", false, messages), 2)
+        cache.put(
+            scope,
+            HistoryThread(third, 1, "Ordered", false, messages, complete = true),
+            2,
+            HistoryAnchor.Beginning
+        )
         val output = ByteArrayOutputStream()
         PhoneHistoryExporter(cache).write(review(3, listOf(third)), password, output)
         val opened = HistoryArchive.decrypt(output.toByteArray(), password)
@@ -188,10 +235,11 @@ class PhoneHistoryExporterTest {
                 1,
                 "Notes 0",
                 true,
-                listOf(HistoryMessage("large", HistoryRole.ASSISTANT, "x".repeat(200_000), 124))
+                listOf(HistoryMessage("large", HistoryRole.ASSISTANT, "x".repeat(200_000), 124)),
+                complete = true
             ),
             2,
-            afterMessageId = "m0"
+            HistoryAnchor.After("m0")
         )
         val review = review(3)
         val entered = CountDownLatch(1)
@@ -251,7 +299,10 @@ class PhoneHistoryExporterTest {
         val decoded = HistoryArchive.decrypt(output.toByteArray(), password)
             as HistoryArchiveReadResult.Success
         assertEquals(listOf(first), decoded.snapshot.conversations.map { it.id })
-        assertEquals(scope.serverId, decoded.snapshot.conversations.single().source.serverId)
+        assertEquals(
+            "00000000-0000-4000-8000-000000000001",
+            decoded.snapshot.conversations.single().source.serverId
+        )
         assertEquals(scope.profileId, decoded.snapshot.conversations.single().source.profileId)
         assertEquals(1L, decoded.snapshot.conversations.single().publicRevision)
         assertEquals(
@@ -271,7 +322,7 @@ class PhoneHistoryExporterTest {
         val invalid = listOf(
             review(1),
             review(ids = listOf("00000000-0000-4000-8000-000000000005")),
-            HistoryExportReview(scope.copy(profileKey = "other"), 2, listOf(first), "Other")
+            HistoryExportReview(scope.copy(enrollmentLabel = "other"), 2, listOf(first), "Other")
         )
         invalid.forEach {
             val output = ByteArrayOutputStream()

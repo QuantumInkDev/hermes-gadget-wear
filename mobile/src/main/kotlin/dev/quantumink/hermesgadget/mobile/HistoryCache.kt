@@ -1,6 +1,9 @@
 package dev.quantumink.hermesgadget.mobile
 
-import dev.quantumink.hermesgadget.protocol.Endpoint
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryAnchor
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryEraseReview
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryFailure
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryProblem
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -8,6 +11,7 @@ import java.io.DataOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
 import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
@@ -16,65 +20,25 @@ import java.nio.charset.CodingErrorAction
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
-import java.util.Collections
+import java.security.MessageDigest
 import java.util.Locale
 import java.util.UUID
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-/** Public identity only. An enrollment tag is a public-key SHA-256, never an enrollment key. */
-internal data class HistoryScope(
-    val profileKey: String,
-    val endpointUrl: String,
-    val serverId: String,
-    val profileId: String,
-    val enrollmentTag: String
-) {
-    override fun toString(): String = "HistoryScope(redacted)"
-}
-internal enum class HistoryRole { USER, ASSISTANT }
+internal typealias HistoryScope =
+    dev.quantumink.hermesgadget.protocol.relay.session.HistoryNamespace
+internal typealias HistoryRole = dev.quantumink.hermesgadget.protocol.relay.session.RetainedRole
+internal typealias HistoryMessage =
+    dev.quantumink.hermesgadget.protocol.relay.session.RetainedMessage
+internal typealias HistoryThread = dev.quantumink.hermesgadget.protocol.relay.session.RetainedThread
+internal typealias HistorySnapshot =
+    dev.quantumink.hermesgadget.protocol.relay.session.RetainedSnapshot
 
-/** Complete display text only; no tool/system payloads, raw segments, actions or audio. */
-internal data class HistoryMessage(
-    val id: String,
-    val role: HistoryRole,
-    val text: String,
-    val createdAtMs: Long
-) {
-    override fun toString(): String = "HistoryMessage(redacted)"
-}
-internal class HistoryThread(
-    val id: String,
-    val publicRevision: Long,
-    val title: String,
-    val bookmarked: Boolean,
-    messages: List<HistoryMessage>
-) {
-    private val content = ownedHistoryItems(messages, 1024)
-    val messages: List<HistoryMessage> get() = content
-    override fun toString(): String = "HistoryThread(redacted)"
-}
-internal class HistorySnapshot(
-    val revision: Long,
-    val retentionDays: Int = 90,
-    threads: List<HistoryThread> = emptyList()
-) {
-    private val content = ownedHistoryItems(threads, 256)
-    val threads: List<HistoryThread> get() = content
-    override fun toString(): String = "HistorySnapshot(redacted)"
-}
-
-/** Element-wise ownership also on API29, whose ArrayList(Collection) can alias toArray(). */
-internal fun <T : Any> ownedHistoryItems(values: List<T>, maximum: Int): List<T> {
-    require(values.size <= maximum) { "History capacity exceeded." }
-    val owned = ArrayList<T>(minOf(values.size, maximum))
-    for (value in values) {
-        require(owned.size < maximum) { "History capacity exceeded." }
-        owned.add(requireNotNull(value) { "Invalid history item." })
-    }
-    return Collections.unmodifiableList(owned)
-}
+/** Element ownership is shared with the Android-free consumer; never ArrayList(Collection). */
+internal fun <T : Any> ownedHistoryItems(values: List<T>, maximum: Int): List<T> =
+    dev.quantumink.hermesgadget.protocol.relay.session.ownHistoryItems(values, maximum)
 
 /**
  * Private bounded text cache. No enrollment, network, transport binding or canonical deletion.
@@ -84,8 +48,12 @@ internal fun <T : Any> ownedHistoryItems(values: List<T>, maximum: Int): List<T>
 internal class EncryptedHistoryCache(
     private val directory: File,
     private val key: (create: Boolean) -> SecretKey,
-    private val clock: () -> Long
+    private val clock: () -> Long,
+    /** Owned filesystem fault seam; production uses the real fsync immediately after promotion. */
+    private val afterPromote: () -> Unit = {}
 ) {
+    private var inspectedVersion: Int? = null
+    private var inspectedRevision: Long? = null
     private data class CachedMessage(val message: HistoryMessage, val receivedAt: Long)
     private data class CachedThread(
         val scope: HistoryScope,
@@ -94,107 +62,111 @@ internal class EncryptedHistoryCache(
         val title: String,
         val bookmarked: Boolean,
         val receivedAt: Long,
-        val messages: List<CachedMessage>
+        val messages: List<CachedMessage>,
+        val complete: Boolean = false,
+        val rebuild: Boolean = false,
+        val listing: String = "",
+        val coverage: Int = 0
     ) {
         fun display() = HistoryThread(
             id,
             publicRevision,
             title,
             bookmarked,
-            messages.map {
-                it.message
-            }
+            messages.map { it.message },
+            complete,
+            rebuild
         )
     }
     private data class Document(
         val revision: Long = 0,
         val days: Int = 90,
-        val threads: List<CachedThread> = emptyList()
+        val threads: List<CachedThread> = emptyList(),
+        val highWater: Long = 0
     )
 
-    fun read(scope: HistoryScope): HistorySnapshot = synchronized(lock) {
-        validate(scope)
-        val original = load()
-        val retained = retain(original, time())
-        snapshot(scope, saveIfChanged(original, retained))
+    fun read(scope: HistoryScope): HistorySnapshot = guarded {
+        synchronized(lock) {
+            validate(scope)
+            val original = load()
+            val retained = retain(original, time())
+            snapshot(scope, saveIfChanged(original, retained))
+        }
     }
 
-    /**
-     * Ordered canonical page, beginning immediately after [afterMessageId], or at the beginning
-     * when null. The caller must assemble complete display messages from one current snapshot.
-     * Overlap must match the cached sequence; unknown anchors/gaps/conflicting order are refused.
-     * The local revision prevents late callbacks from undoing a purge or newer cache write.
-     */
+    /** Explicit canonical placement. Only the authenticated controller supplies production captures. */
     fun put(
         scope: HistoryScope,
         thread: HistoryThread,
         expectedRevision: Long,
-        afterMessageId: String? = null
+        anchor: HistoryAnchor,
+        listing: String = "fixture",
+        complete: Boolean = thread.complete
     ): HistorySnapshot = update(scope, expectedRevision) { document, now ->
         validate(thread)
         if (document.days == 0) {
             document
         } else {
-            val previous = document.threads.singleOrNull {
-                it.scope == scope && it.id == thread.id
-            }
+            val previous = document.threads.singleOrNull { it.scope == scope && it.id == thread.id }
+            if (previous?.rebuild == true) fail(HistoryProblem.REBUILD_REQUIRED)
             if (previous != null) {
-                check(thread.publicRevision >= previous.publicRevision) {
-                    "Stale history metadata."
-                }
-                check(
-                    thread.publicRevision != previous.publicRevision ||
-                        (
-                            thread.title == previous.title &&
-                                thread.bookmarked == previous.bookmarked
-                            )
+                if (thread.publicRevision <
+                    previous.publicRevision
                 ) {
-                    "Conflicting history metadata."
+                    fail(HistoryProblem.STALE_METADATA)
+                }
+                if (thread.publicRevision == previous.publicRevision &&
+                    (thread.title != previous.title || thread.bookmarked != previous.bookmarked)
+                ) {
+                    fail(HistoryProblem.METADATA_CONFLICT)
                 }
             }
             val messages = previous?.messages?.toMutableList() ?: mutableListOf()
-            val start = if (afterMessageId == null) {
-                0
-            } else {
-                token(afterMessageId, 256)
-                val index = messages.indexOfFirst { it.message.id == afterMessageId }
-                check(index >= 0) { "History anchor unavailable. Reload canonical history." }
-                index + 1
+            val start = when (anchor) {
+                HistoryAnchor.Beginning -> 0
+                is HistoryAnchor.After -> {
+                    token(anchor.messageId, 256)
+                    val index = messages.indexOfFirst { it.message.id == anchor.messageId }
+                    if (index < 0) fail(HistoryProblem.MISSING_ANCHOR)
+                    if (previous?.listing != listing) fail(HistoryProblem.REBUILD_REQUIRED)
+                    if (index >= previous.coverage) fail(HistoryProblem.MISSING_ANCHOR)
+                    index + 1
+                }
             }
             var changed = previous == null || previous.publicRevision != thread.publicRevision
             thread.messages.forEachIndexed { offset, message ->
                 val position = start + offset
                 val known = messages.getOrNull(position)
                 if (known != null) {
-                    check(known.message == message) {
-                        "Conflicting history sequence. Reload canonical history."
-                    }
+                    if (known.message != message) fail(HistoryProblem.SEQUENCE_CONFLICT)
                 } else {
-                    check(messages.none { it.message.id == message.id }) {
-                        "Conflicting history sequence. Reload canonical history."
+                    if (messages.any {
+                            it.message.id == message.id
+                        }
+                    ) {
+                        fail(HistoryProblem.SEQUENCE_CONFLICT)
                     }
                     messages.add(CachedMessage(message, now))
                     changed = true
                 }
             }
-            val saved = CachedThread(
-                scope,
-                thread.id,
-                thread.publicRevision,
-                thread.title,
-                thread.bookmarked,
-                if (changed) now else requireNotNull(previous).receivedAt,
-                messages
-            )
+            val coverage = start + thread.messages.size
+            if (complete && coverage != messages.size) fail(HistoryProblem.SEQUENCE_CONFLICT)
+            val saved =
+                CachedThread(
+                    scope, thread.id, thread.publicRevision, thread.title, thread.bookmarked,
+                    if (changed) now else requireNotNull(previous).receivedAt, messages,
+                    complete ||
+                        (
+                            previous?.complete == true && previous.listing == listing &&
+                                messages.size == previous.messages.size
+                            ),
+                    false, listing,
+                    maxOf(coverage, if (previous?.listing == listing) previous.coverage else 0)
+                )
             val entries = document.threads.toMutableList()
-            if (previous ==
-                null
-            ) {
-                entries += saved
-            } else {
-                entries[entries.indexOf(previous)] = saved
-            }
-            document.copy(threads = entries)
+            if (previous == null) entries.add(saved) else entries[entries.indexOf(previous)] = saved
+            document.copy(threads = entries, highWater = if (changed) now else document.highWater)
         }
     }
 
@@ -204,7 +176,7 @@ internal class EncryptedHistoryCache(
         conversationId: String?,
         expectedRevision: Long
     ): HistorySnapshot = update(scope, expectedRevision, force = true) { document, _ ->
-        conversationId?.let(::uuid)
+        conversationId?.let { token(it, 128) }
         document.copy(
             threads = document.threads.filterNot {
                 it.scope == scope && (conversationId == null || it.id == conversationId)
@@ -235,39 +207,67 @@ internal class EncryptedHistoryCache(
         expectedRevision: Long,
         force: Boolean = false,
         transform: (Document, Long) -> Document
-    ): HistorySnapshot = synchronized(lock) {
-        validate(scope)
-        require(expectedRevision in 0..MAX_TIME) { "Invalid history revision." }
-        val original = load()
-        check(expectedRevision == original.revision) { "History changed. Reload before saving." }
-        val now = time()
-        // Merge against unpruned IDs so an exact retry cannot refresh their receipt time at expiry.
-        val retained = retain(transform(original, now), now)
-        snapshot(scope, saveIfChanged(original, retained, force))
+    ): HistorySnapshot = guarded {
+        synchronized(lock) {
+            validate(scope)
+            val original = load()
+            if (expectedRevision != original.revision) fail(HistoryProblem.LOCAL_REVISION)
+            val now = maxOf(time(), original.highWater)
+            // Expiry is durable BEFORE merge. Even a refused replay cannot restore an expired ID.
+            val pruned = saveIfChanged(original, retain(original, now))
+            val next = retain(transform(pruned, now), now)
+            snapshot(scope, saveIfChanged(pruned, next, force))
+        }
     }
 
-    private fun retain(document: Document, now: Long): Document {
-        if (document.days == 0) return document.copy(threads = emptyList())
+    private fun retain(document: Document, wall: Long): Document {
+        val now = maxOf(wall, document.highWater)
         val cutoff = now - document.days * DAY
-        return document.copy(
-            threads = document.threads.mapNotNull { entry ->
-                val messages = entry.messages.filter { it.receivedAt > cutoff }
-                if (messages.isEmpty() && entry.receivedAt <= cutoff) {
-                    null
-                } else {
-                    entry.copy(messages = messages)
-                }
+        var changed = false
+        val threads = document.threads.map { entry ->
+            val messages = if (document.days ==
+                0
+            ) {
+                emptyList()
+            } else {
+                entry.messages.filter { it.receivedAt > cutoff }
             }
-        )
+            val trimmed = messages.size != entry.messages.size ||
+                (entry.messages.isEmpty() && entry.receivedAt <= cutoff && !entry.rebuild)
+            if (trimmed) changed = true
+            if (trimmed) {
+                entry.copy(
+                    messages = messages,
+                    complete = false,
+                    rebuild = true,
+                    title = if (messages.isEmpty()) "" else entry.title,
+                    bookmarked = if (messages.isEmpty()) false else entry.bookmarked
+                )
+            } else {
+                entry
+            }
+        }
+        return if (changed) document.copy(threads = threads, highWater = now) else document
     }
 
     private fun snapshot(scope: HistoryScope, document: Document) = HistorySnapshot(
         document.revision,
         document.days,
-        document.threads.filter { it.scope == scope }.sortedWith(
+        document.threads.filter {
+            it.scope == scope && !(it.rebuild && it.messages.isEmpty())
+        }.sortedWith(
             compareByDescending<CachedThread> { it.receivedAt }.thenBy { it.id }
         ).map { it.display() }
     )
+
+    fun absent(scope: HistoryScope, conversationId: String?): Boolean = guarded {
+        synchronized(lock) {
+            load().threads.none {
+                it.scope == scope &&
+                    (conversationId == null || it.id == conversationId)
+            }
+        }
+    }
 
     private fun time(): Long = clock().also {
         require(it in 0..MAX_TIME) { "History clock unavailable." }
@@ -284,7 +284,7 @@ internal class EncryptedHistoryCache(
         val plaintext = encode(next)
         try {
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.ENCRYPT_MODE, key(!File(directory, RECORD).exists()))
+            cipher.init(Cipher.ENCRYPT_MODE, secret(!File(directory, RECORD).exists()))
             check(cipher.iv.size == 12) { "Unsupported history encryption." }
             cipher.updateAAD(aad)
             val sealed = byteArrayOf(1, 12) + cipher.iv + cipher.doFinal(plaintext)
@@ -296,14 +296,14 @@ internal class EncryptedHistoryCache(
     }
 
     private fun load(): Document {
+        inspectedVersion = null
+        inspectedRevision = null
         check(!Files.isSymbolicLink(directory.toPath())) { "Invalid history directory." }
         if (!directory.exists()) return Document()
         check(directory.isDirectory) { "Invalid history directory." }
         val record = File(directory, RECORD)
         if (!record.exists()) {
-            check(directory.listFiles()?.isEmpty() == true) {
-                "History record missing. Existing data was preserved."
-            }
+            if (directory.listFiles()?.isEmpty() != true) fail(HistoryProblem.RECORD_MISSING)
             return Document()
         }
         val marker = File(directory, MARKER)
@@ -315,26 +315,44 @@ internal class EncryptedHistoryCache(
         }
         check(record.isFile && !Files.isSymbolicLink(record.toPath())) { "Invalid history record." }
         val encrypted = boundedRead(record)
-        require(encrypted.size >= 30 && encrypted[0].toInt() == 1 && encrypted[1].toInt() == 12) {
-            "Unsupported history record."
+        if (encrypted.size < 30 || encrypted[0].toInt() != 1 ||
+            encrypted[1].toInt() != 12
+        ) {
+            fail(HistoryProblem.UNSUPPORTED)
         }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(
             Cipher.DECRYPT_MODE,
-            key(false),
+            secret(false),
             GCMParameterSpec(128, encrypted.copyOfRange(2, 14))
         )
         cipher.updateAAD(aad)
-        val plaintext = cipher.doFinal(encrypted.copyOfRange(14, encrypted.size))
+        val plaintext = try {
+            cipher.doFinal(encrypted.copyOfRange(14, encrypted.size))
+        } catch (
+            _: javax.crypto.AEADBadTagException
+        ) {
+            fail(HistoryProblem.UNREADABLE)
+        }
         return try {
+            if (plaintext.size >= 4) inspectedVersion = ByteBuffer.wrap(plaintext).getInt(0)
+            if (inspectedVersion in 1..3 && plaintext.size >= 12) {
+                inspectedRevision =
+                    ByteBuffer.wrap(plaintext).getLong(4).takeIf { it in 1..MAX_TIME }
+            }
             decode(plaintext)
+        } catch (failure: HistoryFailure) {
+            throw failure
+        } catch (_: Exception) {
+            fail(HistoryProblem.UNREADABLE)
         } finally {
             plaintext.fill(0)
         }
     }
 
     private fun boundedRead(file: File): ByteArray = FileInputStream(file).use { input ->
-        require(input.channel.size() in 30..(MAX_BYTES + 30).toLong()) { "Invalid history size." }
+        if (input.channel.size() > MAX_BYTES + 30L) fail(HistoryProblem.CAPACITY)
+        if (input.channel.size() < 30) fail(HistoryProblem.UNREADABLE)
         val output = ByteArrayOutputStream()
         val buffer = ByteArray(8192)
         while (true) {
@@ -370,7 +388,14 @@ internal class EncryptedHistoryCache(
             StandardCopyOption.REPLACE_EXISTING
         )
         // A failure here is uncertain durability, never a successful acknowledgment.
-        syncDirectory()
+        try {
+            afterPromote()
+            syncDirectory()
+        } catch (
+            _: IOException
+        ) {
+            fail(HistoryProblem.WRITE_UNCERTAIN)
+        }
     }
 
     private fun syncDirectory() {
@@ -378,43 +403,42 @@ internal class EncryptedHistoryCache(
     }
 
     private fun encode(document: Document): ByteArray {
-        require(document.days in 0..365 && document.threads.size <= 256) {
-            "History capacity exceeded."
-        }
-        require(
-            document.threads.sumOf {
-                it.messages.size
-            } <= 4096
-        ) { "History capacity exceeded." }
+        if (document.days !in 0..365 || document.threads.size > 256) fail(HistoryProblem.CAPACITY)
+        if (document.threads.sumOf { it.messages.size } > 4096) fail(HistoryProblem.CAPACITY)
         val output = ByteArrayOutputStream()
         val bounded = object : OutputStream() {
             override fun write(value: Int) {
-                require(output.size() < MAX_BYTES) { "History capacity exceeded." }
+                if (output.size() >= MAX_BYTES) fail(HistoryProblem.CAPACITY)
                 output.write(value)
             }
             override fun write(bytes: ByteArray, offset: Int, length: Int) {
-                require(length <= MAX_BYTES - output.size()) { "History capacity exceeded." }
+                if (length > MAX_BYTES - output.size()) fail(HistoryProblem.CAPACITY)
                 output.write(bytes, offset, length)
             }
         }
         DataOutputStream(bounded).use { data ->
-            data.writeInt(2)
+            data.writeInt(3)
             data.writeLong(document.revision)
             data.writeInt(document.days)
+            data.writeLong(document.highWater)
             data.writeInt(document.threads.size)
             document.threads.forEach { entry ->
                 validate(entry.scope)
                 validate(entry.display())
-                data.string(entry.scope.profileKey, 512)
+                data.string(entry.scope.endpointKey, 512)
                 data.string(entry.scope.endpointUrl, 2048)
-                data.string(entry.scope.serverId, 36)
+                data.string(entry.scope.enrollmentLabel, 512)
                 data.string(entry.scope.profileId, 36)
-                data.string(entry.scope.enrollmentTag, 64)
-                data.string(entry.id, 36)
+                data.writeLong(entry.scope.reviewEpoch)
+                data.string(entry.id, 128)
                 data.writeLong(entry.publicRevision)
                 data.string(entry.title, 512)
                 data.writeBoolean(entry.bookmarked)
                 data.writeLong(entry.receivedAt)
+                data.writeBoolean(entry.complete)
+                data.writeBoolean(entry.rebuild)
+                data.string(entry.listing, 256)
+                data.writeInt(entry.coverage)
                 data.writeInt(entry.messages.size)
                 entry.messages.forEach {
                     data.string(it.message.id, 256)
@@ -430,26 +454,34 @@ internal class EncryptedHistoryCache(
 
     private fun decode(bytes: ByteArray): Document =
         DataInputStream(ByteArrayInputStream(bytes)).use { data ->
-            require(data.readInt() == 2) {
-                "Unsupported history format. Existing record was preserved."
+            when (data.readInt()) {
+                1, 2 -> fail(HistoryProblem.LEGACY_UNBOUND)
+                3 -> Unit
+                else -> fail(HistoryProblem.UNSUPPORTED)
             }
             val revision = data.readLong().also { require(it in 1..MAX_TIME) }
             val days = data.readInt().also { require(it in 0..365) }
-            val count = data.readInt().also { require(it in 0..256 && (days != 0 || it == 0)) }
+            val highWater = data.readLong().also { require(it in 0..MAX_TIME) }
+            val count = data.readInt().also { require(it in 0..256) }
             var total = 0
             val threads = List(count) {
                 val scope = HistoryScope(
                     data.string(512),
                     data.string(2048),
+                    data.string(512),
                     data.string(36),
-                    data.string(36),
-                    data.string(64)
+                    data.readLong()
                 ).also(::validate)
-                val id = data.string(36).also(::uuid)
+                val id = data.string(128).also { token(it, 128) }
                 val metadata = data.readLong().also { require(it in 0..MAX_TIME) }
                 val title = data.string(512)
                 val bookmarked = data.readUnsignedByte().also { require(it in 0..1) } == 1
                 val received = data.readLong().also { require(it in 0..MAX_TIME) }
+                val complete = data.readUnsignedByte().also { require(it in 0..1) } == 1
+                val rebuild = data.readUnsignedByte().also { require(it in 0..1) } == 1
+                require(!complete || !rebuild)
+                val listing = data.string(256)
+                val coverage = data.readInt().also { require(it in 0..1024) }
                 val size = data.readInt().also {
                     require(it in 0..1024 && total + it <= 4096)
                     total += it
@@ -464,14 +496,17 @@ internal class EncryptedHistoryCache(
                     val at = data.readLong().also { require(it in 0..MAX_TIME) }
                     CachedMessage(HistoryMessage(mid, HistoryRole.entries[role], text, created), at)
                 }
-                CachedThread(scope, id, metadata, title, bookmarked, received, messages).also {
+                CachedThread(
+                    scope, id, metadata, title, bookmarked, received, messages,
+                    complete, rebuild, listing, coverage
+                ).also {
                     validate(it.display())
                 }
             }
             require(threads.map { it.scope to it.id }.toSet().size == count && data.read() == -1) {
                 "Invalid history entries."
             }
-            Document(revision, days, threads)
+            Document(revision, days, threads, highWater)
         }
 
     private fun DataOutputStream.string(value: String, limit: Int) {
@@ -498,18 +533,11 @@ internal class EncryptedHistoryCache(
     }
 
     private fun validate(scope: HistoryScope) {
-        token(scope.profileKey, 512)
-        require(Endpoint.parse(scope.endpointUrl).let { it.isTls && it.url == scope.endpointUrl }) {
-            "Invalid history endpoint."
-        }
-        uuid(scope.serverId)
-        uuid(scope.profileId)
-        require(scope.enrollmentTag.matches(Regex("[0-9a-f]{64}"))) {
-            "Invalid history enrollment tag."
-        }
+        // The typed namespace constructor validates actual public endpoint/enrollment/profile/review facts.
+        require(scope.reviewEpoch >= 0)
     }
     private fun validate(thread: HistoryThread) {
-        uuid(thread.id)
+        token(thread.id, 128)
         require(thread.publicRevision in 0..MAX_TIME) { "Invalid history metadata revision." }
         text(thread.title, 512)
         require(thread.title.codePointCount(0, thread.title.length) <= 120) {
@@ -542,14 +570,149 @@ internal class EncryptedHistoryCache(
         utf8(value, limit).fill(0)
     }
     private fun utf8(value: String, limit: Int): ByteArray {
-        require(value.length <= limit) { "History text is too large." }
+        if (value.length > limit) fail(HistoryProblem.CAPACITY)
         val encoded = Charsets.UTF_8.newEncoder().onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT).encode(CharBuffer.wrap(value))
         try {
-            require(encoded.remaining() <= limit) { "History text is too large." }
+            if (encoded.remaining() > limit) fail(HistoryProblem.CAPACITY)
             return ByteArray(encoded.remaining()).also { encoded.get(it) }
         } finally {
             if (encoded.hasArray()) encoded.array().fill(0)
+        }
+    }
+
+    private fun fail(problem: HistoryProblem): Nothing = throw HistoryFailure(problem)
+    private fun secret(create: Boolean): SecretKey = try {
+        key(create)
+    } catch (_: Exception) {
+        fail(HistoryProblem.KEY_UNAVAILABLE)
+    }
+    private fun <T> guarded(action: () -> T): T = try {
+        action()
+    } catch (
+        failure: HistoryFailure
+    ) {
+        throw failure
+    } catch (
+        _: java.nio.charset.CharacterCodingException
+    ) {
+        fail(HistoryProblem.INVALID_VALUE)
+    } catch (
+        _: IOException
+    ) {
+        fail(HistoryProblem.STORAGE)
+    } catch (
+        _: java.security.GeneralSecurityException
+    ) {
+        fail(HistoryProblem.UNREADABLE)
+    } catch (
+        _: IllegalArgumentException
+    ) {
+        fail(HistoryProblem.INVALID_VALUE)
+    } catch (
+        _: IllegalStateException
+    ) {
+        fail(HistoryProblem.UNREADABLE)
+    }
+
+    /** Review does not prune, write, create a key or guess legacy ownership. */
+    fun review(
+        scope: HistoryScope,
+        conversationId: String?,
+        global: Boolean = false,
+        days: Int? = null
+    ): HistoryEraseReview = synchronized(lock) {
+        if (Files.isSymbolicLink(directory.toPath())) fail(HistoryProblem.STORAGE)
+        if (directory.listFiles()?.any { it.name !in setOf(RECORD, MARKER, PENDING) } ==
+            true
+        ) {
+            fail(HistoryProblem.STORAGE)
+        }
+        val record = File(directory, RECORD)
+        val marker = File(directory, MARKER)
+        val document = try {
+            load()
+        } catch (_: Exception) {
+            null
+        }
+        val bytes = if (record.isFile && !Files.isSymbolicLink(record.toPath()) &&
+            record.length() <= MAX_BYTES + 30L
+        ) {
+            record.readBytes()
+        } else {
+            null
+        }
+        fun hash(value: ByteArray) =
+            MessageDigest.getInstance("SHA-256").digest(value).joinToString("") {
+                "%02x".format(it)
+            }
+        if (record.exists() && bytes == null) fail(HistoryProblem.STORAGE)
+        val markerBytes = if (marker.isFile && !Files.isSymbolicLink(marker.toPath()) &&
+            marker.length() <= 16
+        ) {
+            marker.readBytes()
+        } else {
+            byteArrayOf()
+        }
+        val pending = File(directory, PENDING)
+        val pendingHash = if (!pending.exists()) {
+            "absent"
+        } else {
+            if (!pending.isFile || Files.isSymbolicLink(pending.toPath()) ||
+                pending.length() > MAX_BYTES + 30L
+            ) {
+                fail(HistoryProblem.STORAGE)
+            }
+            hash(pending.readBytes())
+        }
+        if (days != null && document == null) fail(HistoryProblem.UNREADABLE)
+        HistoryEraseReview(
+            if (document == null ||
+                global
+            ) {
+                null
+            } else {
+                scope
+            },
+            if (document == null || global) null else conversationId,
+            document == null || global,
+            bytes?.let(
+                ::hash
+            ) ?: "absent",
+            if (marker.exists()) hash(markerBytes) else "absent",
+            bytes?.size?.toLong() ?: 0,
+            inspectedVersion, document?.revision ?: inspectedRevision, days, pendingHash
+        )
+    }
+
+    /** Recheck exact record/revision/hash at mutation. Global unreadable bytes affect ALL profiles. */
+    fun erase(review: HistoryEraseReview, scope: HistoryScope) = guarded {
+        synchronized(lock) {
+            if (review !=
+                review(scope, review.conversationId, review.allProfiles, review.retentionDays)
+            ) {
+                fail(HistoryProblem.STALE_REVIEW)
+            }
+            if (review.retentionDays != null) {
+                setRetention(
+                    scope,
+                    requireNotNull(review.retentionDays),
+                    requireNotNull(review.revision)
+                )
+            } else if (review.allProfiles) {
+                for (name in listOf(RECORD, PENDING, MARKER)) {
+                    val file = File(directory, name)
+                    if (Files.isSymbolicLink(file.toPath())) fail(HistoryProblem.STORAGE)
+                    if (file.exists() && !file.delete()) fail(HistoryProblem.STORAGE)
+                }
+                if (directory.exists()) syncDirectory()
+            } else {
+                purge(
+                    requireNotNull(review.namespace),
+                    review.conversationId,
+                    requireNotNull(review.revision)
+                )
+            }
         }
     }
 

@@ -7,6 +7,8 @@ import dev.quantumink.hermesgadget.protocol.HistoryArchiveRole
 import dev.quantumink.hermesgadget.protocol.HistoryArchiveSnapshot
 import dev.quantumink.hermesgadget.protocol.HistoryArchiveSource
 import dev.quantumink.hermesgadget.protocol.MigrationArchive
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryFailure
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryProblem
 import java.io.OutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
@@ -19,7 +21,9 @@ internal class HistoryExportReview(
     val scope: HistoryScope,
     val expectedRevision: Long,
     conversationIds: List<String>,
-    val sourceLabel: String
+    val sourceLabel: String,
+    /** Independently reviewed export provenance; never inferred from a cache namespace or profile UUID. */
+    val serverId: String? = null
 ) {
     val conversationIds: List<String>
     init {
@@ -66,8 +70,11 @@ internal class PhoneHistoryExporter(
                 val selected = review.conversationIds.map {
                     checkNotNull(indexed[it]) { "Selected history is unavailable. Review again." }
                 }
+                if (selected.any { !it.complete || it.rebuildRequired }) {
+                    throw HistoryFailure(HistoryProblem.REBUILD_REQUIRED)
+                }
                 val source = HistoryArchiveSource(
-                    review.scope.serverId,
+                    review.serverId ?: throw HistoryFailure(HistoryProblem.UNBOUND_PROVENANCE),
                     review.scope.profileId,
                     review.sourceLabel
                 )

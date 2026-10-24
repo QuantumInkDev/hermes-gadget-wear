@@ -600,6 +600,7 @@ class PhoneConversation @JvmOverloads constructor(
 
     @Synchronized fun send() {
         val current = mutable.value
+        if (PhoneRelay.typedRoute(current.relay) == InputRoute.UNAVAILABLE) return
         if (PhoneRelay.typedRoute(current.relay) == InputRoute.RELAY) return sendRelay(current)
         val socket = connection ?: return
         if (!current.visible || current.sending || current.draft.isBlank() ||
@@ -834,7 +835,18 @@ class PhoneConversation @JvmOverloads constructor(
             clearSettled = { run { it.clearSettled() } },
             review = { run { it.acceptReview() } },
             reauthorize = { run { it.reauthorize() } },
-            retryStorage = { run { it.retryStorage() } }
+            retryStorage = { run { it.retryStorage() } },
+            searchOnline = { query, filter -> run { it.searchOnline(query, filter) } },
+            editMetadata = { id, title, bookmark -> run { it.editMetadata(id, title, bookmark) } },
+            retryMetadata = { id -> run { it.retryMetadata(id) } },
+            abandonMetadata = { id -> run { it.abandonMetadata(id) } },
+            searchRetained = { query -> run { it.searchRetained(query) } },
+            openRetained = { id -> run { it.openRetained(id) } },
+            closeRetained = { run { it.closeRetained() } },
+            reviewCache = { id -> run { it.reviewCache(id) } },
+            confirmCacheReview = { run { it.confirmCacheReview() } },
+            cancelCacheReview = { run { it.cancelCacheReview() } },
+            retention = { days -> run { it.setHistoryRetention(days) } }
         )
     }
 

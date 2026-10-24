@@ -147,8 +147,17 @@ class EnrollmentRecord(
 }
 
 /** The controller-owned section of the stored document: at most [StateLimits.MAX_ENROLLMENTS] enrollments. */
-class ControllerSection(enrollments: List<EnrollmentRecord>) {
-    val enrollments: List<EnrollmentRecord> = Collections.unmodifiableList(ArrayList(enrollments))
+class ControllerSection(
+    enrollments: List<EnrollmentRecord>,
+    intents: List<MetadataIntent> = emptyList(),
+    evictions: List<HistoryEviction> = emptyList()
+) {
+    val intents: List<MetadataIntent> = ownHistoryItems(intents, 16)
+    val evictions: List<HistoryEviction> = ownHistoryItems(evictions, 64)
+    val enrollments: List<EnrollmentRecord> = ownHistoryItems(
+        enrollments,
+        StateLimits.MAX_ENROLLMENTS + 1
+    )
 
     init {
         require(this.enrollments.size <= StateLimits.MAX_ENROLLMENTS + 1) {
@@ -158,6 +167,13 @@ class ControllerSection(enrollments: List<EnrollmentRecord>) {
             this.enrollments.map { it.endpointKey to it.enrollmentKey }.toSet().size ==
                 this.enrollments.size
         ) { "Duplicate enrollment." }
+        require(
+            this.intents.map {
+                it.namespace to it.conversationId
+            }.toSet().size == this.intents.size
+        )
+        require(this.intents.map { it.namespace to it.requestId }.toSet().size == this.intents.size)
+        require(this.evictions.toSet().size == this.evictions.size)
     }
 
     fun find(endpointKey: String, enrollmentKey: String): EnrollmentRecord? =
@@ -170,11 +186,57 @@ class ControllerSection(enrollments: List<EnrollmentRecord>) {
         }
         val next = ArrayList(enrollments)
         if (index >= 0) next[index] = record else next.add(record)
-        return ControllerSection(next)
+        return ControllerSection(next, intents, evictions)
     }
 
+    fun withIntent(intent: MetadataIntent): ControllerSection = ControllerSection(
+        enrollments,
+        intents.filterNot {
+            it.namespace == intent.namespace &&
+                it.conversationId == intent.conversationId
+        } +
+            intent,
+        evictions
+    )
+
+    fun withoutIntent(intent: MetadataIntent): ControllerSection = ControllerSection(
+        enrollments,
+        intents.filterNot {
+            it.requestId == intent.requestId &&
+                it.namespace == intent.namespace
+        },
+        evictions
+    )
+
+    fun owing(eviction: HistoryEviction): ControllerSection = ControllerSection(
+        enrollments,
+        intents,
+        if (eviction in
+            evictions
+        ) {
+            evictions
+        } else {
+            evictions + eviction
+        }
+    )
+
+    fun cleared(eviction: HistoryEviction): ControllerSection = ControllerSection(
+        enrollments,
+        intents.filterNot {
+            eviction.kind != EvictionKind.CACHE_ONLY &&
+                it.namespace == eviction.namespace &&
+                (
+                    eviction.conversationId == null ||
+                        it.conversationId.value == eviction.conversationId
+                    )
+        },
+        evictions.filterNot { it == eviction }
+    )
+
     override fun equals(other: Any?): Boolean =
-        other is ControllerSection && other.enrollments == enrollments
+        other is ControllerSection && other.enrollments == enrollments &&
+            other.intents == intents &&
+            other.evictions == evictions
 
     override fun hashCode(): Int = enrollments.hashCode()
 

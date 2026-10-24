@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.quantumink.hermesgadget.protocol.relay.HistoryRole
 import dev.quantumink.hermesgadget.protocol.relay.session.ConversationItem
+import dev.quantumink.hermesgadget.protocol.relay.session.MetadataStatus
 import dev.quantumink.hermesgadget.protocol.relay.session.RelayNotice
 import dev.quantumink.hermesgadget.protocol.relay.session.RelayPhase
 import dev.quantumink.hermesgadget.protocol.relay.session.RelayReason
@@ -42,7 +43,18 @@ internal class RelayActions(
     val clearSettled: () -> Unit = {},
     val review: () -> Unit = {},
     val reauthorize: () -> Unit = {},
-    val retryStorage: () -> Unit = {}
+    val retryStorage: () -> Unit = {},
+    val searchOnline: (String, Boolean?) -> Unit = { _, _ -> },
+    val editMetadata: (String, String?, Boolean?) -> Unit = { _, _, _ -> },
+    val retryMetadata: (String) -> Unit = {},
+    val abandonMetadata: (String) -> Unit = {},
+    val searchRetained: (String) -> Unit = {},
+    val openRetained: (String) -> Unit = {},
+    val closeRetained: () -> Unit = {},
+    val reviewCache: (String?) -> Unit = {},
+    val confirmCacheReview: () -> Unit = {},
+    val cancelCacheReview: () -> Unit = {},
+    val retention: (Int) -> Unit = {}
 ) {
     companion object {
         val NONE = RelayActions()
@@ -99,7 +111,7 @@ internal fun relayNoticeText(notice: RelayNotice): String = when (notice) {
 internal fun relayStoppedText(relay: RelayUiState): String = if (relay.contentEvictionPending) {
     "Relay access was removed. Sending is stopped. Saved Relay content still needs removal."
 } else {
-    "Relay access was removed. Sending is stopped. Saved Relay ledger content was removed."
+    "Relay access was removed. Sending is stopped. Saved Relay content was removed."
 }
 
 internal fun relayReasonText(reason: RelayReason): String = when (reason) {
@@ -190,6 +202,17 @@ internal fun RelaySection(
             Text("Some changes are not saved yet.", color = MaterialTheme.colorScheme.error)
             TextButton(actions.retryStorage) { Text("Save again") }
         }
+        if (relay.enabled && relay.phase != RelayPhase.STOPPED &&
+            relay.phase != RelayPhase.REVIEW_REQUIRED
+        ) {
+            if (relay.phase == RelayPhase.READY ||
+                relay.phase == RelayPhase.SELECTED
+            ) {
+                OnlineHistoryControls(relay, actions)
+            }
+            MetadataIntents(relay, actions)
+            RetainedHistoryControls(relay, actions)
+        }
     }
 }
 
@@ -252,7 +275,10 @@ private fun RelayReady(relay: RelayUiState, actions: RelayActions) {
         if (relay.hasMore) TextButton(actions.more) { Text("More") }
     }
     if (relay.conversations.isEmpty() && !relay.listing) Text("No conversations yet.")
-    relay.conversations.forEach { RelayConversationRow(it, actions) }
+    relay.conversations.forEach {
+        RelayConversationRow(it, actions)
+        MetadataControls(it, relay, actions)
+    }
     TurnList(relay, actions)
     TextButton({ actions.enable(false) }) { Text("Turn off Relay") }
 }
@@ -279,6 +305,7 @@ private fun RelaySelected(relay: RelayUiState, actions: RelayActions) {
         color = MaterialTheme.colorScheme.primary
     )
     if (relay.phase == RelayPhase.ATTACHING) Text("Loading the conversation.")
+    relay.selected?.let { MetadataControls(it, relay, actions) }
     relay.tasksWorking?.let { working ->
         val waiting = relay.tasksNeedInput ?: 0
         if (working > 0 || waiting > 0) Text("Working: $working, needs input elsewhere: $waiting")
@@ -305,6 +332,255 @@ private fun RelaySelected(relay: RelayUiState, actions: RelayActions) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         TextButton(actions.leave) { Text("Leave conversation") }
         TextButton({ actions.enable(false) }) { Text("Turn off Relay") }
+    }
+}
+
+@Composable
+private fun OnlineHistoryControls(relay: RelayUiState, actions: RelayActions) {
+    var query by remember(relay.identity, relay.foregroundSession) {
+        mutableStateOf(relay.onlineQuery)
+    }
+    var filter by remember(relay.identity, relay.foregroundSession) {
+        mutableStateOf(relay.bookmarkFilter)
+    }
+    Text("Online Relay search", style = MaterialTheme.typography.labelLarge)
+    Text(
+        "Online human text and titles. Existing Hermes sources need separate opt-in.",
+        style = MaterialTheme.typography.bodySmall
+    )
+    OutlinedTextField(query, {
+        query = it
+    }, Modifier.fillMaxWidth(), label = { Text("Online search") }, maxLines = 2)
+    Row {
+        TextButton({ filter = null }) { Text(if (filter == null) "All ✓" else "All") }
+        TextButton({ filter = true }) { Text(if (filter == true) "Bookmarks ✓" else "Bookmarks") }
+        TextButton({ filter = false }) {
+            Text(
+                if (filter ==
+                    false
+                ) {
+                    "Unbookmarked ✓"
+                } else {
+                    "Unbookmarked"
+                }
+            )
+        }
+    }
+    Button({
+        actions.searchOnline(query, filter)
+    }, enabled = !relay.listing) { Text("Search online") }
+    if (relay.listing) Text("Searching online…")
+    if (!relay.listing && relay.conversations.isEmpty()) Text("No rows in this online view.")
+    if (relay.listUnavailableCount >
+        0
+    ) {
+        Text("${relay.listUnavailableCount} conversation views are pending or unavailable.")
+    }
+    if (relay.hasMore) {
+        TextButton(actions.more, enabled = !relay.listing) {
+            Text("More online results")
+        }
+    }
+    if (relay.phase ==
+        RelayPhase.SELECTED
+    ) {
+        relay.conversations.forEach { RelayConversationRow(it, actions) }
+    }
+}
+
+@Composable
+private fun MetadataControls(item: ConversationItem, relay: RelayUiState, actions: RelayActions) {
+    val pending = relay.metadataIntents.any { it.conversationId.value == item.id }
+    val allowed =
+        relay.canEditMetadata && item.canContinue && item.metadataState == null &&
+            item.revision >= 1 &&
+            !pending
+    var renaming by remember(item.id, relay.foregroundSession) { mutableStateOf(false) }
+    var title by remember(item.id, item.revision, relay.foregroundSession) {
+        mutableStateOf(item.title.orEmpty())
+    }
+    if (item.metadataState != null) Text("Metadata unavailable; this row is read only.")
+    Row {
+        TextButton({ renaming = !renaming }, enabled = allowed) { Text("Rename") }
+        TextButton({ actions.editMetadata(item.id, null, !item.bookmarked) }, enabled = allowed) {
+            Text(if (item.bookmarked) "Remove bookmark" else "Bookmark")
+        }
+    }
+    if (renaming) {
+        OutlinedTextField(title, {
+            title = it
+        }, Modifier.fillMaxWidth(), label = { Text("New name") }, maxLines = 2)
+        Text(
+            "Hermes validates this name. The returned stored name appears after confirmation.",
+            style = MaterialTheme.typography.bodySmall
+        )
+        Button(
+            {
+                actions.editMetadata(item.id, title, null)
+                renaming = false
+            },
+            enabled =
+            allowed && title.isNotBlank()
+        ) { Text("Request rename") }
+    }
+}
+
+@Composable
+private fun MetadataIntents(relay: RelayUiState, actions: RelayActions) {
+    relay.metadataIntents.forEach { intent ->
+        Text(
+            when (intent.status) {
+                MetadataStatus.PENDING, MetadataStatus.UNKNOWN ->
+                    "Edit unconfirmed; it may have applied."
+                MetadataStatus.TRANSIENT -> "Edit is busy or temporarily unavailable."
+                MetadataStatus.ACCEPTED -> "Hermes confirmed the edit."
+                MetadataStatus.SUPERSEDED -> "Later edit superseded this. Refresh before editing."
+                MetadataStatus.RETIRED -> "The conversation was retired."
+                MetadataStatus.STALE_SNAPSHOT -> "Stale revision. Refresh; no automatic rebase."
+                MetadataStatus.UNAVAILABLE -> "Route unavailable. Stop retrying this edit."
+                MetadataStatus.EXPIRED -> "Edit ID spent. Refresh before a new edit."
+                MetadataStatus.REFUSED -> "Hermes refused this edit."
+            }
+        )
+        intent.coreCommitted?.let {
+            Text(
+                if (it) {
+                    "The core committed the rename."
+                } else {
+                    "No core rename was committed by this outcome."
+                },
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        if (intent.retryable) {
+            TextButton({
+                actions.retryMetadata(intent.requestId.value)
+            }, enabled = relay.canEditMetadata) {
+                Text("Retry same edit (may apply it)")
+            }
+        }
+        TextButton({
+            actions.abandonMetadata(intent.requestId.value)
+        }) { Text("Stop tracking edit") }
+    }
+}
+
+@Composable
+private fun RetainedHistoryControls(relay: RelayUiState, actions: RelayActions) {
+    var query by remember(relay.identity, relay.foregroundSession) { mutableStateOf("") }
+    var days by remember(relay.retentionDays) {
+        mutableStateOf(relay.retentionDays?.toString().orEmpty())
+    }
+    Text("Retained on this phone", style = MaterialTheme.typography.titleSmall)
+    Text(
+        "Local Relay text; read only. Copies grant no attach, send or control permission.",
+        style = MaterialTheme.typography.bodySmall
+    )
+    OutlinedTextField(query, {
+        query = it
+    }, Modifier.fillMaxWidth(), label = { Text("Search retained text") }, maxLines = 2)
+    TextButton({ actions.searchRetained(query) }) { Text("Search this phone") }
+    relay.retainedProblem?.let {
+        Text(
+            "Retained text unavailable: $it. Existing bytes are preserved.",
+            color = MaterialTheme.colorScheme.error
+        )
+    }
+    if (relay.retentionDays == 0) Text("Retention disabled. Online text is not retained.")
+    if (relay.retainedSelected == null) {
+        if (relay.retained.isEmpty()) {
+            Text(
+                "No retained matches in this exact profile and review scope."
+            )
+        }
+        relay.retained.forEach { item ->
+            TextButton({ actions.openRetained(item.id) }) {
+                Text(
+                    (item.title.ifBlank { "Untitled" }) +
+                        if (item.complete) " · retained" else " · partial"
+                )
+            }
+        }
+    } else {
+        val item = requireNotNull(relay.retainedSelected)
+        Text(item.title.ifBlank { "Untitled" }, style = MaterialTheme.typography.labelLarge)
+        Text(
+            if (item.complete) {
+                "Complete at last listing; read only."
+            } else {
+                "Retained fragment; incomplete history."
+            }
+        )
+        item.messages.forEach {
+            Text(
+                (
+                    if (it.role ==
+                        dev.quantumink.hermesgadget.protocol.relay.session.RetainedRole.USER
+                    ) {
+                        "You: "
+                    } else {
+                        "Hermes: "
+                    }
+                    ) +
+                    it.text
+            )
+        }
+        TextButton(actions.closeRetained) { Text("Close retained view") }
+        TextButton({ actions.reviewCache(item.id) }) { Text("Review cache-only erase and rebuild") }
+    }
+    if (relay.retainedProblem !=
+        null
+    ) {
+        TextButton({
+            actions.reviewCache(relay.selected?.id)
+        }) { Text("Review affected retained bytes") }
+    }
+    if (relay.retentionDays != null) {
+        OutlinedTextField(days, {
+            days = it
+        }, Modifier.fillMaxWidth(), label = {
+            Text("All phone profiles: retention days (0–365)")
+        }, singleLine = true)
+        TextButton(
+            { days.toIntOrNull()?.let(actions.retention) },
+            enabled =
+            days.toIntOrNull() in 0..365
+        ) { Text("Review retention change") }
+    }
+    relay.cacheReview?.let { review ->
+        Text(
+            if (review.allProfiles) {
+                "This affects ALL retained profiles on this phone."
+            } else {
+                "This affects the reviewed namespace and " +
+                    "${review.conversationId ?: "all its conversations"}."
+            }
+        )
+        Text(
+            "Record version ${review.version ?: "unknown"}, " +
+                "revision ${review.revision ?: "unreadable"}, ${review.recordBytes} bytes. " +
+                "SHA-256 ${review.recordHash}",
+            style = MaterialTheme.typography.bodySmall
+        )
+        Text(
+            review.retentionDays?.let {
+                "Apply $it days globally (0 clears text and disables retention)."
+            }
+                ?: (
+                    "Erase local bytes; canonical history is unchanged. " +
+                        "Rebuild needs authenticated refetch."
+                    )
+        )
+        Row {
+            Button(actions.confirmCacheReview) { Text("Confirm reviewed change") }
+            TextButton(actions.cancelCacheReview) { Text("Cancel") }
+        }
+    }
+    if (relay.contentEvictionPending) {
+        Text(
+            "Local content removal is still pending confirmation.",
+            color = MaterialTheme.colorScheme.error
+        )
     }
 }
 

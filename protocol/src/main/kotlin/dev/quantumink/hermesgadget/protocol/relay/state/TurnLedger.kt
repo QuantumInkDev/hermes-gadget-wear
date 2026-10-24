@@ -745,18 +745,28 @@ class TurnLedger private constructor(
      * Nulls the stored text of every turn in [scope] (the identity, uncertainty and server evidence stay, honestly) and
      * clears the owed eviction. A turn without text can never be submitted again.
      */
-    fun evictContent(scope: EnrollmentScope): LedgerStep<Int> {
+    fun evictContent(
+        scope: EnrollmentScope,
+        conversationId: ConversationId? = null
+    ): LedgerStep<Int> {
         var bytes = 0L
         var count = 0
         val updated = LinkedHashMap<TurnKey, TurnEntry>(turns)
         for ((key, entry) in turns) {
             if (key.conversation.enrollment != scope || entry.text == null) continue
+            if (conversationId != null &&
+                key.conversation.conversationId != conversationId
+            ) {
+                continue
+            }
             bytes += RelayJson.utf8Length(entry.text).toLong()
             updated[key] = entry.update(text = null)
             count++
         }
         val record = scopes[scope]
-        val newScopes = if (record != null && record.contentEvictionOwed) {
+        val newScopes = if (conversationId == null && record != null &&
+            record.contentEvictionOwed
+        ) {
             val reduced = LinkedHashMap(scopes)
             if (record.status == ScopeStatus.ACTIVE) {
                 reduced.remove(scope)

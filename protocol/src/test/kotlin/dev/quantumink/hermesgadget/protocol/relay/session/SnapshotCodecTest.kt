@@ -143,6 +143,51 @@ class SnapshotCodecTest {
     private fun encoded(document: RelayDocument): ByteArray =
         (SnapshotCodec.encode(document) as EncodeResult.Encoded).bytes
 
+    @Test fun task4SectionsRoundTripWithImmutableBodiesAndExactEvictionScope() {
+        val original = full()
+        val namespace = HistoryNamespace.from(section.enrollments.single())!!
+        val intent = MetadataIntent(
+            namespace,
+            Dto.conversation,
+            RequestId.of("01939c8e-7a00-7000-8000-00000000abcd")!!,
+            4,
+            " raw title ",
+            false,
+            1_792_300_000_000L,
+            MetadataStatus.UNKNOWN
+        )
+        val document = RelayDocument(
+            section.withIntent(intent).owing(
+                HistoryEviction(
+                    namespace,
+                    Dto.otherConversation.value,
+                    EvictionKind.DELETED
+                )
+            ),
+            original.snapshot
+        )
+        val decoded = (SnapshotCodec.decode(encoded(document)) as DecodeResult.Decoded).document
+        assertEquals(document.section, decoded.section)
+        assertArrayEquals(encoded(document), encoded(decoded))
+        assertEquals(
+            original.snapshot.captures.records.single().state,
+            decoded.snapshot.captures.records.single().state
+        )
+    }
+
+    @Test fun originalFormatOneBytesRetainEveryAggregateSectionWithoutInventingTask4Intents() {
+        val bytes = encoded(full())
+        assertArrayEquals(ByteArray(4), bytes.copyOfRange(bytes.size - 8, bytes.size - 4))
+        val legacy = (
+            bytes.copyOfRange(0, bytes.size - 8) +
+                bytes.copyOfRange(bytes.size - 4, bytes.size)
+            ).also { it[5] = 1 }
+        val decoded = (SnapshotCodec.decode(legacy) as DecodeResult.Decoded).document
+        assertTrue(decoded.section.intents.isEmpty())
+        assertTrue(decoded.section.evictions.isEmpty())
+        assertArrayEquals(bytes, encoded(decoded))
+    }
+
     @Test fun theCompleteAggregateRoundTripsExactly() {
         val document = full()
         val bytes = encoded(document)
@@ -528,8 +573,8 @@ class SnapshotCodecTest {
         assertEquals(1_950_663L, StoreBounds.deliveryMax)
         assertEquals(1_237L, StoreBounds.captureMax)
         assertEquals(3_594L, StoreBounds.enrollmentMax)
-        assertEquals(28L, StoreBounds.emptyDocumentBytes())
-        assertEquals(36_699_452L, StoreBounds.theoreticalMaxPlaintextBytes())
+        assertEquals(32L, StoreBounds.emptyDocumentBytes())
+        assertEquals(37_004_816L, StoreBounds.theoreticalMaxPlaintextBytes())
         assertEquals(8L * 1024 * 1024, StoreBounds.PLAINTEXT_CAP_BYTES.toLong())
         assertEquals(8L * 1024 * 1024 + 38, StoreBounds.MAX_FILE_BYTES.toLong())
     }

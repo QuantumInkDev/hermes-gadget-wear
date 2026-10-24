@@ -36,6 +36,7 @@ internal class RelaySocketFixture(
     var relayMember: JsonElement? = RelayNegotiation.capability(),
     var paired: Boolean = true
 ) : WebSocket.Factory {
+    @Volatile var onRelayAcceptance: ((JsonObject) -> Unit)? = null
     inner class Peer(private val request: Request, val listener: WebSocketListener) : WebSocket {
         val relayRequests = LinkedBlockingQueue<JsonObject>()
         val relayTexts = CopyOnWriteArrayList<String>()
@@ -60,6 +61,7 @@ internal class RelaySocketFixture(
                 }
                 "auth" -> deliver(welcome())
                 "relay.request" -> {
+                    onRelayAcceptance?.invoke(parsed)
                     relayTexts.add(text)
                     relayRequests.add(parsed)
                 }

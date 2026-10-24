@@ -58,12 +58,18 @@ internal object PhoneRelay {
             SystemClock::elapsedRealtimeNanos,
             SecureRequestIdEntropy(),
             RelayTiming(),
-            listener
+            retainedHistory = PhoneHistoryCache(application).retained(),
+            listener = listener
         )
 
     /** Typed text: the Relay composer owns it once a Relay conversation is selected; otherwise the stock chat as before. */
-    fun typedRoute(relay: RelayUiState): InputRoute =
-        if (relay.relayOwnsComposer) InputRoute.RELAY else InputRoute.STOCK
+    fun typedRoute(relay: RelayUiState): InputRoute = if (relay.retainedSelected != null) {
+        InputRoute.UNAVAILABLE
+    } else if (relay.relayOwnsComposer) {
+        InputRoute.RELAY
+    } else {
+        InputRoute.STOCK
+    }
 
     /**
      * Hold-to-talk. Stock stays exactly as it was while Relay is off or no Relay conversation is selected. Inside a selected

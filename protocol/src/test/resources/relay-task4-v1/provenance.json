@@ -1,0 +1,65 @@
+[
+  {
+    "scenario": "denied",
+    "path": ".local/phone-history-task4/evidence/runs/task4-capture-r1/files/test_relay_phone_history_task4_capture-51dcaaf48245/captures/denied/session.json",
+    "sha256": "8e3bfa77256e005dee15b88ba680f1eda41e22de9b2978e9821f89fd7255be0e",
+    "steps": 6,
+    "executions": 0
+  },
+  {
+    "scenario": "expired",
+    "path": ".local/phone-history-task4/evidence/runs/task4-capture-r1/files/test_relay_phone_history_task4_capture-51dcaaf48245/captures/expired/session.json",
+    "sha256": "8f8ac15304f4be37296ea4e0e92bfdea099c5e911d9473c73ab9fbf05758ed27",
+    "steps": 6,
+    "executions": 0
+  },
+  {
+    "scenario": "integrated",
+    "path": ".local/phone-history-task4/evidence/runs/task4-capture-r1/files/test_relay_phone_history_task4_capture-51dcaaf48245/captures/integrated/session.json",
+    "sha256": "694d8c0421bb159bba1bf614220ef636f365c68f0ac829d3fbe3012eab9de3f8",
+    "steps": 19,
+    "executions": 0
+  },
+  {
+    "scenario": "method-withdrawn",
+    "path": ".local/phone-history-task4/evidence/runs/task4-capture-r1/files/test_relay_phone_history_task4_capture-51dcaaf48245/captures/method-withdrawn/session.json",
+    "sha256": "910140322d83eb6b2a4cc70b77b0c4737f07ae3867f024cf134e0c4250a0f422",
+    "steps": 6,
+    "executions": 0
+  },
+  {
+    "scenario": "retired",
+    "path": ".local/phone-history-task4/evidence/runs/task4-capture-r1/files/test_relay_phone_history_task4_capture-51dcaaf48245/captures/retired/session.json",
+    "sha256": "4a5c9c588cbf5e9aead5019a574fef949c771c91c9049897905741254b855b20",
+    "steps": 6,
+    "executions": 0
+  },
+  {
+    "scenario": "stale",
+    "path": ".local/phone-history-task4/evidence/runs/task4-capture-r1/files/test_relay_phone_history_task4_capture-51dcaaf48245/captures/stale/session.json",
+    "sha256": "4d49c9b98546df66a68c6e2baed0bf93b8c9957f207d746707914d85ece1cb55",
+    "steps": 6,
+    "executions": 0
+  },
+  {
+    "scenario": "superseded",
+    "path": ".local/phone-history-task4/evidence/runs/task4-capture-r1/files/test_relay_phone_history_task4_capture-51dcaaf48245/captures/superseded/session.json",
+    "sha256": "f96bdd46b38bc6e1111c70cb41c9deeaa6565e9127605b8ca1d7064fdbdd0a2c",
+    "steps": 6,
+    "executions": 0
+  },
+  {
+    "scenario": "text-query",
+    "path": ".local/phone-history-task4/evidence/runs/task4-capture-r1/files/test_relay_phone_history_task4_capture-51dcaaf48245/captures/text-query/session.json",
+    "sha256": "d0845a5fa18ed168f7b3481e4d84bacf35c17adb447224e6f20e72456dda5bb6",
+    "steps": 7,
+    "executions": 1
+  },
+  {
+    "scenario": "unavailable",
+    "path": ".local/phone-history-task4/evidence/runs/task4-capture-r1/files/test_relay_phone_history_task4_capture-51dcaaf48245/captures/unavailable/session.json",
+    "sha256": "c600205aed8eb75c912525c34e65190177bae06a45e29f31d04c3cd883a33b8a",
+    "steps": 7,
+    "executions": 0
+  }
+]

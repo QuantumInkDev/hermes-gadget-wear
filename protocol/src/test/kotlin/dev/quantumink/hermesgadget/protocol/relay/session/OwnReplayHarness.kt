@@ -28,12 +28,13 @@ internal class OwnReplayHarness(
     identity: EnrollmentIdentity? = null,
     val timing: RelayTiming = RelayTiming(),
     startAt: Int = 0,
-    mintStart: Int = 0
+    mintStart: Int = 0,
+    resourceRoot: String = "/relay-own-native-v1"
 ) : AutoCloseable {
     val session = RecordedSession(
         Json.parseToJsonElement(
             OwnReplayHarness::class.java.getResourceAsStream(
-                "/relay-own-native-v1/$scenario.json"
+                "$resourceRoot/$scenario.json"
             )!!.use {
                 it.readBytes().toString(Charsets.UTF_8)
             }
@@ -53,15 +54,56 @@ internal class OwnReplayHarness(
     private var mint = mintStart
     val states = CopyOnWriteArrayList<RelayUiState>()
     val events = ArrayList<String>()
-    var durableSubmits = 0
+
+    @Volatile var durableSubmits = 0
         private set
+
+    @Volatile var durableMetadata = 0
+        private set
+    var entropyExhaustions = 0
+        private set
+    private val acceptanceFailures = CopyOnWriteArrayList<Throwable>()
+
+    init {
+        fixture.onRelayAcceptance = { request ->
+            try {
+                if (request["method"]!!.jsonPrimitive.content == "relay.turn.submit") {
+                    val params = request["params"]!!.jsonObject
+                    val turn = store.reread().snapshot.ledger.turns.single {
+                        it.requestId == params["request_id"]!!.jsonPrimitive.content
+                    }
+                    check(turn.sent && turn.text == params["text"]!!.jsonPrimitive.content)
+                    check(
+                        turn.expiresAtMs == params["expires_at_ms"]!!.jsonPrimitive.content.toLong()
+                    )
+                    durableSubmits++
+                } else if (request["method"]!!.jsonPrimitive.content ==
+                    "relay.conversation.update"
+                ) {
+                    val params = request["params"]!!.jsonObject
+                    val intent = store.reread().section.intents.single {
+                        it.requestId.value == params["request_id"]!!.jsonPrimitive.content
+                    }
+                    check(ScriptedTransport.paramsOf(intent.call()) == params)
+                    durableMetadata++
+                }
+            } catch (failure: Throwable) {
+                acceptanceFailures.add(failure)
+            }
+        }
+    }
 
     val controller = RelayController(
         store,
         scheduler,
         nanos::get,
         RequestIdEntropy { bytes ->
-            val id = session.mintPlan[mint++]
+            val id = try {
+                session.mintPlan[mint++]
+            } catch (failure: IndexOutOfBoundsException) {
+                entropyExhaustions++
+                throw failure
+            }
             RecordedSession.entropyFor(id).copyInto(bytes)
         },
         timing
@@ -123,20 +165,7 @@ internal class OwnReplayHarness(
         val deadline = System.nanoTime() + 10_000_000_000L
         while (stable < 4 && System.nanoTime() < deadline) {
             scheduler.runAll()
-            for (peer in fixture.peers) {
-                for (request in peer.relayRequests) {
-                    if (request["method"]!!.jsonPrimitive.content == "relay.turn.submit") {
-                        val params = request["params"]!!.jsonObject
-                        val turn = store.reread().snapshot.ledger.turns.single()
-                        check(turn.sent && turn.text == params["text"]!!.jsonPrimitive.content)
-                        check(
-                            turn.expiresAtMs ==
-                                params["expires_at_ms"]!!.jsonPrimitive.content.toLong()
-                        )
-                        durableSubmits++
-                    }
-                }
-            }
+            check(acceptanceFailures.isEmpty()) { acceptanceFailures.toString() }
             server.pump()
             scheduler.runAll()
             val fingerprint = fixture.peers.sumOf { it.relayTexts.size.toLong() } * 1_000_003L +
@@ -146,6 +175,7 @@ internal class OwnReplayHarness(
             Thread.sleep(15)
         }
         check(System.nanoTime() < deadline) { "No quiescence" }
+        check(acceptanceFailures.isEmpty()) { acceptanceFailures.toString() }
     }
 
     /** The connection clock moves (channel timeouts, handshake timers); the controller's virtual time is separate. */

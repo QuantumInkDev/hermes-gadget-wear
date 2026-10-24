@@ -1,0 +1,172 @@
+"""Task4 registered captures. Real grants/adapter/authority/SQLite; synthetic socket,
+provider execution, pairing establishment and scoped clock. No TCP/device/billing claim.
+Only this NEW test is added; old tests and server production are unchanged.
+"""
+import copy
+import hashlib
+import inspect
+import json
+
+import pytest
+
+from relay_bridge_support import bridge as bridge, rig as rig, request_id
+from relay_metadata_support import (allow, revoke, public, core_row, external_rename,
+                                    external_delete, move_route)
+
+
+class Recorder:
+    def __init__(self, f, monkeypatch, scenario):
+        import receipt_evidence
+        self.f, self.scenario = f, scenario
+        self.out = receipt_evidence._directory / 'captures' / scenario
+        self.out.mkdir(parents=True, exist_ok=False)
+        self.steps, self.mints, self.raw = [], [], []
+        original = f.rig.adapter.on_relay_request
+        send = f.sessions['phone']._ws.send
+
+        async def observe_send(raw):
+            entry = dict(raw=raw, sha256=hashlib.sha256(raw.encode()).hexdigest(), accepted=False)
+            self.raw.append(entry)
+            try:
+                await send(raw)
+                entry['accepted'] = True
+            finally:
+                self.flush()
+
+        async def observe_request(session, message):
+            request = copy.deepcopy(message)
+            before = len(self.raw)
+            self.steps.append(dict(connection=1, request=request, response=None, note=scenario))
+            self.flush()
+            try:
+                return await original(session, message)
+            finally:
+                responses = [entry for entry in self.raw[before:]
+                             if json.loads(entry['raw']).get('id') == request['id']]
+                if responses:
+                    assert len(responses) == 1
+                    entry = responses[0]
+                    self.steps[-1].update(response=json.loads(entry['raw']), response_accepted=entry['accepted'])
+                self.flush()
+        monkeypatch.setattr(f.sessions['phone']._ws, 'send', observe_send)
+        monkeypatch.setattr(f.rig.adapter, 'on_relay_request', observe_request)
+
+    def mint(self):
+        value = request_id(self.f.clock[0]); self.mints.append(value); return value
+
+    def flush(self):
+        (self.out / 'steps-so-far.json').write_text(json.dumps(self.steps, indent=2)+'\n')
+        (self.out / 'raw-responses.json').write_text(json.dumps(self.raw, indent=2)+'\n')
+
+    async def start(self):
+        f = self.f
+        allow(f, 'relay:metadata')
+        self.welcome = await f.rig.adapter.relay_welcome(f.sessions['phone'])
+        info = await f.call('relay.info')
+        assert 'relay.conversation.update' in info['result']['methods']
+        await f.call('relay.conversations.list', dict(limit=25))
+        created = await f.call('relay.conversation.create', dict(request_id=self.mint(), title='Planning'))
+        f.conversation = created['result']['conversation_id']
+        f.row = public(f, f.conversation)
+        f.ref = f.bridge.core.ref(f.row)
+        await self.snapshots(refresh=False)
+
+    async def snapshots(self, refresh=True):
+        f = self.f
+        if refresh:
+            await f.call('relay.conversations.list', dict(limit=25))
+        await f.attach()
+        await f.call('relay.history.page', dict(conversation_id=f.conversation, limit=50))
+        info = next(step['response']['result'] for step in self.steps if step['request']['method'] == 'relay.info')
+        if 'relay.tasks.list' in info['methods']:
+            await f.call('relay.tasks.list', dict(limit=25))
+
+    async def update(self, revision, title=None, bookmarked=None, rid=None):
+        params = dict(conversation_id=self.f.conversation, request_id=rid or self.mint(), expected_revision=revision)
+        if title is not None: params['title'] = title
+        if bookmarked is not None: params['bookmarked'] = bookmarked
+        return await self.f.call('relay.conversation.update', params)
+
+    def seal(self):
+        from hermes_gadget_plugin import relay_conversations
+        from gateway import session_authority
+        f = self.f
+        assert all(step['response'] is not None for step in self.steps)
+        data = dict(scenario=self.scenario, server_time_ms=self.steps[0]['response']['result']['server_time_ms'],
+                    mint_plan=self.mints, conversation_id=f.conversation,
+                    welcomes=[dict(relay=self.welcome)], steps=self.steps,
+                    executions=len(f.rig.executions), core_state=core_row(f, f.ref),
+                    origins=dict(sdk=inspect.getfile(relay_conversations), core=inspect.getfile(session_authority)),
+                    boundaries='real registration/grants/authority/SQLite; synthetic WebSocket/provider/pairing/scoped clock')
+        (self.out / 'session.json').write_text(json.dumps(data, indent=2)+'\n')
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('scenario', ['integrated', 'stale', 'unavailable', 'denied',
+                                      'superseded', 'retired', 'expired', 'method-withdrawn', 'text-query'])
+async def test_registered_phone_history_capture(bridge, monkeypatch, scenario):
+    f = bridge
+    c = Recorder(f, monkeypatch, scenario)
+    await c.start()
+    if scenario == 'integrated':
+        renamed = await c.update(1, title='  Trip \u200b plans  ')
+        assert renamed['result']['title'] == 'Trip plans' and renamed['result']['core_committed'] is True
+        await c.snapshots()
+        bookmarked = await c.update(2, bookmarked=True)
+        assert bookmarked['result']['bookmarked'] is True and bookmarked['result']['core_committed'] is False
+        await c.snapshots()
+        result = await f.call('relay.conversations.list', dict(limit=25, query='Trip', bookmarked=True))
+        assert [item['conversation_id'] for item in result['result']['items']] == [f.conversation]
+        rid = c.mint()
+        f.sessions['phone']._ws.fail = True
+        with pytest.raises(ConnectionError):
+            await c.update(3, title='Kept', rid=rid)
+        f.sessions['phone']._ws.fail = False
+        before = core_row(f, f.ref)
+        replay = await c.update(3, title='Kept', rid=rid)
+        assert replay['result']['title'] == 'Kept' and replay['result']['revision'] == 4
+        assert core_row(f, f.ref) == before
+        # Native controller preserves the active query/filter through refresh after the outcome.
+        await f.call('relay.conversations.list', dict(limit=25, query='Trip', bookmarked=True))
+        await c.snapshots(refresh=False)
+        assert sum(step.get('response_accepted') is False for step in c.steps) == 1
+    elif scenario == 'text-query':
+        intent = f.turn(text='human history needle')
+        assert 'result' in await f.call('relay.turn.submit', intent)
+        await f.rig.settle(f.ref)
+        result = await f.call('relay.conversations.list', dict(limit=25, query='needle'))
+        assert [item['conversation_id'] for item in result['result']['items']] == [f.conversation]
+    else:
+        revision, rid = 1, c.mint()
+        if scenario == 'stale':
+            await external_rename(f, f.ref, 'Other surface')
+        elif scenario == 'unavailable':
+            move_route(f)
+            listed = await f.call('relay.conversations.list', dict(limit=25))
+            item = listed['result']['items'][0]
+            assert item['metadata_state'] == 'unavailable'
+            revision = item['revision']
+        elif scenario == 'denied':
+            revoke(f, 'relay:metadata')
+        elif scenario == 'method-withdrawn':
+            monkeypatch.setattr(f.rig.authority, 'NATIVE_MUTATIONS_VERSION', 99)
+        elif scenario == 'expired':
+            f.clock[0] += 7 * 86400000 + 1
+        elif scenario in ('superseded', 'retired'):
+            real = f.rig.authority.mutate_native_session
+
+            async def after_commit(*args, **kwargs):
+                result = await real(*args, **kwargs)
+                if scenario == 'superseded': await external_rename(f, f.ref, 'Later title')
+                else: await external_delete(f, f.ref)
+                return result
+            monkeypatch.setattr(f.rig.authority, 'mutate_native_session', after_commit)
+        reply = await c.update(revision, title='Requested', rid=rid)
+        if scenario in ('superseded', 'retired'):
+            assert reply['result']['mutation_outcome'] == scenario and reply['result']['core_committed'] is True
+        else:
+            expected = dict(stale='conflict', unavailable='conflict', denied='permission_denied',
+                            expired='expired', **{'method-withdrawn':'unsupported'})[scenario]
+            assert reply['error']['code'] == expected
+            assert bool(reply['error'].get('snapshot_required')) == (scenario == 'stale')
+    c.seal()

@@ -1,6 +1,6 @@
 # Selected history export, version 1
 
-Private source candidate; UI integration and independent/native review remain open.
+Private source candidate; Task4 adds phone retained browsing. Independent and native review remain open.
 This format contains selected complete conversation text. It is separate from setup
 migration and never carries endpoints, device enrollment/grants, provider credentials,
 transport bindings, artwork, attachment bytes or configuration. Text entered by a user
@@ -37,8 +37,9 @@ selection is validated again before sealing; overflow is refused without truncat
 Wrong password, tamper, malformed/unsupported data and read failure share `Invalid`.
 Authenticated readable text is not server authority, a pairing grant or permission to
 import or send. A caller owns the streams and password; the codec creates no plaintext
-files. Mutable owned buffers are cleared, while immutable strings/JCA internals cannot
-be guaranteed erased. Writers propagate provider failures and do not close caller streams.
+files. Mutable owned buffers are cleared, while immutable strings, JCA and accumulator internals cannot
+be guaranteed erased. Only explicitly owned mutable arrays are cleared; this is not a
+guarantee that every plaintext copy has been erased. Writers propagate provider failures and do not close caller streams.
 
 The phone coordinator requires exact scoped conversation IDs and a reviewed local cache
 revision. A cross-thread cancellation token invalidates replaced/hidden/edited reviews.
@@ -51,27 +52,66 @@ Saved message; provider cleanup, chooser/passphrase UI and native acceptance rem
 
 ## Private cache ordering boundary
 
-The at-rest cache's encrypted plaintext schema is now 2; its authenticated record
-wrapper remains version 1 (`history.v1`). Schema 1 is refused without replacing the
-record: its timestamp/opaque-ID sort discarded canonical ordering and cannot be
-reconstructed from that record. This private candidate has never been activated.
-No automatic migration, deletion or reset is performed.
+The at-rest cache plaintext is schema 3, retaining the existing authenticated wrapper,
+AAD and `history.v1` filename. Schemas 1 and 2 return typed `LEGACY_UNBOUND`; other
+versions return `UNSUPPORTED`. Old identities lack a review lineage and cannot be
+migrated by guessing. Opening a legacy, unreadable or missing-key record never resets
+it, returns empty history, changes its marker or creates a replacement key. Old bytes
+remain exact until a user confirms an exact reviewed discard. New synthetic tests
+are not restoration of any installed or quarantined fixture.
 
-`put(scope, thread, expectedRevision, afterMessageId)` accepts a contiguous ordered
-canonical page. A null anchor means the beginning of the cached conversation; a
-non-null anchor names the cached message immediately preceding this page. Every
-overlapping position must match exactly. New messages extend the tail. Unknown
-anchors, gaps, changed messages or reordered pages are refused before persistence.
-Timestamps and opaque IDs never determine ordering. Earlier pages can be replayed
-when their canonical positions are known; an unplaced later page must wait for its
-predecessor instead of being guessed into position. Replays do not renew retention.
+Schema 3 owns an endpoint namespace (digest of the canonical TLS endpoint), that
+canonical endpoint, the phone's public enrollment label, pinned Info profile UUID
+and deliberate review epoch. It contains no secret keys or invented server UUID.
+Catalog/display IDs confer no authority. Local revisions are distinct from public
+metadata revisions. Stored SDK 120-scalar/512-byte and Core 100-character sanitized
+titles fit the existing bounds; raw rename input limits do not enlarge this format.
 
-The future authenticated consumer must assemble complete segmented messages in
-wire order, maintain a current canonical snapshot/cursor, and supply the anchor.
-It must explicitly refetch/rebuild if deletion, retention or snapshot replacement
-invalidates that sequence; this cache is not canonical deletion or server authority.
-No input SDK DTO, transport, picker or history-screen consumer is enabled here.
+`put` requires a typed `Beginning` or `After(messageId)` anchor. Production receives
+complete owned `HistoryAssembly` emissions directly at the authenticated page
+acceptance boundary, with exact enrollment/conversation/source/review scope, listing
+generation, page, flow and cursor-chain proof. The bounded UI transcript is not the
+feed. A beginning is accepted only for an actual authenticated initial/rebuild chain.
+An After predecessor must have been traversed in this same listing; merely being in
+an older cached tail is insufficient. Positional overlap must match exactly. Wire
+order is retained even for equal or decreasing creation times. No opaque ID/time sort
+or truncation is presented as complete.
 
-The API29 ownership regression uses an exposed caller array; until its native test
-runs on a safe fixture, only compilation is established. The JVM bulk-conversion
-tripwire proves the fixed constructors use element-wise copies on the host runtime.
+Pruning precedes replay and append. Default retention is 90 days, configurable 0..365.
+A persisted receipt-clock high water prevents backward wall-clock movement from
+renewing ages. Exact retries do not renew receipt age. Expiry marks a retained
+fragment incomplete and requiring rebuild, even after all its text expires. These
+content-free per-thread markers occupy the same bounded 256-thread capacity; they
+are never silently evicted to make room for new identities. Expired IDs cannot be
+silently re-added. Capacity and size refusals remain explicit. Retention zero writes
+no retained text and advances no durable text resume point.
+
+Conflicts distinguish local revision, stale public metadata, missing anchor,
+sequence, capacity, invalid value, unreadable/key/missing/unsupported record,
+legacy-unbound, uncertain write and rebuild-required states. A deliberate rebuild
+requires an exact review of namespace/conversation, record version/revision/size,
+record/marker/pending hashes. Unreadable global bytes or a global retention setting
+are labelled as affecting all profiles, not one conversation. The descriptor is
+rechecked at mutation. No automatic erase, marker repaint or catch-and-empty exists.
+A cache-only reviewed rebuild does not delete canonical Hermes history or clear
+unresolved typed/voice/metadata intents. Canonical delete remains a distinct operation.
+
+Text is encrypted with AES-GCM/AndroidKeyStore, authenticated before decode, written
+off main through atomic replacement and directory fsync. Cache promotion precedes
+the aggregate resume commit. Failure/uncertainty leaves progress unacknowledged.
+RelayDocument alone owns pending operations, resumes and eviction obligations. A
+revocation/deletion obligation is committed before removal, and cleared only after
+confirmed cache and aggregate content removal. Repeating after a failed final commit
+is idempotent; removal-pending stays visible. Existing-source Hermes retention is
+unchanged and is not silently included in Relay-only local search.
+
+Archive v1 is unchanged: its server UUID is separate export provenance, unavailable
+from the current Relay wire. The adapter requires independently reviewed provenance
+or returns `UNBOUND_PROVENANCE`. Incomplete/rebuild fragments return `REBUILD_REQUIRED`.
+Message array order is canonical order and may have non-monotonic timestamps. Task7
+owns actual SAF selection, provider close/commit and any reviewed archive-version
+change; no profile UUID or endpoint digest is fabricated as export provenance.
+
+API29 element-ownership and real AndroidKeyStore tests are compiled only in this
+source task. JVM software-key and callback schedules establish neither native
+filesystem/power-loss durability nor physical/live acceptance.

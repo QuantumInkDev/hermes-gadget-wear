@@ -2,8 +2,8 @@
 
 Status: **private source, disabled by default, JVM/replay proven only.** Nothing here ran on a phone, an emulator, a live host
 or a real provider. Real AndroidKeyStore behaviour and power-loss durability are NOT proven (gate V7). Canonical voice (V5),
-the 90-day history cache and browser (Task4), the task inbox and notifications (Task5), the watch client, export/purge and the
-real-device acceptance are later tasks and are not waived by this one.
+native history durability, the task inbox and notifications (Task5), the watch client, export/purge and the
+real-device acceptance remain open and are not waived by this one.
 
 Foundation: app `092cf5b8`, SDK `820db74b`, core `babda6d9` (the admitted disabled V4 source foundation,
 `source-foundation.json` sha256 `5e8ecd86…`). Normative inputs read: `relay-native-clients.md` §§1–2 and step 2 (§4),
@@ -288,8 +288,7 @@ is gone. Native persistence and broader Task4 caches remain outside this evidenc
 
 ## 7. Not done, not proven
 
-Real AndroidKeyStore, device file systems, power loss (V7); any emulator/device/live host/provider; V5/V6 voice; Task4 cache and
-browser, Task5 inbox/notifications, Tasks 6–8; existing-session sources; prompt answering and cancel/stop from the phone; the
+Real AndroidKeyStore, device file systems, power loss (V7); any emulator/device/live host/provider; V5/V6 voice; native history/cache acceptance, Task5 inbox/notifications, Tasks 6–8; existing-session sources; prompt answering and cancel/stop from the phone; the
 watch. Original N6/N10 exact recovery stays REQUIRED, unrestored and unwaived (no quarantine was opened, scanned or reset).
 
 ## 8. Tests, fixtures and provenance
@@ -325,3 +324,45 @@ Both operations use the existing bounded Receipt/error decoder, CallRef/outstand
 Only the current applied, correlated `not_found` lookup may release an automatic retry through the existing ledger and per-process attempt, current binding, clock, expiry and persist-before-SEND gates. Historical ABSENT_SO_FAR can survive a failed lookup, but that retained bit alone does not release new work. The tested old-production schedules with exhausted retry budget were already safe controls, not a reproduced stale-absence SEND defect. Original request ID, text and expiry never change; found admission never submits again, and denial still stops and evicts. Absence does not establish a final outcome, no charge, purged execution or permission to replay STT. Canonical microphone remains OFF.
 
 The separately captured `relay-own-native-v1` sessions exercise the actual registered producer and production controller/DirectConnection replay seams. Their socket/provider boundaries are synthetic; Android tests are compiled separately from JVM execution, and native/live/physical/battery acceptance remains open.
+
+## Task4 phone history, deliberate search and metadata
+
+The existing Relay screen now separates online authorized human-text/title search
+and bookmark filtering from local retained-text browsing/search. Retained results
+are labelled retained/partial/offline and read-only. Selecting cached text never
+attaches, grants control or routes the stock composer to a different conversation.
+Current authenticated selection continues typed messages in the same conversation.
+Existing-source history remains separately opt-in per profile and is not included.
+All actions retain the existing endpoint/enrollment and foreground lease callbacks.
+
+Controller rows retain actual public revision, bookmark and metadata state. Search
+query/filter/limit/cursor and operation generation stay together. Empty progress
+pages advance; repeated cursors, page/request and restart budgets stop with partial
+status. Delayed old query/retry replies cannot append to a new query/profile.
+
+Rename and bookmark use only current advertised conversation.update permission and
+writable listed rows. A UUIDv7 and immutable expected public revision/body are
+committed in the shared RelayDocument before SEND. Lost replies/restart retain that
+intent. Retry is deliberate with the same ID/body/revision; refresh never rebases it.
+Accepted, superseded, retired/core_committed, stale snapshot, route unavailable,
+transient, expired and denied states stay distinct. Returned sanitized metadata is
+shown exactly, without an optimistic Saved title/bookmark. Stop tracking is explicit;
+it cannot undo a server mutation. No metadata retry submits a turn or replays speech.
+
+SnapshotCodec format 2 adds bounded metadata intents and history eviction obligations
+to the same aggregate. Format 1 remains readable without inventing either section;
+voice captures and all pre-existing sections are carried explicitly on every write.
+An old format-1 build fails closed on format 2. Text cache schema 3 and reviewed legacy
+handling are documented in history-export-format.md. No server production, protocol
+method, permission or transport implementation change was needed for Task4.
+
+New registered SDK captures use actual enrollment, grants, Gadget registration,
+GatewayRunner/SessionAuthority, SQLite and canonical metadata/search owners behind
+synthetic socket/provider/pairing/clock boundaries. Native replay uses the actual
+RelayController and DirectConnection. Peer.send acceptance observes the matching
+committed request_id/text/expiry and full metadata body. Independent failed, refused,
+stale and uncertain commit cases and fresh positive controls qualify the earlier
+Minor1 check; the frozen old generations remain unchanged. Android tests are compiled
+only. Task5 inbox/O5, Task6 watch, Task7 SAF/delete acceptance, Task8 native/physical/
+live/battery and full15 remain open. Canonical microphone remains OFF. Original
+Task3 raw evidence and N6/N10 recovery requirements remain unrestored and unwaived.

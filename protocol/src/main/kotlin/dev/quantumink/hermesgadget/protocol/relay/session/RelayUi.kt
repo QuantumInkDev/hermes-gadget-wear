@@ -1,6 +1,7 @@
 package dev.quantumink.hermesgadget.protocol.relay.session
 
 import dev.quantumink.hermesgadget.protocol.relay.HistoryRole
+import dev.quantumink.hermesgadget.protocol.relay.MetadataState
 import dev.quantumink.hermesgadget.protocol.relay.state.TurnStatus
 
 /** The coarse state of Relay mode for the selected phone profile. */
@@ -86,7 +87,10 @@ data class ConversationItem(
     val id: String,
     val title: String?,
     val updatedAtMs: Long,
-    val canContinue: Boolean
+    val canContinue: Boolean,
+    val revision: Long = 0,
+    val bookmarked: Boolean = false,
+    val metadataState: MetadataState? = null
 ) {
     override fun toString(): String = "ConversationItem(id=$id, redacted)"
 }
@@ -135,6 +139,16 @@ data class RelayUiState(
     val conversations: List<ConversationItem> = emptyList(),
     val hasMore: Boolean = false,
     val listing: Boolean = false,
+    val onlineQuery: String = "",
+    val bookmarkFilter: Boolean? = null,
+    val listUnavailableCount: Int = 0,
+    val metadataIntents: List<MetadataIntent> = emptyList(),
+    val canEditMetadata: Boolean = false,
+    val retained: List<RetainedThread> = emptyList(),
+    val retainedSelected: RetainedThread? = null,
+    val retainedProblem: HistoryProblem? = null,
+    val retentionDays: Int? = null,
+    val cacheReview: HistoryEraseReview? = null,
     val pendingCreate: PendingCreate? = null,
     val selected: ConversationItem? = null,
     val resumable: ConversationItem? = null,
@@ -156,7 +170,8 @@ data class RelayUiState(
     val micAvailable: Boolean = false
 ) {
     /** True when a selected Relay conversation owns the composer (stock chat input must not be used). */
-    val relayOwnsComposer: Boolean get() = selected != null || phase == RelayPhase.ATTACHING
+    val relayOwnsComposer: Boolean get() = retainedSelected != null || selected != null ||
+        phase == RelayPhase.ATTACHING
 
     override fun toString(): String = "RelayUiState($phase, content=redacted)"
 }

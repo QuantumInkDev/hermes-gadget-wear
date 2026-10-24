@@ -84,7 +84,7 @@ sealed interface DecodeResult {
 object SnapshotCodec {
     const val MAGIC = 0x52533300
     const val TRAILER = 0x454E4400
-    const val FORMAT_VERSION = 1
+    const val FORMAT_VERSION = 2
 
     fun encode(document: RelayDocument): EncodeResult = try {
         EncodeResult.Encoded(Writer.run(document))
@@ -207,6 +207,7 @@ object SnapshotCodec {
                 } else if (snapshot.captures.records.isNotEmpty()) {
                     throw EncodeFailure(EncodeRefusal.INVALID_VALUE, "captures")
                 }
+                w.features(document.section)
                 w.i32(TRAILER)
                 return w.result()
             }
@@ -247,6 +248,39 @@ object SnapshotCodec {
                     nullableString(create.title, StoreBounds.TITLE_BYTES, "$path.create.title")
                     i64(create.preparedAtMs)
                 }
+            }
+        }
+
+        private fun namespace(value: HistoryNamespace, path: String) {
+            string(value.endpointKey, StoreBounds.SCOPE_KEY_BYTES, "$path.endpoint")
+            string(value.endpointUrl, StoreBounds.URL_BYTES, "$path.url")
+            string(value.enrollmentLabel, StoreBounds.SCOPE_KEY_BYTES, "$path.enrollment")
+            string(value.profileId, StoreBounds.UUID_BYTES, "$path.profile")
+            i64(value.reviewEpoch)
+        }
+
+        private fun features(section: ControllerSection) {
+            count(section.intents.size, 16, "metadata.intents")
+            section.intents.forEachIndexed { index, item ->
+                val path = "metadata.intents[$index]"
+                namespace(item.namespace, path)
+                string(item.conversationId.value, StoreBounds.UUID_BYTES, path)
+                string(item.requestId.value, StoreBounds.UUID_BYTES, path)
+                i64(item.expectedRevision)
+                nullableString(item.title, 4096, path)
+                bool(item.bookmarked != null)
+                item.bookmarked?.let(::bool)
+                i64(item.preparedAtMs)
+                string(item.status.name, StoreBounds.ENUM_BYTES, path)
+                bool(item.coreCommitted != null)
+                item.coreCommitted?.let(::bool)
+            }
+            count(section.evictions.size, 64, "history.evictions")
+            section.evictions.forEachIndexed { index, item ->
+                val path = "history.evictions[$index]"
+                namespace(item.namespace, path)
+                nullableString(item.conversationId, StoreBounds.UUID_BYTES, path)
+                string(item.kind.name, StoreBounds.ENUM_BYTES, path)
             }
         }
 
@@ -448,7 +482,8 @@ object SnapshotCodec {
             ) {
                 throw DecodeFailure(DecodeRefusal.UNSUPPORTED_VERSION, "magic")
             }
-            if (u16("formatVersion") != FORMAT_VERSION) {
+            val format = u16("formatVersion")
+            if (format !in 1..FORMAT_VERSION) {
                 throw DecodeFailure(DecodeRefusal.UNSUPPORTED_VERSION, "formatVersion")
             }
             val version = u16("snapshotVersion")
@@ -468,10 +503,11 @@ object SnapshotCodec {
             } else {
                 CaptureLedgerSnapshot.EMPTY
             }
+            val completeSection = if (format == 2) features(section) else section
             if (i32("trailer") != TRAILER) corrupt("trailer")
             if (position != bytes.size) corrupt("trailing")
             return RelayDocument(
-                section,
+                completeSection,
                 RelayStateSnapshot(version, ledger, histories, deliveries, captures)
             )
         }
@@ -538,6 +574,63 @@ object SnapshotCodec {
                 ControllerSection(records)
             } catch (_: IllegalArgumentException) {
                 corrupt("section")
+            }
+        }
+
+        private fun namespace(path: String): HistoryNamespace = try {
+            HistoryNamespace(
+                string(StoreBounds.SCOPE_KEY_BYTES, path),
+                string(StoreBounds.URL_BYTES, path),
+                string(StoreBounds.SCOPE_KEY_BYTES, path),
+                string(StoreBounds.UUID_BYTES, path),
+                i64(path)
+            )
+        } catch (_: IllegalArgumentException) {
+            corrupt(path)
+        }
+
+        private fun features(section: ControllerSection): ControllerSection {
+            val intents = List(count(16, "metadata.intents")) { index ->
+                val path = "metadata.intents[$index]"
+                val namespace = namespace(path)
+                val conversation =
+                    ConversationId.of(string(StoreBounds.UUID_BYTES, path)) ?: corrupt(path)
+                val request = RequestId.of(string(StoreBounds.UUID_BYTES, path)) ?: corrupt(path)
+                val revision = i64(path)
+                val title = nullableString(4096, path)
+                val bookmark = if (bool(path)) bool(path) else null
+                val prepared = i64(path)
+                val status = string(StoreBounds.ENUM_BYTES, path).let { name ->
+                    MetadataStatus.entries.firstOrNull { it.name == name } ?: corrupt(path)
+                }
+                val core = if (bool(path)) bool(path) else null
+                try {
+                    MetadataIntent(
+                        namespace, conversation, request, revision, title, bookmark,
+                        prepared, status, core
+                    )
+                } catch (
+                    _: IllegalArgumentException
+                ) {
+                    corrupt(path)
+                }
+            }
+            val evictions = List(count(64, "history.evictions")) { index ->
+                val path = "history.evictions[$index]"
+                val namespace = namespace(path)
+                val conversation = nullableString(StoreBounds.UUID_BYTES, path)
+                if (conversation != null && ConversationId.of(conversation) == null) corrupt(path)
+                val kind = string(StoreBounds.ENUM_BYTES, path).let { name ->
+                    EvictionKind.entries.firstOrNull { it.name == name } ?: corrupt(path)
+                }
+                HistoryEviction(namespace, conversation, kind)
+            }
+            return try {
+                ControllerSection(section.enrollments, intents, evictions)
+            } catch (
+                _: IllegalArgumentException
+            ) {
+                corrupt("features")
             }
         }
 

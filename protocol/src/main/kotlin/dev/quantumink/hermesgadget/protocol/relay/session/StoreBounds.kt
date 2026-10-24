@@ -97,7 +97,16 @@ object StoreBounds {
     const val TRAILER_BYTES = 4L
 
     /** The five u16 counts of the document plus the capture section's version and count. */
-    const val COUNTS_BYTES = 2L * 5 + 4 + 2
+    const val COUNTS_BYTES = 2L * 5 + 4 + 2 + 2 + 2
+
+    val historyNamespaceMax: Long =
+        string(SCOPE_KEY_BYTES) * 2 + string(URL_BYTES) + string(UUID_BYTES) + 8
+    val metadataIntentMax: Long =
+        historyNamespaceMax + string(UUID_BYTES) * 2 + 8 + nullableString(4096) + 2 + 8 +
+            string(ENUM_BYTES) +
+            2
+    val historyEvictionMax: Long =
+        historyNamespaceMax + nullableString(UUID_BYTES) + string(ENUM_BYTES)
 
     /** The size of a version 2 document with every collection empty. */
     fun emptyDocumentBytes(): Long = HEADER_BYTES + TRAILER_BYTES + COUNTS_BYTES
@@ -109,7 +118,7 @@ object StoreBounds {
         SCOPE_DECISIONS * scopeDecisionMax +
         HISTORIES * historyMax +
         DELIVERIES * deliveryMax +
-        CAPTURES * captureMax
+        CAPTURES * captureMax + 16 * metadataIntentMax + 64 * historyEvictionMax
 
     /** True: the deliberate cap is below the full capacity the state layer itself would accept. */
     val capIsBelowFullCapacity: Boolean get() = theoreticalMaxPlaintextBytes() > PLAINTEXT_CAP_BYTES

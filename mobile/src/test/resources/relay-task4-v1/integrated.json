@@ -1,0 +1,592 @@
+{
+  "scenario": "integrated",
+  "server_time_ms": 1792300000000,
+  "mint_plan": [
+    "01a14d67-a300-7000-a241-987a17dad984",
+    "01a14d67-a300-7000-bd5c-4734219c9943",
+    "01a14d67-a300-7000-9b2f-d9f1b0b8aa1d",
+    "01a14d67-a300-7000-ba94-fe43cf3459a0"
+  ],
+  "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+  "welcomes": [
+    {
+      "relay": {
+        "version": 1
+      }
+    }
+  ],
+  "steps": [
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r0",
+        "method": "relay.info",
+        "params": {}
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r0",
+        "result": {
+          "profile_id": "9e8af651-47eb-411f-b28c-ed292bbfd305",
+          "grant_generation": 2,
+          "expires_at_ms": 1794892000000,
+          "server_time_ms": 1792300000000,
+          "methods": [
+            "relay.info",
+            "relay.conversation.create",
+            "relay.conversation.attach",
+            "relay.conversation.detach",
+            "relay.turn.submit",
+            "relay.turn.receipt",
+            "relay.turn.receipt.own",
+            "relay.history.page",
+            "relay.events.read",
+            "relay.conversations.list",
+            "relay.conversation.update",
+            "relay.conversation.delete",
+            "relay.outbox.read",
+            "relay.outbox.ack"
+          ],
+          "limits": {
+            "outbox_cursor": false,
+            "page_items": 50,
+            "text_bytes": 16384,
+            "dto_bytes": 8192,
+            "dto_depth": 6,
+            "history_page_bytes": 65536,
+            "history_text_bytes": 32768
+          }
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r1",
+        "method": "relay.conversations.list",
+        "params": {
+          "limit": 25
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r1",
+        "result": {
+          "items": [],
+          "next_cursor": null
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r2",
+        "method": "relay.conversation.create",
+        "params": {
+          "request_id": "01a14d67-a300-7000-a241-987a17dad984",
+          "title": "Planning"
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r2",
+        "result": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "title": "Planning",
+          "revision": 1,
+          "bookmarked": false,
+          "updated_at_ms": 1792300000000,
+          "can_continue": true
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r3",
+        "method": "relay.conversation.attach",
+        "params": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd"
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r3",
+        "result": {
+          "binding_id": "cc471e11-7f94-4d81-b1a4-4832b39a79e2",
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "authority_epoch": 1,
+          "execution_generation": 0,
+          "revision": 1,
+          "replay_epoch": "9915ee49-21f7-48d6-8ec2-10f8d92c4b82",
+          "last_sequence": 0,
+          "execution_state": "idle"
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r4",
+        "method": "relay.history.page",
+        "params": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "limit": 50
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r4",
+        "result": {
+          "items": [],
+          "next_cursor": null
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r5",
+        "method": "relay.conversation.update",
+        "params": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "request_id": "01a14d67-a300-7000-bd5c-4734219c9943",
+          "expected_revision": 1,
+          "title": "  Trip \u200b plans  "
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r5",
+        "result": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "title": "Trip plans",
+          "revision": 2,
+          "bookmarked": false,
+          "updated_at_ms": 1792300000000,
+          "can_continue": true,
+          "mutation_outcome": "accepted",
+          "core_committed": true
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r6",
+        "method": "relay.conversations.list",
+        "params": {
+          "limit": 25
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r6",
+        "result": {
+          "items": [
+            {
+              "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+              "title": "Trip plans",
+              "revision": 2,
+              "bookmarked": false,
+              "updated_at_ms": 1792300000000,
+              "can_continue": true
+            }
+          ],
+          "next_cursor": null
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r7",
+        "method": "relay.conversation.attach",
+        "params": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd"
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r7",
+        "result": {
+          "binding_id": "23fb9a67-172a-4132-a437-c626fc8a40af",
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "authority_epoch": 1,
+          "execution_generation": 0,
+          "revision": 2,
+          "replay_epoch": "90ff89d3-2d20-4296-9581-56e60bf8c9b5",
+          "last_sequence": 0,
+          "execution_state": "idle"
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r8",
+        "method": "relay.history.page",
+        "params": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "limit": 50
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r8",
+        "result": {
+          "items": [],
+          "next_cursor": null
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r9",
+        "method": "relay.conversation.update",
+        "params": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "request_id": "01a14d67-a300-7000-9b2f-d9f1b0b8aa1d",
+          "expected_revision": 2,
+          "bookmarked": true
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r9",
+        "result": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "title": "Trip plans",
+          "revision": 3,
+          "bookmarked": true,
+          "updated_at_ms": 1792300000000,
+          "can_continue": true,
+          "mutation_outcome": "accepted",
+          "core_committed": false
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r10",
+        "method": "relay.conversations.list",
+        "params": {
+          "limit": 25
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r10",
+        "result": {
+          "items": [
+            {
+              "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+              "title": "Trip plans",
+              "revision": 3,
+              "bookmarked": true,
+              "updated_at_ms": 1792300000000,
+              "can_continue": true
+            }
+          ],
+          "next_cursor": null
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r11",
+        "method": "relay.conversation.attach",
+        "params": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd"
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r11",
+        "result": {
+          "binding_id": "1071792f-05f5-4327-9b54-0383376c21e5",
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "authority_epoch": 1,
+          "execution_generation": 0,
+          "revision": 2,
+          "replay_epoch": "6ba53467-3e83-4e8d-82ee-67435843031e",
+          "last_sequence": 0,
+          "execution_state": "idle"
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r12",
+        "method": "relay.history.page",
+        "params": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "limit": 50
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r12",
+        "result": {
+          "items": [],
+          "next_cursor": null
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r13",
+        "method": "relay.conversations.list",
+        "params": {
+          "limit": 25,
+          "query": "Trip",
+          "bookmarked": true
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r13",
+        "result": {
+          "items": [
+            {
+              "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+              "title": "Trip plans",
+              "revision": 3,
+              "bookmarked": true,
+              "updated_at_ms": 1792300000000,
+              "can_continue": true
+            }
+          ],
+          "next_cursor": null
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r14",
+        "method": "relay.conversation.update",
+        "params": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "request_id": "01a14d67-a300-7000-ba94-fe43cf3459a0",
+          "expected_revision": 3,
+          "title": "Kept"
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r14",
+        "result": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "title": "Kept",
+          "revision": 4,
+          "bookmarked": true,
+          "updated_at_ms": 1792300000000,
+          "can_continue": true,
+          "mutation_outcome": "accepted",
+          "core_committed": true
+        }
+      },
+      "note": "integrated",
+      "response_accepted": false
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r14",
+        "method": "relay.conversation.update",
+        "params": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "request_id": "01a14d67-a300-7000-ba94-fe43cf3459a0",
+          "expected_revision": 3,
+          "title": "Kept"
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r14",
+        "result": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "title": "Kept",
+          "revision": 4,
+          "bookmarked": true,
+          "updated_at_ms": 1792300000000,
+          "can_continue": true,
+          "mutation_outcome": "accepted",
+          "core_committed": true
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r15",
+        "method": "relay.conversations.list",
+        "params": {
+          "limit": 25,
+          "query": "Trip",
+          "bookmarked": true
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r15",
+        "result": {
+          "items": [],
+          "next_cursor": null
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r16",
+        "method": "relay.conversation.attach",
+        "params": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd"
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r16",
+        "result": {
+          "binding_id": "ffd19f70-3693-4225-b231-be128db924c4",
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "authority_epoch": 1,
+          "execution_generation": 0,
+          "revision": 3,
+          "replay_epoch": "782b72f7-0a97-4a5c-ac8b-356e4f782505",
+          "last_sequence": 0,
+          "execution_state": "idle"
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r17",
+        "method": "relay.history.page",
+        "params": {
+          "conversation_id": "cb8d99f4-1a5d-4342-8cb0-9281b9946bfd",
+          "limit": 50
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r17",
+        "result": {
+          "items": [],
+          "next_cursor": null
+        }
+      },
+      "note": "integrated",
+      "response_accepted": true
+    }
+  ],
+  "executions": 0,
+  "core_state": [
+    "Kept",
+    3
+  ],
+  "origins": {
+    "sdk": "/Users/quantumdev/.t3/worktrees/Hermes Watch Agent/t3-1a5f609e/.local/phone-history-task4/task4-imports/hermes_gadget_plugin/relay_conversations.py",
+    "core": "/Users/quantumdev/.t3/worktrees/Hermes Watch Agent/t3-1a5f609e/.local/phone-history-task4/upstream/continuity-core/gateway/session_authority.py"
+  },
+  "boundaries": "real registration/grants/authority/SQLite; synthetic WebSocket/provider/pairing/scoped clock"
+}

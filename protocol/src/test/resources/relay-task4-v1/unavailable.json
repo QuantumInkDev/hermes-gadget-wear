@@ -1,0 +1,238 @@
+{
+  "scenario": "unavailable",
+  "server_time_ms": 1792300000000,
+  "mint_plan": [
+    "01a14d67-a300-7000-bc7a-1923ec9bf75c",
+    "01a14d67-a300-7000-aa40-8fc7d879f651"
+  ],
+  "conversation_id": "77d4805c-7195-44ac-8548-2faeae499a43",
+  "welcomes": [
+    {
+      "relay": {
+        "version": 1
+      }
+    }
+  ],
+  "steps": [
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r0",
+        "method": "relay.info",
+        "params": {}
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r0",
+        "result": {
+          "profile_id": "9e8af651-47eb-411f-b28c-ed292bbfd305",
+          "grant_generation": 2,
+          "expires_at_ms": 1794892000000,
+          "server_time_ms": 1792300000000,
+          "methods": [
+            "relay.info",
+            "relay.conversation.create",
+            "relay.conversation.attach",
+            "relay.conversation.detach",
+            "relay.turn.submit",
+            "relay.turn.receipt",
+            "relay.turn.receipt.own",
+            "relay.history.page",
+            "relay.events.read",
+            "relay.conversations.list",
+            "relay.conversation.update",
+            "relay.conversation.delete",
+            "relay.outbox.read",
+            "relay.outbox.ack"
+          ],
+          "limits": {
+            "outbox_cursor": false,
+            "page_items": 50,
+            "text_bytes": 16384,
+            "dto_bytes": 8192,
+            "dto_depth": 6,
+            "history_page_bytes": 65536,
+            "history_text_bytes": 32768
+          }
+        }
+      },
+      "note": "unavailable",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r1",
+        "method": "relay.conversations.list",
+        "params": {
+          "limit": 25
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r1",
+        "result": {
+          "items": [],
+          "next_cursor": null
+        }
+      },
+      "note": "unavailable",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r2",
+        "method": "relay.conversation.create",
+        "params": {
+          "request_id": "01a14d67-a300-7000-bc7a-1923ec9bf75c",
+          "title": "Planning"
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r2",
+        "result": {
+          "conversation_id": "77d4805c-7195-44ac-8548-2faeae499a43",
+          "title": "Planning",
+          "revision": 1,
+          "bookmarked": false,
+          "updated_at_ms": 1792300000000,
+          "can_continue": true
+        }
+      },
+      "note": "unavailable",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r3",
+        "method": "relay.conversation.attach",
+        "params": {
+          "conversation_id": "77d4805c-7195-44ac-8548-2faeae499a43"
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r3",
+        "result": {
+          "binding_id": "4516fd79-aac8-4e5c-b2c1-ad3177a5d6b0",
+          "conversation_id": "77d4805c-7195-44ac-8548-2faeae499a43",
+          "authority_epoch": 1,
+          "execution_generation": 0,
+          "revision": 1,
+          "replay_epoch": "f4ad2f09-afd6-4d4a-b916-7f79cb0ee9cc",
+          "last_sequence": 0,
+          "execution_state": "idle"
+        }
+      },
+      "note": "unavailable",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r4",
+        "method": "relay.history.page",
+        "params": {
+          "conversation_id": "77d4805c-7195-44ac-8548-2faeae499a43",
+          "limit": 50
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r4",
+        "result": {
+          "items": [],
+          "next_cursor": null
+        }
+      },
+      "note": "unavailable",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r5",
+        "method": "relay.conversations.list",
+        "params": {
+          "limit": 25
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r5",
+        "result": {
+          "items": [
+            {
+              "conversation_id": "77d4805c-7195-44ac-8548-2faeae499a43",
+              "title": "Planning",
+              "revision": 2,
+              "bookmarked": false,
+              "updated_at_ms": 1792300000000,
+              "can_continue": false,
+              "metadata_state": "unavailable"
+            }
+          ],
+          "next_cursor": null
+        }
+      },
+      "note": "unavailable",
+      "response_accepted": true
+    },
+    {
+      "connection": 1,
+      "request": {
+        "type": "relay.request",
+        "v": 1,
+        "id": "r6",
+        "method": "relay.conversation.update",
+        "params": {
+          "conversation_id": "77d4805c-7195-44ac-8548-2faeae499a43",
+          "request_id": "01a14d67-a300-7000-aa40-8fc7d879f651",
+          "expected_revision": 2,
+          "title": "Requested"
+        }
+      },
+      "response": {
+        "type": "relay.response",
+        "v": 1,
+        "id": "r6",
+        "error": {
+          "code": "conflict"
+        }
+      },
+      "note": "unavailable",
+      "response_accepted": true
+    }
+  ],
+  "executions": 0,
+  "core_state": [
+    "Planning",
+    1
+  ],
+  "origins": {
+    "sdk": "/Users/quantumdev/.t3/worktrees/Hermes Watch Agent/t3-1a5f609e/.local/phone-history-task4/task4-imports/hermes_gadget_plugin/relay_conversations.py",
+    "core": "/Users/quantumdev/.t3/worktrees/Hermes Watch Agent/t3-1a5f609e/.local/phone-history-task4/upstream/continuity-core/gateway/session_authority.py"
+  },
+  "boundaries": "real registration/grants/authority/SQLite; synthetic WebSocket/provider/pairing/scoped clock"
+}

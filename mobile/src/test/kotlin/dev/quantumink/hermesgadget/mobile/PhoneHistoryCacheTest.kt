@@ -1,5 +1,9 @@
 package dev.quantumink.hermesgadget.mobile
 
+import dev.quantumink.hermesgadget.protocol.relay.session.EnrollmentRecord
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryAnchor
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryFailure
+import dev.quantumink.hermesgadget.protocol.relay.session.HistoryProblem
 import java.util.Collections
 import javax.crypto.KeyGenerator
 import kotlinx.coroutines.runBlocking
@@ -29,13 +33,14 @@ class PhoneHistoryCacheTest {
             })
         }
         assertTrue(operations.isEmpty())
-        val scope = HistoryScope(
-            "test:profile",
-            "wss://example.invalid/gadget",
-            "00000000-0000-4000-8000-000000000001",
-            "00000000-0000-4000-8000-000000000002",
-            "a".repeat(64)
-        )
+        val scope =
+            HistoryScope(
+                EnrollmentRecord.endpointKey("wss://example.invalid/gadget"),
+                "wss://example.invalid/gadget",
+                "a".repeat(64),
+                "00000000-0000-4000-8000-000000000002",
+                0L
+            )
         val first = cache.read(scope)
         val entry = HistoryThread(
             "00000000-0000-4000-8000-000000000003",
@@ -44,7 +49,12 @@ class PhoneHistoryCacheTest {
             true,
             listOf(HistoryMessage("m1", HistoryRole.USER, "Private thought", 123))
         )
-        val saved = cache.put(scope, entry, first.revision)
+        val saved = cache.put(
+            scope,
+            entry,
+            first.revision,
+            HistoryAnchor.Beginning
+        )
         assertEquals(entry.id, cache.search(scope, "thought").single().id)
         val configured = cache.setRetention(scope, 7, saved.revision)
         val purged = cache.purge(scope, null, configured.revision)

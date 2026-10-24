@@ -169,7 +169,7 @@ class PhoneRelayRoutingTest {
         assertTrue(
             relayStoppedText(
                 pending.copy(contentEvictionPending = false, unsaved = false)
-            ).contains("ledger content was removed")
+            ).contains("Saved Relay content was removed")
         )
     }
 }
