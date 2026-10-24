@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -43,7 +44,8 @@ internal fun VoiceRecordButton(
     record: () -> Unit,
     finish: () -> Unit,
     cancel: () -> Unit,
-    holding: (Boolean) -> Unit
+    holding: (Boolean) -> Unit,
+    size: Dp = 56.dp
 ) {
     val currentOwner by rememberUpdatedState(owner)
     val ready by rememberUpdatedState(enabled)
@@ -78,7 +80,7 @@ internal fun VoiceRecordButton(
     }
     DisposableEffect(gesture) { onDispose { terminate(gesture.cancel()) } }
     Box(
-        Modifier.size(56.dp)
+        Modifier.size(size)
             .background(
                 if (enabled) {
                     MaterialTheme.colorScheme.primary

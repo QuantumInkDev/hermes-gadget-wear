@@ -73,6 +73,8 @@ import androidx.wear.compose.material3.TimeText
 import androidx.wear.compose.material3.TimeTextDefaults
 import androidx.wear.compose.material3.timeTextCurvedText
 import dev.quantumink.hermesgadget.client.CuePreferences
+import dev.quantumink.hermesgadget.client.PlaybackOutput
+import dev.quantumink.hermesgadget.client.WalkingPreferences
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
 import dev.quantumink.hermesgadget.protocol.ConversationMode
 import dev.quantumink.hermesgadget.protocol.TransportPath
@@ -423,6 +425,7 @@ private fun SetupPage(
         item {
             Toggle("Recording sound cues", soundCues) { CuePreferences.set(context, !soundCues) }
         }
+        item { WalkingToggle() }
         if (profile != null) item { Secondary(stringResource(R.string.back), onBack) }
         item { Secondary(stringResource(R.string.reset_setup), onReset) }
     }
@@ -538,6 +541,10 @@ internal fun ConversationPage(
     }
     val promptScroll = remember(prompt?.id) { TransformingLazyColumnState() }
     val replyState = rememberWatchReply(conversation, page.key + ":" + watch.profile?.endpoint?.url)
+    val context = LocalContext.current
+    val walking by remember(context) {
+        WalkingPreferences(context)
+    }.enabled.collectAsStateWithLifecycle()
     RoundPage(
         topPadding = if (prompt == null) 28.dp else 40.dp,
         state = if (prompt == null) pageScroll else promptScroll
@@ -604,6 +611,7 @@ internal fun ConversationPage(
                     )
                 }
             }
+            if (walking && paired) walkingControls(watch, service)
             if (watch.screenNotice.isNotEmpty()) item { Body(watch.screenNotice) }
             if (connection.status == ConnectionStatus.PAIRING) {
                 item {
@@ -712,6 +720,7 @@ internal fun ConversationPage(
                         conversation.mode != ConversationMode.LISTENING
                 )
             }
+            item { WalkingToggle() }
             presentationOptions(page, watch) { identity, mode ->
                 service.setPresentation(page.key, identity, mode)
             }
@@ -729,6 +738,82 @@ internal fun ConversationPage(
             )
             item { jump() }
         }
+    }
+}
+
+/** Larger deliberate playback controls. The portrait above stays the only way to talk. */
+private fun TransformingLazyColumnScope.walkingControls(watch: WatchState, service: GadgetService) {
+    val conversation = watch.connection.conversation
+    val idle = !conversation.busy && conversation.mode != ConversationMode.LISTENING &&
+        !watch.captureActive
+    item {
+        Body(
+            stringResource(
+                when (watch.output) {
+                    PlaybackOutput.HEADPHONES -> R.string.walking_output_headphones
+                    PlaybackOutput.SPEAKER -> R.string.walking_output_speaker
+                    PlaybackOutput.OTHER -> R.string.walking_output_other
+                    PlaybackOutput.UNKNOWN -> R.string.walking_on
+                }
+            ),
+            muted = true
+        )
+    }
+    if (watch.speaking || watch.speechPending) {
+        item { WalkingButton(stringResource(R.string.walking_stop), true, service::stopSpeech) }
+    }
+    item {
+        WalkingButton(
+            stringResource(R.string.walking_replay),
+            idle && watch.replayReady,
+            service::replay,
+            primary = false
+        )
+    }
+    if (watch.connection.clientSpeech) {
+        item {
+            WalkingButton(
+                stringResource(R.string.walking_more),
+                idle && watch.moreReady,
+                service::tellMore,
+                primary = false
+            )
+        }
+    } else {
+        item { Body(stringResource(R.string.walking_server_voice), muted = true) }
+    }
+}
+
+@Composable
+private fun WalkingButton(
+    value: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    primary: Boolean = true
+) {
+    val modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)
+    val label: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
+        Text(
+            value,
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+    if (primary) {
+        Button(onClick, modifier, enabled = enabled, content = label)
+    } else {
+        FilledTonalButton(onClick, modifier, enabled = enabled, content = label)
+    }
+}
+
+@Composable
+private fun WalkingToggle() {
+    val context = LocalContext.current
+    val preferences = remember(context) { WalkingPreferences(context) }
+    val walking by preferences.enabled.collectAsStateWithLifecycle()
+    Toggle(stringResource(R.string.walking_mode), walking) {
+        runCatching { preferences.set(!walking) }
     }
 }
 

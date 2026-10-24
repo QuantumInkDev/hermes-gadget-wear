@@ -48,6 +48,11 @@ fun ConversationPage(
     modifier: Modifier = Modifier
 ) {
     val state by model.state.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val walkingPreferences = remember(context) {
+        dev.quantumink.hermesgadget.client.WalkingPreferences(context)
+    }
+    val walking by walkingPreferences.enabled.collectAsStateWithLifecycle()
     LaunchedEffect(state.visible, state.speaking) {
         model.refreshMediaVolume()
         while (state.visible && state.speaking) {
@@ -59,7 +64,9 @@ fun ConversationPage(
         state, page, connect, record, back, model::draft, model::send,
         model::finishRecording, model::cancelRecording, model::stopPlayback,
         { model.cancel() }, { model.cancel(true) }, model::answer, modifier,
-        RelayActions.of(model)
+        RelayActions.of(model),
+        if (walking) WalkingActions(model::replay, model::tellMore) else null,
+        { on -> runCatching { walkingPreferences.set(on) } }
     )
 }
 
@@ -79,7 +86,9 @@ internal fun ConversationContent(
     newSession: () -> Unit,
     answer: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    relayActions: RelayActions = RelayActions.NONE
+    relayActions: RelayActions = RelayActions.NONE,
+    walking: WalkingActions? = null,
+    setWalking: ((Boolean) -> Unit)? = null
 ) {
     val conversation = state.connection.conversation
     val listening = conversation.mode == ConversationMode.LISTENING
@@ -272,7 +281,8 @@ internal fun ConversationContent(
                                 stopVoice, cancelTurn, keyboard,
                                 Modifier.heightIn(
                                     max = controlsHeight
-                                ).verticalScroll(rememberScrollState())
+                                ).verticalScroll(rememberScrollState()),
+                                walking
                             )
                         }
                     }
@@ -308,6 +318,14 @@ internal fun ConversationContent(
                         "Server voice is the default. " +
                             "Optional phone and watch speech is set in Speech providers."
                     )
+                    setWalking?.let { change ->
+                        SettingsToggle(
+                            androidx.compose.ui.res.stringResource(R.string.walking_mode),
+                            walking != null,
+                            true,
+                            change
+                        )
+                    }
                     TextButton({
                         newSession()
                         details = false

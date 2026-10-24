@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
+import android.media.AudioDeviceInfo
 import android.media.AudioFocusRequest
 import android.media.AudioFormat
 import android.media.AudioManager
@@ -177,11 +178,21 @@ class PcmPlayback(
     private val generations = AtomicLong()
     private val requested = AtomicReference<Playback?>()
     private var reportedOutput = PlaybackOutput.UNKNOWN
+
+    /** Applied to each later stream. Walking mode prefers earbuds; SYSTEM is stock behaviour. */
+    @Volatile var route: PlaybackRoute = PlaybackRoute.SYSTEM
+
+    /** Optional extra observer of the same output notifications, on the callback looper. */
+    @Volatile var outputObserver: (PlaybackOutput) -> Unit = {}
     private sealed interface Packet {
         class Data(val bytes: ByteArray) : Packet
         data object End : Packet
     }
-    private class Playback(val generation: Long) {
+    private class Playback(
+        val generation: Long,
+        val route: PlaybackRoute,
+        val clip: ReplayClip? = null
+    ) {
         val stopped = AtomicBoolean(false)
         val interruptionQueued = AtomicBoolean(false)
         val finishing = AtomicBoolean(false)
@@ -199,10 +210,15 @@ class PcmPlayback(
     // Only the callback looper changes this owner. The worker alone releases its resources.
     @Volatile private var active: Playback? = null
 
-    fun start(rate: Int, opusHeader: ByteArray? = null) {
+    fun start(rate: Int, opusHeader: ByteArray? = null) = begin(rate, opusHeader, null)
+
+    /** Plays a completed received clip again on the same focus/route/interruption path. */
+    fun replay(clip: ReplayClip) = begin(clip.rate, clip.header, clip)
+
+    private fun begin(rate: Int, opusHeader: ByteArray?, clip: ReplayClip?) {
         require(rate == 16000)
         val (playback, previous) = synchronized(requested) {
-            val next = Playback(generations.incrementAndGet())
+            val next = Playback(generations.incrementAndGet(), route, clip)
             next to requested.getAndSet(next)
         }
         previous?.let(::cancel)
@@ -258,6 +274,7 @@ class PcmPlayback(
                 .setTransferMode(AudioTrack.MODE_STREAM).build()
             playback.track = track
             check(track.state == AudioTrack.STATE_INITIALIZED)
+            preferredDevice(playback.route)?.let { track.setPreferredDevice(it) }
             val routing = AudioRouting.OnRoutingChangedListener { source ->
                 // AudioTrack also exposes an older listener overload; use AudioRouting explicitly.
                 if (source === track) observe(playback, track)
@@ -320,18 +337,30 @@ class PcmPlayback(
                     samples += count / 2
                 }
             }
+            fun drain() {
+                decoder?.finish(::writePcm)
+                val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+                while (!playback.stopped.get() && !playback.interruptionQueued.get() &&
+                    System.nanoTime() < deadline &&
+                    (track.playbackHeadPosition.toLong() and 0xffffffffL) < samples
+                ) {
+                    Thread.sleep(10)
+                }
+            }
+            playback.clip?.let { clip ->
+                // Blocking writes pace a replay; it never enters the bounded live queue.
+                for (bytes in clip.packets) {
+                    if (playback.stopped.get() || playback.interruptionQueued.get()) break
+                    if (decoder == null) writePcm(bytes) else decoder.push(bytes, ::writePcm)
+                }
+                drain()
+                return
+            }
             while (!playback.stopped.get() && !playback.interruptionQueued.get()) {
                 when (val packet = playback.queue.poll(1, TimeUnit.SECONDS)) {
                     null -> Unit
                     Packet.End -> {
-                        decoder?.finish(::writePcm)
-                        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
-                        while (!playback.stopped.get() && !playback.interruptionQueued.get() &&
-                            System.nanoTime() < deadline &&
-                            (track.playbackHeadPosition.toLong() and 0xffffffffL) < samples
-                        ) {
-                            Thread.sleep(10)
-                        }
+                        drain()
                         break
                     }
                     is Packet.Data -> {
@@ -380,13 +409,23 @@ class PcmPlayback(
                 if (output != reportedOutput) {
                     reportedOutput = output
                     onOutputChanged(output)
+                    outputObserver(output)
                 }
             }
         }
     }
 
+    private fun preferredDevice(route: PlaybackRoute): AudioDeviceInfo? {
+        if (route == PlaybackRoute.SYSTEM) return null
+        val devices = runCatching {
+            manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).toList()
+        }.getOrDefault(emptyList())
+        return preferredOutputIndex(route, devices.map { it.type }, Build.VERSION.SDK_INT)
+            ?.let(devices::get)
+    }
+
     fun offer(bytes: ByteArray) {
-        val playback = requested.get() ?: return
+        val playback = requested.get()?.takeIf { it.clip == null } ?: return
         val failed = synchronized(playback) {
             if (playback.stopped.get() || playback.interruptionQueued.get() ||
                 playback.finishing.get()
@@ -405,7 +444,7 @@ class PcmPlayback(
     }
 
     fun finish() {
-        val playback = requested.get() ?: return
+        val playback = requested.get()?.takeIf { it.clip == null } ?: return
         val failed = synchronized(playback) {
             if (playback.stopped.get() || playback.interruptionQueued.get() ||
                 !playback.finishing.compareAndSet(false, true)
@@ -474,6 +513,7 @@ class PcmPlayback(
         if (latest() && reportedOutput != PlaybackOutput.UNKNOWN) {
             reportedOutput = PlaybackOutput.UNKNOWN
             onOutputChanged(PlaybackOutput.UNKNOWN)
+            outputObserver(PlaybackOutput.UNKNOWN)
         }
         if (latest()) onFinished()
     }

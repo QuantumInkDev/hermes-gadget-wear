@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,13 +32,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import dev.quantumink.hermesgadget.client.PlaybackOutput
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
 import dev.quantumink.hermesgadget.protocol.ConversationMode
 import kotlinx.coroutines.delay
+
+/** Walking mode's deliberate playback actions; null keeps the ordinary controls. */
+internal class WalkingActions(val replay: () -> Unit, val tellMore: () -> Unit)
 
 @Composable
 internal fun ConversationControls(
@@ -49,7 +57,8 @@ internal fun ConversationControls(
     stopVoice: () -> Unit,
     cancelTurn: () -> Unit,
     keyboardVisible: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    walking: WalkingActions? = null
 ) {
     val conversation = state.connection.conversation
     val listening = conversation.mode == ConversationMode.LISTENING
@@ -92,9 +101,13 @@ internal fun ConversationControls(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        if (walking != null && !recording) {
+            WalkingControls(state, walking, stopVoice)
+        }
         if (!recording && (state.speaking || state.preparingSpeech || conversation.busy)) {
             if (state.speaking || state.preparingSpeech) {
-                TextButton(stopVoice) { Text("Stop voice") }
+                // Walking mode already shows its larger Stop control above.
+                if (walking == null) TextButton(stopVoice) { Text("Stop voice") }
             } else {
                 TextButton(cancelTurn, enabled = paired) { Text("Cancel turn") }
             }
@@ -183,7 +196,8 @@ internal fun ConversationControls(
                         {
                             holding =
                                 it
-                        }
+                        },
+                        if (walking != null) 80.dp else 56.dp
                     )
                 }
             }
@@ -200,4 +214,52 @@ internal fun ConversationControls(
             )
         }
     }
+}
+
+@Composable
+private fun WalkingControls(
+    state: PhoneConversationState,
+    walking: WalkingActions,
+    stop: () -> Unit
+) {
+    val conversation = state.connection.conversation
+    val idle = state.visible && !conversation.busy &&
+        conversation.mode != ConversationMode.LISTENING
+    val speaking = state.speaking || state.preparingSpeech
+    Text(
+        stringResource(
+            when (state.output) {
+                PlaybackOutput.HEADPHONES -> R.string.walking_output_headphones
+                PlaybackOutput.SPEAKER -> R.string.walking_output_speaker
+                PlaybackOutput.OTHER -> R.string.walking_output_other
+                PlaybackOutput.UNKNOWN -> R.string.walking_on
+            }
+        ),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary
+    )
+    if (!state.connection.clientSpeech) {
+        Text(
+            stringResource(R.string.walking_server_voice),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        val large = Modifier.weight(1f).heightIn(min = 64.dp)
+        FilledTonalButton(walking.replay, large, enabled = idle && state.replayReady) {
+            WalkingLabel(stringResource(R.string.walking_replay))
+        }
+        Button(stop, large, enabled = speaking) {
+            WalkingLabel(stringResource(R.string.walking_stop))
+        }
+        FilledTonalButton(walking.tellMore, large, enabled = idle && state.moreReady) {
+            WalkingLabel(stringResource(R.string.walking_more))
+        }
+    }
+}
+
+@Composable
+private fun WalkingLabel(value: String) {
+    Text(value, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
 }

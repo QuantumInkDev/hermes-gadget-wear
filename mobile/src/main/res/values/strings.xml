@@ -93,4 +93,14 @@
     <string name="share_rejected_unsupported">Images, documents and other files are not supported yet. Share text or a link instead. Nothing was sent.</string>
     <string name="share_rejected_unreadable">This share could not be read. Try sharing it again. Nothing was sent.</string>
     <string name="share_close">Close</string>
+    <string name="walking_mode">Walking mode</string>
+    <string name="walking_mode_hint">This phone only. Larger controls and a short spoken answer; the full answer stays on screen. Still hold to talk.</string>
+    <string name="walking_on">Walking mode</string>
+    <string name="walking_output_headphones">Walking mode · playing on headphones</string>
+    <string name="walking_output_speaker">Walking mode · playing on speaker</string>
+    <string name="walking_output_other">Walking mode · playing on another output</string>
+    <string name="walking_server_voice">Server voice reads the whole answer. Short spoken answers and Tell me more need phone voice (BYOK).</string>
+    <string name="walking_replay">Replay</string>
+    <string name="walking_stop">Stop</string>
+    <string name="walking_more">Tell me more</string>
 </resources>

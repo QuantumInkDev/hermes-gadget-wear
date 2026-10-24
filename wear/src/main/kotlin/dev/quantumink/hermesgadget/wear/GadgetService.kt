@@ -23,7 +23,13 @@ import dev.quantumink.hermesgadget.client.CuePreferences
 import dev.quantumink.hermesgadget.client.OpusSupport
 import dev.quantumink.hermesgadget.client.PcmCapture
 import dev.quantumink.hermesgadget.client.PcmPlayback
+import dev.quantumink.hermesgadget.client.PlaybackOutput
+import dev.quantumink.hermesgadget.client.PlaybackRoute
 import dev.quantumink.hermesgadget.client.RecordingCues
+import dev.quantumink.hermesgadget.client.ReplayRecorder
+import dev.quantumink.hermesgadget.client.WalkingPreferences
+import dev.quantumink.hermesgadget.client.WalkingReply
+import dev.quantumink.hermesgadget.client.WalkingSpeech
 import dev.quantumink.hermesgadget.protocol.ConnectionObserver
 import dev.quantumink.hermesgadget.protocol.ConnectionState
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
@@ -88,7 +94,12 @@ data class WatchState(
     val speaking: Boolean = false,
     val speechPending: Boolean = false,
     val playbackLevel: Float = 0f,
-    val haptic: Long = 0
+    val haptic: Long = 0,
+    /** Walking mode only: a completed received clip can be replayed / more client speech remains. */
+    val replayReady: Boolean = false,
+    val moreReady: Boolean = false,
+    /** Observed output of the current response playback; never a preference or device identity. */
+    val output: PlaybackOutput = PlaybackOutput.UNKNOWN
 ) {
     val selectionLocked: Boolean get() = saving || captureActive ||
         connection.conversation.prompt != null ||
@@ -138,6 +149,11 @@ class GadgetService : Service() {
 
     @Volatile private var captureToken: String? = null
     private lateinit var playback: PcmPlayback
+    private lateinit var walking: WalkingPreferences
+
+    // Walking mode: the current reply's spoken progress and last received clip, under mediaLock.
+    private val replayRecorder = ReplayRecorder()
+    private var walkingReply: WalkingReply? = null
 
     @Volatile private var connection: DirectConnection? = null
     private var relay: WatchRelay? = null
@@ -169,6 +185,7 @@ class GadgetService : Service() {
         super.onCreate()
         capture = PcmCapture(this)
         CuePreferences.initialize(this)
+        walking = WalkingPreferences(this)
         recordingCues = RecordingCues(this, watchLightHaptics = true)
         petCache = PetCache(this)
         presentationStore = PresentationStore(java.io.File(filesDir, "profile-presentation"))
@@ -198,7 +215,8 @@ class GadgetService : Service() {
             onFinished = {
                 mutableState.update { it.copy(speaking = false, playbackLevel = 0f) }
                 main.post { releaseIdleForeground() }
-            }
+            },
+            onOutputChanged = { output -> mutableState.update { it.copy(output = output) } }
         )
         val notifications = getSystemService(NotificationManager::class.java)
         notifications.createNotificationChannel(
@@ -1014,6 +1032,11 @@ class GadgetService : Service() {
                 }
                 override fun stateChanged(state: ConnectionState) {
                     if (version != epoch.get()) return
+                    if (state.conversation.mode == ConversationMode.THINKING &&
+                        mutableState.value.connection.conversation.mode != ConversationMode.THINKING
+                    ) {
+                        synchronized(mediaLock) { clearWalking() }
+                    }
                     if (state.status == ConnectionStatus.PAIRED &&
                         mutableState.value.connection.status != ConnectionStatus.PAIRED
                     ) {
@@ -1073,50 +1096,35 @@ class GadgetService : Service() {
                         speechEngine?.stop()
                     }
                     if (effect is ConversationEffect.ClientSpeak) {
-                        if (visible || foreground) {
-                            synchronized(mediaLock) {
+                        if ((visible || foreground) && speechEngine != null) {
+                            val part = synchronized(mediaLock) {
                                 if (version != epoch.get()) return
-                                mutableState.update { it.copy(speechPending = true) }
-                            }
-                            speechEngine?.speak(
-                                effect.id,
-                                effect.text,
-                                effect.voice,
-                                { header ->
-                                    synchronized(mediaLock) {
-                                        if (version == epoch.get()) {
-                                            playback.start(16000, header)
-                                            mutableState.update {
-                                                it.copy(speaking = true, speechPending = false)
-                                            }
-                                        }
-                                    }
-                                },
-                                {
-                                    synchronized(mediaLock) {
-                                        if (version == epoch.get()) playback.offer(it)
-                                    }
-                                },
-                                {
-                                    synchronized(mediaLock) {
-                                        if (version == epoch.get()) {
-                                            mutableState.update { it.copy(speechPending = false) }
-                                            playback.finish()
-                                        }
-                                    }
-                                },
-                                {
-                                    synchronized(mediaLock) {
-                                        if (version == epoch.get()) {
-                                            mutableState.update { it.copy(speechPending = false) }
-                                            playback.stop()
-                                            connection?.report(
-                                                getString(R.string.client_speech_failed)
-                                            )
-                                        }
-                                    }
+                                if (walking.enabled.value) {
+                                    // Walking speaks a short extract; the full reply stays on screen.
+                                    val reply = WalkingReply(
+                                        effect.id,
+                                        effect.voice,
+                                        WalkingSpeech.parts(effect.text)
+                                    )
+                                    walkingReply = reply
+                                    reply.next().also { publishWalking() }
+                                        ?.let { Triple(it.first, it.second, reply.voice) }
+                                } else {
+                                    walkingReply = null
+                                    Triple(effect.id, effect.text, effect.voice)
                                 }
-                            )
+                            }
+                            if (part == null) {
+                                connection?.report(getString(R.string.walking_nothing))
+                            } else {
+                                speakClient(
+                                    version,
+                                    speechEngine,
+                                    part.first,
+                                    part.second,
+                                    part.third
+                                )
+                            }
                         }
                         return
                     }
@@ -1202,11 +1210,19 @@ class GadgetService : Service() {
                             is ConversationEffect.PlaybackStart -> if (visible ||
                                 foreground
                             ) {
-                                playback.start(effect.rate, effect.opusHeader)
+                                startPlayback(effect.rate, effect.opusHeader)
                                 mutableState.update { it.copy(speaking = true) }
                             }
-                            is ConversationEffect.PlaybackData -> playback.offer(effect.bytes)
-                            ConversationEffect.PlaybackFinish -> playback.finish()
+                            is ConversationEffect.PlaybackData -> {
+                                // Server voice keeps arriving after Stop, so Replay can use it.
+                                replayRecorder.offer(effect.bytes)
+                                playback.offer(effect.bytes)
+                            }
+                            ConversationEffect.PlaybackFinish -> {
+                                replayRecorder.finish()
+                                publishWalking()
+                                playback.finish()
+                            }
                             ConversationEffect.PlaybackStop -> {
                                 mutableState.update { it.copy(speechPending = false) }
                                 playback.stop()
@@ -1255,6 +1271,135 @@ class GadgetService : Service() {
                 transportNotice = notice
             )
         }
+    }
+
+    /** Never called under [mediaLock]: the engine delivers callbacks that take it. */
+    private fun speakClient(
+        version: Long,
+        engine: WatchSpeech,
+        id: String,
+        text: String,
+        voice: String
+    ) {
+        synchronized(mediaLock) {
+            if (version != epoch.get()) return
+            mutableState.update { it.copy(speechPending = true) }
+        }
+        engine.speak(
+            id,
+            text,
+            voice,
+            { header ->
+                synchronized(mediaLock) {
+                    if (version == epoch.get()) {
+                        startPlayback(16000, header)
+                        mutableState.update {
+                            it.copy(speaking = true, speechPending = false)
+                        }
+                    }
+                }
+            },
+            {
+                synchronized(mediaLock) {
+                    if (version == epoch.get()) {
+                        replayRecorder.offer(it)
+                        playback.offer(it)
+                    }
+                }
+            },
+            {
+                synchronized(mediaLock) {
+                    if (version == epoch.get()) {
+                        mutableState.update { it.copy(speechPending = false) }
+                        replayRecorder.finish()
+                        publishWalking()
+                        playback.finish()
+                    }
+                }
+            },
+            {
+                synchronized(mediaLock) {
+                    if (version == epoch.get()) {
+                        mutableState.update { it.copy(speechPending = false) }
+                        playback.stop()
+                        connection?.report(
+                            getString(R.string.client_speech_failed)
+                        )
+                    }
+                }
+            }
+        )
+    }
+
+    /** Caller holds [mediaLock]. Walking prefers earbuds, else the watch speaker. */
+    private fun startPlayback(rate: Int, header: ByteArray?) {
+        val walkingOn = walking.enabled.value
+        if (walkingOn) replayRecorder.start(rate, header) else replayRecorder.clear()
+        playback.route = if (walkingOn) {
+            PlaybackRoute.HEADPHONES_THEN_SPEAKER
+        } else {
+            PlaybackRoute.SYSTEM
+        }
+        playback.start(rate, header)
+        publishWalking()
+    }
+
+    private fun publishWalking() {
+        val on = walking.enabled.value
+        val replayReady = on && replayRecorder.clip != null
+        val moreReady = on && walkingReply?.hasMore == true
+        mutableState.update { it.copy(replayReady = replayReady, moreReady = moreReady) }
+    }
+
+    private fun clearWalking() {
+        replayRecorder.clear()
+        walkingReply = null
+        publishWalking()
+    }
+
+    /** Stops the current response audio only; the agent turn and its text are unchanged. */
+    fun stopSpeech() {
+        speech?.stop()
+        synchronized(mediaLock) {
+            mutableState.update { it.copy(speechPending = false) }
+            playback.stop()
+        }
+    }
+
+    /** Walking mode: replays the last received clip exactly, with no synthesis or agent turn. */
+    fun replay() {
+        val watch = mutableState.value
+        if (!visible || !walking.enabled.value || watch.captureActive ||
+            watch.connection.conversation.mode == ConversationMode.LISTENING
+        ) {
+            return
+        }
+        speech?.stop()
+        synchronized(mediaLock) {
+            val clip = replayRecorder.clip ?: return
+            playback.route = PlaybackRoute.HEADPHONES_THEN_SPEAKER
+            playback.replay(clip)
+            mutableState.update { it.copy(speaking = true, speechPending = false) }
+        }
+    }
+
+    /** Walking mode: deliberately speaks the next part of the same client-speech reply. */
+    fun tellMore() {
+        val watch = mutableState.value
+        val engine = speech ?: return
+        if (!visible || !walking.enabled.value || !watch.connection.clientSpeech ||
+            watch.captureActive || watch.connection.conversation.busy
+        ) {
+            return
+        }
+        val version = epoch.get()
+        val (part, voice) = synchronized(mediaLock) {
+            val reply = walkingReply ?: return
+            val part = reply.next() ?: return
+            publishWalking()
+            part to reply.voice
+        }
+        speakClient(version, engine, part.first, part.second, voice)
     }
 
     private fun availableActions(): Set<String> = buildSet {
@@ -1412,6 +1557,7 @@ class GadgetService : Service() {
             mutableState.update { it.copy(speechPending = false) }
             capture.stop()
             playback.stop()
+            clearWalking()
         }
         connection?.close()
         connection = null

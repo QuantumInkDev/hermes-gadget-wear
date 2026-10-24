@@ -7,7 +7,14 @@ import dev.quantumink.hermesgadget.client.Cue
 import dev.quantumink.hermesgadget.client.OpusSupport
 import dev.quantumink.hermesgadget.client.PcmCapture
 import dev.quantumink.hermesgadget.client.PcmPlayback
+import dev.quantumink.hermesgadget.client.PlaybackOutput
+import dev.quantumink.hermesgadget.client.PlaybackRoute
 import dev.quantumink.hermesgadget.client.RecordingCues
+import dev.quantumink.hermesgadget.client.ReplayClip
+import dev.quantumink.hermesgadget.client.ReplayRecorder
+import dev.quantumink.hermesgadget.client.WalkingPreferences
+import dev.quantumink.hermesgadget.client.WalkingReply
+import dev.quantumink.hermesgadget.client.WalkingSpeech
 import dev.quantumink.hermesgadget.protocol.CatalogPage
 import dev.quantumink.hermesgadget.protocol.ClientSpeech
 import dev.quantumink.hermesgadget.protocol.ConnectionObserver
@@ -57,7 +64,12 @@ data class PhoneConversationState(
     /** Relay mode (off by default): the typed controller's view. Stock chat is unchanged while it is off. */
     val relay: RelayUiState = RelayUiState(),
     /** The user asked for Relay before this phone had an identity: it starts at the next connect. */
-    val relayRequested: Boolean = false
+    val relayRequested: Boolean = false,
+    /** Walking mode only: a completed received clip can be replayed / more client speech remains. */
+    val replayReady: Boolean = false,
+    val moreReady: Boolean = false,
+    /** Observed output of the current response playback; never a preference or device identity. */
+    val output: PlaybackOutput = PlaybackOutput.UNKNOWN
 ) {
     override fun toString(): String = "PhoneConversationState(content=redacted)"
 }
@@ -110,6 +122,11 @@ class PhoneConversation @JvmOverloads constructor(
     private var recordingToken: String? = null
     private var recordingRequested = false
     private val cues = RecordingCues(application)
+    private val walking by lazy { WalkingPreferences(application) }
+
+    // Walking mode: the current reply's spoken progress and its last received clip, memory only.
+    private val replayRecorder = ReplayRecorder()
+    private var walkingReply: WalkingReply? = null
 
     /** Built on first use: construction opens no key, store or socket. */
     private val relaySession =
@@ -348,6 +365,11 @@ class PhoneConversation @JvmOverloads constructor(
                 synchronized(this@PhoneConversation) {
                     if (active(version)) {
                         val previous = mutable.value.connection
+                        if (state.conversation.mode == ConversationMode.THINKING &&
+                            previous.conversation.mode != ConversationMode.THINKING
+                        ) {
+                            clearWalking() // A new turn supersedes Replay and Tell me more.
+                        }
                         if ((
                                 clientAudio &&
                                     state.conversation.reply != previous.conversation.reply
@@ -472,63 +494,37 @@ class PhoneConversation @JvmOverloads constructor(
                         }
                         is ConversationEffect.ClientSpeak -> {
                             if (!mutable.value.connection.clientSpeech) return@synchronized
-                            val engine =
-                                speech ?: PhoneClientSpeech(speechApi()).also { speech = it }
-                            stopPlayback()
-                            val stream = playbackVersion
-                            val request = SpeechRequest(
-                                ClientSpeech.endpointId(profile.endpoint),
-                                effect.id,
-                                effect.text,
-                                effect.voice,
-                                mutable.value.connection.conversation.speakerFormat
-                            )
-                            fun live() = active(version) && playbackVersion == stream
-                            val accepted = engine.speak(
-                                request,
-                                {
-                                    selectedSpeech(request.endpointId)
-                                },
-                                object : SpeechSink {
-                                    override fun start(format: String, header: ByteArray?) {
-                                        synchronized(this@PhoneConversation) {
-                                            if (live()) {
-                                                startPlayback(
-                                                    version,
-                                                    16000,
-                                                    header,
-                                                    stream
-                                                )
-                                            }
-                                        }
-                                    }
-                                    override fun packet(bytes: ByteArray) {
-                                        synchronized(this@PhoneConversation) {
-                                            if (live()) playback?.offer(bytes)
-                                        }
-                                    }
-                                    override fun finish() {
-                                        synchronized(this@PhoneConversation) {
-                                            if (live()) playback?.finish()
-                                        }
-                                    }
-                                },
-                                { reason ->
-                                    synchronized(this@PhoneConversation) {
-                                        if (live()) {
-                                            stopPlayback()
-                                            notice(reason)
-                                        }
-                                    }
-                                }
-                            )
-                            if (accepted) {
-                                clientAudio = true
-                                mutable.update { it.copy(preparingSpeech = true) }
+                            if (!walking.enabled.value) {
+                                walkingReply = null
+                                speakClient(version, profile, effect.id, effect.text, effect.voice)
+                                return@synchronized
                             }
+                            // Walking speaks a short extract; the full reply text stays on screen.
+                            val reply = WalkingReply(
+                                effect.id,
+                                effect.voice,
+                                WalkingSpeech.parts(effect.text)
+                            )
+                            walkingReply = reply
+                            val part = reply.next()
+                            if (part == null) {
+                                stopPlayback()
+                                notice("Nothing to read aloud. The full answer is on screen.")
+                            } else {
+                                speakClient(version, profile, part.first, part.second, reply.voice)
+                            }
+                            publishWalking()
                         }
-                        is ConversationEffect.PlaybackData -> playback?.offer(effect.bytes)
-                        ConversationEffect.PlaybackFinish -> playback?.finish()
+                        is ConversationEffect.PlaybackData -> {
+                            // Server voice keeps arriving after Stop, so Replay can still use it.
+                            replayRecorder.offer(effect.bytes)
+                            playback?.offer(effect.bytes)
+                        }
+                        ConversationEffect.PlaybackFinish -> {
+                            replayRecorder.finish()
+                            publishWalking()
+                            playback?.finish()
+                        }
                         ConversationEffect.PlaybackStop -> stopPlayback()
                         else -> Unit // Phone actions stay independent of the watch.
                     }
@@ -589,12 +585,88 @@ class PhoneConversation @JvmOverloads constructor(
         connection?.connect()
     }
 
+    private fun speakClient(
+        version: Long,
+        profile: EndpointProfile,
+        id: String,
+        text: String,
+        voice: String
+    ) {
+        val engine = speech ?: PhoneClientSpeech(speechApi()).also { speech = it }
+        stopPlayback()
+        val stream = playbackVersion
+        val request = SpeechRequest(
+            ClientSpeech.endpointId(profile.endpoint),
+            id,
+            text,
+            voice,
+            mutable.value.connection.conversation.speakerFormat
+        )
+        fun live() = active(version) && playbackVersion == stream
+        val accepted = engine.speak(
+            request,
+            {
+                selectedSpeech(request.endpointId)
+            },
+            object : SpeechSink {
+                override fun start(format: String, header: ByteArray?) {
+                    synchronized(this@PhoneConversation) {
+                        if (live()) {
+                            startPlayback(
+                                version,
+                                16000,
+                                header,
+                                stream
+                            )
+                        }
+                    }
+                }
+                override fun packet(bytes: ByteArray) {
+                    synchronized(this@PhoneConversation) {
+                        if (live()) {
+                            replayRecorder.offer(bytes)
+                            playback?.offer(bytes)
+                        }
+                    }
+                }
+                override fun finish() {
+                    synchronized(this@PhoneConversation) {
+                        if (live()) {
+                            replayRecorder.finish()
+                            publishWalking()
+                            playback?.finish()
+                        }
+                    }
+                }
+            },
+            { reason ->
+                synchronized(this@PhoneConversation) {
+                    if (live()) {
+                        stopPlayback()
+                        notice(reason)
+                    }
+                }
+            }
+        )
+        if (accepted) {
+            clientAudio = true
+            mutable.update { it.copy(preparingSpeech = true) }
+        }
+    }
+
     private fun startPlayback(
         version: Long,
         rate: Int,
         header: ByteArray?,
-        speechStream: Long? = null
+        speechStream: Long? = null,
+        replay: ReplayClip? = null
     ) {
+        val walkingOn = walking.enabled.value
+        when {
+            replay != null -> Unit
+            walkingOn -> replayRecorder.start(rate, header)
+            else -> replayRecorder.clear()
+        }
         val stream = speechStream ?: ++playbackVersion
         val speaker = playbackFactory(
             getApplication(),
@@ -643,16 +715,69 @@ class PhoneConversation @JvmOverloads constructor(
             }
         )
         playback = speaker
+        speaker.route = if (walkingOn) PlaybackRoute.HEADPHONES_FIRST else PlaybackRoute.SYSTEM
+        speaker.outputObserver = { output ->
+            mutable.update { current ->
+                if (current.sessionVersion == version && current.playbackVersion == stream) {
+                    current.copy(output = output)
+                } else {
+                    current
+                }
+            }
+        }
         mutable.update {
             it.copy(
                 speaking = true,
                 preparingSpeech = false,
                 playbackVersion = stream,
                 playbackLevel = 0f,
-                mediaMuted = mediaMuted()
+                mediaMuted = mediaMuted(),
+                replayReady = walkingOn && replayRecorder.clip != null,
+                output = PlaybackOutput.UNKNOWN
             )
         }
-        speaker.start(rate, header)
+        if (replay == null) speaker.start(rate, header) else speaker.replay(replay)
+    }
+
+    /** Walking mode: replays the last received clip exactly, with no synthesis or agent turn. */
+    @Synchronized fun replay() {
+        val current = mutable.value
+        val clip = replayRecorder.clip ?: return
+        if (!walking.enabled.value || !active(epoch) || recordingRequested ||
+            current.connection.conversation.mode == ConversationMode.LISTENING
+        ) {
+            return
+        }
+        stopPlayback()
+        startPlayback(epoch, clip.rate, clip.header, replay = clip)
+    }
+
+    /** Walking mode: deliberately speaks the next part of the same client-speech reply. */
+    @Synchronized fun tellMore() {
+        val current = mutable.value
+        val profile = current.profile ?: return
+        val reply = walkingReply ?: return
+        if (!walking.enabled.value || !active(epoch) || !current.connection.clientSpeech ||
+            recordingRequested || current.connection.conversation.busy
+        ) {
+            return
+        }
+        val part = reply.next() ?: return
+        speakClient(epoch, profile, part.first, part.second, reply.voice)
+        publishWalking()
+    }
+
+    private fun publishWalking() {
+        val on = walking.enabled.value
+        val replayReady = on && replayRecorder.clip != null
+        val moreReady = on && walkingReply?.hasMore == true
+        mutable.update { it.copy(replayReady = replayReady, moreReady = moreReady) }
+    }
+
+    private fun clearWalking() {
+        replayRecorder.clear()
+        walkingReply = null
+        publishWalking()
     }
 
     internal companion object {
@@ -838,6 +963,8 @@ class PhoneConversation @JvmOverloads constructor(
         stopPlayback()
         speech?.close()
         speech = null
+        replayRecorder.clear()
+        walkingReply = null
         relaySession.hide()
         connection?.relayTransport?.invalidatePending()
         connection?.close()
@@ -854,6 +981,9 @@ class PhoneConversation @JvmOverloads constructor(
             speaking = false,
             playbackLevel = 0f,
             recordingStartedAt = null,
+            replayReady = false,
+            moreReady = false,
+            output = PlaybackOutput.UNKNOWN,
             connection = ConnectionState(conversation = ConversationState(reply = reply))
         )
     }

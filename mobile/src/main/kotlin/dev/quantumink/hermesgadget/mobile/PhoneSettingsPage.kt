@@ -16,21 +16,26 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.quantumink.hermesgadget.client.CuePreferences
+import dev.quantumink.hermesgadget.client.WalkingPreferences
 
 @Composable
 fun PhoneSettingsPage(context: Context, navigate: (String) -> Unit) {
     val soundCues by CuePreferences.enabled.collectAsStateWithLifecycle()
+    val walkingPreferences = remember(context) { WalkingPreferences(context) }
+    val walking by walkingPreferences.enabled.collectAsStateWithLifecycle()
     Text("Settings", style = MaterialTheme.typography.titleMedium)
     Text("Make yourself at home.", color = MaterialTheme.colorScheme.onSurfaceVariant)
     Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surface) {
@@ -72,6 +77,26 @@ fun PhoneSettingsPage(context: Context, navigate: (String) -> Unit) {
                         contentDescription =
                             "Recording sound cues"
                     }
+                )
+            }
+            val walkingTitle = stringResource(R.string.walking_mode)
+            Row(
+                Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(walkingTitle, style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        stringResource(R.string.walking_mode_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = walking,
+                    onCheckedChange = { runCatching { walkingPreferences.set(it) } },
+                    modifier = Modifier.semantics { contentDescription = walkingTitle }
                 )
             }
         }
