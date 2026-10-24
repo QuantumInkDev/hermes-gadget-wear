@@ -355,7 +355,7 @@ class MainActivity : ComponentActivity() {
             PhoneAppearance(mode) {
                 val phone by conversation.state.collectAsStateWithLifecycle()
                 val inboxSnapshot by inboxOwner.state.collectAsStateWithLifecycle()
-                androidx.compose.runtime.LaunchedEffect(inboxSnapshot?.revision) {
+                androidx.compose.runtime.LaunchedEffect(inboxSnapshot) {
                     val handle = inboxRoute?.copy?.handle ?: inboxRoute?.task?.handle
                     if (handle != null &&
                         inboxSnapshot?.let {
