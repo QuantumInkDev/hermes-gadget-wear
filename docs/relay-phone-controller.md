@@ -539,3 +539,12 @@ Opaque final conversation/event/message references are never reclassified by UUI
 They remain read-only and survive an unrelated exact canonical deletion, while genuine whole namespace
 revocation and local retention still apply. Current delivery refresh kinds are HISTORY and TASKS; clearing
 both still requires the complete bounded conversation enumeration/history/task and opted-in source joins.
+
+Application owner construction also defers aggregate/inbox backend factories until off-main blocking callbacks;
+it does not request storage paths or keys on main. Factory failures map to unavailable/failed results through
+the same stores, with no reset. Existing PhoneHistoryCache already defers its factory. Native Looper/Context/
+Keystore execution is still a separate unexecuted acceptance gate.
+
+A replacement onStartJob withdraws the prior active background lease before installing its own generation;
+changing a service alive predicate alone is not transport/controller withdrawal. Old completion cannot finish
+the replacement job. Actual platform callback ordering/Doze/permission behavior still requires native acceptance.

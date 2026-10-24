@@ -69,9 +69,13 @@ class InboxJobService : JobService() {
     @Volatile private var active: Pair<Long, JobParameters>? = null
     private val main = Handler(Looper.getMainLooper())
     override fun onStartJob(params: JobParameters): Boolean {
+        val owner = (application as CompanionApplication).inbox
+        if (active != null) {
+            active = null
+            owner.stopBackground()
+        }
         val generation = ++serial
         active = generation to params
-        val owner = (application as CompanionApplication).inbox
         owner.refresh(params.network, background = true, alive = { active?.first == generation }) {
             main.post {
                 if (active?.first == generation && active?.second === params) {
