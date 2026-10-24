@@ -21,8 +21,11 @@ internal class InboxAuthorityLease private constructor(
     private val highWater = AtomicLong(admitted.monotonicNanos)
     private val withdrawn = AtomicBoolean()
 
-    fun allows(nanos: Long): Boolean {
+    fun allows(nanos: Long, promptDeadlineMs: Long? = null): Boolean {
         if (withdrawn.get()) return false
+        if (promptDeadlineMs != null && promptDeadlineMs !in 1..StateLimits.SERVER_TIME_MAX_MS) {
+            return refuse()
+        }
         while (true) {
             val previous = highWater.get()
             if (nanos < previous) return refuse()
@@ -35,8 +38,18 @@ internal class InboxAuthorityLease private constructor(
         } catch (_: ArithmeticException) {
             return refuse()
         }
-        if (upper > StateLimits.SERVER_TIME_MAX_MS || upper >= expiresAtMs) return refuse()
+        if (upper > StateLimits.SERVER_TIME_MAX_MS || upper >= expiresAtMs ||
+            (promptDeadlineMs != null && upper >= promptDeadlineMs)
+        ) {
+            return refuse()
+        }
         return !withdrawn.get()
+    }
+
+    /** Actor-side request identity uses this SAME immutable clock, never a later Info sample. */
+    fun instant(nanos: Long, promptDeadlineMs: Long?): ServerInstant? {
+        if (!allows(nanos, promptDeadlineMs)) return null
+        return (clock.read(nanos) as? InstantRead.At)?.instant
     }
 
     private fun refuse(): Boolean {
@@ -45,6 +58,11 @@ internal class InboxAuthorityLease private constructor(
     }
 
     companion object {
+        fun captureInput(info: Info?, clock: ServerClock?, nanos: Long): InboxAuthorityLease? {
+            if (info == null || info.expiresAtMs !in 1..StateLimits.SERVER_TIME_MAX_MS) return null
+            return capture(info, clock, nanos)
+        }
+
         fun capture(info: Info?, clock: ServerClock?, nanos: Long): InboxAuthorityLease? {
             if (info == null || clock == null) return null
             val admitted = (clock.read(nanos) as? InstantRead.At)?.instant ?: return null

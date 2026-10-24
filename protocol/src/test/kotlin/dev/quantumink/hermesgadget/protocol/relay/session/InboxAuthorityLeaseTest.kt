@@ -54,4 +54,23 @@ class InboxAuthorityLeaseTest {
             )
         )
     }
+
+    @Test fun inputAdmissionRefusesInvalidInfoExpiryWithoutChangingAckCaptureContract() {
+        val invalid = Dto.info(expiresAtMs = StateLimits.SERVER_TIME_MAX_MS + 1)
+        assertNull(InboxAuthorityLease.captureInput(invalid, clock(), anchor))
+        assertNull(InboxAuthorityLease.captureInput(Dto.info(expiresAtMs = 0), clock(), anchor))
+        assertNull(InboxAuthorityLease.captureInput(null, clock(), anchor))
+        assertNull(InboxAuthorityLease.captureInput(Dto.info(), null, anchor))
+        assertTrue(InboxAuthorityLease.capture(invalid, clock(), anchor) != null)
+    }
+
+    @Test fun expiredOrInvalidPromptDeadlineCannotReviveTheCapturedOneShotLease() {
+        val lease = InboxAuthorityLease.captureInput(Dto.info(), clock(), anchor)!!
+        assertTrue(lease.allows(anchor + 8_000_000, Dto.SERVER_TIME + 10))
+        assertFalse(lease.allows(anchor + 9_000_000, Dto.SERVER_TIME + 10))
+        assertFalse(lease.allows(anchor + 10_000_000, Dto.EXPIRES))
+        val invalid = InboxAuthorityLease.captureInput(Dto.info(), clock(), anchor)!!
+        assertFalse(invalid.allows(anchor, 0))
+        assertFalse(invalid.allows(anchor + 1))
+    }
 }

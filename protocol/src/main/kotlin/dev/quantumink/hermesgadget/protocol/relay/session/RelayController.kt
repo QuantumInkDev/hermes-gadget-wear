@@ -16,6 +16,7 @@ import dev.quantumink.hermesgadget.protocol.relay.OutboxItem
 import dev.quantumink.hermesgadget.protocol.relay.ProfileId
 import dev.quantumink.hermesgadget.protocol.relay.Prompt
 import dev.quantumink.hermesgadget.protocol.relay.PromptAnswer
+import dev.quantumink.hermesgadget.protocol.relay.PromptDeadline
 import dev.quantumink.hermesgadget.protocol.relay.Receipt
 import dev.quantumink.hermesgadget.protocol.relay.RelayCall
 import dev.quantumink.hermesgadget.protocol.relay.RelayCallResult
@@ -236,6 +237,7 @@ class RelayController(
         val mine = flow
         request(RelayCalls.existingAttach(conversation)) { result ->
             if (mine != flow || namespace() != route.namespace || !isReady()) return@request
+            if (inboxInputError(result, route)) return@request
             val binding =
                 ((result as? RelayCallResult.Outcome)?.outcome as? RelayOutcome.Success)?.value
             if (binding?.conversationId == conversation &&
@@ -262,19 +264,37 @@ class RelayController(
             done(null)
             return@post
         }
+        val authority = InboxAuthorityLease.captureInput(info, clock, monotonicNanos()) ?: run {
+            done(null)
+            return@post
+        }
         val mine = flow
         val observer = inboxEpoch.get()
         val writer = writerEpoch()
         fun permit() = observer == inboxEpoch.get() && writer == writerEpoch() &&
             inputGeneration == inputEpoch.get()
+        fun sendPermit() = permit() && authority.allows(monotonicNanos())
         fun accept(prompt: Prompt?) {
             if (!permit() || mine != flow || !isReady() || namespace() != route.namespace ||
-                localInboxRoute(handle) == null || prompt?.asActionable() == null ||
-                (
-                    prompt.expiresAtMs != null &&
-                        prompt.expiresAtMs <= (now()?.serverMs ?: Long.MAX_VALUE)
-                    )
+                localInboxRoute(handle) == null || prompt?.asActionable() == null
             ) {
+                done(null)
+                return
+            }
+            // Storage may have crossed expiry or a replacement fence after the first check.
+            if (!permit()) return
+            val promptDeadline: Long? = when (prompt.deadline) {
+                PromptDeadline.BOUNDED -> prompt.expiresAtMs ?: run {
+                    done(null)
+                    return
+                }
+                PromptDeadline.UNLIMITED -> null
+                PromptDeadline.UNKNOWN -> {
+                    done(null)
+                    return
+                }
+            }
+            if (!authority.allows(monotonicNanos(), promptDeadline)) {
                 done(null)
                 return
             }
@@ -292,7 +312,7 @@ class RelayController(
             val issued =
                 InboxInput(
                     prompt, handle, route.namespace, serial, mine, writerEpoch(),
-                    observer, inputGeneration, bound,
+                    observer, inputGeneration, authority, promptDeadline, bound,
                     marker, bound != null && supports(RelayMethod.PROMPT_RESPOND)
                 )
             inboxInput = issued
@@ -310,7 +330,11 @@ class RelayController(
                 done(null)
                 return@post
             }
-            request(RelayCalls.existingPrompt(binding.bindingId), permit = ::permit) { result ->
+            request(
+                RelayCalls.existingPrompt(binding.bindingId),
+                permit = ::sendPermit,
+                callbackPermit = ::permit
+            ) { result ->
                 if (inboxInputError(result, route)) {
                     done(null)
                     return@request
@@ -325,7 +349,11 @@ class RelayController(
                 done(null)
                 return@post
             }
-            request(RelayCalls.task(task.taskId), permit = ::permit) { result ->
+            request(
+                RelayCalls.task(task.taskId),
+                permit = ::sendPermit,
+                callbackPermit = ::permit
+            ) { result ->
                 if (inboxInputError(result, route)) {
                     done(null)
                     return@request
@@ -360,13 +388,16 @@ class RelayController(
             done(false)
             return@post
         }
+        fun permit() = issued.writer == writerEpoch() &&
+            issued.observer == inboxEpoch.get() && issued.inputGeneration == inputEpoch.get()
+        if (!issued.authority.allows(monotonicNanos(), issued.promptDeadlineMs)) {
+            inboxInput = null
+            done(false)
+            return@post
+        }
         val route = localInboxRoute(issued.route)
-        if (route == null ||
-            (
-                issued.prompt.expiresAtMs != null &&
-                    issued.prompt.expiresAtMs <= (now()?.serverMs ?: Long.MAX_VALUE)
-                )
-        ) {
+        if (!permit()) return@post
+        if (route == null) {
             done(false)
             return@post
         }
@@ -374,7 +405,8 @@ class RelayController(
             done(false)
             return@post
         }
-        val at = now() ?: run {
+        val at = issued.authority.instant(monotonicNanos(), issued.promptDeadlineMs) ?: run {
+            inboxInput = null
             done(false)
             return@post
         }
@@ -392,16 +424,24 @@ class RelayController(
             done(false)
             return@post
         }
-        if (!tryCommit(requireNotNull(runtime))) {
+        val committed = tryCommit(requireNotNull(runtime))
+        if (!permit()) return@post
+        if (!committed) {
+            if (!issued.authority.allows(monotonicNanos(), issued.promptDeadlineMs)) {
+                inboxInput =
+                    null
+            }
             done(false)
             return@post
         }
         inboxInput = null
-        request(call, permit = {
-            issued.writer == writerEpoch() &&
-                issued.observer == inboxEpoch.get() &&
-                issued.inputGeneration == inputEpoch.get()
-        }) { result ->
+        request(
+            call,
+            permit = {
+                permit() && issued.authority.allows(monotonicNanos(), issued.promptDeadlineMs)
+            },
+            callbackPermit = ::permit
+        ) { result ->
             val failed = inboxInputError(result, route)
             done(!failed && (result as? RelayCallResult.Outcome)?.outcome is RelayOutcome.Success)
         }
@@ -2000,10 +2040,10 @@ class RelayController(
         var pages = 0
         val cursors = HashSet<String>()
         val repository = requireNotNull(inbox)
-        fun current(): Boolean =
+        fun currentLifetime(): Boolean =
             inboxRun === this && generation == serial && permit() && isReady() &&
-                namespace() == owner && info?.profileId?.value == owner.profileId &&
-                authority?.allows(monotonicNanos()) == true
+                namespace() == owner && info?.profileId?.value == owner.profileId
+        fun current(): Boolean = currentLifetime() && authority?.allows(monotonicNanos()) == true
         fun finish(status: String) {
             if (inboxRun !== this) return
             runtime = runtime?.let { rt ->
@@ -2037,9 +2077,13 @@ class RelayController(
         fun <T : Any> read(call: RelayCall<T>, target: String? = null, done: (T) -> Unit) {
             if (!budget()) return
             request(call, permit = ::permit) { result ->
-                if (!current()) return@request
+                if (!currentLifetime()) return@request
                 val outcome = (result as? RelayCallResult.Outcome)?.outcome
                 if (outcome is RelayOutcome.Success) {
+                    if (!current()) {
+                        finish("Partial / fresh authority required")
+                        return@request
+                    }
                     try {
                         done(outcome.value)
                     } catch (
@@ -2049,6 +2093,29 @@ class RelayController(
                     }
                 } else {
                     val error = (outcome as? RelayOutcome.Failed)?.error
+                    if (error?.action in setOf(
+                            RelayErrorAction.STOP_AND_EVICT_SCOPE,
+                            RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW
+                        )
+                    ) {
+                        val completed = inboxCompleted
+                        when (error?.action) {
+                            RelayErrorAction.STOP_AND_EVICT_SCOPE -> stopScope()
+                            RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW -> requireReview()
+                            else -> Unit
+                        }
+                        // Withdrawal retired this observer synchronously, before fallible persistence.
+                        if (writer == writerEpoch()) {
+                            inboxStatus = "Partial / source authority withdrawn"
+                            publish()
+                            completed(inboxStatus)
+                        }
+                        return@request
+                    }
+                    if (!current()) {
+                        finish("Partial / fresh authority required")
+                        return@request
+                    }
                     if (call.method in
                         setOf(
                             RelayMethod.EXISTING_LIST,
@@ -2056,33 +2123,16 @@ class RelayController(
                             RelayMethod.EXISTING_HISTORY_PAGE
                         )
                     ) {
-                        if (target != null &&
-                            error?.code in
-                            setOf(RelayErrorCode.NOT_FOUND, RelayErrorCode.PERMISSION_DENIED)
-                        ) {
+                        if (target != null && error?.code == RelayErrorCode.NOT_FOUND) {
                             repository.sourceUnavailable(
                                 owner,
                                 target,
                                 call.method == RelayMethod.EXISTING_HISTORY_PAGE,
                                 true
                             )
-                        } else if (target == null &&
-                            error?.code == RelayErrorCode.PERMISSION_DENIED
-                        ) {
-                            val p = repository.snapshot().profiles.single { it.namespace == owner }
-                            repository.configure(
-                                p.copy(existingAvailable = false, existingHistoryAvailable = false)
-                            )
                         }
-                        if (error?.action != RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW) {
-                            finish("Partial / existing source unavailable")
-                            return@request
-                        }
-                    }
-                    when (error?.action) {
-                        RelayErrorAction.STOP_AND_EVICT_SCOPE -> stopScope()
-                        RelayErrorAction.INVALIDATE_PROFILE_AND_REVIEW -> requireReview()
-                        else -> Unit
+                        finish("Partial / existing source unavailable")
+                        return@request
                     }
                     finish("Partial / source unavailable")
                 }
@@ -2095,6 +2145,11 @@ class RelayController(
             val available = profile.existingTasks && supports(RelayMethod.EXISTING_TASKS_LIST)
             val historyAvailable = profile.existingHistory && supports(RelayMethod.EXISTING_LIST) &&
                 supports(RelayMethod.EXISTING_HISTORY_PAGE)
+            // Task reads require exact targets; the history-purpose catalog is not exhaustive
+            // for the independent task-purpose scope. Known-target progress stays bounded Partial.
+            if (profile.existingTasks || (profile.existingHistory && !historyAvailable)) {
+                incomplete = true
+            }
             if (available != profile.existingAvailable ||
                 historyAvailable != profile.existingHistoryAvailable
             ) {
@@ -2571,7 +2626,7 @@ class RelayController(
             if (refreshBeforeAck) {
                 refreshBeforeAck = false
                 if (incomplete) {
-                    finish("Partial / exact existing source unavailable")
+                    finish("Partial / source refresh incomplete")
                     return
                 }
                 ack { outbox() }
@@ -2598,7 +2653,7 @@ class RelayController(
                 if (incomplete ||
                     delivery().refreshOwed.isNotEmpty()
                 ) {
-                    "Partial / refresh owed"
+                    "Partial / source refresh incomplete"
                 } else {
                     "Current"
                 }
@@ -2612,6 +2667,7 @@ class RelayController(
         call: RelayCall<R>,
         correlation: CorrelationId? = null,
         permit: () -> Boolean = { true },
+        callbackPermit: () -> Boolean = permit,
         done: (RelayCallResult<R>) -> Unit
     ) {
         val link = transport
@@ -2625,7 +2681,13 @@ class RelayController(
         val epoch = writerEpoch()
         val id = correlation ?: link.correlation()
         link.callGuarded(id, call, timing.requestTimeoutMs, permit) { result ->
-            post { if (expected == serial && epoch == writerEpoch() && permit()) done(result) }
+            post {
+                if (expected == serial && epoch == writerEpoch() &&
+                    callbackPermit()
+                ) {
+                    done(result)
+                }
+            }
         }
     }
 

@@ -260,6 +260,8 @@ class InboxInput internal constructor(
     internal val writer: Long,
     internal val observer: Long,
     internal val inputGeneration: Long,
+    internal val authority: InboxAuthorityLease,
+    internal val promptDeadlineMs: Long?,
     internal val binding: BindingRef?,
     internal val boundToken: Any?,
     val canAnswer: Boolean

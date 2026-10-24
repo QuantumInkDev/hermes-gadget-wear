@@ -577,3 +577,42 @@ and debt. Failed/refused/stale/uncertain aggregate proposals retain their prior 
 itself also requires a Committed display write. This owner masks an unconfirmed timestamp promotion until a later
 complete refresh confirms it; physical rollback, restart durability and fsync/power-loss behavior are not claimed.
 No schema, attempt timestamp or UI label change is introduced. Native/platform/job routing acceptance remains OPEN.
+
+
+### Task5 FIX2 observer, input deadline and completeness boundaries
+
+Existing list, existing task-list and existing history callbacks apply their correlated permission/profile action
+before source-availability persistence or publication. Deliberate existing Continue uses the same synchronous
+exact-scope withdrawal/review owners. A current correlated denial still applies after the observer's local time
+lease expires; successful data requires current time as well as the observer lifetime. Exact-target NOT_FOUND
+remains local unavailability and temporary failure remains non-revoking. Continue already ends its prior session
+before attaching; it does not preserve that old typed queue.
+
+Each deliberate current-input getter captures the exact immutable Info/ServerClock lease that admits it. The
+getter's final paced SEND and acceptance after route IO require that lease. A transient accepted input retains the
+same clock/Info lease and the actually fetched prompt's deadline. Bounded deadlines require a valid supplied expiry;
+registered unlimited prompts retain Info expiry, while unknown-deadline prompts remain display-only. A deliberate
+answer uses that captured clock for its request identity and checks the captured Info/prompt deadline at final SEND
+after persistence or pacing. Transport threads read immutable lease data and atomics only. A later Info cannot
+lend time to an old input.
+
+Expiry consumes/refuses the stale one-shot action and completes the current caller. Callback lifetime fences are
+separate from the time-varying SEND permit, preserving replacement/cancellation and a correlated completion already
+posted after a valid SEND. The phone's existing Answer path clears its displayed input before dispatch and reports
+an unconfirmed action by requiring fresh current input. A separate deliberate Get current input/action is required;
+fresh actual Info is also required when the captured Info lease expires. No automatic getter, answer, attach,
+resubmit or retry is introduced. Local refusal is not server execution, acceptance, billing or no-charge proof.
+The earlier ACK lease and deliberate same-ID lost-response controls remain distinct and unchanged.
+
+Required source completeness is independent of an empty retained target set. Missing required existing-source
+methods keep the exact aggregate refresh debt and previous confirmed Last full sync. Existing task reads require
+exact conversation targets, and there is no registered exhaustive task-purpose discovery method. The independent
+history-purpose catalog cannot prove that every task-readable-only target was visited. Existing-task updates
+therefore remain useful bounded progress with honest Partial status; they do not clear enrollment-wide gap debt
+or advance Last full sync. No target IDs, conversations, history grants or new API are invented. Complete canonical
+and eligible history-purpose traversals still advance Last full sync only after confirmed aggregate and display
+writes. The owner-local uncertain timestamp mask is preserved; no physical rollback or crash recovery is claimed.
+
+Source demo: explicitly refresh the Inbox, inspect retained progress and Partial/Last full sync, then use deliberate
+Continue, Get current input and Answer as separate actions. Expired input refuses without automatic replacement.
+Native UI, jobs, storage, network and physical acceptance remain separate open gates.
