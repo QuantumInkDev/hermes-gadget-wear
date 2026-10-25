@@ -1,47 +1,48 @@
 # Session status
 
-Updated 2026-10-24. Keep this file short: current state, next step, blockers. History lives in git.
+Updated 2026-10-24 (evening). Keep this file short: current state, next step, blockers. History lives in git.
 
 ## Branch
 
-`relay/delivery` is the single working branch. It starts from the furthest relay candidate
-(`bfb7124`: relay protocol, phone history, phone inbox, outbox, voice V4 off) plus the pet
-factory skill. The interrupted FIX4 inbox edits were dropped. `feature/multi-box-profile-carousel`
-is superseded.
+`relay/delivery` is the single working branch (`feature/multi-box-profile-carousel` is superseded).
 
-Server code lives outside this repo:
+Server code:
 
-- SDK: `~/Projects/hermes-gadget-sdk` branches `relay/continuity`, `relay/attachments`,
-  `relay/remote-wake` (all from `v0.2.0`).
-- Core: `~/Backups/hermes-watch-agent/core-relay.bundle` (103 commits on Hermes `e6f57427`).
+- Gadget plugin: `~/Projects/hermes-gadget-sdk` branch `relay/combined` (continuity + attachments +
+  remote wake + the edit-stream speech fix). Installed at `~/.hermes/plugins/gadget` on the m5.
+- Hermes core seams: ported to v0.22.5 (`1c0cd66774`); bundle
+  `~/Backups/hermes-watch-agent/core-relay-0.22.5.bundle`. Live on the m5 through the mesh patch
+  `~/.hermes/scripts/patch-relay-core-seams.py` (re-applied by the mac fleet-update leg).
 
-## Baseline
+## Live on the m5 (2026-10-24)
 
-`./gradlew check :wear:assembleDebug :mobile:assembleDebug`: 1,234 tests pass, 1 skipped,
-0 failed; both debug APKs build.
+- All 11 profiles + root: pets, Opus, client speech.
+- Root (Cthulhu), personal (Kitana), critic (Akuma), biz (C. Viper): relay history, task inbox,
+  outbox, prompts, controls, task outbox, attachments (grants in each `plugin-data/gadget/relay-grants.json`).
+- Root: remote wake (`plugin-data/gadget/wake-policy.json`: arm Parallels VM, gpu5090 Wake-on-LAN).
 
 ## Devices
 
-Phone (S25 Ultra) and watch (Galaxy Watch Ultra) updated in place to `relay/delivery`
-debug builds on 2026-10-24; app and data backups in `.local/expansion/device-baselines/`.
+Phone and watch updated in place on 2026-10-24; backups in `.local/expansion/device-baselines/`.
+Phone has sharing, walking mode, handoff and wake. Watch has walking mode.
 
 ## Feature status (spec: docs/superpowers/specs/2026-10-18-relay-expansion-design.md)
 
 | Feature | State |
 |---|---|
-| N8 diagnostics, N4 quick actions | Built; installed on phone Oct 18 |
-| N6 structured replies, N10 QR/migration | Built; installed Oct 24 |
-| O1 pets, O2 expressions | Watch side built; server pet delivery not live |
-| O3 Opus | Client built; server patch not live; battery measurement open |
-| O4 ElevenLabs | Phone settings built; full voice path present but off |
-| O5 outbox, N1 history, N2 inbox | Phone + protocol built; no watch side; server not live |
-| N3 sharing + attachments | Server store only; no phone share target |
-| N5 walking mode | Audio groundwork only |
-| N7 handoff | Not started |
-| N9 remote wake | Server only; no client |
+| O1 pets, O2 expressions | Live; Akuma verified on the watch (listening, talking, full speech) |
+| O3 Opus | Live; battery measurement still open |
+| O4 ElevenLabs | Phone client speech live on all profiles |
+| O5 outbox, N1 history, N2 inbox | Server live on 4 profiles; phone built; watch side in progress |
+| N3 sharing | Text/links done; images/documents next (server store is live) |
+| N4, N6, N8, N10 | Built and installed |
+| N5 walking mode | Built and installed (phone + watch) |
+| N7 handoff | Built and installed (phone) |
+| N9 remote wake | Server live on root; phone built and installed |
 
 ## Next
 
-1. Deploy server SDK/core changes to one box and smoke test.
-2. Build the missing pieces: watch history/inbox, N3, N5, N7, N9 client.
-3. One physical test pass with the owner.
+1. Owner test: phone Relay history/inbox on the 4 profiles; wake from Cthulhu's Relay section.
+2. Watch history/inbox (in progress), then install.
+3. N3 images/documents; Opus battery measurement.
+4. SDK: 3 history-retirement edge cases fail against v0.22.5 (external delete while listed).
