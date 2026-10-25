@@ -26,6 +26,11 @@ Server code:
 Phone and watch updated in place on 2026-10-24; backups in `.local/expansion/device-baselines/`.
 Phone has sharing, walking mode, handoff and wake. Watch has walking mode.
 
+2026-10-25: watch reinstalled with the pet-cache quota fix (`PetCacheQuota.kt`: whole-pet LRU, 64 MiB;
+the old 16 MiB per-file eviction deleted manifests first). Uncommitted. All 11 m5 profile pets are in the watch cache.
+Pets still reach the watch only reliably by direct cache install; server delivery after a late pairing
+approval is not retried until reconnect.
+
 ## Feature status (spec: docs/superpowers/specs/2026-10-18-relay-expansion-design.md)
 
 | Feature | State |

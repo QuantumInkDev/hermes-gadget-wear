@@ -50,7 +50,7 @@ class PetCache(context: Context) {
     @Synchronized fun saveManifest(endpoint: String, manifest: PetManifest): PetAtlas? {
         require(manifest.encoded.toByteArray().size <= 16384)
         atomic(File(directory(endpoint), "manifest.json"), manifest.encoded.toByteArray())
-        evict()
+        PetCacheQuota.evict(root, directory(endpoint))
         return build(endpoint, manifest)
     }
 
@@ -64,7 +64,7 @@ class PetCache(context: Context) {
         val frames = decode(sheet, bytes)
         frames.values.flatten().forEach(Bitmap::recycle)
         atomic(File(directory(endpoint), sheet.sha256 + ".png"), bytes)
-        evict()
+        PetCacheQuota.evict(root, directory(endpoint))
         return build(endpoint, manifest)
     }
 
@@ -188,19 +188,6 @@ class PetCache(context: Context) {
         } catch (failure: Exception) {
             target.failWrite(stream)
             throw failure
-        }
-    }
-    private fun evict() {
-        val files = root.walkTopDown().filter { it.isFile }.toList().sortedBy { it.lastModified() }
-        var total = files.sumOf { it.length() }
-        var count = files.size
-        for (file in files) {
-            if (total <= 16 * 1024 * 1024 && count <= 64) break
-            val length = file.length()
-            if (file.delete()) {
-                total -= length
-                count--
-            }
         }
     }
 }
