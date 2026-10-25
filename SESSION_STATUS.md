@@ -51,4 +51,3 @@ a pet.request sent before pairing approval is now answered on approval; failures
 1. Owner test: phone Relay history/inbox on the 4 profiles; wake from Cthulhu's Relay section.
 2. Watch: surface "catalog offline" (phone Tailscale off) instead of silent still portraits.
 3. N3 images/documents; Opus battery measurement.
-4. SDK: 3 history-retirement edge cases fail against v0.22.5 (external delete while listed).
