@@ -46,8 +46,16 @@ a pet.request sent before pairing approval is now answered on approval; failures
 | N7 handoff | Built and installed (phone) |
 | N9 remote wake | Server live on root; phone built and installed |
 
+## Beta launch kit (2026-10-25)
+
+`docs/launch/` holds the beta plan, plugin-catalog strategy, announcement copy and shot list;
+`docs/install.md` and `docs/manual.md` are the tester guides. Blockers: relay features need the
+Hermes core-seams patch (catalog rule 9), our plugin is a fork of the listed `gadget` (rule 16),
+and owner devices are debug-signed. Nothing posted or published.
+
 ## Next
 
+0. Owner test: Arrange sheet (phone installed 2026-10-25 19:17) and watch order follow.
 1. Owner test: phone Relay history/inbox on the 4 profiles; wake from Cthulhu's Relay section.
 2. Watch: surface "catalog offline" (phone Tailscale off) instead of silent still portraits.
 3. N3 images/documents; Opus battery measurement.

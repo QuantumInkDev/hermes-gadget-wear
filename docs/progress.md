@@ -8,3 +8,4 @@ The previous long-form log (through 2026-10-24) is in git history before this co
   1,234 tests pass, 1 skipped; phone and watch debug APKs build.
 - 2026-10-24: Installed relay/delivery debug builds on phone and watch (in-place, same signer, backups taken).
 - 2026-10-24: Fleet updated to Hermes v0.22.5. m5 server live: pets/Opus/client speech (all profiles), relay history/inbox/outbox (Cthulhu, Kitana, Akuma, Viper), remote wake (root). Fixed one-word watch speech (edit-stream preview). Added N3 sharing, N5 walking mode, N7 handoff, N9 wake client; installed on phone and watch.
+- 2026-10-25: Arrange profiles sheet (drag to reorder) installed on the phone. Beta launch kit: README rewrite, install guide, user guide, SECURITY.md, docs/launch/ (plan, plugin submission, announcements, screenshots).
