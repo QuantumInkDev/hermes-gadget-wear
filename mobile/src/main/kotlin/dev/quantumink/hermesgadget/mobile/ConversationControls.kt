@@ -4,7 +4,9 @@ import android.os.SystemClock
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -103,6 +105,8 @@ internal fun ConversationControls(
         }
         if (walking != null && !recording) {
             WalkingControls(state, walking, stopVoice)
+            // Keep the walking actions clear of the hold-to-talk button below.
+            Spacer(Modifier.height(16.dp))
         }
         if (!recording && (state.speaking || state.preparingSpeech || conversation.busy)) {
             if (state.speaking || state.preparingSpeech) {
@@ -196,8 +200,7 @@ internal fun ConversationControls(
                         {
                             holding =
                                 it
-                        },
-                        if (walking != null) 80.dp else 56.dp
+                        }
                     )
                 }
             }
@@ -246,7 +249,7 @@ private fun WalkingControls(
         )
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        val large = Modifier.weight(1f).heightIn(min = 64.dp)
+        val large = Modifier.weight(1f).heightIn(min = 52.dp)
         FilledTonalButton(walking.replay, large, enabled = idle && state.replayReady) {
             WalkingLabel(stringResource(R.string.walking_replay))
         }
