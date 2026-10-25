@@ -156,10 +156,10 @@ class RelayDtoMutationTest {
                 }
             }
         }
-        // These frozen vectors predate own receipt; voice and own have separate captured suites.
+        // These frozen vectors predate own receipt and wake; voice, own and wake have separate suites.
         assertEquals(
             RelayMethod.entries.filter {
-                !it.isVoice && it != RelayMethod.TURN_RECEIPT_OWN
+                !it.isVoice && !it.isWake && it != RelayMethod.TURN_RECEIPT_OWN
             }.toSet(),
             methodsSeen
         )

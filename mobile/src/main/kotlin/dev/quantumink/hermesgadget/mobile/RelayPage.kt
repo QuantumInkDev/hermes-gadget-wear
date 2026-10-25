@@ -57,7 +57,9 @@ internal class RelayActions(
         dev.quantumink.hermesgadget.protocol.relay.session.CacheReviewConfirmation
     ) -> Unit = {},
     val cancelCacheReview: () -> Unit = {},
-    val retention: (Int) -> Unit = {}
+    val retention: (Int) -> Unit = {},
+    val listWake: () -> Unit = {},
+    val wake: (String) -> Unit = {}
 ) {
     companion object {
         val NONE = RelayActions()
@@ -235,6 +237,7 @@ internal fun RelaySection(
                 relay.phase == RelayPhase.SELECTED
             ) {
                 OnlineHistoryControls(relay, actions)
+                WakeControls(relay, actions)
             }
             MetadataIntents(relay, actions)
             RetainedHistoryControls(relay, actions)

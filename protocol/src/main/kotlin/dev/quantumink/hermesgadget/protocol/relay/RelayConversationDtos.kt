@@ -145,8 +145,9 @@ internal inline fun <T> guarded(reader: FieldReader, field: String, build: () ->
 }
 
 /**
- * `relay.info`: the first call; use ONLY the listed methods. [serverTimeMs] is present only in the conversation
- * bridge form and is the sole clock for deadlines (never the device wall clock). Scope (endpoint, profile) is
+ * `relay.info`: the first call; use ONLY the listed methods. [serverTimeMs] is present in the conversation bridge form
+ * (and, additively, in the O5 form while remote wake is enabled) and is the sole clock for deadlines (never the
+ * device wall clock). Scope (endpoint, profile) is
  * carried by the caller in a `RelayScope`; nothing in this DTO proves authority.
  */
 class Info(
@@ -169,7 +170,8 @@ class Info(
                     it.all { c -> c in 'a'..'z' || c == '.' || c == '_' }
             }
         )
-        require((serverTimeMs != null) == limits.hasConversationBounds)
+        // The conversation form always carries the clock; the O5 form carries it only while remote wake is enabled.
+        require(serverTimeMs != null || !limits.hasConversationBounds)
     }
 
     private val known: Set<RelayMethod> = this.methods.mapNotNull(RelayMethod::fromWire).toSet()

@@ -1064,7 +1064,9 @@ class PhoneConversation @JvmOverloads constructor(
             reviewCache = { id -> run { it.reviewCache(id) } },
             confirmCacheReview = { rendered -> run { it.confirmCacheReview(rendered) } },
             cancelCacheReview = { run { it.cancelCacheReview() } },
-            retention = { days -> run { it.setHistoryRetention(days) } }
+            retention = { days -> run { it.setHistoryRetention(days) } },
+            listWake = { run { it.listWakeTargets() } },
+            wake = { id -> run { it.wake(id) } }
         )
     }
 

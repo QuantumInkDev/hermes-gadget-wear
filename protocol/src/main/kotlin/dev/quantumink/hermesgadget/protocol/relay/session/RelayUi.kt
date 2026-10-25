@@ -3,6 +3,8 @@ package dev.quantumink.hermesgadget.protocol.relay.session
 import dev.quantumink.hermesgadget.protocol.relay.HistoryRole
 import dev.quantumink.hermesgadget.protocol.relay.MetadataState
 import dev.quantumink.hermesgadget.protocol.relay.state.TurnStatus
+import dev.quantumink.hermesgadget.protocol.relay.wake.WakeAnswer
+import dev.quantumink.hermesgadget.protocol.relay.wake.WakeTarget
 
 /** The coarse state of Relay mode for the selected phone profile. */
 enum class RelayPhase {
@@ -126,6 +128,27 @@ data class PendingCreate(val title: String?) {
     override fun toString(): String = "PendingCreate(redacted)"
 }
 
+/**
+ * Remote wake on this connection: what `relay.info` lists and the last deliberate read and request. Transient: nothing
+ * is stored, retried or sent by itself, and a wake answer never changes the conversation scope.
+ */
+data class WakeView(
+    val canList: Boolean = false,
+    val canRequest: Boolean = false,
+    val listing: Boolean = false,
+    /** Null until the user asked for the list on this screen. */
+    val targets: List<WakeTarget>? = null,
+    val listAnswer: WakeAnswer? = null,
+    /** The target whose single request is in flight; another wake waits for its answer. */
+    val sending: String? = null,
+    /** The last answer per target id. */
+    val answers: Map<String, WakeAnswer> = emptyMap()
+) {
+    val offered: Boolean get() = canList || canRequest
+
+    override fun toString(): String = "WakeView(list=$canList, request=$canRequest, redacted)"
+}
+
 data class RelayUiState(
     val identity: EnrollmentIdentity? = null,
     val foregroundSession: Long = 0,
@@ -168,7 +191,8 @@ data class RelayUiState(
     /** The typed composer may send into the selected conversation. */
     val canSend: Boolean = false,
     /** Canonical voice is not exposed in this stage: inside a selected Relay conversation the microphone stays off. */
-    val micAvailable: Boolean = false
+    val micAvailable: Boolean = false,
+    val wake: WakeView = WakeView()
 ) {
     /** True when a selected Relay conversation owns the composer (stock chat input must not be used). */
     val relayOwnsComposer: Boolean get() = retainedSelected != null || selected != null ||

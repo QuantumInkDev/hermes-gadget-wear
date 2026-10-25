@@ -641,3 +641,14 @@ Source demo: explicitly refresh; a current denial withdraws access even after lo
 and Answer remain separate deliberate actions; a storage fault reports an unavailable/unconfirmed current action.
 Peer/JVM controls establish local owner ordering only. Native UI, storage, jobs, network, physical and full15
 acceptance remain OPEN. The terminal FIX2 report's incomplete COMPLETE-review gate is not retrospectively closed.
+
+## Remote wake (N9, experimental, server default off)
+
+Inside the Relay section of the chosen profile, a collapsed "Wake a box" entry appears once Relay is READY. Opening it
+reads `wake.targets` once; each Wake is confirmed and sends exactly one `wake.request` with a fresh UUIDv7 and an
+`expires_at_ms` 20 s after the `ServerClock` estimate (`WakeCalls`, cap 30 s; never the device clock). Both methods are
+called only when this connection's `relay.info` lists them and answer with the nine O5 error codes only. Nothing is
+stored, retried or sent on connect/reconnect; a lost answer is shown as unconfirmed and a new tap is a new request.
+Wake errors, including `permission_denied`, are shown and never stop, review or evict the conversation scope. `accepted`
+means the host dispatched the wake, not that the box is up. The O5 `relay.info` form now decodes with the additive
+`server_time_ms` a wake-enabled server adds. A wake-only grant (no `limits`) is not supported by the phone client.

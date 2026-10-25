@@ -274,8 +274,8 @@ class RelayEnvelopeTest {
     }
 
     @Test fun methodNamesAndLimitsComeFromTheAcceptedSdk() {
-        // The frozen 22 Task1 + seven voice methods remain; own receipt is separately optional.
-        val predecessor = RelayMethod.entries - RelayMethod.TURN_RECEIPT_OWN
+        // The frozen 22 Task1 + seven voice methods remain; own receipt and the two wake methods are separately optional.
+        val predecessor = RelayMethod.entries.filter { !it.isWake } - RelayMethod.TURN_RECEIPT_OWN
         assertEquals(22, predecessor.count { !it.isVoice })
         assertEquals(7, predecessor.count { it.isVoice })
         assertEquals(29, predecessor.size)

@@ -129,7 +129,7 @@ class VoiceStockCompatibilityTest {
         assertEquals(
             22,
             RelayMethod.entries.count {
-                !it.isVoice && it != RelayMethod.TURN_RECEIPT_OWN
+                !it.isVoice && !it.isWake && it != RelayMethod.TURN_RECEIPT_OWN
             }
         )
     }

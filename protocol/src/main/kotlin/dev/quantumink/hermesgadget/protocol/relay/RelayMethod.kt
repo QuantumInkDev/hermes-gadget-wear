@@ -43,13 +43,20 @@ enum class RelayMethod(
     VOICE_CAPTURE_RESULT("relay.voice.capture.result", RelayLimits.VOICE_LARGE_BYTES),
     VOICE_CAPTURE_DISCARD("relay.voice.capture.discard"),
     VOICE_SPEAK("relay.voice.speak", RelayLimits.VOICE_LARGE_BYTES),
-    VOICE_SPEAK_STOP("relay.voice.speak.stop");
+    VOICE_SPEAK_STOP("relay.voice.speak.stop"),
+
+    // Remote wake (`relay_wake`, experimental, default off): 16 targets of up to 80 scalars fit no 8,192-byte bound.
+    WAKE_TARGETS("wake.targets", RelayLimits.FRAME_BYTES),
+    WAKE_REQUEST("wake.request");
 
     /** O5 methods answer with the first nine stable error codes only. */
     val isOutbox: Boolean get() = this == OUTBOX_READ || this == OUTBOX_ACK
 
     /** The seven canonical-voice methods; a build that predates them keeps the name as an unknown method of `relay.info`. */
     val isVoice: Boolean get() = wire.startsWith("relay.voice.")
+
+    /** The two remote-wake methods; like O5 they answer with the first nine stable error codes only. */
+    val isWake: Boolean get() = wire.startsWith("wake.")
 
     companion object {
         private val byWire: Map<String, RelayMethod> = entries.associateBy { it.wire }

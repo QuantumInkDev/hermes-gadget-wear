@@ -214,7 +214,7 @@ object RelayEnvelope {
         expected: CorrelationId,
         frame: RelayFrame.Failure
     ) = when {
-        call.method.isOutbox && !frame.error.code.isOutboxCode ->
+        (call.method.isOutbox || call.method.isWake) && !frame.error.code.isOutboxCode ->
             RelayOutcome.Invalid(RelayProblem.UNEXPECTED_ERROR_CODE)
         frame.id == null -> RelayOutcome.Uncorrelated(frame.error)
         frame.id != expected -> RelayOutcome.Invalid(RelayProblem.ID_MISMATCH)

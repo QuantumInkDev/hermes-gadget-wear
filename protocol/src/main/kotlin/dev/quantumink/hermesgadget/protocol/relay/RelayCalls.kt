@@ -1,6 +1,7 @@
 package dev.quantumink.hermesgadget.protocol.relay
 
 import dev.quantumink.hermesgadget.protocol.relay.voice.VoiceCalls
+import dev.quantumink.hermesgadget.protocol.relay.wake.WakeCalls
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -368,6 +369,7 @@ object RelayCalls {
         RelayMethod.VOICE_CAPTURE_DISCARD,
         RelayMethod.VOICE_SPEAK,
         RelayMethod.VOICE_SPEAK_STOP -> VoiceCalls.resultDecoder(method)
+        RelayMethod.WAKE_TARGETS, RelayMethod.WAKE_REQUEST -> WakeCalls.resultDecoder(method)
     }
 
     // -- shared validation ------------------------------------------------------------------------------
@@ -582,6 +584,8 @@ object RelayCalls {
             RelayMethod.VOICE_CAPTURE_DISCARD,
             RelayMethod.VOICE_SPEAK,
             RelayMethod.VOICE_SPEAK_STOP -> VoiceCalls.fromWire(method, params)
+                ?: throw DecodeFailure("params")
+            RelayMethod.WAKE_TARGETS, RelayMethod.WAKE_REQUEST -> WakeCalls.fromWire(method, params)
                 ?: throw DecodeFailure("params")
             RelayMethod.OUTBOX_READ -> reader(emptySet(), setOf("limit")).let {
                 outboxRead(limit(it))

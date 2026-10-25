@@ -283,9 +283,9 @@ class RelayVectorGoldenTest {
             "7c17e6d72a3b9ec2974b3566f02dab1ed4b94eae",
             manifest["core"]!!.jsonObject["head"]!!.jsonPrimitive.content
         )
-        // This frozen Task1 manifest predates voice and own receipt; their captures stay separate.
+        // This frozen Task1 manifest predates voice, own receipt and wake; their tests stay separate.
         val relayMethods = RelayMethod.entries.filter {
-            !it.isVoice && it != RelayMethod.TURN_RECEIPT_OWN
+            !it.isVoice && !it.isWake && it != RelayMethod.TURN_RECEIPT_OWN
         }
         val methods = relayMethods.filter { m ->
             cases.any {

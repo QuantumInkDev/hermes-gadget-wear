@@ -87,6 +87,10 @@ import dev.quantumink.hermesgadget.protocol.relay.state.TurnKey
 import dev.quantumink.hermesgadget.protocol.relay.state.TurnLedger
 import dev.quantumink.hermesgadget.protocol.relay.state.TurnPhase
 import dev.quantumink.hermesgadget.protocol.relay.voice.VoiceCaptureLedger
+import dev.quantumink.hermesgadget.protocol.relay.wake.WakeAnswer
+import dev.quantumink.hermesgadget.protocol.relay.wake.WakeCalls
+import dev.quantumink.hermesgadget.protocol.relay.wake.WakeTarget
+import dev.quantumink.hermesgadget.protocol.relay.wake.WakeTargetId
 import java.security.MessageDigest
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -846,6 +850,14 @@ class RelayController(
     /** Automatic fresh attaches after an uncertain submit, per turn (bounded; then it waits for the user). */
     private val uncertainAttempts = HashMap<TurnKey, Int>()
 
+    /** Remote wake: transient, never stored. The session serial a read or request was written under ends it. */
+    private var wakeTargets: List<WakeTarget>? = null
+    private var wakeListAnswer: WakeAnswer? = null
+    private var wakeListSerial: Long? = null
+    private var wakeSending: WakeTargetId? = null
+    private var wakeSendSerial = 0L
+    private val wakeAnswers = LinkedHashMap<WakeTargetId, WakeAnswer>()
+
     // -- public API (thread-safe) ------------------------------------------------------------------------------
 
     fun prepare(identity: EnrollmentIdentity, foregroundSession: Long = 0) = post {
@@ -882,6 +894,7 @@ class RelayController(
             onlineQuery = null
             bookmarkFilter = null
             unsaved = false
+            clearWake()
         }
         if (stored is Stored.NotLoaded) load()
         loadRetained()
@@ -968,6 +981,7 @@ class RelayController(
             retainedSelected = null
             selectedSummary = null
             cacheReview = null
+            clearWake()
         }
         unavailable = null
         notice = RelayNotice.NONE
@@ -1071,7 +1085,102 @@ class RelayController(
         cacheReview = null
         selectedSummary = null
         notice = RelayNotice.NONE
+        clearWake()
         publish()
+    }
+
+    /**
+     * Remote wake: one deliberate read of the targets this device's grant may see on the current connection. Only
+     * when `relay.info` lists `wake.targets`; nothing is stored or repeated by itself.
+     */
+    fun listWakeTargets() = post {
+        if (!isReady() || wakeListSerial != null) return@post
+        if (!supports(RelayMethod.WAKE_TARGETS)) {
+            wakeListAnswer = WakeAnswer.NOT_OFFERED
+            return@post publish()
+        }
+        val expected = serial
+        wakeListSerial = expected
+        wakeListAnswer = null
+        request(WakeCalls.targets()) { result ->
+            if (wakeListSerial != expected) return@request
+            wakeListSerial = null
+            val outcome = (result as? RelayCallResult.Outcome)?.outcome
+            if (outcome is RelayOutcome.Success) {
+                wakeTargets = outcome.value.targets
+                wakeAnswers.keys.retainAll(outcome.value.targets.map { it.targetId }.toSet())
+            } else {
+                wakeListAnswer = WakeCalls.answer(result)
+            }
+            publish()
+        }
+        publish()
+    }
+
+    /**
+     * Remote wake: exactly ONE `wake.request` for a listed, available target, after the user confirmed it. A fresh
+     * UUIDv7 and a 20 s expiry are both formed from the server clock. No retry, no persistence; a lost answer stays
+     * [WakeAnswer.NOT_CONFIRMED] and a new tap is a new request. A wake answer never stops or reviews the conversation
+     * scope: wake authority is independent of it.
+     */
+    fun wake(targetId: String) = post {
+        val id = WakeTargetId.of(targetId) ?: return@post
+        if (!isReady() || wakeSending != null) return@post
+        val target = wakeTargets?.firstOrNull { it.targetId == id } ?: return@post
+        if (!target.available) return@post
+        if (!supports(RelayMethod.WAKE_REQUEST)) {
+            wakeAnswers[id] = WakeAnswer.NOT_OFFERED
+            return@post publish()
+        }
+        val at = now()
+        val requestId = at?.let { (RequestIds.mint(it, entropy) as? MintResult.Minted)?.id }
+        if (at == null || requestId == null ||
+            WakeCalls.expiry(at.serverMs, WakeCalls.DEFAULT_TTL_MS) == null
+        ) {
+            wakeAnswers[id] = WakeAnswer.NO_CLOCK
+            return@post publish()
+        }
+        val expected = serial
+        wakeSending = id
+        wakeSendSerial = expected
+        wakeAnswers.remove(id)
+        request(WakeCalls.request(id, requestId, at)) { result ->
+            if (wakeSending != id || wakeSendSerial != expected) return@request
+            wakeSending = null
+            wakeAnswers[id] = WakeCalls.answer(result)
+            publish()
+        }
+        publish()
+    }
+
+    private fun clearWake() {
+        wakeTargets = null
+        wakeListAnswer = null
+        wakeListSerial = null
+        wakeSending = null
+        wakeAnswers.clear()
+    }
+
+    /** A read or request whose session ended gets no callback: its result is unknown, never silently pending. */
+    private fun wakeView(): WakeView {
+        if (wakeListSerial != null && wakeListSerial != serial) {
+            wakeListSerial = null
+            wakeListAnswer = WakeAnswer.NOT_CONFIRMED
+        }
+        wakeSending?.takeIf { wakeSendSerial != serial }?.let {
+            wakeSending = null
+            wakeAnswers[it] = WakeAnswer.NOT_CONFIRMED
+        }
+        val ready = isReady()
+        return WakeView(
+            canList = ready && supports(RelayMethod.WAKE_TARGETS),
+            canRequest = ready && supports(RelayMethod.WAKE_REQUEST),
+            listing = wakeListSerial != null,
+            targets = wakeTargets,
+            listAnswer = wakeListAnswer,
+            sending = wakeSending?.value,
+            answers = wakeAnswers.entries.associate { it.key.value to it.value }
+        )
     }
 
     /** The newest state, for tests and for a first paint. */
@@ -4571,7 +4680,8 @@ class RelayController(
             canSend =
             retainedSelected == null && phase == RelayPhase.SELECTED && token != null &&
                 selectedId != null,
-            micAvailable = false
+            micAvailable = false,
+            wake = wakeView()
         )
         inboxUpdates(filteredInbox(inbox?.peek()), inboxStatus)
         listener(ui)
