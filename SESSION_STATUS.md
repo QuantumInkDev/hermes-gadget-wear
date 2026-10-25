@@ -51,3 +51,5 @@ a pet.request sent before pairing approval is now answered on approval; failures
 1. Owner test: phone Relay history/inbox on the 4 profiles; wake from Cthulhu's Relay section.
 2. Watch: surface "catalog offline" (phone Tailscale off) instead of silent still portraits.
 3. N3 images/documents; Opus battery measurement.
+5. Roll the Gadget relay plugin and the core seams patch to gpu5090 and arm (Windows leg 2 patch list;
+   the plugin's Windows storage-privacy verifier already exists). Owner wants all three boxes eventually.
