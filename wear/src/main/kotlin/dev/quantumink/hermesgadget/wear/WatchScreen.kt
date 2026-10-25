@@ -106,6 +106,21 @@ fun WatchScreen(
         route = "appearance"
     }
     androidx.activity.compose.BackHandler(route == "appearance") { route = appearanceReturn }
+    var inboxHandle by navigation.inboxHandle
+    var relayDraft by navigation.relayDraft
+    val relayParent = when (route) {
+        "relay" -> "home"
+        "relay-thread", "relay-inbox" -> "relay"
+        "relay-reply" -> "relay-thread"
+        else -> null
+    }
+    androidx.activity.compose.BackHandler(relayParent != null) {
+        if (route == "relay-inbox" && inboxHandle != null) {
+            inboxHandle = null
+        } else {
+            route = relayParent ?: "home"
+        }
+    }
     fun selectActivePage() {
         val current = service.state.value
         val page = ProfilePages.merge(current.profiles, current.catalog).firstOrNull {
@@ -115,7 +130,7 @@ fun WatchScreen(
         if (page != null) service.rememberPage(page.key)
     }
     val textDraft = watch.draft
-    val editingText = route == "text"
+    val editingText = route == "text" || route == "relay-reply"
     DisposableEffect(editingText) { onDispose { if (editingText) service.finishTextInput() } }
     val feedback = LocalHapticFeedback.current
     var haptic by remember { mutableLongStateOf(watch.haptic) }
@@ -253,6 +268,42 @@ fun WatchScreen(
             profiles = { route = "profiles" },
             appearance = ::openAppearance
         )
+        route == "relay" -> RelayHistoryPage(
+            watch,
+            service,
+            connect,
+            open = { route = "relay-thread" },
+            inbox = { route = "relay-inbox" },
+            back = { route = "home" }
+        )
+        route == "relay-thread" -> RelayThreadPage(
+            watch,
+            service,
+            connect,
+            reply = {
+                service.prepareTextInput()
+                route = "relay-reply"
+            },
+            back = { route = "relay" }
+        )
+        route == "relay-reply" -> RelayReplyPage(
+            watch,
+            service,
+            relayDraft,
+            { relayDraft = it },
+            back = { route = "relay-thread" }
+        )
+        route == "relay-inbox" -> RelayInboxPage(
+            watch,
+            service,
+            inboxHandle,
+            { inboxHandle = it },
+            opened = {
+                inboxHandle = null
+                route = "relay-thread"
+            },
+            back = { route = "relay" }
+        )
         route == "text" -> TextPage(
             text = textDraft,
             changed = service::updateDraft,
@@ -309,6 +360,7 @@ fun WatchScreen(
                         route = "profiles"
                     },
                     appearance = ::openAppearance,
+                    relay = { route = "relay" },
                     page = page,
                     pageScroll = pageScroll,
                     jump = jump
@@ -512,6 +564,7 @@ internal fun ConversationPage(
     appearance: () -> Unit,
     page: ProfilePage,
     pageScroll: TransformingLazyColumnState,
+    relay: () -> Unit = {},
     jump: @Composable () -> Unit = {}
 ) {
     val connection = watch.connection
@@ -704,6 +757,8 @@ internal fun ConversationPage(
             } else {
                 item { Secondary(stringResource(R.string.disconnect), service::disconnect) }
             }
+            // One small entry: Relay history and the inbox live on secondary pages, never over the portrait.
+            item { Secondary("Conversations & inbox", relay) }
             item {
                 Secondary("Refresh profiles", {
                     service.refreshCatalog()
@@ -903,12 +958,12 @@ internal fun Secondary(value: String, onClick: () -> Unit, enabled: Boolean = tr
 }
 
 @Composable
-private fun Toggle(value: String, checked: Boolean, onClick: () -> Unit) {
+internal fun Toggle(value: String, checked: Boolean, onClick: () -> Unit) {
     Secondary((if (checked) "✓ " else "○ ") + value, onClick)
 }
 
 @Composable
-private fun Input(
+internal fun Input(
     label: String,
     value: String,
     changed: (String) -> Unit,

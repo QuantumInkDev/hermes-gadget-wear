@@ -47,6 +47,12 @@ import dev.quantumink.hermesgadget.protocol.TransportPolicy
 import dev.quantumink.hermesgadget.protocol.TransportPreference
 import dev.quantumink.hermesgadget.protocol.WatchAction
 import dev.quantumink.hermesgadget.protocol.WatchActions
+import dev.quantumink.hermesgadget.protocol.relay.session.EnrollmentIdentity
+import dev.quantumink.hermesgadget.protocol.relay.session.InboxProfile
+import dev.quantumink.hermesgadget.protocol.relay.session.InboxSnapshot
+import dev.quantumink.hermesgadget.protocol.relay.session.RelayController
+import dev.quantumink.hermesgadget.protocol.relay.session.RelayPhase
+import dev.quantumink.hermesgadget.protocol.relay.session.RelayUiState
 import java.net.Proxy
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
@@ -99,7 +105,12 @@ data class WatchState(
     val replayReady: Boolean = false,
     val moreReady: Boolean = false,
     /** Observed output of the current response playback; never a preference or device identity. */
-    val output: PlaybackOutput = PlaybackOutput.UNKNOWN
+    val output: PlaybackOutput = PlaybackOutput.UNKNOWN,
+    /** Relay mode of the selected profile (off by default); the stock conversation above is independent of it. */
+    val relay: RelayUiState = RelayUiState(),
+    /** The retained watch inbox across this watch's Relay profiles (null until read). */
+    val inbox: InboxSnapshot? = null,
+    val inboxStatus: String = ""
 ) {
     val selectionLocked: Boolean get() = saving || captureActive ||
         connection.conversation.prompt != null ||
@@ -157,6 +168,15 @@ class GadgetService : Service() {
 
     @Volatile private var connection: DirectConnection? = null
     private var relay: WatchRelay? = null
+
+    // Relay mode (explicit per-profile opt-in): the watch's own enrollment of the configured profile and its session.
+    private lateinit var relayMode: WatchRelayMode
+
+    @Volatile private var relayWho: EnrollmentIdentity? = null
+
+    @Volatile private var relaySession = 0L
+    private var inboxRefreshed = 0L
+    private val pendingInbox = java.util.concurrent.atomic.AtomicReference<String?>(null)
     private var speech: WatchSpeech? = null
 
     @Volatile private var visible = false
@@ -188,6 +208,16 @@ class GadgetService : Service() {
         walking = WalkingPreferences(this)
         recordingCues = RecordingCues(this, watchLightHaptics = true)
         petCache = PetCache(this)
+        relayMode = WatchRelayMode(
+            this,
+            ui = { relayState ->
+                mutableState.update { it.copy(relay = relayState) }
+                main.post { relayProgress(relayState) }
+            },
+            inbox = { snapshot, status ->
+                mutableState.update { it.copy(inbox = snapshot, inboxStatus = status) }
+            }
+        )
         presentationStore = PresentationStore(java.io.File(filesDir, "profile-presentation"))
         catalog = WatchCatalogController(
             this,
@@ -676,6 +706,11 @@ class GadgetService : Service() {
             val byok =
                 selected.getOrNull() == TransportPath.RELAY && node != null &&
                     WatchSpeech.ready(this, profile.endpoint, node)
+            // Relay is advertised on this socket only when this profile's saved setting is on.
+            val who = WatchRelayModel.identity(profile.endpoint, identity)
+            val session = relayMode.open(who, profile.endpoint.url, profile.label)
+            val relayOn = who != null &&
+                runCatching { relayMode.enabledBlocking(who, session) }.getOrDefault(false)
             main.post {
                 if (destroyed || request != selectionEpoch.get()) return@post
                 selected.fold(
@@ -699,7 +734,9 @@ class GadgetService : Service() {
                                     reply,
                                     speechNode = node?.takeIf {
                                         byok
-                                    }
+                                    },
+                                    relaySession = session,
+                                    relayOn = relayOn
                                 )
                                 connection?.connect()
                             },
@@ -785,6 +822,118 @@ class GadgetService : Service() {
     }
     fun finishTextInput() {
         textEditing = false
+    }
+
+    // -- Relay mode (explicit, per profile; every action below is a deliberate user action) -------------------------
+
+    /** Turns Relay on or off for the selected profile. The capability is negotiated per socket, so a live link restarts. */
+    fun relayEnable(on: Boolean) {
+        // Not a wss profile: the page explains it and offers no switch.
+        if (relayWho == null) return
+        relayMode.controller.setEnabled(on)
+        if (mutableState.value.connection.status !in
+            setOf(ConnectionStatus.OFFLINE, ConnectionStatus.ERROR)
+        ) {
+            disconnect()
+            connect()
+        }
+    }
+
+    /** Runs [action] only while the rendered [seen] state still belongs to the configured profile and session. */
+    fun relay(seen: RelayUiState, action: (RelayController) -> Unit) {
+        val who = relayWho ?: return
+        if (seen.identity == who && seen.foregroundSession == relaySession &&
+            relayMode.current(who, relaySession)
+        ) {
+            action(relayMode.controller)
+        }
+    }
+
+    /** A dictated or typed turn into the selected Relay conversation: stored first, then written; never the stock chat. */
+    fun relaySend(seen: RelayUiState, text: String, completed: (Boolean) -> Unit) {
+        var posted = false
+        relay(seen) { controller ->
+            if (!seen.canSend || text.isBlank()) return@relay
+            posted = true
+            controller.send(text.take(8192)) { accepted -> main.post { completed(accepted) } }
+        }
+        if (!posted) completed(false)
+    }
+
+    fun loadInbox() = relayMode.loadInbox()
+
+    /** Refreshes the selected profile's inbox over its live Relay link; other profiles keep their retained lines. */
+    fun refreshInbox() {
+        val relayState = mutableState.value.relay
+        if (relayState.phase in setOf(RelayPhase.READY, RelayPhase.SELECTED)) {
+            relay(relayState) { relayMode.refreshInbox() }
+        } else {
+            relayMode.loadInbox()
+        }
+    }
+
+    /** Quiet private notifications for this profile's Needs input / Finished changes (off until the user turns them on). */
+    fun inboxAlerts(profile: InboxProfile, on: Boolean) {
+        relayMode.controller.configureInbox(profile.copy(completionAlerts = on, inputAlerts = on))
+        relayMode.loadInbox()
+    }
+
+    /**
+     * Opens an inbox line deliberately: resolves it locally, selects the watch profile that owns it (same endpoint and
+     * this watch's own enrollment) and continues that exact conversation once its Relay link is ready.
+     */
+    fun openInbox(handle: String, opened: (Boolean) -> Unit) {
+        val controller = relayMode.controller
+        storage.execute {
+            val route = runCatching { controller.inboxRouteBlocking(handle) }.getOrNull()
+            val owner = route?.let { found ->
+                runCatching {
+                    WatchRelayModel.owner(
+                        found.namespace,
+                        vault.profiles().map { profile ->
+                            profile to runCatching {
+                                WatchRelayModel.identity(
+                                    profile.endpoint,
+                                    vault.identity(profile.endpoint)
+                                )
+                            }.getOrNull()
+                        }
+                    )
+                }.getOrNull()
+            }
+            main.post {
+                if (destroyed) return@post
+                if (route?.canonicalConversation == null || owner == null) {
+                    opened(false)
+                    return@post
+                }
+                controller.markInboxRead(handle)
+                pendingInbox.set(handle)
+                opened(true)
+                if (mutableState.value.profile?.endpoint?.url == owner.endpoint.url) {
+                    relayProgress(mutableState.value.relay)
+                    if (mutableState.value.connection.status in
+                        setOf(ConnectionStatus.OFFLINE, ConnectionStatus.ERROR)
+                    ) {
+                        connect()
+                    }
+                } else {
+                    selectProfile(owner.endpoint.url) { connect() }
+                }
+            }
+        }
+    }
+
+    /** Main thread. Continues a pending inbox line and refreshes the inbox once per ready Relay session. */
+    private fun relayProgress(seen: RelayUiState) {
+        if (destroyed || seen.phase !in setOf(RelayPhase.READY, RelayPhase.SELECTED)) return
+        val who = relayWho ?: return
+        if (seen.identity != who || seen.foregroundSession != relaySession) return
+        if (inboxRefreshed != relaySession) {
+            inboxRefreshed = relaySession
+            relayMode.refreshInbox()
+        }
+        pendingInbox.getAndSet(null)?.let { relayMode.controller.continueInbox(it) }
     }
     fun enterAmbient() {
         cancelRecording()
@@ -930,10 +1079,18 @@ class GadgetService : Service() {
         pipe: WatchRelay? = null,
         previousReply: String = "",
         notice: String = "",
-        speechNode: String? = null
+        speechNode: String? = null,
+        relaySession: Long? = null,
+        relayOn: Boolean = false
     ) {
         closeConnection()
         relay = pipe
+        val who = WatchRelayModel.identity(profile.endpoint, identity)
+        val session = relaySession?.takeIf { relayMode.current(who, it) }
+            ?: relayMode.open(who, profile.endpoint.url, profile.label)
+        val withRelay = relayOn && who != null && session == relaySession
+        relayWho = who
+        this.relaySession = session
         val speechEngine = speechNode?.let { WatchSpeech(this, profile.endpoint, it, opusReady) }
         speech = speechEngine
         val path = if (pipe == null) TransportPath.DIRECT else TransportPath.RELAY
@@ -1074,7 +1231,9 @@ class GadgetService : Service() {
                                     profile,
                                     identity,
                                     previousReply = state.conversation.reply,
-                                    notice = getString(R.string.relay_fallback)
+                                    notice = getString(R.string.relay_fallback),
+                                    relaySession = session,
+                                    relayOn = withRelay
                                 )
                                 connection?.connect()
                             }
@@ -1256,8 +1415,14 @@ class GadgetService : Service() {
             capabilities = JsonObject(caps),
             httpClient = pipe?.client,
             connectionProxy = pipe?.bridge?.proxy ?: Proxy.NO_PROXY,
-            previousReply = previousReply
+            previousReply = previousReply,
+            relay = if (withRelay) {
+                relayMode.optIn { version == epoch.get() && relayMode.current(who, session) }
+            } else {
+                null
+            }
         )
+        if (who != null) relayMode.controller.attachTransport(connection?.relayTransport)
         mutableState.update {
             it.copy(
                 profile = profile,
@@ -1559,8 +1724,11 @@ class GadgetService : Service() {
             playback.stop()
             clearWalking()
         }
+        val relayed = connection?.relayTransport
+        relayed?.invalidatePending()
         connection?.close()
         connection = null
+        if (relayed != null) relayMode.controller.attachTransport(null)
         relay?.close()
         relay = null
         endForeground()
@@ -1571,6 +1739,7 @@ class GadgetService : Service() {
         destroyed = true
         catalog.close()
         closeConnection()
+        relayMode.close()
         WatchSurfaces.publish(
             this,
             mutableState.value.copy(

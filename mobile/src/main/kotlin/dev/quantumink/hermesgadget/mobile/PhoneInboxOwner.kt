@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.ConnectivityManager
 import android.net.Network
 import android.os.SystemClock
+import dev.quantumink.hermesgadget.client.failClosed
 import dev.quantumink.hermesgadget.protocol.CatalogPage
 import dev.quantumink.hermesgadget.protocol.CatalogStatus
 import dev.quantumink.hermesgadget.protocol.ConnectionObserver
@@ -13,21 +14,12 @@ import dev.quantumink.hermesgadget.protocol.DirectConnection
 import dev.quantumink.hermesgadget.protocol.EndpointProfile
 import dev.quantumink.hermesgadget.protocol.relay.RelayOptIn
 import dev.quantumink.hermesgadget.protocol.relay.session.EnrollmentIdentity
-import dev.quantumink.hermesgadget.protocol.relay.session.InboxFailure
-import dev.quantumink.hermesgadget.protocol.relay.session.InboxFile
-import dev.quantumink.hermesgadget.protocol.relay.session.InboxProblem
 import dev.quantumink.hermesgadget.protocol.relay.session.InboxProfile
 import dev.quantumink.hermesgadget.protocol.relay.session.InboxRepository
 import dev.quantumink.hermesgadget.protocol.relay.session.InboxRoute
 import dev.quantumink.hermesgadget.protocol.relay.session.InboxSnapshot
-import dev.quantumink.hermesgadget.protocol.relay.session.InboxWrite
 import dev.quantumink.hermesgadget.protocol.relay.session.RelayController
-import dev.quantumink.hermesgadget.protocol.relay.session.RelayDocument
-import dev.quantumink.hermesgadget.protocol.relay.session.RelayStore
 import dev.quantumink.hermesgadget.protocol.relay.session.RelayUiState
-import dev.quantumink.hermesgadget.protocol.relay.session.StoreCommit
-import dev.quantumink.hermesgadget.protocol.relay.session.StoreLoad
-import dev.quantumink.hermesgadget.protocol.relay.session.StoreProblem
 import dev.quantumink.hermesgadget.protocol.relay.state.SecureRequestIdEntropy
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -51,39 +43,8 @@ internal class PhoneInboxOwner(private val app: Application) {
     private val epochs = java.util.concurrent.atomic.AtomicLong()
 
     @Volatile private var listener: (RelayUiState) -> Unit = {}
-    private val displayFile by lazy { EncryptedInboxFile.create(app) }
-    private val repository = InboxRepository(object : InboxFile {
-        override fun load(): InboxSnapshot = try {
-            displayFile.load()
-        } catch (failure: InboxFailure) {
-            throw failure
-        } catch (_: Exception) {
-            throw InboxFailure(InboxProblem.STORAGE)
-        }
-        override fun commit(next: InboxSnapshot, base: Long): InboxWrite = try {
-            displayFile.commit(next, base)
-        } catch (_: Exception) {
-            InboxWrite.Failed(false)
-        }
-    })
-    private val aggregateFile by lazy { EncryptedRelayStore.android(app) }
-    private val aggregate = object : RelayStore {
-        override fun load(): StoreLoad = try {
-            aggregateFile.load()
-        } catch (_: Exception) {
-            StoreLoad.Unreadable(StoreProblem.STORAGE_UNAVAILABLE)
-        }
-        override fun commit(document: RelayDocument, base: Long): StoreCommit = try {
-            aggregateFile.commit(document, base)
-        } catch (_: Exception) {
-            StoreCommit.Failed(StoreProblem.STORAGE_UNAVAILABLE, false)
-        }
-        override fun currentSequence(): Long = try {
-            aggregateFile.currentSequence()
-        } catch (_: Exception) {
-            -1
-        }
-    }
+    private val repository = InboxRepository(EncryptedInboxFile.create(app).failClosed())
+    private val aggregate = EncryptedRelayStore.android(app).failClosed()
     private val mutable = MutableStateFlow<InboxSnapshot?>(null)
     val state = mutable.asStateFlow()
     private val statusMutable = MutableStateFlow("Retained / offline")

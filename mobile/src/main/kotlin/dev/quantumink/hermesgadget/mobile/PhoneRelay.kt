@@ -4,47 +4,10 @@ import android.app.Application
 import android.os.SystemClock
 import dev.quantumink.hermesgadget.protocol.relay.RelayChannelState
 import dev.quantumink.hermesgadget.protocol.relay.RelayOptIn
-import dev.quantumink.hermesgadget.protocol.relay.session.Cancelable
 import dev.quantumink.hermesgadget.protocol.relay.session.RelayController
-import dev.quantumink.hermesgadget.protocol.relay.session.RelayScheduler
 import dev.quantumink.hermesgadget.protocol.relay.session.RelayTiming
 import dev.quantumink.hermesgadget.protocol.relay.session.RelayUiState
 import dev.quantumink.hermesgadget.protocol.relay.state.SecureRequestIdEntropy
-import java.util.concurrent.RejectedExecutionException
-import java.util.concurrent.ScheduledThreadPoolExecutor
-import java.util.concurrent.TimeUnit
-
-/** The controller's single thread: every Relay state change runs on it, off the main thread (disk and crypto live here). */
-internal class ExecutorRelayScheduler :
-    RelayScheduler,
-    AutoCloseable {
-    private val executor = ScheduledThreadPoolExecutor(1) {
-        Thread(it, "relay-controller").apply {
-            isDaemon =
-                true
-        }
-    }
-        .apply { removeOnCancelPolicy = true }
-
-    override fun post(task: Runnable) {
-        try {
-            executor.execute(task)
-        } catch (_: RejectedExecutionException) {
-            // Closed: the task belongs to a screen that is gone.
-        }
-    }
-
-    override fun postDelayed(delayMs: Long, task: Runnable): Cancelable = try {
-        val scheduled = executor.schedule(task, delayMs, TimeUnit.MILLISECONDS)
-        Cancelable { scheduled.cancel(false) }
-    } catch (_: RejectedExecutionException) {
-        Cancelable { }
-    }
-
-    override fun close() {
-        executor.shutdownNow()
-    }
-}
 
 /** Where a typed message or a hold-to-talk press goes. Inside a SELECTED Relay conversation nothing reaches the stock chat. */
 internal enum class InputRoute { STOCK, RELAY, UNAVAILABLE }

@@ -16,6 +16,10 @@ class WatchNavigation {
     val page = mutableStateOf("")
     val pinKey = mutableStateOf<String?>(null)
     val pickerOpen = mutableStateOf(false)
+
+    /** The opened inbox line (a local opaque handle, never content) and the Relay reply draft. */
+    val inboxHandle = mutableStateOf<String?>(null)
+    val relayDraft = mutableStateOf("")
     private val scrolls = LinkedHashMap<String, TransformingLazyColumnState>()
     fun scrollFor(key: String): TransformingLazyColumnState =
         scrolls.getOrPut(key) { TransformingLazyColumnState() }

@@ -1,4 +1,4 @@
-package dev.quantumink.hermesgadget.mobile
+package dev.quantumink.hermesgadget.client
 
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
@@ -21,12 +21,13 @@ import javax.crypto.spec.GCMParameterSpec
 
 /** Display-only cache. Existing bytes always require the existing key and a valid marker.
  * Promotion uncertainty is never a confirmed copy. Blocking: the application serial worker owns
- * every call.
+ * every call. The phone and the watch each use their own directory and alias.
  */
-internal class EncryptedInboxFile(
+class EncryptedInboxFile(
     private val directory: File,
     private val key: (Boolean) -> SecretKey,
-    private val files: RelayFiles = RealRelayFiles
+    private val files: RelayFiles = RealRelayFiles,
+    private val alias: String = ALIAS
 ) : InboxFile {
     private val lock = locks.getOrPut(directory.absoluteFile.normalize().path) { Any() }
     private fun problem(p: InboxProblem): Nothing = throw InboxFailure(p)
@@ -72,7 +73,7 @@ internal class EncryptedInboxFile(
         problem(InboxProblem.KEY)
     }
     private fun aad(revision: Long) =
-        "hermes-gadget|phone-inbox|container1|$ALIAS|$revision".toByteArray()
+        "hermes-gadget|phone-inbox|container1|$alias|$revision".toByteArray()
     private fun read(): InboxSnapshot {
         val record = File(directory, RECORD)
         if (record.length() !in 46L..(InboxCodec.MAX_BYTES + 38L)) problem(InboxProblem.CORRUPT)
@@ -155,16 +156,21 @@ internal class EncryptedInboxFile(
         }
     }
     companion object {
-        private const val ALIAS = "quantumink.relay.phone.inbox.v1"
+        const val ALIAS = "quantumink.relay.phone.inbox.v1"
+        const val DIRECTORY = "phone-inbox"
         private const val RECORD = "inbox.v1"
         private const val MARKER = "initialized"
         private const val PENDING = "inbox.pending"
         private val locks = ConcurrentHashMap<String, Any>()
-        fun create(context: Context): EncryptedInboxFile = EncryptedInboxFile(
-            File(context.noBackupFilesDir, "phone-inbox"),
+        fun create(
+            context: Context,
+            directory: String = DIRECTORY,
+            alias: String = ALIAS
+        ): EncryptedInboxFile = EncryptedInboxFile(
+            File(context.noBackupFilesDir, directory),
             { create ->
                 val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-                (store.getKey(ALIAS, null) as? SecretKey) ?: run {
+                (store.getKey(alias, null) as? SecretKey) ?: run {
                     check(create) { "Existing inbox key unavailable" }
                     KeyGenerator.getInstance(
                         KeyProperties.KEY_ALGORITHM_AES,
@@ -172,7 +178,7 @@ internal class EncryptedInboxFile(
                     ).apply {
                         init(
                             KeyGenParameterSpec.Builder(
-                                ALIAS,
+                                alias,
                                 KeyProperties.PURPOSE_ENCRYPT or
                                     KeyProperties.PURPOSE_DECRYPT
                             ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
@@ -182,7 +188,8 @@ internal class EncryptedInboxFile(
                         )
                     }.generateKey()
                 }
-            }
+            },
+            alias = alias
         )
     }
 }

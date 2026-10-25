@@ -1,4 +1,4 @@
-package dev.quantumink.hermesgadget.mobile
+package dev.quantumink.hermesgadget.client
 
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
@@ -31,13 +31,13 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /** The file operations whose failure order matters; tests inject faults here (the production values are plain `java.nio`). */
-internal interface RelayFiles {
+interface RelayFiles {
     fun move(from: File, to: File)
     fun syncDirectory(directory: File)
     fun write(file: File, bytes: ByteArray)
 }
 
-internal object RealRelayFiles : RelayFiles {
+object RealRelayFiles : RelayFiles {
     override fun move(from: File, to: File) {
         Files.move(
             from.toPath(),
@@ -71,13 +71,13 @@ internal object RealRelayFiles : RelayFiles {
  *
  * Never: generate a key while any stored byte exists, erase or reset after a failed read, replace an unreadable record by
  * an empty document, or treat a record that disappeared after initialisation as an empty store. The result of every read
- * and write is explicit ([StoreProblem], [StoreCommit]).
+ * and write is explicit ([StoreProblem], [StoreCommit]). The watch uses the same container under its own directory and alias.
  *
  * Durability: `AtomicFile`/`ATOMIC_MOVE` plus an `fsync` of the file and of the directory is NOT proof of power-loss
  * durability on a real device (that is the later native gate V7). A failure after the atomic replace is reported as
  * UNCERTAIN, never as success. All methods block on disk and crypto: call them off the main thread.
  */
-internal class EncryptedRelayStore(
+class EncryptedRelayStore(
     private val directory: File,
     private val key: (create: Boolean) -> SecretKey,
     private val alias: String = ALIAS,

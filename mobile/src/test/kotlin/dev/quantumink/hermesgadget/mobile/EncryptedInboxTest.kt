@@ -44,6 +44,26 @@ class EncryptedInboxTest {
         }
     }
 
+    @Test fun aRecordIsBoundToItsAliasSoTheWatchStoreCannotReadThePhoneOne() {
+        val dir = Files.createTempDirectory("inbox-alias").resolve("inbox").toFile()
+        try {
+            val key = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+            assertTrue(
+                EncryptedInboxFile(dir, { key }).commit(InboxSnapshot(revision = 1), 0) is
+                    InboxWrite.Committed
+            )
+            try {
+                EncryptedInboxFile(dir, { key }, alias = "quantumink.relay.watch.inbox.v1").load()
+                fail("another alias must not authenticate")
+            } catch (e: InboxFailure) {
+                assertEquals(InboxProblem.CORRUPT, e.problem)
+            }
+            assertEquals(1, EncryptedInboxFile(dir, { key }).load().revision)
+        } finally {
+            requireNotNull(dir.parentFile).deleteRecursively()
+        }
+    }
+
     @Test fun wrongKeyAndTamperingNeverResetOrCreateAKeyOverBytes() {
         val dir = Files.createTempDirectory("inbox-key").resolve("inbox").toFile()
         try {

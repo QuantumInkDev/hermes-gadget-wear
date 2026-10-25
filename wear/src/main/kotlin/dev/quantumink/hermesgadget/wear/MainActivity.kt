@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
         } ?: intent
         tileLaunch.receive(launchIntent)
         intent.removeExtra(TileProfileLaunch.EXTRA_PAGE_KEY)
+        if (savedInstanceState == null) receiveInbox(intent)
         setContent {
             val ambientManager = rememberAmbientModeManager()
             CompositionLocalProvider(LocalAmbientModeManager provides ambientManager) {
@@ -217,6 +218,14 @@ class MainActivity : ComponentActivity() {
         intent.removeExtra(TileProfileLaunch.EXTRA_PAGE_KEY)
         setIntent(intent)
         gadget?.let(::reconcileTile)
+        receiveInbox(intent)
+    }
+
+    /** A private inbox notification opens its inbox line; continuing the conversation stays a deliberate tap. */
+    private fun receiveInbox(intent: Intent) {
+        val handle = WatchInboxAlerts.handle(intent) ?: return
+        navigation.inboxHandle.value = handle
+        navigation.route.value = "relay-inbox"
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
