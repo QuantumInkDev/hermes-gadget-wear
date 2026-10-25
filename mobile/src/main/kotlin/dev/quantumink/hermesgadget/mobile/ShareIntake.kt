@@ -7,7 +7,8 @@ import dev.quantumink.hermesgadget.protocol.EndpointProfile
 
 /** One incoming share, already bounded. Text is a draft only: nothing here reads a URI, fetches a link or sends. */
 internal sealed interface SharedContent {
-    class Text(val text: String) : SharedContent {
+    /** [source] is set for an agent handoff from a phone conversation; a plain share has none. */
+    class Text(val text: String, val source: HandoffSource? = null) : SharedContent {
         override fun toString(): String = "SharedContent.Text(content=redacted)"
     }
     data class Rejected(val reason: ShareRejection) : SharedContent
@@ -62,13 +63,15 @@ internal object ShareIntake {
         key: String,
         text: String,
         resolved: Pair<CatalogPage, EndpointProfile>?,
-        state: PhoneConversationState
+        state: PhoneConversationState,
+        source: HandoffSource? = null
     ): Pair<CatalogPage, EndpointProfile>? {
         val (page, profile) = resolved ?: return null
         return resolved.takeIf {
             !phoneSelectionLocked(state) && sendable(text) && page.key == key &&
                 page.status != CatalogStatus.WITHDRAWN && profile.endpoint.isTls &&
-                page.profile.gadgetUrl == profile.endpoint.url
+                page.profile.gadgetUrl == profile.endpoint.url &&
+                (source == null || AgentHandoff.distinct(source, page))
         }
     }
 }

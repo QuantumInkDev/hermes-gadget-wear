@@ -594,7 +594,8 @@ class MainActivity : ComponentActivity() {
                                 ::connectPhone,
                                 ::recordPhone,
                                 { navigate("profiles") },
-                                Modifier.weight(1f)
+                                Modifier.weight(1f),
+                                ::startHandoff
                             )
                             else -> Column(
                                 Modifier.weight(1f).verticalScroll(rememberScrollState())
@@ -848,6 +849,23 @@ class MainActivity : ComponentActivity() {
         shareNotice = ""
     }
 
+    /** Opens the share review on a captured handoff. The source conversation closes; only [text] travels. */
+    private fun startHandoff(source: HandoffSource, text: String) {
+        val current = conversation.state.value
+        if (!started || destination != "conversation" || phoneSelectionLocked(current) ||
+            current.profile?.endpoint?.url != source.url
+        ) {
+            return
+        }
+        navigation.cancel()
+        conversation.hide()
+        ShareHandoff.store.remove(shareToken)
+        shareToken = ShareHandoff.store.put(SharedContent.Text(text, source))
+        shareNotice = ""
+        shareLaunch++
+        destination = "share"
+    }
+
     private fun requestShare(key: String, text: String, reviewIsCurrent: () -> Boolean) {
         if (!reviewIsCurrent()) return
         if (phoneSelectionLocked(conversation.state.value)) {
@@ -855,14 +873,17 @@ class MainActivity : ComponentActivity() {
             return
         }
         val token = shareToken
+        val source = (ShareHandoff.store.get(token) as? SharedContent.Text)?.source
         navigation.request(key, null, {
             reviewIsCurrent() && started && destination == "share" && shareToken == token &&
                 lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
         }) { resolved ->
             if (!reviewIsCurrent()) return@request
-            val accepted = ShareIntake.accept(key, text, resolved, conversation.state.value)
+            val accepted = ShareIntake.accept(key, text, resolved, conversation.state.value, source)
             if (accepted == null) {
-                shareNotice = getString(R.string.share_changed)
+                shareNotice = getString(
+                    if (source == null) R.string.share_changed else R.string.handoff_changed
+                )
             } else {
                 conversation.open(accepted.second, accepted.first)
                 conversation.draft(text)

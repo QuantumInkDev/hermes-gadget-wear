@@ -33,7 +33,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.quantumink.hermesgadget.protocol.CatalogStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -53,12 +52,15 @@ internal fun ShareReviewPage(
     LaunchedEffect(Unit) {
         runCatching { withContext(Dispatchers.IO) { repository.savedPages() } }
     }
+    // A handoff reuses this review with its captured text; only the wording and the source exclusion differ.
+    val source = (content as? SharedContent.Text)?.source
+    val wording = { share: Int, handoff: Int -> if (source == null) share else handoff }
     Column(
         modifier.verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(
-            stringResource(R.string.share_title),
+            stringResource(wording(R.string.share_title, R.string.handoff_title)),
             Modifier.semantics { heading() },
             style = MaterialTheme.typography.headlineSmall
         )
@@ -87,9 +89,7 @@ internal fun ShareReviewPage(
             is SharedContent.Text -> {
                 var text by remember(content) { mutableStateOf(content.text) }
                 var selectedKey by rememberSaveable(content) { mutableStateOf<String?>(null) }
-                val options = pages.filter {
-                    it.status != CatalogStatus.WITHDRAWN && it.profile.gadgetUrl != null
-                }
+                val options = AgentHandoff.targets(pages, source)
                 val selected = options.singleOrNull { it.key == selectedKey }
                 // A catalog reload or edit invalidates any lookup already in flight.
                 val generation = remember(
@@ -99,12 +99,24 @@ internal fun ShareReviewPage(
                     selected?.status
                 ) { QuickActionReviewGeneration() }
                 DisposableEffect(generation) { onDispose { generation.close() } }
-                Text(stringResource(R.string.share_intro))
+                Text(
+                    if (source == null) {
+                        stringResource(R.string.share_intro)
+                    } else {
+                        stringResource(R.string.handoff_intro, source.label)
+                    }
+                )
                 Text(
                     stringResource(R.string.share_profiles),
                     style = MaterialTheme.typography.titleMedium
                 )
-                if (options.isEmpty()) Text(stringResource(R.string.share_no_profiles))
+                if (options.isEmpty()) {
+                    Text(
+                        stringResource(
+                            wording(R.string.share_no_profiles, R.string.handoff_no_profiles)
+                        )
+                    )
+                }
                 Column(
                     Modifier.selectableGroup(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -139,7 +151,10 @@ internal fun ShareReviewPage(
                         generation.invalidate()
                         text = it
                     },
-                    label = { Text(stringResource(R.string.share_message)) },
+                    label = {
+                        val label = wording(R.string.share_message, R.string.handoff_message)
+                        Text(stringResource(label))
+                    },
                     supportingText = {
                         Text(stringResource(R.string.share_size, bytes, ShareIntake.MAX_BYTES))
                     },
@@ -172,7 +187,9 @@ internal fun ShareReviewPage(
                     },
                     enabled = !locked && selected != null && ShareIntake.sendable(text)
                 ) { Text(stringResource(R.string.share_use)) }
-                TextButton(cancel) { Text(stringResource(R.string.share_cancel)) }
+                TextButton(cancel) {
+                    Text(stringResource(wording(R.string.share_cancel, R.string.handoff_cancel)))
+                }
             }
         }
     }

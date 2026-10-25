@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,20 +34,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.quantumink.hermesgadget.mobile.widgets.phoneSelectionLocked
 import dev.quantumink.hermesgadget.protocol.ConnectionStatus
 import dev.quantumink.hermesgadget.protocol.ConversationMode
+import dev.quantumink.hermesgadget.protocol.relay.HistoryRole
 import kotlinx.coroutines.delay
 
 @Composable
-fun ConversationPage(
+internal fun ConversationPage(
     model: PhoneConversation,
     page: dev.quantumink.hermesgadget.protocol.CatalogPage?,
     connect: () -> Unit,
     record: () -> Unit,
     back: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    handoff: ((HandoffSource, String) -> Unit)? = null
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -66,7 +74,8 @@ fun ConversationPage(
         { model.cancel() }, { model.cancel(true) }, model::answer, modifier,
         RelayActions.of(model),
         if (walking) WalkingActions(model::replay, model::tellMore) else null,
-        { on -> runCatching { walkingPreferences.set(on) } }
+        { on -> runCatching { walkingPreferences.set(on) } },
+        handoff
     )
 }
 
@@ -88,12 +97,18 @@ internal fun ConversationContent(
     modifier: Modifier = Modifier,
     relayActions: RelayActions = RelayActions.NONE,
     walking: WalkingActions? = null,
-    setWalking: ((Boolean) -> Unit)? = null
+    setWalking: ((Boolean) -> Unit)? = null,
+    handoff: ((HandoffSource, String) -> Unit)? = null
 ) {
     val conversation = state.connection.conversation
     val listening = conversation.mode == ConversationMode.LISTENING
     val paired = state.connection.status == ConnectionStatus.PAIRED
     var details by remember(state.profile?.endpoint?.url) { mutableStateOf(false) }
+    // Captured when Hand off is tapped: later replies or callbacks never change what the owner is choosing from.
+    var handoffSnapshot by remember(state.profile?.endpoint?.url) {
+        mutableStateOf<Pair<HandoffSource, List<HandoffMessage>>?>(null)
+    }
+    val visibleMessages = if (handoff == null) emptyList() else AgentHandoff.visible(state)
     var health by remember(state.sessionVersion, state.profile?.endpoint?.url) {
         mutableStateOf(false)
     }
@@ -114,6 +129,18 @@ internal fun ConversationContent(
                         Modifier.weight(1f).padding(horizontal = 8.dp),
                         style = MaterialTheme.typography.titleMedium
                     )
+                    val profile = state.profile
+                    if (handoff != null && profile != null && visibleMessages.isNotEmpty()) {
+                        TextButton({
+                            handoffSnapshot = HandoffSource(
+                                page?.key.orEmpty(),
+                                profile.endpoint.url,
+                                profile.label.ifBlank { page?.profile?.name.orEmpty() }
+                            ) to visibleMessages
+                        }, enabled = !phoneSelectionLocked(state)) {
+                            Text(stringResource(R.string.handoff_action))
+                        }
+                    }
                     IconButton({ details = true }) {
                         Icon(painterResource(R.drawable.ic_more), "Connection details")
                     }
@@ -351,6 +378,13 @@ internal fun ConversationContent(
             dismissButton = { TextButton({ details = false }) { Text("Close") } }
         )
     }
+    handoffSnapshot?.let { (source, messages) ->
+        val locked = phoneSelectionLocked(state)
+        HandoffPicker(messages, locked, { handoffSnapshot = null }) { chosen ->
+            handoffSnapshot = null
+            handoff?.invoke(source, AgentHandoff.text(source.label, messages, chosen))
+        }
+    }
     if (health) {
         androidx.compose.runtime.key(state.sessionVersion, state.profile?.endpoint?.url) {
             ConnectionHealthDialog(
@@ -362,4 +396,59 @@ internal fun ConversationContent(
             )
         }
     }
+}
+
+/** Picks which captured messages a handoff carries; the default is the last question and the last reply. */
+@Composable
+private fun HandoffPicker(
+    messages: List<HandoffMessage>,
+    locked: Boolean,
+    dismiss: () -> Unit,
+    review: (Set<Int>) -> Unit
+) {
+    var chosen by remember(messages) { mutableStateOf(AgentHandoff.defaultSelection(messages)) }
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text(stringResource(R.string.handoff_pick_title)) },
+        text = {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(stringResource(R.string.handoff_pick_intro))
+                messages.forEachIndexed { index, message ->
+                    val checked = index in chosen
+                    Row(
+                        Modifier.fillMaxWidth().toggleable(checked, role = Role.Checkbox) {
+                            chosen = if (it) chosen + index else chosen - index
+                        }.padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(checked, null)
+                        Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                            Text(
+                                stringResource(
+                                    if (message.role == HistoryRole.USER) {
+                                        R.string.handoff_role_user
+                                    } else {
+                                        R.string.handoff_role_assistant
+                                    }
+                                ),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                            Text(message.text, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+                if (chosen.isEmpty()) Text(stringResource(R.string.handoff_pick_none))
+                if (locked) Text(stringResource(R.string.handoff_locked))
+            }
+        },
+        confirmButton = {
+            Button({ review(chosen) }, enabled = chosen.isNotEmpty() && !locked) {
+                Text(stringResource(R.string.handoff_review))
+            }
+        },
+        dismissButton = { TextButton(dismiss) { Text(stringResource(R.string.handoff_cancel)) } }
+    )
 }

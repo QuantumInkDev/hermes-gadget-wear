@@ -103,4 +103,18 @@
     <string name="walking_replay">Replay</string>
     <string name="walking_stop">Stop</string>
     <string name="walking_more">Tell me more</string>
+    <string name="handoff_action">Hand off</string>
+    <string name="handoff_pick_title">Hand off to another profile</string>
+    <string name="handoff_pick_intro">Choose the messages to carry. Only these are included. You review the text and choose the profile next.</string>
+    <string name="handoff_role_user">User</string>
+    <string name="handoff_role_assistant">Assistant</string>
+    <string name="handoff_pick_none">Choose at least one message.</string>
+    <string name="handoff_locked">Finish the current turn or approval before handing off.</string>
+    <string name="handoff_review">Review handoff</string>
+    <string name="handoff_title">Hand off to a profile</string>
+    <string name="handoff_intro">Handing off from %1$s. Choose another profile and review the text. Nothing is sent until you tap Send in Talk/Chat.</string>
+    <string name="handoff_no_profiles">No other profile is ready. Add a box or manual profile in Settings, then hand off again.</string>
+    <string name="handoff_message">Handoff text</string>
+    <string name="handoff_cancel">Cancel handoff</string>
+    <string name="handoff_changed">The profile changed, is unavailable, or the conversation is locked. Review the handoff again. Nothing was sent.</string>
 </resources>
