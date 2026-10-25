@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -27,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -104,7 +107,7 @@ internal fun DirectoryContent(
     var profiles by remember { mutableStateOf(emptyMap<String, EndpointProfile?>()) }
     var query by rememberSaveable { mutableStateOf("") }
     var menu by remember { mutableStateOf(false) }
-    var reorder by rememberSaveable { mutableStateOf(false) }
+    var arranging by rememberSaveable { mutableStateOf(false) }
     var collapsed by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var pictureKey by rememberSaveable { mutableStateOf<String?>(null) }
     var photoKey by rememberSaveable { mutableStateOf<String?>(null) }
@@ -183,7 +186,7 @@ internal fun DirectoryContent(
     val groups = CatalogOrder.group(pages).associateBy { it.first().sourceId }
     val labels = sources.associate { it.id to it.label }
     val ids = (sourceOrder + groups.keys).distinct().filter { id ->
-        id != "manual" || groups[id].orEmpty().isNotEmpty() || reorder
+        id != "manual" || groups[id].orEmpty().isNotEmpty()
     }
     LaunchedEffect(ids, busy) {
         if (!busy) collapsed = collapsed.filter { it in ids }
@@ -214,6 +217,19 @@ internal fun DirectoryContent(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                    FilledTonalButton(
+                        onClick = { arranging = true },
+                        enabled = !busy && pages.isNotEmpty(),
+                        contentPadding = PaddingValues(start = 12.dp, end = 16.dp)
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.ic_drag_handle),
+                            null,
+                            Modifier.size(18.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Arrange")
+                    }
                     Box {
                         IconButton(onClick = { menu = true }) {
                             Icon(painterResource(R.drawable.ic_more), "Directory options")
@@ -225,15 +241,6 @@ internal fun DirectoryContent(
                                 menu = false
                                 work { repository.refresh(true).get(20, TimeUnit.SECONDS) }
                             })
-                            DropdownMenuItem(
-                                text = { Text("Reorder") },
-                                enabled =
-                                !busy && query.isBlank(),
-                                onClick = {
-                                    menu = false
-                                    reorder = true
-                                }
-                            )
                             DropdownMenuItem(text = {
                                 Text("Manage boxes")
                             }, enabled = !busy, onClick = {
@@ -256,7 +263,6 @@ internal fun DirectoryContent(
                     leadingIcon = { Icon(painterResource(R.drawable.ic_search), null) },
                     shape = RoundedCornerShape(28.dp),
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !reorder,
                     singleLine = true
                 )
                 if (query.isNotBlank()) {
@@ -266,13 +272,7 @@ internal fun DirectoryContent(
                     )
                     TextButton(onClick = { query = "" }) { Text("Clear search") }
                 }
-                if (reorder) {
-                    Text(
-                        "Move boxes and profiles with the arrows. This order also appears on your watch."
-                    )
-                    TextButton(onClick = { reorder = false }) { Text("Done reordering") }
-                }
-                if (busy) Text("Updating profiles…")
+                if (busy && !arranging) Text("Updating profiles…")
                 if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
                 if (notice.isNotEmpty()) Text(notice, style = MaterialTheme.typography.bodySmall)
             }
@@ -298,8 +298,7 @@ internal fun DirectoryContent(
                 labels[id] ?: group.firstOrNull()?.sourceLabel
                     ?: "Box"
             }
-            val isCollapsed = id in collapsed && !reorder && query.isBlank()
-            val sourceIndex = ids.indexOf(id)
+            val isCollapsed = id in collapsed && query.isBlank()
             val boxMatches = label.contains(query.trim(), ignoreCase = true)
             val shownProfiles = group.filter {
                 query.isBlank() || boxMatches ||
@@ -319,28 +318,15 @@ internal fun DirectoryContent(
                     ),
                     expanded = !isCollapsed,
                     hasContents = !isCollapsed && shownProfiles.isNotEmpty(),
-                    canToggle = !reorder && query.isBlank(),
+                    canToggle = query.isBlank(),
                     onToggle = {
                         collapsed = if (id in collapsed) collapsed - id else collapsed + id
                     },
-                    modifier = Modifier.padding(top = 16.dp),
-                    orderControls = {
-                        if (reorder) {
-                            OrderArrow("Move $label earlier", "↑", !busy && sourceIndex > 0) {
-                                work { repository.moveSource(id, -1) }
-                            }
-                            OrderArrow(
-                                "Move $label later",
-                                "↓",
-                                !busy && sourceIndex < ids.lastIndex
-                            ) { work { repository.moveSource(id, 1) } }
-                        }
-                    }
+                    modifier = Modifier.padding(top = 16.dp)
                 )
             }
             if (!isCollapsed) {
                 items(shownProfiles, key = { it.key }) { page ->
-                    val index = group.indexOfFirst { it.key == page.key }
                     val last = page.key == shownProfiles.lastOrNull()?.key
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -363,19 +349,13 @@ internal fun DirectoryContent(
                                     chosenPicture = page.key in watchPictures,
                                     profile = profiles[page.key],
                                     busy = busy,
-                                    reorder = reorder,
-                                    canMoveUp = index > 0,
-                                    canMoveDown = index < group.lastIndex,
                                     onTalk = { onTalk(page) },
                                     onPicture = { pictureKey = page.key },
                                     onDetails = { detailKey = page.key },
                                     onResetPicture = {
                                         work { repository.useBoxPicture(page.key) }
                                     },
-                                    onRetire = { retiringKey = page.key },
-                                    onMove = { delta ->
-                                        work { repository.movePage(page.key, delta) }
-                                    }
+                                    onRetire = { retiringKey = page.key }
                                 )
                                 if (!last) {
                                     HorizontalDivider(
@@ -391,6 +371,24 @@ internal fun DirectoryContent(
                 }
             }
         }
+    }
+    if (arranging) {
+        ArrangeProfilesSheet(
+            repository,
+            ids.map { id ->
+                val group = groups[id].orEmpty()
+                val label = if (id == "manual") {
+                    "Manual endpoints"
+                } else {
+                    labels[id] ?: group.firstOrNull()?.sourceLabel ?: "Box"
+                }
+                ArrangeBox(id, label, group)
+            },
+            busy,
+            onMoveBox = { id, delta -> work { repository.moveSource(id, delta) } },
+            onMoveProfile = { key, delta -> work { repository.movePage(key, delta) } },
+            dismiss = { arranging = false }
+        )
     }
     pages.singleOrNull { it.key == pictureKey }?.let { page ->
         ProfilePictureSheet(
@@ -509,20 +507,6 @@ internal fun DirectoryPortrait(
                 Text(page.profile.name.take(1), style = MaterialTheme.typography.headlineSmall)
             }
         }
-    }
-}
-
-@Composable
-internal fun OrderArrow(description: String, glyph: String, enabled: Boolean, onClick: () -> Unit) {
-    IconButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.size(48.dp).semantics {
-            contentDescription =
-                description
-        }
-    ) {
-        Text(glyph, style = MaterialTheme.typography.titleLarge)
     }
 }
 

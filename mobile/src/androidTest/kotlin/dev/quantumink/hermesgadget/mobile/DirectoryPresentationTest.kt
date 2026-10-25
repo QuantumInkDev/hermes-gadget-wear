@@ -112,7 +112,7 @@ class DirectoryPresentationTest {
         }
     }
 
-    @Test fun directoryOverflowReordersRealRepositoryAndKeepsSetupReachable() {
+    @Test fun arrangeSheetReordersRealRepositoryAndOverflowKeepsSetupReachable() {
         directoryFixture { fixture ->
             fixture.show()
             fixture.clickDescription("Directory options")
@@ -121,11 +121,10 @@ class DirectoryPresentationTest {
             fixture.clickDescription("Directory options")
             fixture.clickText("Manual setup")
             assertEquals(1, fixture.manual)
-            fixture.clickDescription("Directory options")
-            fixture.clickText("Reorder")
+            fixture.clickText("Arrange")
             fixture.clickDescription("Move Box Two earlier")
             fixture.await { fixture.repository.sourceOrder().first() == "b" }
-            fixture.clickText("Done reordering")
+            fixture.clickText("Done")
             assertEquals("b", fixture.vault.sourceOrder()?.first())
             assertEquals(
                 listOf("b:beta", "a:alpha"),

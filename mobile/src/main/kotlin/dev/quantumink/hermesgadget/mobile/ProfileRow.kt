@@ -20,7 +20,7 @@ import dev.quantumink.hermesgadget.protocol.CatalogPage
 import dev.quantumink.hermesgadget.protocol.CatalogStatus
 import dev.quantumink.hermesgadget.protocol.EndpointProfile
 
-/** Stable-keyed portrait row; overflow and ordering never trigger conversation entry. */
+/** Stable-keyed portrait row; overflow never triggers conversation entry. */
 @Composable
 internal fun ProfileRow(
     page: CatalogPage,
@@ -28,15 +28,11 @@ internal fun ProfileRow(
     chosenPicture: Boolean,
     profile: EndpointProfile?,
     busy: Boolean,
-    reorder: Boolean,
-    canMoveUp: Boolean,
-    canMoveDown: Boolean,
     onTalk: () -> Unit,
     onPicture: () -> Unit,
     onResetPicture: () -> Unit,
     onDetails: () -> Unit,
-    onRetire: () -> Unit,
-    onMove: (Int) -> Unit
+    onRetire: () -> Unit
 ) {
     val reason = when {
         profile == null -> "Set up a Gadget endpoint in Settings to talk."
@@ -46,7 +42,7 @@ internal fun ProfileRow(
     Column {
         Row(
             Modifier.fillMaxWidth().clickable(
-                enabled = !busy && !reorder && reason == null,
+                enabled = !busy && reason == null,
                 role = Role.Button,
                 onClickLabel = "Talk and Chat",
                 onClick = onTalk
@@ -82,44 +78,20 @@ internal fun ProfileRow(
                     )
                 }
             }
-            if (!reorder) {
-                ProfileActions(
-                    page.profile.name,
-                    !busy,
-                    if (chosenPicture) {
-                        if (page.sourceId == "manual") "Use default picture" else "Use box picture"
-                    } else {
-                        null
-                    },
-                    page.status == CatalogStatus.WITHDRAWN,
-                    onPicture,
-                    onResetPicture,
-                    onDetails,
-                    onRetire
-                )
-            }
-        }
-        if (reorder) {
-            Row(
-                Modifier.padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Profile order",
-                    Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelMedium
-                )
-                OrderArrow(
-                    "Move ${page.profile.name} earlier in ${page.sourceLabel}",
-                    "↑",
-                    !busy && canMoveUp
-                ) { onMove(-1) }
-                OrderArrow(
-                    "Move ${page.profile.name} later in ${page.sourceLabel}",
-                    "↓",
-                    !busy && canMoveDown
-                ) { onMove(1) }
-            }
+            ProfileActions(
+                page.profile.name,
+                !busy,
+                if (chosenPicture) {
+                    if (page.sourceId == "manual") "Use default picture" else "Use box picture"
+                } else {
+                    null
+                },
+                page.status == CatalogStatus.WITHDRAWN,
+                onPicture,
+                onResetPicture,
+                onDetails,
+                onRetire
+            )
         }
     }
 }
