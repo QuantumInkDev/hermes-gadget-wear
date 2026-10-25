@@ -26,10 +26,11 @@ Server code:
 Phone and watch updated in place on 2026-10-24; backups in `.local/expansion/device-baselines/`.
 Phone has sharing, walking mode, handoff and wake. Watch has walking mode.
 
-2026-10-25: watch reinstalled with the pet-cache quota fix (`PetCacheQuota.kt`: whole-pet LRU, 64 MiB;
-the old 16 MiB per-file eviction deleted manifests first). Uncommitted. All 11 m5 profile pets are in the watch cache.
-Pets still reach the watch only reliably by direct cache install; server delivery after a late pairing
-approval is not retried until reconnect.
+2026-10-25: watch reinstalled with the pet-cache quota fix (whole-pet LRU, 64 MiB) and watch
+history/inbox. All 11 m5 profile pets were also installed straight into the watch cache.
+Server pet delivery fixed the same day (plugin `be3ccf4`): the hub resolved every profile's pet
+against the root profile (Cthulhu) because the multiplexed gateway scopes a profile only per turn;
+a pet.request sent before pairing approval is now answered on approval; failures are logged.
 
 ## Feature status (spec: docs/superpowers/specs/2026-10-18-relay-expansion-design.md)
 
@@ -38,7 +39,7 @@ approval is not retried until reconnect.
 | O1 pets, O2 expressions | Live; Akuma verified on the watch (listening, talking, full speech) |
 | O3 Opus | Live; battery measurement still open |
 | O4 ElevenLabs | Phone client speech live on all profiles |
-| O5 outbox, N1 history, N2 inbox | Server live on 4 profiles; phone built; watch side in progress |
+| O5 outbox, N1 history, N2 inbox | Server live on 4 profiles; phone and watch built and installed |
 | N3 sharing | Text/links done; images/documents next (server store is live) |
 | N4, N6, N8, N10 | Built and installed |
 | N5 walking mode | Built and installed (phone + watch) |
@@ -48,6 +49,6 @@ approval is not retried until reconnect.
 ## Next
 
 1. Owner test: phone Relay history/inbox on the 4 profiles; wake from Cthulhu's Relay section.
-2. Watch history/inbox (in progress), then install.
+2. Watch: surface "catalog offline" (phone Tailscale off) instead of silent still portraits.
 3. N3 images/documents; Opus battery measurement.
 4. SDK: 3 history-retirement edge cases fail against v0.22.5 (external delete while listed).
