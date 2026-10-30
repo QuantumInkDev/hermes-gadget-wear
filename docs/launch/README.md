@@ -134,11 +134,14 @@ plus the catalog publisher. Most testers will stall here.
 
 ### Release engineering
 
-- [ ] Set the version: name `0.2.0-beta`, a higher phone `versionCode`, and the watch
-      `versionCode` kept above the phone's.
-- [ ] Create a release key in `.local/signing.properties`, backed up in Proton Pass. One key
-      covers both apps.
-- [ ] Build signed bundles and APKs, then run `bundletool validate`.
+- [x] Set the version: `0.2.0-beta`, phone `versionCode` 20000, watch 20001.
+- [x] Upload key created (2026-10-30) in `.local/signing/upload.jks` via
+      `.local/signing.properties`, vaulted as `ANDROID_UPLOAD_KEYSTORE_HERMESWATCH_B64` and
+      `_PASS` in Hermes Mesh. SHA-256 `5B:36:92:A3:…:0F:CE:62`. One key covers both apps.
+- [x] Signed bundles built, `bundletool validate` passed, release builds smoke-tested on
+      phone and Wear emulators. Copies in `.local/releases/0.2.0-beta/`.
+- [ ] First upload to Play internal testing by hand, before the 2026-11-05 inactivity
+      deadline. Later uploads go through fastlane once a service account exists.
 - [ ] Add a CI job that attaches signed artifacts to a draft GitHub Release (key from CI
       secrets).
 
