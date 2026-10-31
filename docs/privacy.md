@@ -1,9 +1,11 @@
-# Privacy policy draft
+# Privacy policy
 
-Quantum Relay for Hermes on phone and watch is a client for a Hermes server that you choose. The project
-operates no conversation backend, accounts, advertising or analytics service. This draft
-matches the current app; the publisher must add its identity, contact and effective date
-and host the final policy at a public URL before Play submission.
+**Quantum Relay for Hermes** (Android phone and Wear OS apps, package
+`dev.quantumink.hermesgadget`). Publisher: Quantum Ink Labs. Effective 2026-10-31.
+
+Quantum Relay is a client for a Hermes server that you choose and run. The publisher
+operates no conversation backend, accounts, advertising or analytics service, and receives
+none of your data.
 
 Microphone access starts only after permission and an explicit recording gesture. Audio
 streams to your configured server while recording; releasing completes that input. Cancel
@@ -51,5 +53,8 @@ selected voice/setup record. Uninstall removes app-private storage and vault acc
 removal does not automatically delete setup on the other device; remove it there separately.
 Server enrollment/history and provider records must be removed through their own controls.
 
-The publisher's public support channel should be supplied here before release. Do not post
-keys, actual endpoint details, personal screenshots or recordings in public bug reports.
+Questions about this policy: open an issue at
+https://github.com/QuantumInkDev/hermes-gadget-wear/issues, or report security problems
+privately at https://github.com/QuantumInkDev/hermes-gadget-wear/security/advisories/new.
+Do not post keys, actual endpoint details, personal screenshots or recordings in public bug
+reports. Changes to this policy are published at this address with a new effective date.
