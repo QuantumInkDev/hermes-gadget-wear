@@ -1,11 +1,21 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="200dp" android:height="200dp" android:viewportWidth="200" android:viewportHeight="200">
-    <path android:fillColor="#000000" android:pathData="M0,0H200V200H0Z" />
-    <path android:fillColor="#18222F" android:pathData="M100,38a42,42 0,1 0,0 84a42,42 0,1 0,0 -84" />
-    <group android:translateX="46" android:translateY="26">
-        <path android:fillColor="#00000000" android:strokeColor="#C8D3F5" android:strokeWidth="6" android:strokeLineCap="round"
-            android:pathData="M77,50A25,25 0,1 1,27 50A25,25 0,1 1,77 50Z M69,69L83,83" />
-        <path android:fillColor="#00000000" android:strokeColor="#86E1FC" android:strokeWidth="6" android:strokeLineCap="round"
-            android:pathData="M42,47V54M52,40V61M62,45V56" />
-    </group>
-    <path android:fillColor="#F1F5FC" android:pathData="M72,135h56v5h-56zM84,148h32v4h-32z" />
-</vector>
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tile picker preview for the single-profile tile. Built from the launcher icon's own pieces
+     (brand background circle + the Courier foreground) so the preview always matches the app icon.
+     The foreground box is the circle scaled by 108/72, the adaptive-icon safe-zone ratio. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp" android:height="200dp">
+    <item>
+        <shape android:shape="rectangle"><solid android:color="#000000" /></shape>
+    </item>
+    <item android:left="58dp" android:top="38dp" android:right="58dp" android:bottom="78dp">
+        <shape android:shape="oval"><solid android:color="@color/quantumink_relay_background" /></shape>
+    </item>
+    <item android:left="37dp" android:top="17dp" android:right="37dp" android:bottom="57dp"
+        android:drawable="@drawable/quantumink_relay_foreground" />
+    <item android:left="72dp" android:top="135dp" android:right="72dp" android:bottom="60dp">
+        <shape android:shape="rectangle"><solid android:color="#F1F5FC" /></shape>
+    </item>
+    <item android:left="84dp" android:top="148dp" android:right="84dp" android:bottom="48dp">
+        <shape android:shape="rectangle"><solid android:color="#F1F5FC" /></shape>
+    </item>
+</layer-list>

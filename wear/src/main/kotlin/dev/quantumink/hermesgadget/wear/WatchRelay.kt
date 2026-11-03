@@ -69,8 +69,12 @@ class WatchRelay(context: Context, endpoint: Endpoint, private val nodeId: Strin
         sessions.values.forEach { it.close() }
         sessions.clear()
         clock.shutdownNow()
-        client.dispatcher.executorService.shutdown()
-        client.connectionPool.evictAll()
+        // Evicting the pool closes sockets, which is network I/O: close() is called from the main
+        // thread when the transport falls back, and doing it there threw NetworkOnMainThreadException.
+        Thread({
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        }, "watch-relay-close").apply { isDaemon = true }.start()
     }
 
     companion object {
