@@ -1,6 +1,17 @@
 # Session status
 
-Updated 2026-10-24 (evening). Keep this file short: current state, next step, blockers. History lives in git.
+Updated 2026-11-02 (night). Keep this file short: current state, next step, blockers. History lives in git.
+
+## 2026-11-02 (night): 0.2.1-beta on Play internal testing
+
+- Phone 20002 and watch 20003 are "Available to internal testers" (released 11:04 and 11:05 pm). Commit
+  `ff2e166`: watch fallback crash (NetworkOnMainThreadException in `WatchRelay.close()`), and the 1x tile
+  preview now uses the launcher icon. Bundles: `.local/releases/0.2.1-beta/`.
+- Both devices run the Play-signed builds (phone installed by Play; watch from the bundle explorer's universal
+  APK via `pm install -i com.android.vending`). All 21 profiles were re-paired on 11/2.
+- Watch rotation is a device setting (`accelerometer_rotation 0`, `user_rotation 0`), not the app.
+- Open: the Play Console Wear OS track reads "Inactive" even with a live release and testers attached (the
+  watch Play Store says "Item not found"); the m5 profile gadget plugins were 10/11 copies until synced on 11/2.
 
 ## Branch
 
