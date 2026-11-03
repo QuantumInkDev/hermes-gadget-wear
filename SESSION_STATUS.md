@@ -2,6 +2,13 @@
 
 Updated 2026-11-02 (night). Keep this file short: current state, next step, blockers. History lives in git.
 
+## 2026-11-03 (12:15 am): phone 0.2.2-beta
+
+- Phone 20004 on Play internal testing and on the phone (commit `a2504f3`): client speech uses `eleven_v3`. With
+  `eleven_multilingual_v2`, Kitana's Voice Design voice sounded like an older British woman (owner-confirmed by A/B).
+- Phone client speech restored after the reinstall: shared ElevenLabs key saved; all 21 profiles set to "shared BYOK key"
+  (speech keys are never in the export).
+
 ## 2026-11-02 (night): 0.2.1-beta on Play internal testing
 
 - Phone 20002 and watch 20003 are "Available to internal testers" (released 11:04 and 11:05 pm). Commit
