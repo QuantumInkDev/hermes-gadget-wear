@@ -49,6 +49,8 @@ Start with the account's existing voices and, if requested, the Voice Library. M
 
 Read [deployment.md](references/deployment.md). Default is a staged bundle and a dry-run plan. Only apply after exact art/motion/SOUL/voice/installation approvals. Install into the selected profile's real Hermes home, preserving regular desktop atlas and separate watch companion/Gadget base. Set that profile's `display.pet.slug` and approved ElevenLabs voice configuration; verify with the actual profile resolver. Do not set a global voice/pet for every profile or copy device keys.
 
+**Which card goes where:** the **square** card is the profile picture everywhere except the watch face: the profile's `assets/avatar.png`, the desktop Bots tab card and the phone apps. The **round** card is only for the watch (the Relay catalog portrait and watch-face art). Never write the round card to `assets/avatar.png`, and keep the replaced file as a dated backup. The desktop Bots tab keeps its own copy of each picture in local storage, so after changing an avatar, update that card too (see deployment.md).
+
 Install/import the square/circular card and pack into Quantum Relay's exact endpoint/profile mapping using supported catalog/picker/pet delivery, and deliberately select Portrait/Pet as approved. Report desktop, catalog, phone and watch outcomes separately. A local bundle or ADB success is not delivery proof. If a box/device is offline, leave a resumable target marked pending with its backup/install plan; do not claim success.
 
 ## Completion

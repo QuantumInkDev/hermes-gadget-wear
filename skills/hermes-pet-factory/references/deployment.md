@@ -14,6 +14,12 @@ Apply only approved SOUL content and profile-local `display.pet.slug` / approved
 
 For a remote host, use its existing authorized management channel and the exact approved home/profile. Stage/validate there before changing live files. A copied skill/bundle or SSH exit0 is not a profile-selection check. Keep per-target receipts/backup hashes and independent rollback. Do not ship private keys or create enrollments.
 
+## Profile picture and the desktop Bots tab
+
+Write the approved **square** card (512 export, resized to the existing 256×256) to the profile's `assets/avatar.png`; the round card is watch-only (Quantum Relay section below). Back up the old file first (`avatar.png.<reason>-<date>`).
+
+The desktop Bots tab does not read `avatar.png` once a card has a picture: each desktop stores its own copy in localStorage `hermes.plugin.hermes-bots.bot-meta-v2` (key `<connectionId>::<profile>`, e.g. `local::cloud`). A new profile whose card says `imageKind: photo` but has no image shows a broken picture. After changing an avatar, merge the new image into that card on every desktop that shows the bot: relaunch the desktop once with `--remote-debugging-port=9333 --remote-debugging-address=127.0.0.1`, run the mesh repo's `scripts/desktop-bot-meta/merge-bot-meta.mjs 9333 <seed.json>` (seed = `{"local::<profile>": {"imageKind": "photo", "image": "data:image/png;base64,…"}}`; it merges, keeping title/shape/color), then relaunch normally. Verify in the Bots tab, not from the file.
+
 ## Quantum Relay
 
 Where the project tools exist, stage into a NEW output directory using:
