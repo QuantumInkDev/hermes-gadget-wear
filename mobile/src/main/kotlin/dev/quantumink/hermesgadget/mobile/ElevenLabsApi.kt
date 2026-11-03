@@ -132,7 +132,9 @@ class ElevenLabsApi internal constructor(
         val json =
             buildJsonObject {
                 put("text", request.text)
-                put("model_id", "eleven_multilingual_v2")
+                // eleven_v3 renders Voice Design voices as designed; multilingual_v2 made them sound
+                // like a different speaker (Kitana came out as an older British woman).
+                put("model_id", "eleven_v3")
             }
         val call = client.newCall(
             Request.Builder().url(url).header("xi-api-key", settings.key)
