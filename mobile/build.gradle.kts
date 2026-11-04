@@ -23,8 +23,8 @@ android {
         applicationId = "dev.quantumink.hermesgadget"
         minSdk = 29
         targetSdk = 37
-        versionCode = 20004
-        versionName = "0.2.2-beta"
+        versionCode = 20006
+        versionName = "0.2.3-beta"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

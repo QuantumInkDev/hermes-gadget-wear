@@ -79,8 +79,13 @@ class ElevenLabsApi internal constructor(
         }
     }
     override fun close() {
-        client.connectionPool.evictAll()
-        client.dispatcher.executorService.shutdown()
+        // Evicting the pool closes TLS sockets, which is network I/O. RelayService.onDestroy calls this
+        // on the main thread, and doing it there threw NetworkOnMainThreadException and killed the
+        // whole app, leaving the watch with no relay (0.2.2 and earlier).
+        Thread({
+            client.dispatcher.executorService.shutdown()
+            client.connectionPool.evictAll()
+        }, "speech-api-close").apply { isDaemon = true }.start()
     }
     fun stream(
         settings: SpeechSettings,
