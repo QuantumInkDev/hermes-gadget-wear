@@ -1,6 +1,17 @@
 # Session status
 
-Updated 2026-11-02 (night). Keep this file short: current state, next step, blockers. History lives in git.
+Updated 2026-11-07 (evening). Keep this file short: current state, next step, blockers. History lives in git.
+
+## 2026-11-07: watch reply audio (Kitana), in progress
+
+- Symptom: wrong voice earlier; silent, then truncated, today. The m5 voice is right (`ndHQ…` on `eleven_v3`,
+  owner-confirmed, also at 16 kHz). Diagnosis and toolkit: wiki `concepts/quantum-relay-watch-audio.md`.
+- Server fix (SDK worktree `plugin/pets.py`, `hub.py`; uncommitted; live only in personal's plugin copy): pet sheets
+  wait for 3 s idle and `asset.abort` during turns. Before it, 2.2 MB of pet art on every short watch connection delayed
+  replies past the screen-off disconnect.
+- Watch fix next, build 20007: `PcmPlayback` holds only 32000 bytes before its AudioTrack starts, and `PetCache.load`
+  reloads stall the main looper about 2 s, so only the last ~0.7 s plays. Also `screenOrientation="nosensor"` on
+  `MainActivity` (already edited). The owner approved iterating builds and Play internal uploads.
 
 ## 2026-11-03 (12:15 am): phone 0.2.2-beta
 
