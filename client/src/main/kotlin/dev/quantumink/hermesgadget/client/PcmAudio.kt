@@ -164,6 +164,10 @@ class PcmCapture(private val context: Context) {
     }
 }
 
+/** Up to 8 s of 16 kHz PCM16 (or 400 Opus packets) may queue before playback starts. */
+private const val PREROLL_BYTES = 256000
+private const val PREROLL_PACKETS = 512
+
 class PcmPlayback(
     private val context: Context,
     private val onInterrupted: () -> Unit,
@@ -197,7 +201,9 @@ class PcmPlayback(
         val interruptionQueued = AtomicBoolean(false)
         val finishing = AtomicBoolean(false)
         val queuedBytes = AtomicInteger()
-        val queue = LinkedBlockingQueue<Packet>(64)
+        // Holds what arrives before the AudioTrack exists. Starting the track goes through the main looper, which pet
+        // atlas work stalled for ~2 s on the watch; a 1 s queue then overflowed and cut the reply to its tail (2026-11-07).
+        val queue = LinkedBlockingQueue<Packet>(PREROLL_PACKETS)
         var completed = false
 
         @Volatile var track: AudioTrack? = null
@@ -433,7 +439,7 @@ class PcmPlayback(
                 return
             }
             val size = playback.queuedBytes.addAndGet(bytes.size)
-            if (size > 32000 || !playback.queue.offer(Packet.Data(bytes.copyOf()))) {
+            if (size > PREROLL_BYTES || !playback.queue.offer(Packet.Data(bytes.copyOf()))) {
                 playback.queuedBytes.addAndGet(-bytes.size)
                 true
             } else {

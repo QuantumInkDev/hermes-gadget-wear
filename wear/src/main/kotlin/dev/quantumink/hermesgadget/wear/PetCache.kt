@@ -20,21 +20,30 @@ class PetAtlas(val name: String, val loopMs: Int, val rows: Map<String, List<Bit
 /** App-private, endpoint-isolated cache. All decode/crop work runs on a storage worker. */
 class PetCache(context: Context) {
     private val root = File(context.filesDir, "pet-cache")
+    // Built atlases by endpoint, with the manifest they were built from. Every load() and every connection's manifest
+    // used to decode the full sheets again (1536x1872 PNGs) under this monitor, for every profile on each presentation
+    // refresh. That stalled the main looper and cut reply audio (2026-11-07). Callers never recycle atlas bitmaps, and the
+    // service already holds these atlases in its state, so sharing them costs no extra memory.
+    private class Built(val manifest: String, val atlas: PetAtlas)
+    private val built = HashMap<String, Built>()
     private fun hash(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
         .digest(bytes).joinToString("") { "%02x".format(it) }
     private fun directory(endpoint: String) =
         File(root, hash(endpoint.toByteArray())).apply { mkdirs() }
 
     @Synchronized fun reset() {
+        built.clear()
         check(!root.exists() || root.deleteRecursively())
     }
 
     @Synchronized fun remove(endpoint: String) {
+        built.remove(endpoint)
         val file = File(root, hash(endpoint.toByteArray()))
         check(!file.exists() || file.deleteRecursively())
     }
 
     @Synchronized fun load(endpoint: String): PetAtlas? = runCatching {
+        built[endpoint]?.let { return it.atlas }
         val file = File(directory(endpoint), "manifest.json")
         if (!file.isFile || file.length() > 16384) return null
         val message =
@@ -44,14 +53,16 @@ class PetCache(context: Context) {
                 }
             )
                 ?: return null
-        build(endpoint, PetManifest.parse(message))
+        val manifest = PetManifest.parse(message)
+        remember(endpoint, manifest, build(endpoint, manifest))
     }.getOrNull()
 
     @Synchronized fun saveManifest(endpoint: String, manifest: PetManifest): PetAtlas? {
         require(manifest.encoded.toByteArray().size <= 16384)
+        built[endpoint]?.let { if (it.manifest == manifest.encoded) return it.atlas }
         atomic(File(directory(endpoint), "manifest.json"), manifest.encoded.toByteArray())
         PetCacheQuota.evict(root, directory(endpoint))
-        return build(endpoint, manifest)
+        return remember(endpoint, manifest, build(endpoint, manifest))
     }
 
     @Synchronized fun saveAsset(
@@ -65,7 +76,13 @@ class PetCache(context: Context) {
         frames.values.flatten().forEach(Bitmap::recycle)
         atomic(File(directory(endpoint), sheet.sha256 + ".png"), bytes)
         PetCacheQuota.evict(root, directory(endpoint))
-        return build(endpoint, manifest)
+        return remember(endpoint, manifest, build(endpoint, manifest))
+    }
+
+    /** Keeps a complete-enough atlas (null clears the entry so the next load reads the disk again). */
+    private fun remember(endpoint: String, manifest: PetManifest, atlas: PetAtlas?): PetAtlas? {
+        if (atlas == null) built.remove(endpoint) else built[endpoint] = Built(manifest.encoded, atlas)
+        return atlas
     }
 
     private fun build(endpoint: String, manifest: PetManifest): PetAtlas? {
